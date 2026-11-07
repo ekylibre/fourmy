@@ -1,0 +1,15 @@
+# Exclusions de l'image du site : comme .dockerignore, mais `.git` est GARDÉ
+# (historique nécessaire au calcul de la version et des nouveautés).
+**/node_modules
+**/dist
+**/.turbo
+**/.astro
+**/test-results
+**/playwright-report
+**/*.tsbuildinfo
+fixtures
+.github
+**/*.log
+.env
+.env.*
+!.env.example

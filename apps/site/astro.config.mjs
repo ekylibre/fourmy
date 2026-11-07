@@ -10,5 +10,8 @@ export default defineConfig({
   output: "static",
   build: { format: "directory" },
   integrations: [sitemap({ filter: (page) => !page.includes("/contact/merci/") })],
+  // Aucun script inséré dans les pages : la CSP de nginx n'autorise que des
+  // fichiers du site (script-src 'self').
+  vite: { build: { assetsInlineLimit: 0 } },
   i18n: { locales: ["fr"], defaultLocale: "fr", routing: { prefixDefaultLocale: false } },
 });
