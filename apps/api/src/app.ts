@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { DomainError } from "@fourmy/domain";
 import { auth, farmScope, type Env } from "./context.js";
 import { getAuth } from "./auth.js";
+import { contactRoutes } from "./contact.js";
 import { farmRoutes } from "./routes/farm.js";
 import { meRoutes } from "./routes/me.js";
 import { BadRequest, NotFound, Conflict } from "./routes/helpers.js";
@@ -15,6 +16,9 @@ export function createApp() {
 
   // Version calculée depuis l'historique (packages/release), injectée à la construction.
   app.get("/health", (c) => c.json({ status: "ok", service: "fourmy-api", version: process.env.FOURMY_VERSION ?? "dev" }));
+
+  // Points d'entrée publics du site fourmy.org (sans session).
+  app.route("/api/public", contactRoutes);
 
   // Connexion, déconnexion, session (better-auth).
   app.on(["GET", "POST"], "/api/auth/*", (c) => getAuth().handler(c.req.raw));

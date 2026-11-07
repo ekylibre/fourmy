@@ -15,6 +15,7 @@
     "worker": "node dist/worker.js"
   },
   "dependencies": {
+    "@fourmy/connector-traccar": "workspace:*",
     "@fourmy/contracts": "workspace:*",
     "@fourmy/db": "workspace:*",
     "@fourmy/domain": "workspace:*",
@@ -25,14 +26,16 @@
     "better-auth": "1.7.12",
     "drizzle-orm": "0.38.3",
     "hono": "4.6.15",
+    "nodemailer": "10.2.1",
     "pg": "8.23.1",
-    "zod": "3.24.1",
-    "@fourmy/connector-traccar": "workspace:*",
-    "postgres": "3.4.5"
+    "postgres": "3.4.5",
+    "zod": "3.24.1"
   },
   "devDependencies": {
     "@fourmy/domain": "workspace:*",
     "@types/pg": "8.23.1",
+    "@types/smtp-server": "3.5.13",
+    "smtp-server": "3.21.1",
     "vitest": "2.1.8"
   }
 }
