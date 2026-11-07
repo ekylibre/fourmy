@@ -13,3 +13,6 @@ __pycache__/
 .pytest_cache/
 *.pyc
 uv.lock
+apps/web/test-results/
+apps/web/playwright-report/
+apps/web/dist/

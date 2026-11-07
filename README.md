@@ -32,13 +32,14 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | Agent B — migration Ekylibre | ✅ 3 fermes migrées, registre phyto identique, fixtures anonymisées |
 | Agent D — API métier | ✅ autorisation par ferme, snapshot, cuves, stocks, interventions (US-2), registre phyto (JSON/CSV), synchro mobile, imports |
 | Agent C — Traccar et traces | ✅ synchro réelle (7 592 positions), rejeu CZML, couverture validée contre Traccar (+1,5 %) |
-| Agents E, F, G (web, 3D, mobile) | ⏳ à faire |
+| Agent E — interface web | ✅ React + Mantine (charte Lyvre) : tableau de bord, carte IGN + traces, interventions, stocks, cuverie, registre, imports ; parcours e2e en CI |
+| Agents F, G (3D, mobile) | ⏳ à faire |
 | Jours 6-7 — migration réelle + recette | ⏳ à faire |
 
 ### À reprendre
 
-1. Agents restants : **E** (web React), **F** (3D/cuverie, relief —
-   `/terrain` est la seule route encore en 501), **G** (mobile).
+1. Agents restants : **F** (plan 3D, relief, cuverie en 3D — `/terrain` est
+   la seule route encore en 501), **G** (mobile).
 2. `apps/worker` : planifier la synchro Traccar (toutes les minutes).
 3. Finitions agent 0 : better-auth (l'identité vient encore de `x-user-id` ;
    l'autorisation par ferme est, elle, en place) et documentation OpenAPI.
@@ -52,8 +53,12 @@ docker compose -f docker/compose.dev.yml up -d
 export DATABASE_URL=postgres://fourmy:fourmy@localhost:5432/fourmy
 corepack pnpm build && corepack pnpm migrate
 corepack pnpm --filter @fourmy/db seed:dev   # utilisateur de dev, owner de toutes les fermes
-corepack pnpm dev
+corepack pnpm dev                              # API :3000, web :5173 (relaie /api)
 ```
+
+Application web : http://localhost:5173 (identifiant prérempli = utilisateur
+de `seed:dev`). Parcours de bout en bout : API + `vite preview` démarrés,
+puis `DATABASE_URL=… corepack pnpm --filter @fourmy/web e2e`.
 
 En attendant better-auth, l'API lit l'identité dans l'en-tête `x-user-id`
 (affiché par `seed:dev`) et vérifie l'appartenance à la ferme (rôles `owner`

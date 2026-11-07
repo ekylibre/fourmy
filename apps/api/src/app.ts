@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { DomainError } from "@fourmy/domain";
 import { auth, farmScope, type Env } from "./context.js";
 import { farmRoutes } from "./routes/farm.js";
+import { meRoutes } from "./routes/me.js";
 import { BadRequest, NotFound, Conflict } from "./routes/helpers.js";
 
 /**
@@ -13,6 +14,7 @@ export function createApp() {
 
   app.get("/health", (c) => c.json({ status: "ok", service: "fourmy-api" }));
 
+  app.route("/api/v1/me", new Hono<Env>().use(auth).route("/", meRoutes));
   app.route("/api/v1/farms/:farmId", new Hono<Env>().use(auth).use(farmScope).route("/", farmRoutes));
 
   const problem = (status: number, title: string, detail?: string) =>

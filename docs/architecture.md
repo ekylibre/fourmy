@@ -358,6 +358,17 @@ flowchart LR
 
 ### 6.4 Web (`apps/web`)
 
+Réalisé le 2026-11-07 : React 19 + Vite + Mantine 9 + TanStack Query + React
+Router, mêmes versions que Lyvre ; thème et jetons CSS de Lyvre repris dans
+`packages/ui-lyvre` (logotype « fourmy », jauge de cuve). La date de la frise
+est portée par l'URL (`?at=`) : toutes les vues et les liens partagés
+montrent la ferme au même instant. Carte : MapLibre 6 sur les fonds IGN
+Géoplateforme (Plan IGN, photographie aérienne), chargée à la demande ; son
+worker (module ESM) est construit par Vite et déclaré par `setWorkerUrl` —
+sans cela la carte ne se charge pas une fois bundlée. Libellés de procédures
+générés depuis la locale française d'Ekylibre. Tests : composants (Vitest,
+MSW sur `@fourmy/mocks`, Mantine `env="test"`) et parcours Playwright en CI.
+
 Écrans de la tranche : connexion · tableau de bord ferme · carte 2D
 parcellaire · plan 3D et frise · rejeu des traces · interventions (liste,
 saisie, réalisation) · stocks · cuverie · registre phyto · suivi de

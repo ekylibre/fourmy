@@ -11,6 +11,7 @@ import type {
   ContainerContents,
   TrackCoverage,
 } from "@fourmy/contracts";
+import type { Article, Intervention, PhytoRegisterEntry, StockLevel } from "@fourmy/contracts";
 
 /**
  * Jeu de données de démonstration — anonymisé, inspiré d'une petite ferme
@@ -139,7 +140,7 @@ export const demoContainerContents: ContainerContents = {
   at: now,
   volumeL: 30000,
   composition: [
-    { lotId: "00000000-0000-7000-8000-000000000201", lotCode: "MERLOT-2025", share: 1, attrs: { vintage: 2025, variety: "Merlot" } },
+    { lotId: "00000000-0000-7000-8000-000000000201", lotCode: "MERLOT-2025", share: 1, attrs: { vintage: 2025, varieties: ["Merlot"] } },
   ],
   lastMovements: [
     { occurredAt: "2025-10-02T08:00:00.000Z", quantityL: 30000, cause: "intervention" },
@@ -152,3 +153,91 @@ export const demoTrackCoverage: TrackCoverage = {
     { landParcelId: "00000000-0000-7000-8000-0000000000b0", parcelName: "Grande pièce", durationS: 5400, areaM2: 48000 },
   ],
 };
+
+// --- Ajouts pour l'interface web (agent E) ---------------------------------
+
+
+export const DEMO_USER_ID = "00000000-0000-7000-8000-00000000de00";
+export const demoMyFarms = [{ id: DEMO_FARM_ID, name: "Ferme de démonstration", role: "owner" as const }];
+
+export const demoArticles: Article[] = [
+  {
+    id: "00000000-0000-7000-8000-000000000301",
+    farmId: DEMO_FARM_ID,
+    lexiconRef: null,
+    name: "Fongicide X",
+    kind: "phyto",
+    unit: "liter",
+    amm: "2100001",
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: "00000000-0000-7000-8000-000000000302",
+    farmId: DEMO_FARM_ID,
+    lexiconRef: null,
+    name: "Raisin",
+    kind: "harvest",
+    unit: "liter",
+    createdAt: now,
+    updatedAt: now,
+  },
+];
+
+export const demoInterventions: Intervention[] = [
+  {
+    id: "00000000-0000-7000-8000-000000000401",
+    farmId: DEMO_FARM_ID,
+    procedure: "spraying",
+    status: "done",
+    startedAt: "2026-06-10T08:00:00.000Z",
+    stoppedAt: "2026-06-10T09:00:00.000Z",
+    origin: "mobile",
+    clientId: "00000000-0000-7000-8000-000000000401",
+    createdAt: now,
+    updatedAt: now,
+    parameters: [
+      { id: "00000000-0000-7000-8000-000000000411", interventionId: "00000000-0000-7000-8000-000000000401", role: "target", refType: "land_parcel", refId: "00000000-0000-7000-8000-0000000000a0", quantity: null, unit: null },
+      { id: "00000000-0000-7000-8000-000000000412", interventionId: "00000000-0000-7000-8000-000000000401", role: "input", refType: "article", refId: "00000000-0000-7000-8000-000000000301", quantity: 2, unit: "liter_per_hectare" },
+    ],
+  },
+];
+
+export const demoStock: StockLevel[] = [
+  {
+    articleId: "00000000-0000-7000-8000-000000000301",
+    articleName: "Fongicide X",
+    articleKind: "phyto",
+    lotId: "00000000-0000-7000-8000-000000000501",
+    lotCode: "LOT-A",
+    placeId: "00000000-0000-7000-8000-0000000000e0",
+    containerId: null,
+    quantity: 18,
+    unit: "liter",
+  },
+  {
+    articleId: "00000000-0000-7000-8000-000000000302",
+    articleName: "Raisin",
+    articleKind: "harvest",
+    lotId: "00000000-0000-7000-8000-000000000502",
+    lotCode: "LOT-B",
+    placeId: null,
+    containerId: "00000000-0000-7000-8000-0000000000f0",
+    quantity: -5,
+    unit: "liter",
+  },
+];
+
+export const demoPhytoRegister: PhytoRegisterEntry[] = [
+  {
+    interventionId: "00000000-0000-7000-8000-000000000401",
+    doneOn: "2026-06-10T09:00:00.000Z",
+    parcelName: "Les Rouffiats",
+    areaM2: 12500,
+    crop: "Merlot",
+    productName: "Fongicide X",
+    amm: "2100001",
+    quantity: 2,
+    unit: "liter_per_hectare",
+  },
+];

@@ -31,3 +31,45 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+
+  e2e:
+    # Parcours navigateur de bout en bout : vraie API, vraie base, build de prod.
+    needs: check
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: timescale/timescaledb-ha:pg17
+        env:
+          POSTGRES_USER: fourmy
+          POSTGRES_PASSWORD: fourmy
+          POSTGRES_DB: fourmy
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U fourmy -d fourmy"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgres://fourmy:fourmy@localhost:5432/fourmy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9.15.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm migrate
+      - run: pnpm --filter @fourmy/web exec playwright install --with-deps chromium
+      - name: Démarrer l'API et l'application
+        run: |
+          PORT=3000 node apps/api/dist/server.js > api.log 2>&1 &
+          (cd apps/web && pnpm exec vite preview --port 4173 --strictPort > ../../web.log 2>&1 &)
+          for i in $(seq 1 30); do curl -sf localhost:3000/health && curl -sf localhost:4173/ >/dev/null && break; sleep 1; done
+      - run: pnpm --filter @fourmy/web e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-traces
+          path: |
+            apps/web/test-results
+            api.log
+            web.log

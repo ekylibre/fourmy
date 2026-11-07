@@ -8,6 +8,7 @@ import { trackRoutes } from "./tracks.js";
 import { interventionRoutes } from "./interventions.js";
 import { syncRoutes } from "./sync.js";
 import { importRoutes } from "./imports.js";
+import { articleRoutes } from "./articles.js";
 import { problem } from "./helpers.js";
 
 /**
@@ -25,4 +26,5 @@ export const farmRoutes = new Hono<Env>()
   .route("/", interventionRoutes)
   .route("/", syncRoutes)
   .route("/", importRoutes)
+  .route("/", articleRoutes)
   .get("/terrain/heightmap/:z/:x/:y", notImplemented("GET /terrain/heightmap (agent F)"));

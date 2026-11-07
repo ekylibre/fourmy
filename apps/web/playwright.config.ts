@@ -1,0 +1,22 @@
+import { defineConfig, devices } from "@playwright/test";
+
+/**
+ * Parcours de bout en bout contre la vraie API et une vraie base.
+ * Prérequis : API (port 3000) et application (`vite preview`, port 4173)
+ * démarrées, DATABASE_URL pointant la même base que l'API.
+ */
+export default defineConfig({
+  testDir: "./e2e",
+  timeout: 60_000,
+  fullyParallel: false,
+  reporter: [["list"]],
+  globalSetup: "./e2e/global-setup.ts",
+  globalTeardown: "./e2e/global-teardown.ts",
+  use: {
+    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:4173",
+    locale: "fr-FR",
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
+  },
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } }],
+});

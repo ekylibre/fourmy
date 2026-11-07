@@ -1,0 +1,24 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+// En dev, /api est relayé vers l'API Fourmy (apps/api, port 3000).
+export default defineConfig({
+  plugins: [react()],
+  // Le worker de MapLibre est un module ESM (new Worker(url, { type: "module" })).
+  worker: { format: "es" },
+  server: {
+    port: 5173,
+    proxy: { "/api": { target: process.env.FOURMY_API_URL ?? "http://localhost:3000", changeOrigin: true } },
+  },
+  preview: {
+    port: 4173,
+    proxy: { "/api": { target: process.env.FOURMY_API_URL ?? "http://localhost:3000", changeOrigin: true } },
+  },
+  test: {
+    environment: "jsdom",
+    globals: true,
+    setupFiles: ["./test/setup.ts"],
+    css: false,
+    include: ["test/**/*.test.{ts,tsx}"],
+  },
+});
