@@ -43,6 +43,9 @@ describe("relief IGN", () => {
     const v = new DataView(buf);
     [12.5, -99999, 30, Number.NaN].forEach((x, i) => v.setFloat32(i * 4, x, true));
     expect([...decodeBil(buf, 2)]).toEqual([12.5, 0, 30, 0]);
+    // Marqueur mélangé par le rééchantillonnage IGN (côte varoise, niveau 11).
+    [-976.55, -7, 1, 2].forEach((x, i) => v.setFloat32(i * 4, x, true));
+    expect([...decodeBil(buf, 2)]).toEqual([0, -7, 1, 2]);
     expect(() => decodeBil(new ArrayBuffer(12), 2)).toThrow(/inattendue/);
   });
   it("refuse une réponse qui n'est pas une grille (page d'erreur XML)", async () => {

@@ -11,6 +11,7 @@ import {
   DistanceDisplayCondition,
   Entity,
   GeographicTilingScheme,
+  HeightmapTerrainData,
   HeightReference,
   JulianDate,
   LabelStyle,
@@ -31,6 +32,38 @@ import {
 import { outerRing, type Pt } from "@fourmy/domain";
 import type { GeoJsonGeometry } from "@fourmy/contracts";
 import { initialView, splitRuns, type Sample } from "./geometry";
+
+/** Échantillons par côté d'une tuile de relief (API /terrain/heightmap). */
+const TERRAIN_SIZE = 65;
+export const TERRAIN_TILE_BYTES = TERRAIN_SIZE * TERRAIN_SIZE * 4;
+/**
+ * Niveau le plus fin servi par l'API (au-delà : 400). Sans cette limite,
+ * Cesium demande des niveaux toujours plus fins quand on zoome au plus près.
+ * Plus loin, il agrandit la tuile de ce niveau (déjà interpolée au-delà de 16).
+ */
+export const TERRAIN_MAX_LEVEL = 22;
+
+/** Relief sur mesure, plafonné à TERRAIN_MAX_LEVEL. */
+class FarmTerrainProvider extends CustomHeightmapTerrainProvider {
+  constructor(private readonly load: (x: number, y: number, level: number) => Promise<Float32Array>) {
+    super({ width: TERRAIN_SIZE, height: TERRAIN_SIZE, tilingScheme: new GeographicTilingScheme(), callback: () => undefined });
+  }
+  override requestTileGeometry(x: number, y: number, level: number) {
+    return this.load(x, y, level).then(
+      (buffer) =>
+        new HeightmapTerrainData({
+          buffer,
+          width: TERRAIN_SIZE,
+          height: TERRAIN_SIZE,
+          // Pas d'enfants au niveau maximal : Cesium agrandit cette tuile.
+          childTileMask: level >= TERRAIN_MAX_LEVEL ? 0 : 15,
+        }),
+    );
+  }
+  override getTileDataAvailable(_x: number, _y: number, level: number) {
+    return level <= TERRAIN_MAX_LEVEL;
+  }
+}
 
 /**
  * Scène 3D de la ferme (ADR-8/9/10) : relief IGN servi par l'API, photo
@@ -104,16 +137,12 @@ export class FarmScene {
   constructor(container: HTMLElement, private readonly opts: FarmSceneOptions) {
     this.viewer = new Viewer(container, {
       baseLayer: false,
-      terrainProvider: new CustomHeightmapTerrainProvider({
-        width: 65,
-        height: 65,
-        tilingScheme: new GeographicTilingScheme(),
-        callback: (x, y, level) =>
-          opts.loadTerrainTile(level, x, y).then(({ heights, source }) => {
-            if (source === "fallback") opts.onTerrainFallback();
-            return heights;
-          }),
-      }),
+      terrainProvider: new FarmTerrainProvider((x, y, level) =>
+        opts.loadTerrainTile(level, x, y).then(({ heights, source }) => {
+          if (source === "fallback") opts.onTerrainFallback();
+          return heights;
+        }),
+      ),
       geocoder: false,
       baseLayerPicker: false,
       homeButton: false,

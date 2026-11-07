@@ -10,8 +10,13 @@ import { samplingBbox, type Bounds } from "./tiles.js";
 export const GEOPF_WMS_R = "https://data.geopf.fr/wms-r";
 export const ELEVATION_LAYER = "ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES";
 
-/** Valeurs « pas de donnée » (mer, hors France) ramenées au niveau de la mer. */
-const NODATA_BELOW = -1000;
+/**
+ * Valeurs « pas de donnée » (mer, hors France) ramenées au niveau de la mer.
+ * Aux niveaux éloignés, l'IGN rééchantillonne et mélange le marqueur -99999
+ * avec les points voisins (-97,7 m, -976,6 m… constatés près de la côte) :
+ * le seuil est donc proche du point le plus bas de France (-10 m).
+ */
+const NODATA_BELOW = -50;
 
 export function elevationUrl(b: Bounds, size: number, base = GEOPF_WMS_R): string {
   const s = samplingBbox(b, size);

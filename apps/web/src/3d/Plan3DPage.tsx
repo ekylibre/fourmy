@@ -13,7 +13,7 @@ import { formatDate } from "../app/labels";
 import { useSnapshot } from "../app/queries";
 import { ErrorAlert, Loading } from "../components/states";
 import { TankContents } from "../features/cellar/CellarPage";
-import { FarmScene, type PlanData } from "./FarmScene";
+import { FarmScene, TERRAIN_TILE_BYTES, type PlanData } from "./FarmScene";
 import { placementFromClick } from "./geometry";
 
 type Plan = PlanData & { at: string; unplaced: { id: string; name: string; reason: string }[] };
@@ -53,7 +53,14 @@ export function Plan3DPage() {
         const res = await fetch(`${location.origin}/api/v1${farmPath(farm.id, `/terrain/heightmap/${level}/${x}/${y}`)}`, {
           credentials: "same-origin",
         });
-        return { heights: new Float32Array(await res.arrayBuffer()), source: res.headers.get("x-terrain-source") ?? "ign" };
+        // Une erreur (400, 401, 429…) lue comme une grille donnerait des altitudes
+        // absurdes et Cesium s'arrêterait (« normalized result is not a number ») :
+        // la tuile est déclarée en échec, Cesium affiche alors sa tuile parente.
+        const buffer = await res.arrayBuffer();
+        if (!res.ok || buffer.byteLength !== TERRAIN_TILE_BYTES) {
+          throw new Error(`relief ${level}/${x}/${y} : HTTP ${res.status}, ${buffer.byteLength} octets`);
+        }
+        return { heights: new Float32Array(buffer), source: res.headers.get("x-terrain-source") ?? "ign" };
       },
       onTankClick: (id) => setSelected(id),
       onGroundClick: (p) => handlers.current.ground(p),
