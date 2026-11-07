@@ -5,8 +5,16 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": { "fourmy-migrate-ekylibre": "./dist/cli.js" },
-  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "bin": {
+    "fourmy-migrate-ekylibre": "./dist/cli.js",
+    "fourmy-export-fixture": "./dist/export-fixture.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b",
@@ -18,5 +26,7 @@
     "@fourmy/domain": "workspace:*",
     "postgres": "3.4.5"
   },
-  "devDependencies": { "vitest": "2.1.8" }
+  "devDependencies": {
+    "vitest": "2.1.8"
+  }
 }

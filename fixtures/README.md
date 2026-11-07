@@ -3,12 +3,30 @@
 Jeux de données **anonymisés** servant de référence commune aux agents et à
 la CI (NFR-DEV-4).
 
-- Les **exports bruts** d'Ekylibre ne sont **jamais** versionnés ici :
-  `fixtures/raw/` est ignoré par git. Ils restent hors du dépôt
-  (`~/Documents/ressources_fourmy/old_backup_ekylibre_v5`).
-- Le jeu de **démonstration** typé (une petite ferme viti + une parcelle de
-  grandes cultures) vit dans `@fourmy/mocks` (`packages/mocks/src/fixtures.ts`)
-  et alimente les écrans avant l'API réelle.
-- L'agent B produira ici les **fixtures anonymisées** dérivées des vrais
-  exports (personnes, tiers et pièces jointes remplacés ; géométries et
-  données agronomiques conservées).
+| Fichier | Origine | Contenu |
+|---|---|---|
+| `pilote-grandes-cultures.json` | export Ekylibre 5.0 (ferme pilote grandes cultures) | 12 campagnes, 162 parcelles, 588 interventions, 610 mouvements de stock |
+| `pilote-viticulture.json` | export Ekylibre 4.37 (ferme pilote viticole) | 9 parcelles de vigne, chai, 9 cuves, réceptions de vendange |
+
+## Anonymisation
+
+- Noms de ferme, parcelles, bâtiments, matériels et codes de lots remplacés.
+- **Tous les identifiants remappés** (UUID v5 propres à la fixture), sans lien
+  avec les identifiants dérivés des instances d'origine.
+- Personnes : jamais migrées, donc absentes.
+- **Conservés** (décision du 2026-11-07) : géométries (alignées au
+  micro-degré), données agronomiques, noms commerciaux des intrants, dates.
+
+## Usage
+
+- Chargement : `loadFixture(sql, fixture)` de `@fourmy/db` (idempotent, suivi
+  d'un `ANALYZE`).
+- Chaque fichier embarque ses **valeurs attendues** (`meta.expected` :
+  volumes, lignes du registre phyto par année). La CI les vérifie sous RLS
+  (`packages/db/test/fixtures.integration.test.ts`).
+- Régénération depuis une ferme migrée :
+  `node packages/migrator-ekylibre/dist/export-fixture.js --farm <uuid> --label <libellé> --out fixtures/<fichier>.json`
+
+Les **exports bruts** ne sont jamais versionnés (`fixtures/raw/` est ignoré) ;
+ils restent hors du dépôt. Le petit jeu de démonstration typé des mocks vit
+dans `@fourmy/mocks`.

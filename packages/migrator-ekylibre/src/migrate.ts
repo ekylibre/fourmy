@@ -492,6 +492,14 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
           VALUES (${event.id}, ${farmId}, ${event.type}, ${tx.json(event as unknown as Record<string, never>)})`;
       });
 
+      // Statistiques à jour après l'écriture massive : sans elles, les vues
+      // sous RLS (registre phyto) prennent des plans désastreux (> 5 s mesurés).
+      for (const t of ["land_parcels", "land_parcel_versions", "productions", "places", "place_versions",
+        "containers", "container_versions", "equipments", "articles", "lots", "interventions",
+        "intervention_parameters", "stock_movements"]) {
+        await target.unsafe(`ANALYZE ${t}`);
+      }
+
       // ---- Écart du registre phyto (critère US-5) ---------------------------
       const fourmy = await target.begin(async (tx) => {
         await tx`SET LOCAL ROLE fourmy_app`;
