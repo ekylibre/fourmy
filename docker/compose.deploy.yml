@@ -83,14 +83,11 @@ services:
     #   - "8080:80"
 
   # Site public fourmy.org (+ www → fourmy.org). Relaie /api/public/ seulement.
+  # Image construite par la CI (historique Git complet, absent du clone de
+  # Dokploy) : .github/workflows/ci.yml, job site-image.
   site:
-    build:
-      context: ..
-      dockerfile: docker/site.Dockerfile
-      target: site
-      args:
-        PUBLIC_APP_URL: ${PUBLIC_URL}
-        PUBLIC_SITE_URL: ${SITE_URL:-https://fourmy.org}
+    image: ${SITE_IMAGE:-ghcr.io/ekylibre/fourmy-site:main}
+    pull_policy: always
     restart: unless-stopped
     depends_on:
       api:

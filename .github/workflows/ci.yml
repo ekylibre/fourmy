@@ -78,3 +78,44 @@ jobs:
             apps/web/test-results
             api.log
             web.log
+
+  site-image:
+    # Image du site fourmy.org, construite ici car Dokploy clone le dépôt sans
+    # historique (version et changelog en dépendent). Publiée sur GHCR, puis
+    # Dokploy est relancé pour la récupérer (docs/deploiement.md).
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [check, e2e]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/site.Dockerfile
+          target: site
+          push: true
+          build-args: |
+            PUBLIC_APP_URL=${{ vars.FOURMY_PUBLIC_APP_URL || 'https://dev.fourmy.org' }}
+            PUBLIC_SITE_URL=${{ vars.FOURMY_PUBLIC_SITE_URL || 'https://fourmy.org' }}
+          tags: |
+            ghcr.io/ekylibre/fourmy-site:main
+            ghcr.io/ekylibre/fourmy-site:sha-${{ github.sha }}
+      - name: Relancer le déploiement Dokploy (dev)
+        env:
+          WEBHOOK: ${{ secrets.DOKPLOY_DEPLOY_WEBHOOK }}
+        run: |
+          if [ -z "$WEBHOOK" ]; then echo "Pas de webhook Dokploy configuré : déploiement à relancer à la main."; exit 0; fi
+          curl -fsS -X POST "$WEBHOOK" \
+            -H "content-type: application/json" -H "x-github-event: push" \
+            -d '{"ref":"refs/heads/main"}' > /dev/null

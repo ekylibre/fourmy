@@ -24,7 +24,7 @@ demandera d'abord de les retirer. Dokploy y accède par l'application GitHub
 | `api` | `Dockerfile`, cible `api` | API Hono ; applique les migrations au démarrage |
 | `worker` | même image, `node apps/api/dist/worker.js` | synchronise les intégrations des fermes (Traccar : chaque minute) |
 | `web` | `Dockerfile`, cible `web` (nginx) | application React + relais `/api` → `api` |
-| `site` | `docker/site.Dockerfile` (nginx) | site public fourmy.org ; relaie seulement `/api/public/` (formulaire de contact) ; `www` → apex |
+| `site` | `ghcr.io/ekylibre/fourmy-site:main`, construite par la CI depuis `docker/site.Dockerfile` (nginx) | site public fourmy.org ; relaie seulement `/api/public/` (formulaire de contact) ; `www` → apex |
 
 Sont exposés **`web`** (dev.fourmy.org, l'application) et **`site`**
 (fourmy.org et www.fourmy.org) — domaines et HTTPS par Dokploy/Traefik. Le web et
@@ -40,7 +40,7 @@ l'API partagent la même origine : cookies de session sans CORS.
 | `FOURMY_SECRETS_KEY` | oui | chiffre les secrets d'intégration (`openssl rand -base64 32`) ; **la perdre rend les jetons illisibles** (à ressaisir) — la sauvegarder hors du serveur |
 | `FOURMY_MOBILE_ORIGINS` | non | `zeromobile://` par défaut (application mobile) |
 | `FOURMY_SMTP_HOST`, `_PORT`, `_USER`, `_PASSWORD`, `_FROM` | non | envoi du formulaire de contact de fourmy.org vers `FOURMY_CONTACT_TO` (contact@fourmy.org) ; sans eux, le formulaire répond « indisponible » |
-| `SITE_URL` | non | `https://fourmy.org` par défaut (site public) |
+| `SITE_IMAGE` | non | image du site, `ghcr.io/ekylibre/fourmy-site:main` par défaut (prod : une étiquette `sha-…` précise) |
 | `EKYLIBRE_SOURCES_URL` | non | serveur des bases Ekylibre restaurées pour les imports depuis l'interface |
 
 Aucun secret dans le dépôt : ils sont générés directement dans Dokploy.
@@ -75,12 +75,24 @@ worker actif.
 
 ## Site public : version et nouveautés
 
-L'image `site` est construite **avec l'historique Git** (son fichier
-d'exclusions garde `.git`) : `packages/release` en calcule la version et les
-nouveautés publiques à chaque déploiement. Si le clone de Dokploy est
-superficiel, la construction échoue avec un message explicite — rien de faux
-n'est publié ; il faudra alors construire l'image du site en CI (historique
-complet) et la faire tirer par Dokploy.
+La version et les nouveautés publiques sont calculées depuis l'historique Git
+(`packages/release`). Dokploy clone le dépôt **sans historique** (vérifié au
+premier déploiement, 2026-11-07) : l'image du site est donc construite par la
+CI (job `site-image` de `.github/workflows/ci.yml`, sur `main`, après des tests
+verts), publiée sur `ghcr.io/ekylibre/fourmy-site` (`main` et `sha-…`),
+puis tirée par Dokploy (`pull_policy: always`).
+
+- Le paquet GHCR est **public** : il ne contient que le site statique et sa
+  configuration nginx, déjà publics. Aucun identifiant côté Dokploy.
+- Après publication, la CI relance Dokploy via le secret GitHub
+  `DOKPLOY_DEPLOY_WEBHOOK` (webhook du service Compose). Sans ce secret, le
+  déploiement est à relancer à la main.
+- Les adresses intégrées au site viennent des variables GitHub
+  `FOURMY_PUBLIC_APP_URL` et `FOURMY_PUBLIC_SITE_URL` (dev.fourmy.org et
+  fourmy.org par défaut). La prod (Eyona) aura sa propre image ou ses propres
+  variables.
+- Un historique superficiel fait échouer la construction avec un message
+  explicite : rien de faux n'est publié.
 
 ## Sauvegardes (à mettre en place)
 
