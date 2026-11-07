@@ -1,0 +1,20 @@
+# Pile de développement Fourmy : une seule base (PostGIS + TimescaleDB).
+services:
+  db:
+    image: timescale/timescaledb-ha:pg17
+    environment:
+      POSTGRES_USER: fourmy
+      POSTGRES_PASSWORD: fourmy
+      POSTGRES_DB: fourmy
+    ports:
+      - "5432:5432"
+    volumes:
+      - fourmy_pgdata:/home/postgres/pgdata/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fourmy -d fourmy"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  fourmy_pgdata:

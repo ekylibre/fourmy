@@ -167,7 +167,7 @@ erDiagram
 | `containers` / `container_versions` | `place_id`, `kind ∈ {tank, silo, barrel}`, `capacity_l`, `shape3d jsonb` (`{x, y, z, radius, height}` en mètres dans le repère local du bâtiment), `placement ∈ {auto, manual}` | ADR-10 |
 | `equipments` / `equipment_versions` | `name`, `kind`, `state` | |
 | `tracker_bindings` | `equipment_id`, `source = 'traccar'`, `device_id`, `valid tstzrange` | Un traceur peut changer de matériel |
-| `positions` (hypertable) | `farm_id`, `binding_id`, `time`, `point geometry(Point)`, `speed`, `heading`, `attrs jsonb` | Index `(binding_id, time)`, compression après 30 jours |
+| `positions` (hypertable) | `farm_id`, `binding_id`, `time`, `point geometry(Point)`, `speed`, `heading`, `attrs jsonb` | Index `(binding_id, time)`. **RLS active ; compression reportée** : sur `timescaledb-ha` pg17, columnstore et RLS sont mutuellement exclusifs sur une hypertable — priorité à l'isolation (2026-11-07) |
 | `articles` | `lexicon_ref` (nullable), `name`, `kind ∈ {phyto, fertilizer, seed, harvest, wine, other}`, `unit`, `amm` (phyto), `custom jsonb` | FR-STK-2 : base Lexicon + personnalisation |
 | `lots` | `article_id`, `code`, `attrs jsonb` (millésime, cépages, appellation) | |
 | `lot_lineage` | `child_lot_id`, `parent_lot_id`, `share` | Assemblages viticoles, traçabilité |
@@ -456,7 +456,7 @@ relue par l'intégrateur.
 | Bâtiments ou cuves sans géométrie dans les exports | Plan 3D vide | Rapprochement BD TOPO + placement automatique + éditeur de placement |
 | Hétérogénéité des données Ekylibre (procédures anciennes, unités) | Rejets à la migration | Rapport de rejets dès le jour 3 sur les vraies exports ; mapping itératif |
 | Conflits entre agents sur les contrats | Blocages, régressions | Contrats figés au jour 1, propriété stricte des dossiers, changement de contrat par l'intégrateur seul |
-| Volume de positions Traccar | Rejeu lent | Simplification serveur, compression TimescaleDB, fenêtres temporelles bornées |
+| Volume de positions Traccar | Rejeu lent | Simplification serveur, fenêtres temporelles bornées. Compression Timescale incompatible avec la RLS sur hypertable (pg17) : à réintroduire via isolation applicative de `positions` ou version ultérieure de Timescale |
 | Licence des plugins privés | Risque juridique | Frontière hors processus + SDK Apache-2.0 + exception de licence, à faire valider avant annonce |
 | Données personnelles des pilotes données aux agents | RGPD | Fixtures anonymisées (personnes, tiers, pièces jointes) produites au jour 1 ; géométries conservées ; exports bruts hors du dépôt, réservés à la recette |
 
