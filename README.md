@@ -27,9 +27,22 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | Exigences (`/sc:brainstorm`) | ✅ terminé |
 | Architecture (`/sc:design`) | ✅ stack confirmée (TypeScript + service Python, React + Mantine), exports vérifiés |
 | Plan d'implémentation (`/sc:workflow`) | ✅ rédigé (`docs/workflow.md`) |
-| Développement de la première tranche (7 jours, multi-agent) | ⏳ à faire |
+| Jour 1 — fondations (agent 0) | ✅ gel terminé (contrats, db+RLS, API, CI, mocks, agro) |
+| Jours 2-5 — agents A→G (domaine, migration, Traccar, API, web, 3D, mobile) | ⏳ à faire |
+| Jours 6-7 — migration réelle + recette | ⏳ à faire |
 
 ### À reprendre
 
-1. Valider `docs/workflow.md`, puis lancer l'exécution agent par agent
-   (worktrees), en commençant par l'agent 0 (fondations).
+1. Lancer les **agents A→G** (domaine, migration Ekylibre, Traccar, API
+   métier/synchro, web React, 3D/cuverie, mobile) contre les contrats gelés.
+2. Finitions agent 0 : better-auth réel (aujourd'hui stub) et montage
+   `@hono/zod-openapi` complet.
+
+### Démarrage local
+
+```bash
+corepack pnpm install
+docker compose -f docker/compose.dev.yml up -d
+DATABASE_URL=postgres://fourmy:fourmy@localhost:5432/fourmy corepack pnpm migrate
+corepack pnpm dev
+```
