@@ -7,6 +7,7 @@ import type { Env } from "../context.js";
 import { db } from "../db.js";
 import { listParcelsAt, createParcel, versionParcel } from "../repos/parcels.js";
 import { listContainersAt, correctContainer, NotFound } from "../repos/containers.js";
+import { trackReplay, trackCoverage, toCzml } from "../repos/tracks.js";
 
 /**
  * Routes métier sous `/api/v1/farms/:farmId` (architecture §5.1).
@@ -33,6 +34,21 @@ function domainCtx(c: Context<Env>): DomainCtx {
 }
 
 const atOrNow = (c: Context<Env>) => c.req.query("at") ?? new Date().toISOString();
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Paramètres communs des traces : matériel + fenêtre (31 jours max). */
+function trackQuery(c: Context<Env>): { equipmentId: string; from: string; to: string } | { error: string } {
+  const equipmentId = c.req.query("equipment") ?? "";
+  const from = c.req.query("from") ?? "";
+  const to = c.req.query("to") ?? "";
+  if (!UUID_RE.test(equipmentId)) return { error: "equipment doit être un UUID" };
+  const f = Date.parse(from);
+  const t = Date.parse(to);
+  if (Number.isNaN(f) || Number.isNaN(t) || t <= f) return { error: "from/to : dates ISO, from < to" };
+  if (t - f > 31 * 86_400_000) return { error: "fenêtre limitée à 31 jours" };
+  return { equipmentId, from: new Date(f).toISOString(), to: new Date(t).toISOString() };
+}
 
 export const farmRoutes = new Hono<Env>()
   // --- État consolidé -------------------------------------------------------
@@ -114,8 +130,26 @@ export const farmRoutes = new Hono<Env>()
   .post("/interventions", notImplemented("POST /interventions"))
   .post("/interventions/:id/complete", notImplemented("POST /interventions/:id/complete"))
   .get("/registers/phyto", notImplemented("GET /registers/phyto"))
-  .get("/tracks", notImplemented("GET /tracks"))
-  .get("/tracks/coverage", notImplemented("GET /tracks/coverage"))
+  .get("/tracks", async (c) => {
+    const q = trackQuery(c);
+    if ("error" in q) return problem(c, 400, "Paramètres invalides", q.error);
+    const toleranceM = Number(c.req.query("tolerance") ?? 2);
+    const track = await trackReplay(db(), c.get("farmId"), { ...q, toleranceM });
+    if ((c.req.query("format") ?? "json") === "czml") {
+      return c.json(toCzml(track, c.req.query("name") ?? "Matériel"));
+    }
+    return c.json(track);
+  })
+  .get("/tracks/coverage", async (c) => {
+    const q = trackQuery(c);
+    if ("error" in q) return problem(c, 400, "Paramètres invalides", q.error);
+    const coverage = await trackCoverage(db(), c.get("farmId"), {
+      ...q,
+      defaultWidthM: Number(c.req.query("width") ?? 3),
+      maxGapS: Number(c.req.query("maxGap") ?? 30),
+    });
+    return c.json(coverage);
+  })
   .get("/terrain/heightmap/:z/:x/:y", notImplemented("GET /terrain/heightmap"))
   .get("/sync/pull", notImplemented("GET /sync/pull"))
   .post("/sync/push", notImplemented("POST /sync/push"))

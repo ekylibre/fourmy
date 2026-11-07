@@ -301,7 +301,13 @@ flowchart LR
   `GET /api/positions?deviceId&from&to` avec un jeton en lecture ; identifiants
   dans des variables d'environnement, jamais dans le dépôt. Supporte aussi
   l'**authentification HTTP Basic** en repli (c'est ce qu'utilisait Ekylibre).
-  Boîtiers de Pierre : id 1, 3, 5 (tracteurs).
+  Boîtiers de Pierre : id 1, 3, 5 (tracteurs), rattachés par nom aux matériels migrés.
+- **Attributs agricoles** du serveur osfarm conservés dans `positions.attrs` :
+  `isWorking` (en chaîne « True »/« False »), `workingWidth`, `tool`, `field`,
+  `appliedArea` (compteur cumulé du jour). La couverture utilise la **largeur
+  réelle de l'outil** et ne compte que les positions au travail.
+  Validé le 2026-11-07 : 16,03 ha calculés contre 15,79 ha mesurés par Traccar
+  sur une journée réelle (+1,5 %).
 - Import de l'historique au premier lancement, puis récupération toutes les
   minutes (fenêtre glissante, déduplication sur `(binding_id, time)`).
 - `GET /tracks` simplifie les traces côté serveur (Douglas-Peucker

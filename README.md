@@ -31,14 +31,16 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | Agent A — domaine | ✅ logique pure + vue registre phyto |
 | Agent B — migration Ekylibre | ✅ 3 fermes migrées, registre phyto identique, fixtures anonymisées |
 | Agent D — API métier | 🟡 parcellaire versionné de bout en bout ; autres routes en 501 |
-| Agents C, E, F, G (Traccar, web, 3D, mobile) | ⏳ à faire |
+| Agent C — Traccar et traces | ✅ synchro réelle (7 592 positions), rejeu CZML, couverture validée contre Traccar (+1,5 %) |
+| Agents E, F, G (web, 3D, mobile) | ⏳ à faire |
 | Jours 6-7 — migration réelle + recette | ⏳ à faire |
 
 ### À reprendre
 
-1. Agents restants : **C** (Traccar), compléter **D** (routes métier), **E**
-   (web React), **F** (3D/cuverie), **G** (mobile).
-2. Finitions agent 0 : better-auth réel (aujourd'hui stub) et montage
+1. Agents restants : compléter **D** (routes métier), **E** (web React),
+   **F** (3D/cuverie), **G** (mobile).
+2. `apps/worker` : planifier la synchro Traccar (toutes les minutes).
+3. Finitions agent 0 : better-auth réel (aujourd'hui stub) et montage
    `@hono/zod-openapi` complet.
 
 ### Démarrage local

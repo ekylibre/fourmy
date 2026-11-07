@@ -1,0 +1,22 @@
+{
+  "name": "@fourmy/connector-traccar",
+  "version": "0.0.0",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": { "fourmy-traccar-sync": "./dist/cli.js" },
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@fourmy/contracts": "workspace:*",
+    "@fourmy/domain": "workspace:*",
+    "postgres": "3.4.5"
+  },
+  "devDependencies": { "vitest": "2.1.8" }
+}
