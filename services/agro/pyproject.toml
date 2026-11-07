@@ -1,0 +1,16 @@
+[project]
+name = "fourmy-agro"
+version = "0.0.0"
+description = "Service Python sans état pour les méthodes agronomiques de Fourmy (ADR-1)"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.34",
+  "pydantic>=2.10",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.3", "httpx>=0.28"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
