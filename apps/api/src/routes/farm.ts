@@ -7,6 +7,7 @@ import { registerRoutes } from "./registers.js";
 import { trackRoutes } from "./tracks.js";
 import { interventionRoutes } from "./interventions.js";
 import { syncRoutes } from "./sync.js";
+import { importRoutes } from "./imports.js";
 import { problem } from "./helpers.js";
 
 /**
@@ -23,6 +24,5 @@ export const farmRoutes = new Hono<Env>()
   .route("/", trackRoutes)
   .route("/", interventionRoutes)
   .route("/", syncRoutes)
-  .get("/terrain/heightmap/:z/:x/:y", notImplemented("GET /terrain/heightmap (agent F)"))
-  .post("/imports/ekylibre", notImplemented("POST /imports/ekylibre"))
-  .get("/imports/:id", notImplemented("GET /imports/:id"));
+  .route("/", importRoutes)
+  .get("/terrain/heightmap/:z/:x/:y", notImplemented("GET /terrain/heightmap (agent F)"));

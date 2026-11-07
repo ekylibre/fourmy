@@ -219,6 +219,22 @@ Conventions : erreurs au format `application/problem+json`, pagination par
 curseur, montants absents (Fourmy ne connaît pas les prix), unités
 explicites sur toute quantité.
 
+**Autorisation** (2026-11-07) : l'utilisateur doit être membre de la ferme
+de l'URL (`memberships`, sinon 403). Rôle `owner` : tout ; rôle `worker` :
+lecture, interventions, synchro mobile. Réservé à `owner` : parcellaire,
+placement et corrections de cuves, imports. La RLS isole les fermes entre
+elles ; l'appartenance décide qui entre. L'identité vient provisoirement de
+l'en-tête `x-user-id` (better-auth ensuite, ADR-14).
+
+**Interventions** : la réalisation transforme les paramètres en mouvements
+de stock selon des règles pures du domaine (dose par hectare × surface
+traitée à la date ; unité incohérente refusée ; lot le mieux pourvu ;
+surconsommation acceptée mais signalée ; une sortie exige un lieu).
+
+**Imports** : le client fournit un **nom** de base source
+(`ekylibre_src_…`), jamais une URL ; le serveur source est fixé par la
+configuration (`EKYLIBRE_SOURCES_URL`). Exécution asynchrone (202 + suivi).
+
 ### 5.2 Événements (contrat, publiés via l'outbox)
 
 `land_parcel.versioned`, `intervention.planned`, `intervention.completed`,
@@ -231,6 +247,14 @@ après les 7 jours.
 
 ### 5.3 Synchro mobile
 
+Implémentée le 2026-11-07. Pull : parcelles (version courante, GeoJSON,
+tracé SVG, surface), articles, matériels, interventions — enregistrements
+plats, instants en ms. Push : interventions seulement en v1, **tout ou rien
+par intervention**, résultat par intervention (`applied` / `failed` avec
+motif) adapté à l'état de synchro par intervention de zero-mobile. Conflit =
+intervention modifiée sur le serveur par autre chose que le mobile depuis
+son dernier pull (d'après l'audit).
+
 ```mermaid
 sequenceDiagram
   participant M as zero-mobile (WatermelonDB)
@@ -242,7 +266,7 @@ sequenceDiagram
   Note over M: saisie hors-ligne, id = UUID v7 client
   M->>A: POST /sync/push {changes, last_pulled_at: T1}
   A->>D: upsert idempotent par client_id → mouvements de stock, audit, outbox
-  A-->>M: 200 (ou 409 si conflit → re-pull)
+  A-->>M: 200 {applied, failed} (ou 409 si conflit → re-pull)
 ```
 
 Le catalogue de procédures est servi par l'API : le formulaire de

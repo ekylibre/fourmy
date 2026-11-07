@@ -25,6 +25,14 @@ export interface MigrateOptions {
   /** Schéma du tenant ; lu dans le commentaire de la base source si absent. */
   tenant?: string;
   farmName?: string;
+  /**
+   * Ferme Fourmy cible (import depuis l'API). Par défaut, la ferme est
+   * dérivée du tenant. Si une autre ferme est visée, l'espace des UUID
+   * inclut la ferme : un même tenant importé dans deux fermes ne collisionne pas.
+   */
+  farmId?: string;
+  /** Identifiant du suivi, pour le connaître avant la fin (import asynchrone). */
+  runId?: string;
 }
 
 export interface Report {
@@ -62,9 +70,11 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
     const tenant = opts.tenant ?? info.tenant;
     if (!tenant) throw new Error("Tenant inconnu : passer --tenant ou restaurer avec restore-source.sh");
     const src: x.Source = { sql: source, tenant };
-    const instance = `ekylibre:${tenant}`;
+    const baseInstance = `ekylibre:${tenant}`;
+    const defaultFarmId = idsFor(baseInstance)("farm", tenant);
+    const farmId = opts.farmId ?? defaultFarmId;
+    const instance = farmId === defaultFarmId ? baseInstance : `${baseInstance}@${farmId}`;
     const id = idsFor(instance);
-    const farmId = id("farm", tenant);
 
     // ---- Extraction (lecture seule) -------------------------------------
     const data = await x.read(src, async (s) => ({
@@ -81,8 +91,11 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
       phytoRef: await x.phytoReference(s),
     }));
 
-    const runId = uuidv5(`${instance}:run:${new Date().toISOString()}`);
-    await target`INSERT INTO import_runs (id, source, status) VALUES (${runId}, ${instance}, 'running')`;
+    const runId = opts.runId ?? uuidv5(`${instance}:run:${new Date().toISOString()}`);
+    await target`
+      INSERT INTO import_runs (id, farm_id, source, status)
+      VALUES (${runId}, ${opts.farmId ?? null}, ${instance}, 'running')
+      ON CONFLICT (id) DO UPDATE SET status = 'running', started_at = now()`;
 
     const counts: Record<string, number> = {};
     const rejected: Report["rejected"] = [];
@@ -106,7 +119,7 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
         // ---- Ferme et campagnes -------------------------------------------
         await tx`
           INSERT INTO farms (id, name) VALUES (${farmId}, ${opts.farmName ?? tenant})
-          ON CONFLICT (id) DO UPDATE SET name = excluded.name, updated_at = now()`;
+          ON CONFLICT (id) DO UPDATE SET name = coalesce(${opts.farmName ?? null}, farms.name), updated_at = now()`;
         inc("farms");
 
         const campaignByYear = new Map<number, string>();

@@ -38,6 +38,9 @@ importers:
       '@fourmy/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@fourmy/migrator-ekylibre':
+        specifier: workspace:*
+        version: link:../../packages/migrator-ekylibre
       '@hono/node-server':
         specifier: 1.13.8
         version: 1.13.8(hono@4.6.15)
