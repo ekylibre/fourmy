@@ -18,6 +18,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 |---|---|
 | [`docs/requirements.md`](docs/requirements.md) | Exigences v1, user stories, fermes pilotes, première tranche de 7 jours |
 | [`docs/architecture.md`](docs/architecture.md) | Choix d'architecture (ADR), modèle de données, API, 3D, plugins, organisation multi-agent |
+| [`docs/workflow.md`](docs/workflow.md) | Plan d'implémentation de la première tranche : jour 1 des fondations, tâches des 7 agents, recette |
 
 ## État du projet (2026-11-07)
 
@@ -25,9 +26,10 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 |---|---|
 | Exigences (`/sc:brainstorm`) | ✅ terminé |
 | Architecture (`/sc:design`) | ✅ stack confirmée (TypeScript + service Python, React + Mantine), exports vérifiés |
-| Plan d'implémentation (`/sc:workflow`) | ⏳ à faire |
+| Plan d'implémentation (`/sc:workflow`) | ✅ rédigé (`docs/workflow.md`) |
 | Développement de la première tranche (7 jours, multi-agent) | ⏳ à faire |
 
 ### À reprendre
 
-1. Lancer `/sc:workflow` pour le plan détaillé de chaque agent.
+1. Valider `docs/workflow.md`, puis lancer l'exécution agent par agent
+   (worktrees), en commençant par l'agent 0 (fondations).
