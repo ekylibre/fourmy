@@ -1,93 +1,120 @@
 import { z } from "zod";
-import {
-  uuid,
-  farmId,
-  isoDateTime,
-  geoJsonGeometry,
-  auditFields,
-} from "../primitives.js";
+import { uuid, farmId, isoDateTime, geoJsonGeometry, auditFields } from "../primitives.js";
+import { treatmentPurpose } from "../procedures.js";
 
-/** Rôle d'un paramètre d'intervention (procédures Ekylibre simplifiées). */
-export const parameterRole = z.enum([
-  "target", // cible : parcelle, culture, zone
-  "input", // intrant : phyto, engrais, semence
-  "output", // sortie : récolte, moût
-  "tool", // outil : matériel
-  "doer", // intervenant
-]);
+/**
+ * Interventions (docs/interventions.md §4). Modèle simplifié par rapport à
+ * Ekylibre : pas de `reference_name`, pas de « handlers » de quantité, pas de
+ * formules. Une quantité est totale ou par hectare ; la procédure (sa forme)
+ * dit ce que les cibles, intrants et sorties doivent être.
+ */
+
+export const interventionStatus = z.enum(["planned", "done", "cancelled"]);
+export type InterventionStatus = z.infer<typeof interventionStatus>;
+
+export const interventionOrigin = z.enum(["web", "mobile", "migration", "plugin"]);
+
+/** Rôle d'une ligne de paramètre en base (stockage) ; l'API expose la forme structurée. */
+export const parameterRole = z.enum(["target", "input", "output", "tool", "doer"]);
 export type ParameterRole = z.infer<typeof parameterRole>;
 
-export const interventionParameter = z.object({
+/** Une quantité est totale, ou par hectare (× surface traitée à la date). */
+export const quantityPer = z.enum(["total", "hectare"]);
+export type QuantityPer = z.infer<typeof quantityPer>;
+
+export const workPeriod = z.object({ startedAt: isoDateTime, stoppedAt: isoDateTime });
+export type WorkPeriod = z.infer<typeof workPeriod>;
+
+export const targetKind = z.enum(["land_parcel", "equipment", "place", "container"]);
+export type TargetKind = z.infer<typeof targetKind>;
+
+export const interventionTarget = z.object({
+  kind: targetKind,
   id: uuid,
-  interventionId: uuid,
-  role: parameterRole,
-  refType: z.string(), // land_parcel, article, equipment, worker…
-  refId: uuid.nullable(),
-  quantity: z.number().nullable(),
-  unit: z.string().nullable(),
+  /** Surface réellement traitée si l'intervention ne couvre qu'une partie de la parcelle. */
+  workedAreaM2: z.number().positive().optional(),
+  /** Zone de travail (ex. tirée de la trace GPS). */
   workingZone: geoJsonGeometry.optional(),
 });
-export type InterventionParameter = z.infer<typeof interventionParameter>;
+export type InterventionTarget = z.infer<typeof interventionTarget>;
 
-export const interventionStatus = z.enum(["planned", "done"]);
-export const interventionOrigin = z.enum([
-  "web",
-  "mobile",
-  "migration",
-  "plugin",
-]);
+const location = z
+  .object({ placeId: uuid.optional(), containerId: uuid.optional() })
+  .refine((l) => !(l.placeId && l.containerId), { message: "Un lieu OU une cuve, pas les deux." });
 
+export const interventionInput = z.object({
+  articleId: uuid,
+  quantity: z.number().positive(),
+  per: quantityPer,
+  /** Lot consommé ; à défaut, le lot le mieux pourvu à la date. */
+  lotId: uuid.optional(),
+  /** Lieu de prélèvement ; à défaut, celui du lot. */
+  from: location.optional(),
+});
+export type InterventionInput = z.infer<typeof interventionInput>;
+
+export const interventionOutput = z.object({
+  articleId: uuid,
+  quantity: z.number().positive(),
+  per: quantityPer,
+  lotId: uuid.optional(),
+  /** Destination (lieu ou cuve) : obligatoire à la réalisation. */
+  to: location.optional(),
+});
+export type InterventionOutput = z.infer<typeof interventionOutput>;
+
+export const interventionTool = z.object({ equipmentId: uuid });
+export const interventionDoer = z.object({ personId: uuid });
+
+/** Corps commun de saisie (planification ou réalisation). */
+const interventionBody = z.object({
+  procedure: z.string().min(1),
+  periods: z.array(workPeriod).default([]),
+  targets: z.array(interventionTarget).default([]),
+  inputs: z.array(interventionInput).default([]),
+  outputs: z.array(interventionOutput).default([]),
+  tools: z.array(interventionTool).default([]),
+  doers: z.array(interventionDoer).default([]),
+  purposes: z.array(treatmentPurpose).default([]),
+  notes: z.string().trim().max(2000).optional(),
+});
+
+/** Planification (POST /interventions). `id` client → idempotent. */
+export const interventionPlanWrite = interventionBody.extend({
+  id: uuid.optional(),
+  /** Date prévue (début) si aucune période n'est encore connue. */
+  plannedAt: isoDateTime.optional(),
+});
+export type InterventionPlanWrite = z.infer<typeof interventionPlanWrite>;
+
+/** Réalisation (POST /interventions/:id/complete) : au moins une période. */
+export const interventionCompleteWrite = interventionBody.omit({ procedure: true }).extend({
+  periods: z.array(workPeriod).min(1, "Au moins une période de travail."),
+});
+export type InterventionCompleteWrite = z.infer<typeof interventionCompleteWrite>;
+
+/** Intervention telle que lue (quantités accompagnées de l'unité de l'article). */
 export const intervention = z
   .object({
     id: uuid,
     farmId,
-    procedure: z.string(), // référence au catalogue de procédures
+    procedure: z.string(),
     status: interventionStatus,
     startedAt: isoDateTime.nullable(),
     stoppedAt: isoDateTime.nullable(),
+    periods: z.array(workPeriod),
+    targets: z.array(interventionTarget),
+    inputs: z.array(interventionInput.extend({ unit: z.string() })),
+    outputs: z.array(interventionOutput.extend({ unit: z.string() })),
+    tools: z.array(interventionTool),
+    doers: z.array(interventionDoer),
+    purposes: z.array(treatmentPurpose),
+    notes: z.string().nullable(),
     origin: interventionOrigin,
-    clientId: z.string().nullable(), // idempotence de la synchro mobile
-    parameters: z.array(interventionParameter).default([]),
+    clientId: z.string().nullable(),
   })
   .merge(auditFields);
 export type Intervention = z.infer<typeof intervention>;
-
-/**
- * Indications de stock d'un intrant / d'une sortie. Toutes facultatives pour
- * un intrant (le serveur choisit lot et lieu) ; le lieu est obligatoire pour
- * une sortie (on ne range pas une récolte « nulle part »).
- */
-export const stockHint = z.object({
-  lotId: uuid.optional(),
-  placeId: uuid.optional(),
-  containerId: uuid.optional(),
-  /** Quantité absolue, dans l'unité de l'article (prime sur le calcul dose × surface). */
-  quantity: z.number().positive().optional(),
-});
-export type StockHint = z.infer<typeof stockHint>;
-
-/** Paramètre saisi (sans identifiants serveur), avec indications de stock. */
-export const interventionParameterWrite = interventionParameter
-  .omit({ id: true, interventionId: true })
-  .extend({ stock: stockHint.optional() });
-export type InterventionParameterWrite = z.infer<typeof interventionParameterWrite>;
-
-/** Planification d'une intervention (POST). `id` client → idempotent. */
-export const interventionPlanWrite = z.object({
-  id: uuid.optional(),
-  procedure: z.string().min(1),
-  startedAt: isoDateTime.optional(),
-  parameters: z.array(interventionParameterWrite),
-});
-export type InterventionPlanWrite = z.infer<typeof interventionPlanWrite>;
-
-/** Réalisation (POST /:id/complete) : paramètres réels, mouvements de stock. */
-export const interventionCompleteWrite = z.object({
-  startedAt: isoDateTime,
-  stoppedAt: isoDateTime,
-  parameters: z.array(interventionParameterWrite),
-});
-export type InterventionCompleteWrite = z.infer<typeof interventionCompleteWrite>;
 
 /** Ligne du registre phytosanitaire — calculée, jamais saisie (§4.4). */
 export const phytoRegisterEntry = z.object({
@@ -102,3 +129,25 @@ export const phytoRegisterEntry = z.object({
   unit: z.string(),
 });
 export type PhytoRegisterEntry = z.infer<typeof phytoRegisterEntry>;
+
+/** Personne de la ferme (intervenant), avec ou sans compte Fourmy. */
+export const person = z
+  .object({
+    id: uuid,
+    farmId,
+    name: z.string().min(1),
+    role: z.string().nullable(),
+    userId: uuid.nullable(),
+    active: z.boolean(),
+  })
+  .merge(auditFields);
+export type Person = z.infer<typeof person>;
+
+export const personWrite = z.object({
+  id: uuid.optional(),
+  name: z.string().trim().min(1).max(200),
+  role: z.string().trim().max(100).optional(),
+  userId: uuid.optional(),
+  active: z.boolean().optional(),
+});
+export type PersonWrite = z.infer<typeof personWrite>;

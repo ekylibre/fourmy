@@ -4,7 +4,7 @@ import { E2E_USER } from "./shared";
 /**
  * Parcours de la tranche (docs/workflow.md, agent E) sur la ferme pilote
  * viticole, données réelles anonymisées : connexion → ferme → cuverie dans le
- * passé → carte → saisie d'une intervention → registre phyto.
+ * passé → carte → saisie d'un traitement → registre phyto → annulation.
  */
 test("connexion, cuverie dans le temps, carte, intervention jusqu'au registre", async ({ page }) => {
   const errors: string[] = [];
@@ -44,17 +44,36 @@ test("connexion, cuverie dans le temps, carte, intervention jusqu'au registre", 
   await page.getByRole("link", { name: "Interventions" }).click();
   await page.getByRole("button", { name: "Nouvelle intervention" }).click();
   const form = page.getByRole("dialog");
+  // La forme « traitement » de la procédure guide la saisie (produits phyto, motifs).
+  await form.getByRole("combobox", { name: "Intervention" }).fill("sans fertilisation");
+  await page.getByRole("option", { name: "Pulvérisation (sans fertilisation)" }).click();
   await form.getByRole("combobox", { name: "Parcelles" }).click();
   await page.getByRole("option").first().click();
   await page.keyboard.press("Escape"); // ferme la liste, pas le formulaire
   await form.getByRole("combobox", { name: "Produit", exact: true }).click();
   await page.getByRole("option", { name: /AMM/ }).first().click();
-  await form.getByRole("textbox", { name: "Dose" }).fill("1,5");
+  await form.getByRole("textbox", { name: "Quantité" }).fill("1,5");
   await form.getByRole("button", { name: "Enregistrer" }).click();
   await expect(page.getByText("Intervention enregistrée.")).toBeVisible();
 
   await page.getByRole("link", { name: "Registre phyto" }).click();
   await expect(page.getByText(`${before + 1} application(s) en 2023.`)).toBeVisible();
+
+  // Saisie erronée : on l'annule avec un motif, elle sort du registre.
+  await page.getByRole("link", { name: "Interventions" }).click();
+  await page
+    .getByRole("row")
+    .filter({ hasText: "Pulvérisation (sans fertilisation)" })
+    .filter({ hasText: "Réalisée" })
+    .filter({ hasNotText: "Ekylibre" }) // celle saisie à l'instant, pas une reprise
+    .getByRole("button", { name: "Annuler" })
+    .click();
+  const modal = page.getByRole("dialog");
+  await modal.getByRole("textbox", { name: "Motif" }).fill("essai de bout en bout");
+  await modal.getByRole("button", { name: "Annuler l'intervention" }).click();
+  await expect(page.getByText("Intervention annulée.")).toBeVisible();
+  await page.getByRole("link", { name: "Registre phyto" }).click();
+  await expect(page.getByText(`${before} application(s) en 2023.`)).toBeVisible();
 
   expect(errors, `erreurs navigateur : ${errors.join(" | ")}`).toEqual([]);
 });

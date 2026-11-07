@@ -5,7 +5,7 @@ la CI (NFR-DEV-4).
 
 | Fichier | Origine | Contenu |
 |---|---|---|
-| `pilote-grandes-cultures.json` | export Ekylibre 5.0 (ferme pilote grandes cultures) | 12 campagnes, 162 parcelles, 588 interventions, 610 mouvements de stock |
+| `pilote-grandes-cultures.json` | export Ekylibre 5.0 (ferme pilote grandes cultures) | 12 campagnes, 162 parcelles, 588 interventions (603 périodes de travail), 610 mouvements de stock |
 | `pilote-viticulture.json` | export Ekylibre 4.37 (ferme pilote viticole) | 9 parcelles de vigne, chai, 9 cuves, réceptions de vendange |
 
 ## Anonymisation
@@ -13,7 +13,8 @@ la CI (NFR-DEV-4).
 - Noms de ferme, parcelles, bâtiments, matériels et codes de lots remplacés.
 - **Tous les identifiants remappés** (UUID v5 propres à la fixture), sans lien
   avec les identifiants dérivés des instances d'origine.
-- Personnes : jamais migrées, donc absentes.
+- Personnes : seuls les intervenants sont migrés, par leur nom, remplacé
+  ici par « Personne N ».
 - **Conservés** (décision du 2026-11-07) : géométries (alignées au
   micro-degré), données agronomiques, noms commerciaux des intrants, dates.
 

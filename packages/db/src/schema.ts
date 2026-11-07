@@ -4,6 +4,7 @@ import {
   text,
   numeric,
   integer,
+  boolean,
   timestamp,
   jsonb,
   date,
@@ -189,6 +190,25 @@ export const interventions = pgTable("interventions", {
   stoppedAt: timestamp("stopped_at", { withTimezone: true }),
   origin: text("origin").notNull(),
   clientId: text("client_id"),
+  purposes: text("purposes").array().notNull().default([]),
+  notes: text("notes"),
+  ...audit,
+});
+
+export const interventionPeriods = pgTable("intervention_periods", {
+  id: uuid("id").primaryKey(),
+  interventionId: uuid("intervention_id").notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+  stoppedAt: timestamp("stopped_at", { withTimezone: true }).notNull(),
+});
+
+export const people = pgTable("people", {
+  id: uuid("id").primaryKey(),
+  farmId: uuid("farm_id").notNull(),
+  name: text("name").notNull(),
+  role: text("role"),
+  userId: uuid("user_id"),
+  active: boolean("active").notNull().default(true),
   ...audit,
 });
 
@@ -201,6 +221,7 @@ export const interventionParameters = pgTable("intervention_parameters", {
   quantity: numeric("quantity"),
   unit: text("unit"),
   workingZone: geometry("working_zone"),
+  attrs: jsonb("attrs"),
 });
 
 export const stockMovements = pgTable("stock_movements", {

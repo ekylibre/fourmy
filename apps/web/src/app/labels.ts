@@ -1,6 +1,6 @@
 /** Libellés français des codes métier (procédures Ekylibre, natures, unités). */
 
-import { PROCEDURE_LABELS } from "./procedure-labels";
+import { PROCEDURE_LABELS } from "@fourmy/contracts";
 
 /** Libellé officiel Ekylibre ; à défaut, le code rendu lisible. */
 export function procedureLabel(code: string): string {

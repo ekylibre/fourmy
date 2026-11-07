@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { isoDateTime, uuid } from "./primitives.js";
-import { interventionParameterWrite } from "./entities/interventions.js";
+import {
+  interventionTarget,
+  interventionInput,
+  interventionOutput,
+  interventionTool,
+  interventionDoer,
+  workPeriod,
+} from "./entities/interventions.js";
+import { treatmentPurpose } from "./procedures.js";
 
 /**
  * Protocole de synchronisation mobile (ADR-13), au format WatermelonDB :
@@ -11,7 +19,7 @@ import { interventionParameterWrite } from "./entities/interventions.js";
  */
 
 /** Collections synchronisées dans la première tranche. */
-export const syncCollection = z.enum(["land_parcels", "articles", "equipments", "interventions"]);
+export const syncCollection = z.enum(["land_parcels", "articles", "equipments", "people", "interventions"]);
 export type SyncCollection = z.infer<typeof syncCollection>;
 
 /** Jeu de changements WatermelonDB pour une collection. */
@@ -57,16 +65,24 @@ export const syncEquipment = z.object({
   updated_at_server: z.number(),
 });
 
+export const syncPerson = z.object({
+  id: uuid,
+  name: z.string(),
+  role: z.string().nullable(),
+  active: z.boolean(),
+  updated_at_server: z.number(),
+});
+
 export const syncInterventionPulled = z.object({
   id: uuid,
   procedure: z.string(),
-  status: z.enum(["planned", "done"]),
+  status: z.enum(["planned", "done", "cancelled"]),
   started_at: z.number().nullable(),
   stopped_at: z.number().nullable(),
   origin: z.string(),
   client_id: z.string().nullable(),
-  /** Paramètres sérialisés (WatermelonDB : colonnes scalaires). */
-  parameters_json: z.string(),
+  /** Corps structuré (périodes, cibles, intrants, sorties, matériels, personnes, motifs) sérialisé. */
+  body_json: z.string(),
   updated_at_server: z.number(),
 });
 
@@ -81,17 +97,19 @@ export type SyncPullResponse = z.infer<typeof syncPullResponse>;
 
 // --- Enregistrements poussés (push) -----------------------------------------
 
-/** Instant en millisecondes (WatermelonDB) ou ISO-8601. */
-const instant = z.union([z.number().int().nonnegative(), isoDateTime]);
-
 /** Intervention saisie sur le mobile. `id` = UUID client, clé d'idempotence. */
 export const syncInterventionPushed = z.object({
   id: uuid,
   procedure: z.string().min(1),
   status: z.enum(["planned", "done"]),
-  started_at: instant.nullable().optional(),
-  stopped_at: instant.nullable().optional(),
-  parameters: z.array(interventionParameterWrite).default([]),
+  periods: z.array(workPeriod).default([]),
+  targets: z.array(interventionTarget).default([]),
+  inputs: z.array(interventionInput).default([]),
+  outputs: z.array(interventionOutput).default([]),
+  tools: z.array(interventionTool).default([]),
+  doers: z.array(interventionDoer).default([]),
+  purposes: z.array(treatmentPurpose).default([]),
+  notes: z.string().max(2000).optional(),
 });
 export type SyncInterventionPushed = z.infer<typeof syncInterventionPushed>;
 

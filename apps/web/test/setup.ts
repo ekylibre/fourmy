@@ -52,3 +52,10 @@ class IntersectionObserverStub {
   }
 }
 window.IntersectionObserver = IntersectionObserverStub as unknown as typeof IntersectionObserver;
+
+// jsdom n'a pas document.fonts (utilisé par le Textarea autosize de Mantine).
+if (!("fonts" in document)) {
+  Object.defineProperty(document, "fonts", {
+    value: { addEventListener: () => {}, removeEventListener: () => {}, ready: Promise.resolve() },
+  });
+}

@@ -9,6 +9,8 @@ import {
   demoMyFarms,
   demoArticles,
   demoInterventions,
+  demoPeople,
+  demoProcedures,
   demoStock,
   demoPhytoRegister,
   DEMO_FARM_ID,
@@ -41,6 +43,11 @@ export const handlers = [
   http.post(`*${base}/interventions/:id/complete`, () =>
     HttpResponse.json({ intervention: { ...demoInterventions[0] }, movements: [], warnings: [] }),
   ),
+  http.post(`*${base}/interventions/:id/cancel`, ({ params }) =>
+    HttpResponse.json({ ...demoInterventions[0], id: params.id, status: "cancelled" }),
+  ),
+  http.get(`*${base}/procedures`, () => HttpResponse.json(demoProcedures)),
+  http.get(`*${base}/people`, () => page(demoPeople)),
   http.get(`*${base}/registers/phyto`, ({ request }) => {
     const url = new URL(request.url);
     if (url.searchParams.get("format") === "csv") {

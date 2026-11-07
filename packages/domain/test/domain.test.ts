@@ -106,6 +106,9 @@ describe("interventions", () => {
     const plan = planCorrection(ctx, "f", "i1", original);
     expect(plan.movements.map((m) => m.quantity)).toEqual([3, -100]);
     expect(plan.movements.every((m) => m.cause === "adjustment")).toBe(true);
+    // Datée comme l'original (historique du stock juste), saisie maintenant.
+    expect(plan.movements.map((m) => m.occurredAt)).toEqual(original.map((m) => m.occurredAt));
+    expect(plan.movements.every((m) => m.createdAt === ctx.now)).toBe(true);
     expect(plan.event.type).toBe("intervention.corrected");
   });
 });

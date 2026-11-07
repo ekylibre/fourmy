@@ -8,7 +8,7 @@ import {
   type SyncPushRequest,
   type SyncPushResult,
 } from "@fourmy/contracts";
-import { planInTx, completeInTx } from "./interventions.js";
+import { planInTx, completeInTx, readInterventionsWhere } from "./interventions.js";
 import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
 
 /**
@@ -48,16 +48,15 @@ export async function pull(db: Database, farmId: string, lastPulledAt: string | 
       tx,
       sql`SELECT id, name, kind, state, updated_at FROM equipments WHERE updated_at > ${since}::timestamptz`,
     );
-    const interventions = await rows<Record<string, unknown>>(
+    const people = await rows<Record<string, unknown>>(
       tx,
-      sql`
-        SELECT i.id, i.procedure, i.status, i.started_at, i.stopped_at, i.origin, i.client_id, i.updated_at,
-               coalesce(json_agg(json_build_object('role', p.role, 'refType', p.ref_type, 'refId', p.ref_id,
-                 'quantity', p.quantity, 'unit', p.unit)) FILTER (WHERE p.id IS NOT NULL), '[]') AS parameters
-        FROM interventions i LEFT JOIN intervention_parameters p ON p.intervention_id = i.id
-        WHERE i.updated_at > ${since}::timestamptz
-          ${first ? sql`AND coalesce(i.started_at, i.stopped_at, i.created_at) > now() - interval '365 days'` : sql``}
-        GROUP BY i.id`,
+      sql`SELECT id, name, role, active, updated_at FROM people WHERE updated_at > ${since}::timestamptz`,
+    );
+    const interventions = await readInterventionsWhere(
+      tx,
+      sql`i.updated_at > ${since}::timestamptz
+          ${first ? sql`AND coalesce(i.started_at, i.stopped_at, i.created_at) > now() - interval '365 days'` : sql``}`,
+      5000,
     );
 
     const bucket = () => ({ created: [] as Record<string, unknown>[], updated: [] as Record<string, unknown>[], deleted: [] as string[] });
@@ -65,6 +64,7 @@ export async function pull(db: Database, farmId: string, lastPulledAt: string | 
       land_parcels: bucket(),
       articles: bucket(),
       equipments: bucket(),
+      people: bucket(),
       interventions: bucket(),
     };
     const put = (collection: keyof SyncChanges, record: Record<string, unknown>) =>
@@ -92,25 +92,26 @@ export async function pull(db: Database, farmId: string, lastPulledAt: string | 
     for (const e of equipments) {
       put("equipments", { id: e.id, name: e.name, kind: e.kind, state: e.state ?? null, updated_at_server: ms(e.updated_at) });
     }
+    for (const p of people) {
+      put("people", { id: p.id, name: p.name, role: p.role ?? null, active: p.active, updated_at_server: ms(p.updated_at) });
+    }
     for (const i of interventions) {
+      const { periods, targets, inputs, outputs, tools, doers, purposes, notes } = i;
       put("interventions", {
         id: i.id,
         procedure: i.procedure,
         status: i.status,
-        started_at: ms(i.started_at),
-        stopped_at: ms(i.stopped_at),
+        started_at: ms(i.startedAt),
+        stopped_at: ms(i.stoppedAt),
         origin: i.origin,
-        client_id: i.client_id ?? null,
-        parameters_json: JSON.stringify(i.parameters),
-        updated_at_server: ms(i.updated_at),
+        client_id: i.clientId,
+        body_json: JSON.stringify({ periods, targets, inputs, outputs, tools, doers, purposes, notes }),
+        updated_at_server: ms(i.updatedAt),
       });
     }
     return { changes, timestamp: new Date(now).toISOString() };
   });
 }
-
-const toIso = (v: number | string | null | undefined) =>
-  v === null || v === undefined ? undefined : new Date(v).toISOString();
 
 /**
  * Conflit (WatermelonDB) : l'intervention a été modifiée sur le serveur, par
@@ -151,19 +152,19 @@ export async function push(db: Database, farmId: string, ctx: DomainCtx, body: S
       const outcome = await withFarm(db, farmId, async (tx) => {
         const [current] = await rows<{ status: string }>(tx, sql`SELECT status FROM interventions WHERE id = ${r.id}`);
         if (current?.status === "done") return "unchanged" as const; // re-push idempotent
+        const { id, procedure, status, ...body } = r;
         if (!current) {
-          await planInTx(tx, farmId, ctx, {
-            id: r.id,
-            procedure: r.procedure,
-            startedAt: toIso(r.started_at),
-            parameters: r.status === "planned" ? r.parameters : [],
-          }, r.id);
+          // Réalisée d'emblée : on planifie à vide puis on réalise avec le corps complet.
+          await planInTx(
+            tx,
+            farmId,
+            ctx,
+            status === "planned" ? { id, procedure, ...body } : { id, procedure, periods: [], targets: [], inputs: [], outputs: [], tools: [], doers: [], purposes: [] },
+            id,
+          );
         }
-        if (r.status === "done") {
-          const startedAt = toIso(r.started_at);
-          const stoppedAt = toIso(r.stopped_at);
-          if (!startedAt || !stoppedAt) throw new BadRequest("started_at et stopped_at requis pour une intervention réalisée.");
-          await completeInTx(tx, farmId, ctx, r.id, { startedAt, stoppedAt, parameters: r.parameters });
+        if (status === "done") {
+          await completeInTx(tx, farmId, ctx, id, body);
           return "completed" as const;
         }
         return current ? ("unchanged" as const) : ("created" as const);

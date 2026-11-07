@@ -91,13 +91,16 @@ un `treatment` qui accepte aussi des fertilisants.
   category: "crops" | "vine" | "equipment" | "general",   // regroupement à l'écran
   inputKinds: ["phyto"],             // natures d'articles acceptées en intrant
   outputKinds: [],                   // natures d'articles acceptées en sortie
-  toolHints: ["sprayer", "tractor"], // matériels proposés en premier (pas un filtre)
 }
 ```
 
-Les matériels ne sont plus **filtrés** par une grammaire : ils sont
-**suggérés** (ceux dont le `kind` figure dans `toolHints` apparaissent en
-premier), et tout matériel reste sélectionnable.
+Les matériels, produits et personnes ne sont plus **filtrés** par une
+grammaire : ils sont **suggérés** d'après les **habitudes de la ferme** —
+`GET /procedures` renvoie, pour chaque procédure, son usage et les matériels,
+produits et intervenants les plus utilisés avec elle sur les 3 dernières
+années. Ils apparaissent en premier (« Habituels ») ; tout reste
+sélectionnable. (Décidé à la réalisation, à la place d'une liste figée
+`toolHints` : les habitudes réelles valent mieux qu'une table de natures.)
 
 ### 3.3 Catalogue v1
 
@@ -147,7 +150,7 @@ fin de la dernière.
 |---|---|
 | `reference_name` par paramètre (`driver`, `plant_medicine`…) | le rôle suffit (`targets`, `inputs`, `tools`, `doers`) ; la procédure dit le reste |
 | 7 « handlers » de quantité + formules Procedo | `per: "total" \| "hectare"` + l'unité de l'article |
-| Grammaire de filtres `is … can …` | `inputKinds`, `outputKinds`, `toolHints` (listes simples) |
+| Grammaire de filtres `is … can …` | `inputKinds`, `outputKinds` (listes simples) + suggestions tirées de l'historique |
 | Paramètres de groupe, lectures d'équipement, attributs | supprimés (rien ne les utilise dans les données) |
 | « Actions » cochées par défaut | `purposes` facultatif, saisi seulement si connu |
 | Coûts, prescriptions, demandes | Lyvre (coûts) ; prescriptions et planification : après la tranche |
@@ -230,10 +233,33 @@ quand seule une partie de la parcelle est traitée.
 
 ## 8. Ordre de réalisation
 
-1. **Fourmy — interventions et procédures** : catalogue et règles de forme
+1. ✅ **Fourmy — interventions et procédures** : catalogue et règles de forme
    (contrats + domaine), base (périodes, personnes, motifs), API, migrateur,
-   formulaire web unique.
+   formulaire web unique. Réalisé le 2026-11-07 — voir §9.
 2. **Fourmy — comptes** : better-auth (comptes locaux), remplacement de
    l'identité de développement, rattachement des personnes aux comptes.
 3. **zero-mobile** : client Fourmy, schéma local v5, formulaire par forme,
    push par intervention sur `/sync/push`.
+
+## 9. Réalisation (étape 1)
+
+- **Contrats** : `packages/contracts/src/procedures.ts` (catalogue, formes,
+  motifs) et `entities/interventions.ts` (forme structurée) ; synchro mobile
+  en forme structurée (`body_json` au pull, corps structuré au push) avec la
+  collection `people`.
+- **Domaine** : `validateIntervention` (règles de forme, plan / réalisation),
+  `storedUnit` / `splitUnit`. Annuler une intervention réalisée contre-passe
+  ses mouvements **à leur date d'origine** : l'historique du stock montre
+  qu'elle n'a pas eu lieu ; `createdAt` garde la date de l'annulation.
+- **Base** : migration `0006` (personnes, périodes, motifs, notes, statut
+  `cancelled`, attributs de paramètres). Stockage inchangé : une ligne par
+  rôle dans `intervention_parameters` (unité suffixée `_per_hectare`).
+- **API** : `POST /interventions`, `/:id/complete`, `/:id/cancel` (motif),
+  `GET /procedures` (catalogue + habitudes), `GET|POST|PATCH /people`.
+- **Migrateur** : intervenants « Worker » → personnes (nom seul), périodes
+  depuis `intervention_working_periods` (chevauchements fusionnés ; à défaut
+  début/fin de l'intervention). Fixtures : personnes renommées
+  « Personne N », hauteurs IGN des bâtiments exclues (donnée dérivée).
+- **Web** : formulaire unique piloté par la forme (périodes multiples,
+  quantités par hectare ou totales, sortie + destination, motifs, notes,
+  habitudes en premier), annulation avec motif, annulées masquables.

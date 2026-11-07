@@ -13,3 +13,4 @@ export * from "./entities/interventions.js";
 export * from "./events.js";
 export * from "./sync.js";
 export * from "./api.js";
+export * from "./procedures.js";

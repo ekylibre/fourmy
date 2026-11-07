@@ -87,6 +87,7 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
       matters: await x.matters(s),
       interventions: await x.interventions(s),
       parameters: await x.parameters(s),
+      workingPeriods: await x.workingPeriods(s),
       harvests: await x.harvests(s),
       phytoRef: await x.phytoReference(s),
     }));
@@ -375,6 +376,27 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
           paramsByIntervention.set(p.intervention_id, list);
         }
 
+        const periodsByIntervention = new Map<number, x.WorkingPeriodRow[]>();
+        for (const wp of data.workingPeriods) {
+          const list = periodsByIntervention.get(wp.intervention_id) ?? [];
+          list.push(wp);
+          periodsByIntervention.set(wp.intervention_id, list);
+        }
+
+        // Personnes : les intervenants (« Worker ») des interventions, par leur nom
+        // seulement (docs/interventions.md §7 — aucune autre donnée personnelle).
+        const migratedPeople = new Set<number>();
+        for (const p of data.parameters) {
+          if (p.type !== "InterventionDoer" || !p.product_id || p.product_type !== "Worker") continue;
+          if (migratedPeople.has(p.product_id)) continue;
+          migratedPeople.add(p.product_id);
+          await tx`
+            INSERT INTO people (id, farm_id, name)
+            VALUES (${id("products", p.product_id)}, ${farmId}, ${p.product_name?.trim() || `Personne ${p.product_id}`})
+            ON CONFLICT (id) DO NOTHING`;
+          inc("people");
+        }
+
         for (const it of data.interventions) {
           const status = interventionStatus(it.state);
           if (!status) {
@@ -390,6 +412,31 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
             ON CONFLICT (id) DO UPDATE SET procedure = excluded.procedure, status = excluded.status,
               started_at = excluded.started_at, stopped_at = excluded.stopped_at, updated_at = now()`;
           inc("interventions");
+
+          // Périodes de travail : celles d'Ekylibre, sinon [début, fin] de l'intervention.
+          // Recalculées à chaque migration, comme le reste de l'intervention.
+          const periods: { id: string; startedAt: string; stoppedAt: string }[] = [];
+          for (const wp of periodsByIntervention.get(it.id) ?? []) {
+            const last = periods.at(-1);
+            const startedAt = iso(wp.started_at)!;
+            const stoppedAt = iso(wp.stopped_at)!;
+            // Ekylibre tolère les chevauchements : on fusionne les périodes qui se recouvrent.
+            if (last && startedAt < last.stoppedAt) {
+              if (stoppedAt > last.stoppedAt) last.stoppedAt = stoppedAt;
+              continue;
+            }
+            periods.push({ id: id("intervention_working_periods", wp.id), startedAt, stoppedAt });
+          }
+          if (periods.length === 0 && it.started_at && it.stopped_at && it.stopped_at > it.started_at) {
+            periods.push({ id: id("intervention_period", it.id), startedAt: iso(it.started_at)!, stoppedAt: stoppedAt! });
+          }
+          await tx`DELETE FROM intervention_periods WHERE intervention_id = ${iid}`;
+          for (const pr of periods) {
+            await tx`
+              INSERT INTO intervention_periods (id, intervention_id, started_at, stopped_at)
+              VALUES (${pr.id}, ${iid}, ${pr.startedAt}, ${pr.stoppedAt})`;
+            inc("intervention_periods");
+          }
 
           for (const p of paramsByIntervention.get(it.id) ?? []) {
             const role = parameterRole(p.type);
@@ -430,7 +477,12 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
               refType = "equipment";
               refId = p.product_id && equipmentIds.has(p.product_id) ? id("products", p.product_id) : null;
             } else if (role === "doer") {
-              refType = "worker"; // personnes non migrées (données personnelles)
+              if (p.product_id && migratedPeople.has(p.product_id)) {
+                refType = "person";
+                refId = id("products", p.product_id);
+              } else {
+                refType = "worker";
+              }
             }
 
             await tx`
@@ -524,8 +576,8 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
       // Statistiques à jour après l'écriture massive : sans elles, les vues
       // sous RLS (registre phyto) prennent des plans désastreux (> 5 s mesurés).
       for (const t of ["land_parcels", "land_parcel_versions", "productions", "places", "place_versions",
-        "containers", "container_versions", "equipments", "articles", "lots", "interventions",
-        "intervention_parameters", "stock_movements"]) {
+        "containers", "container_versions", "equipments", "articles", "lots", "people", "interventions",
+        "intervention_periods", "intervention_parameters", "stock_movements"]) {
         await target.unsafe(`ANALYZE ${t}`);
       }
 

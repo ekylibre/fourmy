@@ -3,7 +3,9 @@ import type {
   Article,
   ContainerContents,
   Intervention,
+  Person,
   PhytoRegisterEntry,
+  ProcedureCatalogue,
   Snapshot,
   StockLevel,
 } from "@fourmy/contracts";
@@ -62,5 +64,22 @@ export function usePhytoRegister(farmId: string, campaign: number) {
     queryKey: ["register", farmId, campaign],
     queryFn: () =>
       api.get<{ campaign: number; items: PhytoRegisterEntry[] }>(farmPath(farmId, `/registers/phyto?campaign=${campaign}`)),
+  });
+}
+
+/** Catalogue des procédures, avec usage et suggestions propres à la ferme. */
+export function useProcedures(farmId: string) {
+  return useQuery({
+    queryKey: ["procedures", farmId],
+    queryFn: () => api.get<ProcedureCatalogue>(farmPath(farmId, "/procedures")),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function usePeople(farmId: string) {
+  return useQuery({
+    queryKey: ["people", farmId],
+    queryFn: () => api.get<Page<Person>>(farmPath(farmId, "/people")),
+    staleTime: 5 * 60_000,
   });
 }

@@ -95,6 +95,9 @@ export function planInterventionCompletion(
 /**
  * Correction d'une intervention réalisée : contre-passe ses mouvements
  * (quantités opposées, cause `adjustment`). On ne modifie jamais un mouvement.
+ * La contre-passation porte la date du mouvement d'origine (l'historique du
+ * stock montre que l'intervention n'a pas eu lieu) ; `createdAt` garde la
+ * date de saisie de la correction.
  */
 export function planCorrection(
   ctx: DomainCtx,
@@ -110,7 +113,7 @@ export function planCorrection(
     containerId: m.containerId,
     quantity: -m.quantity,
     unit: m.unit,
-    occurredAt: ctx.now,
+    occurredAt: m.occurredAt,
     cause: "adjustment",
     interventionId,
     createdAt: ctx.now,

@@ -8,6 +8,7 @@ const url = process.env.DATABASE_URL;
 const app = createApp();
 const parcelId = crypto.randomUUID();
 const articleId = crypto.randomUUID();
+const personId = crypto.randomUUID();
 const square = (d: number) => ({
   type: "MultiPolygon",
   coordinates: [[[[0.5, 44.8], [0.5 + d, 44.8], [0.5 + d, 44.8 + d], [0.5, 44.8 + d], [0.5, 44.8]]]],
@@ -32,6 +33,7 @@ describe.skipIf(!url)("synchro mobile (intégration)", () => {
       VALUES (${crypto.randomUUID()}, ${parcelId}, ST_SetSRID(ST_GeomFromGeoJSON(${JSON.stringify(square(0.0013))}), 4326),
               10000, tstzrange('2020-01-01', NULL))`;
     await sql`INSERT INTO articles (id, farm_id, name, kind, unit, amm) VALUES (${articleId}, ${farmId}, 'Herbicide Y', 'phyto', 'liter', '2000123')`;
+    await sql`INSERT INTO people (id, farm_id, name) VALUES (${personId}, ${farmId}, 'Dominique')`;
     await sql`INSERT INTO equipments (id, farm_id, name, kind) VALUES (${crypto.randomUUID()}, ${farmId}, 'Pulvérisateur', 'sprayer')`;
   });
   afterAll(async () => {
@@ -43,16 +45,15 @@ describe.skipIf(!url)("synchro mobile (intégration)", () => {
     (await app.request(`${base}/sync/pull${last ? `?lastPulledAt=${encodeURIComponent(last)}` : ""}`, { headers: mobile.headers })).json();
   const push = (body: unknown) =>
     app.request(`${base}/sync/push`, { method: "POST", headers: mobile.headers, body: JSON.stringify(body) });
-  const done = (id: string, unit = "liter_per_hectare") => ({
+  const done = (id: string, articleRef = articleId) => ({
     id,
     procedure: "spraying",
     status: "done",
-    started_at: Date.parse("2026-05-02T07:00:00Z"),
-    stopped_at: Date.parse("2026-05-02T08:00:00Z"),
-    parameters: [
-      { role: "target", refType: "land_parcel", refId: parcelId, quantity: null, unit: null },
-      { role: "input", refType: "article", refId: articleId, quantity: 1.5, unit },
-    ],
+    periods: [{ startedAt: "2026-05-02T07:00:00Z", stoppedAt: "2026-05-02T08:00:00Z" }],
+    targets: [{ kind: "land_parcel", id: parcelId }],
+    inputs: [{ articleId: articleRef, quantity: 1.5, per: "hectare" }],
+    doers: [{ personId }],
+    purposes: ["herbicide"],
   });
 
   it("premier pull : tout arrive en « created », parcelle prête pour la carte", async () => {
@@ -64,6 +65,7 @@ describe.skipIf(!url)("synchro mobile (intégration)", () => {
     expect(p.shape_svg).toMatch(/^M /);
     expect(r.changes.articles.created).toHaveLength(1);
     expect(r.changes.equipments.created).toHaveLength(1);
+    expect(r.changes.people.created).toEqual([expect.objectContaining({ id: personId, name: "Dominique", active: true })]);
   });
 
   it("pull incrémental sans changement : vide", async () => {
@@ -105,13 +107,13 @@ describe.skipIf(!url)("synchro mobile (intégration)", () => {
     const bad = crypto.randomUUID();
     const res = await push({
       lastPulledAt: t1,
-      changes: { interventions: { created: [done(ok), done(bad, "kilogram_per_hectare")], updated: [], deleted: [ok] } },
+      changes: { interventions: { created: [done(ok), done(bad, crypto.randomUUID())], updated: [], deleted: [ok] } },
     });
     expect(res.status).toBe(200);
     const r = await res.json();
     expect(r.applied).toEqual([{ id: ok, outcome: "completed" }]);
     expect(r.failed.map((f: { id: string }) => f.id)).toEqual([bad, ok]);
-    expect(r.failed[0].error).toMatch(/incompatible/);
+    expect(r.failed[0].error).toMatch(/article inconnu/);
     expect(r.failed[1].error).toMatch(/Suppression/);
     // Tout ou rien : l'intervention rejetée n'a laissé aucune trace côté serveur.
     expect(await sql`SELECT 1 FROM interventions WHERE id = ${bad}`).toHaveLength(0);
@@ -120,7 +122,7 @@ describe.skipIf(!url)("synchro mobile (intégration)", () => {
   it("conflit : une intervention modifiée sur le web depuis le pull renvoie 409", async () => {
     const id = crypto.randomUUID();
     const created = await app.request(`${base}/interventions`, {
-      method: "POST", headers: owner.headers, body: JSON.stringify({ id, procedure: "spraying", parameters: [] }),
+      method: "POST", headers: owner.headers, body: JSON.stringify({ id, procedure: "spraying" }),
     });
     expect(created.status).toBe(201);
     const res = await push({ lastPulledAt: t1, changes: { interventions: { created: [], updated: [done(id)], deleted: [] } } });
@@ -132,6 +134,9 @@ describe.skipIf(!url)("synchro mobile (intégration)", () => {
     const fromMobile = r.changes.interventions.updated.filter((i: { origin: string }) => i.origin === "mobile");
     expect(fromMobile.length).toBe(2);
     expect(fromMobile.every((i: { status: string }) => i.status === "done")).toBe(true);
-    expect(JSON.parse(fromMobile[0].parameters_json)).toHaveLength(2);
+    const body = JSON.parse(fromMobile[0].body_json);
+    expect(body.inputs).toEqual([{ articleId, quantity: 1.5, per: "hectare", unit: "liter" }]);
+    expect(body).toMatchObject({ purposes: ["herbicide"], doers: [{ personId }] });
+    expect(body.periods).toHaveLength(1);
   });
 });

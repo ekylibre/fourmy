@@ -9,6 +9,8 @@ import { syncRoutes } from "./sync.js";
 import { importRoutes } from "./imports.js";
 import { articleRoutes } from "./articles.js";
 import { plan3dRoutes } from "./plan3d.js";
+import { peopleRoutes } from "./people.js";
+import { procedureRoutes } from "./procedures.js";
 
 /**
  * Routes métier sous `/api/v1/farms/:farmId` (architecture §5.1), découpées
@@ -23,4 +25,6 @@ export const farmRoutes = new Hono<Env>()
   .route("/", syncRoutes)
   .route("/", importRoutes)
   .route("/", articleRoutes)
-  .route("/", plan3dRoutes);
+  .route("/", plan3dRoutes)
+  .route("/", peopleRoutes)
+  .route("/", procedureRoutes);

@@ -11,7 +11,8 @@ import type {
   ContainerContents,
   TrackCoverage,
 } from "@fourmy/contracts";
-import type { Article, Intervention, PhytoRegisterEntry, StockLevel } from "@fourmy/contracts";
+import { PROCEDURES, SHAPE_LABELS, TREATMENT_PURPOSE_LABELS } from "@fourmy/contracts";
+import type { Article, Intervention, Person, PhytoRegisterEntry, ProcedureCatalogue, StockLevel } from "@fourmy/contracts";
 
 /**
  * Jeu de données de démonstration — anonymisé, inspiré d'une petite ferme
@@ -184,6 +185,19 @@ export const demoArticles: Article[] = [
   },
 ];
 
+export const demoPeople: Person[] = [
+  {
+    id: "00000000-0000-7000-8000-000000000601",
+    farmId: DEMO_FARM_ID,
+    name: "Camille",
+    role: "tractoriste",
+    userId: null,
+    active: true,
+    createdAt: now,
+    updatedAt: now,
+  },
+];
+
 export const demoInterventions: Intervention[] = [
   {
     id: "00000000-0000-7000-8000-000000000401",
@@ -192,16 +206,31 @@ export const demoInterventions: Intervention[] = [
     status: "done",
     startedAt: "2026-06-10T08:00:00.000Z",
     stoppedAt: "2026-06-10T09:00:00.000Z",
+    periods: [{ startedAt: "2026-06-10T08:00:00.000Z", stoppedAt: "2026-06-10T09:00:00.000Z" }],
+    targets: [{ kind: "land_parcel", id: "00000000-0000-7000-8000-0000000000a0" }],
+    inputs: [{ articleId: "00000000-0000-7000-8000-000000000301", quantity: 2, per: "hectare", unit: "liter" }],
+    outputs: [],
+    tools: [],
+    doers: [{ personId: "00000000-0000-7000-8000-000000000601" }],
+    purposes: ["fungicide"],
+    notes: null,
     origin: "mobile",
     clientId: "00000000-0000-7000-8000-000000000401",
     createdAt: now,
     updatedAt: now,
-    parameters: [
-      { id: "00000000-0000-7000-8000-000000000411", interventionId: "00000000-0000-7000-8000-000000000401", role: "target", refType: "land_parcel", refId: "00000000-0000-7000-8000-0000000000a0", quantity: null, unit: null },
-      { id: "00000000-0000-7000-8000-000000000412", interventionId: "00000000-0000-7000-8000-000000000401", role: "input", refType: "article", refId: "00000000-0000-7000-8000-000000000301", quantity: 2, unit: "liter_per_hectare" },
-    ],
   },
 ];
+
+/** Catalogue des procédures ; la pulvérisation est l'habitude de la ferme de démo. */
+export const demoProcedures: ProcedureCatalogue = {
+  shapes: SHAPE_LABELS,
+  purposes: TREATMENT_PURPOSE_LABELS,
+  items: PROCEDURES.map((p) =>
+    p.code === "spraying"
+      ? { ...p, usage: 1, suggestions: { tools: [], inputs: ["00000000-0000-7000-8000-000000000301"], doers: ["00000000-0000-7000-8000-000000000601"] } }
+      : { ...p, usage: 0, suggestions: { tools: [], inputs: [], doers: [] } },
+  ),
+};
 
 export const demoStock: StockLevel[] = [
   {

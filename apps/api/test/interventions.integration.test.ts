@@ -56,30 +56,37 @@ describe.skipIf(!url)("interventions (intégration)", () => {
     app.request(`${base}${path}`, { method: "POST", headers: worker.headers, body: JSON.stringify(body) });
   const get = async (path: string) => (await app.request(`${base}${path}`, { headers: worker.headers })).json();
 
-  const spraying = (dose: number, unit = "liter_per_hectare", stock?: object) => [
-    { role: "target", refType: "land_parcel", refId: parcelId, quantity: null, unit: null },
-    { role: "input", refType: "article", refId: fongicideId, quantity: dose, unit, stock },
-  ];
+  const period = (day: string, from = "08:00", to = "09:00") => ({
+    startedAt: `${day}T${from}:00Z`,
+    stoppedAt: `${day}T${to}:00Z`,
+  });
+  const spraying = (dose: number, extra: object = {}) => ({
+    targets: [{ kind: "land_parcel", id: parcelId }],
+    inputs: [{ articleId: fongicideId, quantity: dose, per: "hectare" }],
+    purposes: ["fungicide"],
+    ...extra,
+  });
   const plannedId = crypto.randomUUID();
+  const doneIds: string[] = [];
 
   it("un salarié planifie un traitement ; la planification est idempotente", async () => {
-    const body = { id: plannedId, procedure: "spraying", startedAt: "2026-06-10T08:00:00Z", parameters: spraying(2) };
+    const body = { id: plannedId, procedure: "spraying", plannedAt: "2026-06-10T08:00:00Z", ...spraying(2) };
     const first = await post("/interventions", body);
     expect(first.status).toBe(201);
-    expect((await first.json()).status).toBe("planned");
+    const created = await first.json();
+    expect(created).toMatchObject({ status: "planned", startedAt: "2026-06-10T08:00:00.000Z", purposes: ["fungicide"] });
+    expect(created.inputs).toEqual([{ articleId: fongicideId, quantity: 2, per: "hectare", unit: "liter" }]);
     const again = await post("/interventions", body);
     expect(again.status).toBe(200);
   });
 
   it("il le réalise : 2 L/ha × 1 ha = 2 L sortis du lot en stock, au hangar", async () => {
-    const res = await post(`/interventions/${plannedId}/complete`, {
-      startedAt: "2026-06-10T08:00:00Z",
-      stoppedAt: "2026-06-10T09:00:00Z",
-      parameters: spraying(2),
-    });
+    const res = await post(`/interventions/${plannedId}/complete`, { periods: [period("2026-06-10")], ...spraying(2) });
     expect(res.status).toBe(200);
     const r = await res.json();
+    doneIds.push(plannedId);
     expect(r.intervention.status).toBe("done");
+    expect(r.intervention.periods).toEqual([{ startedAt: "2026-06-10T08:00:00.000Z", stoppedAt: "2026-06-10T09:00:00.000Z" }]);
     expect(r.warnings).toEqual([]);
     expect(r.movements).toHaveLength(1);
     expect(r.movements[0]).toMatchObject({ lotId: lotA, placeId: hangarId, quantity: -2, unit: "liter" });
@@ -94,58 +101,120 @@ describe.skipIf(!url)("interventions (intégration)", () => {
   });
 
   it("une intervention réalisée ne se réalise pas deux fois (409)", async () => {
-    const res = await post(`/interventions/${plannedId}/complete`, {
-      startedAt: "2026-06-10T08:00:00Z", stoppedAt: "2026-06-10T09:00:00Z", parameters: spraying(2),
-    });
+    const res = await post(`/interventions/${plannedId}/complete`, { periods: [period("2026-06-10")], ...spraying(2) });
     expect(res.status).toBe(409);
+  });
+
+  it("plusieurs périodes, surface traitée partielle : la dose suit la surface réellement traitée", async () => {
+    const id = crypto.randomUUID();
+    await post("/interventions", { id, procedure: "spraying" });
+    const res = await post(`/interventions/${id}/complete`, {
+      periods: [period("2026-06-15", "08:00", "10:00"), period("2026-06-15", "14:00", "16:00")],
+      ...spraying(2, { targets: [{ kind: "land_parcel", id: parcelId, workedAreaM2: 5000 }] }),
+    });
+    expect(res.status).toBe(200);
+    const r = await res.json();
+    doneIds.push(id);
+    expect(r.movements[0].quantity).toBe(-1);
+    expect(r.intervention).toMatchObject({ startedAt: "2026-06-15T08:00:00.000Z", stoppedAt: "2026-06-15T16:00:00.000Z" });
+    expect(r.intervention.periods).toHaveLength(2);
+    expect(r.intervention.targets[0].workedAreaM2).toBe(5000);
   });
 
   it("une surconsommation est acceptée mais signalée (stock négatif)", async () => {
     const id = crypto.randomUUID();
-    await post("/interventions", { id, procedure: "spraying", parameters: [] });
+    await post("/interventions", { id, procedure: "spraying" });
     const res = await post(`/interventions/${id}/complete`, {
-      startedAt: "2026-06-20T08:00:00Z", stoppedAt: "2026-06-20T09:00:00Z",
-      parameters: spraying(2, "liter_per_hectare", { quantity: 50 }),
+      periods: [period("2026-06-20")],
+      ...spraying(50, { inputs: [{ articleId: fongicideId, quantity: 50, per: "total" }] }),
     });
     const r = await res.json();
+    doneIds.push(id);
     expect(r.movements[0].quantity).toBe(-50);
     expect(r.warnings[0]).toMatch(/stock négatif/);
     const stock = await get(`/stock?at=2026-06-21T00:00:00Z&article=${fongicideId}`);
-    expect(stock.items[0].quantity).toBe(-32);
+    expect(stock.items[0].quantity).toBe(-33);
   });
 
-  it("une récolte sans lieu est refusée (422), puis rangée en cuve", async () => {
+  it("une récolte sans destination est refusée (422), puis rangée en cuve", async () => {
     const id = crypto.randomUUID();
-    await post("/interventions", { id, procedure: "harvesting", parameters: [] });
-    const output = (stock?: object) => [
-      { role: "target", refType: "land_parcel", refId: parcelId, quantity: null, unit: null },
-      { role: "output", refType: "article", refId: raisinId, quantity: 300, unit: "liter", stock },
-    ];
-    const window = { startedAt: "2026-09-15T08:00:00Z", stoppedAt: "2026-09-15T12:00:00Z" };
-    expect((await post(`/interventions/${id}/complete`, { ...window, parameters: output() })).status).toBe(422);
-    const ok = await post(`/interventions/${id}/complete`, { ...window, parameters: output({ containerId: cuveId }) });
+    await post("/interventions", { id, procedure: "harvesting" });
+    const body = (to?: object) => ({
+      periods: [period("2026-09-15", "08:00", "12:00")],
+      targets: [{ kind: "land_parcel", id: parcelId }],
+      outputs: [{ articleId: raisinId, quantity: 300, per: "total", ...(to ? { to } : {}) }],
+    });
+    const refused = await post(`/interventions/${id}/complete`, body());
+    expect(refused.status).toBe(422);
+    const ok = await post(`/interventions/${id}/complete`, body({ containerId: cuveId }));
     expect(ok.status).toBe(200);
+    doneIds.push(id);
     const contents = await get(`/containers/${cuveId}/contents?at=2026-09-16T00:00:00Z`);
     expect(contents.volumeL).toBe(300);
     expect(contents.composition[0].lotCode).toBe("Raisin 2026-09-15");
   });
 
-  it("une unité incohérente est refusée plutôt que devinée (422)", async () => {
+  it("la forme de la procédure est vérifiée (422) et rien n'est écrit", async () => {
     const id = crypto.randomUUID();
-    await post("/interventions", { id, procedure: "spraying", parameters: [] });
-    const res = await post(`/interventions/${id}/complete`, {
-      startedAt: "2026-07-01T08:00:00Z", stoppedAt: "2026-07-01T09:00:00Z",
-      parameters: spraying(3, "kilogram_per_hectare"),
+    await post("/interventions", { id, procedure: "spraying" });
+    // Un traitement sans produit phyto, des motifs sur un travail du sol, des périodes qui se chevauchent.
+    const noPhyto = await post(`/interventions/${id}/complete`, {
+      periods: [period("2026-07-01")], targets: [{ kind: "land_parcel", id: parcelId }],
     });
-    expect(res.status).toBe(422);
-    // Et rien n'a été écrit (transaction annulée) : l'intervention reste planifiée.
+    expect(noPhyto.status).toBe(422);
+    const overlap = await post(`/interventions/${id}/complete`, {
+      periods: [period("2026-07-01", "08:00", "10:00"), period("2026-07-01", "09:00", "11:00")], ...spraying(1),
+    });
+    expect(overlap.status).toBe(422);
+    const plowing = await post("/interventions", { procedure: "plowing", purposes: ["herbicide"], targets: [{ kind: "land_parcel", id: parcelId }] });
+    expect(plowing.status).toBe(422);
     const list = await get("/interventions?from=2026-01-01T00:00:00Z&to=2026-12-31T00:00:00Z&status=planned");
     expect(list.items.map((i: { id: string }) => i.id)).toContain(id);
   });
 
-  it("liste les interventions d'une période avec leurs paramètres", async () => {
+  it("une référence inconnue est refusée (400)", async () => {
+    const res = await post("/interventions", { procedure: "spraying", ...spraying(1, { tools: [{ equipmentId: crypto.randomUUID() }] }) });
+    expect(res.status).toBe(400);
+    expect((await res.json()).detail).toMatch(/Matériel introuvable/);
+  });
+
+  it("liste les interventions d'une période, structurées", async () => {
     const list = await get("/interventions?from=2026-01-01T00:00:00Z&to=2026-12-31T00:00:00Z&status=done");
-    expect(list.items.length).toBe(3);
-    expect(list.items[0].parameters.length).toBeGreaterThan(0);
+    expect(list.items.length).toBe(doneIds.length);
+    expect(list.items.every((i: { targets: unknown[] }) => i.targets.length > 0)).toBe(true);
+  });
+
+  it("une personne de la ferme est désignée comme intervenant (propriétaire seul pour la créer)", async () => {
+    const refused = await post("/people", { name: "Camille" });
+    expect(refused.status).toBe(403);
+    const ownerHeaders = { "x-user-id": ownerId, "content-type": "application/json" };
+    const res = await app.request(`${base}/people`, { method: "POST", headers: ownerHeaders, body: JSON.stringify({ name: "Camille", role: "tractoriste" }) });
+    expect(res.status).toBe(201);
+    const person = await res.json();
+    const planned = await post("/interventions", { procedure: "plowing", targets: [{ kind: "land_parcel", id: parcelId }], doers: [{ personId: person.id }] });
+    expect(planned.status).toBe(201);
+    expect((await planned.json()).doers).toEqual([{ personId: person.id }]);
+    expect((await get("/people")).items.map((p: { name: string }) => p.name)).toEqual(["Camille"]);
+  });
+
+  it("annuler une intervention réalisée contre-passe ses mouvements et la retire du registre", async () => {
+    expect((await post(`/interventions/${plannedId}/cancel`, {})).status).toBe(400);
+    const res = await post(`/interventions/${plannedId}/cancel`, { reason: "saisie en double" });
+    expect(res.status).toBe(200);
+    expect((await res.json()).status).toBe("cancelled");
+    const stock = await get(`/stock?at=2026-06-21T00:00:00Z&article=${fongicideId}`);
+    expect(stock.items[0].quantity).toBe(-31);
+    const register = await get("/registers/phyto?campaign=2026");
+    expect(register.items.map((i: { interventionId: string }) => i.interventionId)).not.toContain(plannedId);
+    expect((await post(`/interventions/${plannedId}/cancel`, { reason: "encore" })).status).toBe(409);
+  });
+
+  it("le catalogue des procédures suggère ce que la ferme utilise", async () => {
+    const r = await get("/procedures");
+    expect(Object.keys(r.shapes)).toHaveLength(6);
+    const spray = r.items.find((p: { code: string }) => p.code === "spraying");
+    expect(spray).toMatchObject({ shape: "treatment", inputKinds: ["phyto"] });
+    expect(spray.usage).toBe(2); // 3 réalisés, dont 1 annulé depuis
+    expect(spray.suggestions.inputs).toEqual([fongicideId]);
   });
 });

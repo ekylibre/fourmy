@@ -156,6 +156,8 @@ export type ParameterRow = {
   reference_name: string | null;
   product_id: number | null;
   product_type: string | null;
+  /** Nom du produit (personne pour un intervenant « Worker »). */
+  product_name: string | null;
   plant_support_id: number | null;
   quantity_value: string | null;
   quantity_unit_name: string | null;
@@ -166,7 +168,7 @@ export type ParameterRow = {
 export const parameters = (s: Sql) =>
   s.unsafe<ParameterRow[]>(`
     SELECT ip.id, ip.intervention_id, ip.type, ip.reference_name, ip.product_id,
-           p.type AS product_type,
+           p.type AS product_type, p.name AS product_name,
            ap.support_id AS plant_support_id,
            ip.quantity_value, ip.quantity_unit_name, ip.quantity_population,
            CASE WHEN ip.working_zone IS NULL OR ST_IsEmpty(ip.working_zone) THEN NULL
@@ -175,6 +177,20 @@ export const parameters = (s: Sql) =>
     LEFT JOIN products p ON p.id = ip.product_id
     LEFT JOIN activity_productions ap ON p.type = 'Plant' AND ap.id = p.activity_production_id
     ORDER BY ip.intervention_id, ip.id`);
+
+export type WorkingPeriodRow = {
+  id: number;
+  intervention_id: number;
+  started_at: Date;
+  stopped_at: Date;
+};
+/** Périodes de travail rattachées à l'intervention (pas aux participations individuelles). */
+export const workingPeriods = (s: Sql) =>
+  s<WorkingPeriodRow[]>`
+    SELECT id, intervention_id, started_at, stopped_at
+    FROM intervention_working_periods
+    WHERE intervention_id IS NOT NULL AND started_at IS NOT NULL AND stopped_at > started_at
+    ORDER BY intervention_id, started_at, id`;
 
 export type HarvestRow = {
   id: number;

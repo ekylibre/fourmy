@@ -44,7 +44,9 @@ export const FIXTURE_TABLES = [
   "articles",
   "lots",
   "lot_lineage",
+  "people",
   "interventions",
+  "intervention_periods",
   "intervention_parameters",
   "stock_movements",
 ] as const;
@@ -70,7 +72,8 @@ function exportQuery(table: (typeof FIXTURE_TABLES)[number], label: string): str
                 CASE WHEN t.name LIKE '%(migration)%' THEN t.name ELSE 'Bâtiment ' || ${rank("t")} END)
               FROM places t WHERE t.farm_id = $1`;
     case "place_versions":
-      return `SELECT to_jsonb(t) || jsonb_build_object('footprint',
+      // Hauteurs : dérivées de la BD TOPO dans Fourmy, jamais issues d'Ekylibre → recalculées.
+      return `SELECT to_jsonb(t) || jsonb_build_object('height_m', NULL, 'footprint',
                 CASE WHEN t.footprint IS NULL THEN NULL ELSE ${snap("t.footprint")} END)
               FROM place_versions t JOIN places p ON p.id = t.place_id WHERE p.farm_id = $1`;
     case "container_versions":
@@ -84,6 +87,12 @@ function exportQuery(table: (typeof FIXTURE_TABLES)[number], label: string): str
               FROM lots t WHERE t.farm_id = $1`;
     case "lot_lineage":
       return `SELECT to_jsonb(t) FROM lot_lineage t JOIN lots l ON l.id = t.child_lot_id WHERE l.farm_id = $1`;
+    case "people":
+      return `SELECT to_jsonb(t) || jsonb_build_object('name', 'Personne ' || ${rank("t")}, 'user_id', NULL)
+              FROM people t WHERE t.farm_id = $1`;
+    case "intervention_periods":
+      return `SELECT to_jsonb(t) FROM intervention_periods t
+              JOIN interventions i ON i.id = t.intervention_id WHERE i.farm_id = $1`;
     case "intervention_parameters":
       return `SELECT to_jsonb(t) || jsonb_build_object('working_zone',
                 CASE WHEN t.working_zone IS NULL THEN NULL ELSE ${snap("t.working_zone")} END)
