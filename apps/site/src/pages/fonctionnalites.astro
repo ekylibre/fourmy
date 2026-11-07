@@ -13,7 +13,7 @@ const sorted = [...features].sort((a, b) => order[a.status] - order[b.status]);
     <h1>Fonctionnalités</h1>
     <p class="lead muted">
       {catalogue.procedures} procédures ({catalogue.crops} pour les cultures, {catalogue.vine} pour la vigne) regroupées en
-      {catalogue.shapes.length} formes : {catalogue.shapes.join(", ").toLowerCase()}. Les captures viennent de fermes de test.
+      {catalogue.shapes.length} formes : {catalogue.shapes.join(", ").toLowerCase()}. Les captures viennent de fermes de test ; photographies aériennes et relief : © IGN, licence ouverte Etalab 2.0.
     </p>
     {
       sorted.map((f) => (
