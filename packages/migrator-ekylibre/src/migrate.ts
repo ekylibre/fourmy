@@ -153,7 +153,10 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
               tstzrange(${lower}::timestamptz, ${upper}::timestamptz))
             ON CONFLICT (id) DO UPDATE SET
               shape = excluded.shape, area_m2 = excluded.area_m2,
-              pac_islet = excluded.pac_islet, viti = excluded.viti, valid = excluded.valid`;
+              pac_islet = excluded.pac_islet, viti = excluded.viti,
+              valid = tstzrange(lower(excluded.valid), coalesce(upper(land_parcel_versions.valid), upper(excluded.valid)))
+            WHERE NOT EXISTS (SELECT 1 FROM audit_log a
+              WHERE a.entity_id = land_parcel_versions.id AND a.action = 'corrected')`;
           migratedParcels.add(lp.id);
           inc("land_parcels");
         }
@@ -218,7 +221,9 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
               ${footprint ? tx`ST_SetSRID(ST_GeomFromGeoJSON(${geo(footprint)}), 4326)` : null},
               NULL, 'ekylibre', tstzrange(${lower}::timestamptz, ${upper}::timestamptz))
             ON CONFLICT (id) DO UPDATE SET kind = excluded.kind, footprint = excluded.footprint,
-              valid = excluded.valid`;
+              valid = tstzrange(lower(excluded.valid), coalesce(upper(place_versions.valid), upper(excluded.valid)))
+            WHERE NOT EXISTS (SELECT 1 FROM audit_log a
+              WHERE a.entity_id = place_versions.id AND a.action = 'corrected')`;
         };
         for (const pl of data.places) {
           const lower = iso(pl.born_at) ?? FAR_PAST;
@@ -260,6 +265,11 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
         };
 
         // ---- Contenants (cuves) --------------------------------------------
+        const correctedVersions = new Set(
+          (await tx<{ id: string }[]>`
+            SELECT DISTINCT entity_id::text AS id FROM audit_log
+            WHERE action = 'corrected' AND entity = 'container_versions'`).map((r) => r.id),
+        );
         const containerIds = new Set<number>();
         for (const c of data.containers) {
           const kind = containerKind(c.variety);
@@ -274,7 +284,11 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
             warnings.push({
               entity: "container",
               id: String(c.id),
-              message: `${c.name} : capacité saisie ${capacity} L ≠ libellé « ${c.variant_name} » (${announced} L) — valeur source conservée`,
+              message: `${c.name} : capacité saisie ${capacity} L ≠ libellé « ${c.variant_name} » (${announced} L) — ${
+                correctedVersions.has(id("container_versions", c.id))
+                  ? "corrigée dans Fourmy (correction préservée)"
+                  : "valeur source conservée, à corriger dans Fourmy"
+              }`,
             });
           }
           const placeId =
@@ -292,7 +306,9 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
             VALUES (${id("container_versions", c.id)}, ${cid}, ${kind}, ${capacity}, NULL, 'auto',
                     tstzrange(${lower}::timestamptz, ${upper}::timestamptz))
             ON CONFLICT (id) DO UPDATE SET kind = excluded.kind, capacity_l = excluded.capacity_l,
-              valid = excluded.valid`;
+              valid = tstzrange(lower(excluded.valid), coalesce(upper(container_versions.valid), upper(excluded.valid)))
+            WHERE NOT EXISTS (SELECT 1 FROM audit_log a
+              WHERE a.entity_id = container_versions.id AND a.action = 'corrected')`;
           containerIds.add(c.id);
           inc("containers");
         }
@@ -499,6 +515,12 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
         "intervention_parameters", "stock_movements"]) {
         await target.unsafe(`ANALYZE ${t}`);
       }
+
+      // Corrections faites dans Fourmy et préservées par cette migration.
+      const [preserved] = await target<{ n: number }[]>`
+        SELECT count(DISTINCT entity_id)::int AS n FROM audit_log
+        WHERE farm_id = ${farmId} AND action = 'corrected'`;
+      if (preserved && preserved.n > 0) counts.preserved_corrections = preserved.n;
 
       // ---- Écart du registre phyto (critère US-5) ---------------------------
       const fourmy = await target.begin(async (tx) => {

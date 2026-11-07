@@ -156,3 +156,31 @@ describe("stocks", () => {
     expect(comp.syrah).toBeCloseTo(0.25);
   });
 });
+
+import { planStateCorrection } from "../src/index.js";
+
+describe("corrections", () => {
+  const base = { farmId: "f", entity: "container_versions", entityId: "v1" };
+  it("trace l'avant, l'après et le motif", () => {
+    const plan = planStateCorrection(ctx, {
+      ...base,
+      before: { capacityL: 100000, kind: "tank" },
+      patch: { capacityL: 1000 },
+      reason: "saisie en hl au lieu de L",
+    });
+    expect(plan.after).toEqual({ capacityL: 1000, kind: "tank" });
+    expect(plan.audit.action).toBe("corrected");
+    expect(plan.audit.diff).toEqual({
+      reason: "saisie en hl au lieu de L",
+      changes: { capacityL: { before: 100000, after: 1000 } },
+    });
+  });
+  it("refuse une correction sans motif ou sans effet", () => {
+    expect(() =>
+      planStateCorrection(ctx, { ...base, before: { capacityL: 1 }, patch: { capacityL: 2 }, reason: " " }),
+    ).toThrow(DomainError);
+    expect(() =>
+      planStateCorrection(ctx, { ...base, before: { capacityL: 1 }, patch: { capacityL: 1 }, reason: "rien" }),
+    ).toThrow(DomainError);
+  });
+});

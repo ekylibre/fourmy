@@ -1,11 +1,12 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { landParcelWrite } from "@fourmy/contracts";
+import { landParcelWrite, containerCorrectionWrite } from "@fourmy/contracts";
 import type { DomainCtx } from "@fourmy/domain";
 import { DomainError } from "@fourmy/domain";
 import type { Env } from "../context.js";
 import { db } from "../db.js";
 import { listParcelsAt, createParcel, versionParcel } from "../repos/parcels.js";
+import { listContainersAt, correctContainer, NotFound } from "../repos/containers.js";
 
 /**
  * Routes métier sous `/api/v1/farms/:farmId` (architecture §5.1).
@@ -88,7 +89,24 @@ export const farmRoutes = new Hono<Env>()
 
   // --- Déclarées, non encore implémentées ----------------------------------
   .get("/places", notImplemented("GET /places"))
-  .get("/containers", notImplemented("GET /containers"))
+  .get("/containers", async (c) => {
+    const items = await listContainersAt(db(), c.get("farmId"), atOrNow(c));
+    return c.json({ items, nextCursor: null });
+  })
+  .post("/containers/:id/corrections", async (c) => {
+    const parsed = containerCorrectionWrite.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.message);
+    try {
+      const container = await correctContainer(
+        db(), c.get("farmId"), domainCtx(c), c.req.param("id"), parsed.data,
+      );
+      return c.json(container);
+    } catch (e) {
+      if (e instanceof NotFound) return problem(c, 404, "Cuve introuvable", e.message);
+      if (e instanceof DomainError) return problem(c, 422, "Correction refusée", e.message);
+      throw e;
+    }
+  })
   .patch("/containers/:id/placement", notImplemented("PATCH /containers/:id/placement"))
   .get("/containers/:id/contents", notImplemented("GET /containers/:id/contents"))
   .get("/stock", notImplemented("GET /stock"))

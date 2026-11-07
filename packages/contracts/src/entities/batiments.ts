@@ -93,3 +93,29 @@ export const trackerBinding = z.object({
   valid: validRange,
 });
 export type TrackerBinding = z.infer<typeof trackerBinding>;
+
+/**
+ * Correction d'une erreur de saisie sur la version courante d'une cuve
+ * (POST /containers/:id/corrections). À distinguer d'un changement physique
+ * (nouvelle version datée) : la correction répare aussi l'historique, et elle
+ * est tracée dans le journal d'audit avec son motif.
+ */
+export const containerCorrectionWrite = z
+  .object({
+    capacityL: z.number().positive().optional(),
+    kind: z.enum(["tank", "silo", "barrel"]).optional(),
+    reason: z.string().trim().min(3),
+  })
+  .refine((v) => v.capacityL !== undefined || v.kind !== undefined, {
+    message: "Rien à corriger : préciser capacityL ou kind.",
+  });
+export type ContainerCorrectionWrite = z.infer<typeof containerCorrectionWrite>;
+
+/** Cuve avec sa version valide à la date demandée (GET /containers?at=). */
+export const containerAt = z.object({
+  id: uuid,
+  placeId: uuid,
+  name: z.string(),
+  version: containerVersion,
+});
+export type ContainerAt = z.infer<typeof containerAt>;
