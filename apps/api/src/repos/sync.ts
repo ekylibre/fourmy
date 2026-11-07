@@ -50,7 +50,21 @@ export async function pull(db: Database, farmId: string, lastPulledAt: string | 
     );
     const people = await rows<Record<string, unknown>>(
       tx,
-      sql`SELECT id, name, role, active, updated_at FROM people WHERE updated_at > ${since}::timestamptz`,
+      sql`SELECT id, name, role, active, user_id, updated_at FROM people WHERE updated_at > ${since}::timestamptz`,
+    );
+    // Lieux et cuves : destinations des récoltes. « current » = encore en service aujourd'hui.
+    const places = await rows<Record<string, unknown>>(
+      tx,
+      sql`SELECT p.id, p.name, p.updated_at,
+                 EXISTS (SELECT 1 FROM place_versions v WHERE v.place_id = p.id AND v.valid @> now()) AS current
+          FROM places p WHERE p.updated_at > ${since}::timestamptz`,
+    );
+    const containers = await rows<Record<string, unknown>>(
+      tx,
+      sql`SELECT c.id, c.name, c.place_id, c.updated_at, v.capacity_l, v.id IS NOT NULL AS current
+          FROM containers c
+          LEFT JOIN container_versions v ON v.container_id = c.id AND v.valid @> now()
+          WHERE c.updated_at > ${since}::timestamptz`,
     );
     const interventions = await readInterventionsWhere(
       tx,
@@ -65,6 +79,8 @@ export async function pull(db: Database, farmId: string, lastPulledAt: string | 
       articles: bucket(),
       equipments: bucket(),
       people: bucket(),
+      places: bucket(),
+      containers: bucket(),
       interventions: bucket(),
     };
     const put = (collection: keyof SyncChanges, record: Record<string, unknown>) =>
@@ -93,7 +109,34 @@ export async function pull(db: Database, farmId: string, lastPulledAt: string | 
       put("equipments", { id: e.id, name: e.name, kind: e.kind, state: e.state ?? null, updated_at_server: ms(e.updated_at) });
     }
     for (const p of people) {
-      put("people", { id: p.id, name: p.name, role: p.role ?? null, active: p.active, updated_at_server: ms(p.updated_at) });
+      put("people", {
+        id: p.id,
+        name: p.name,
+        role: p.role ?? null,
+        active: p.active,
+        user_id: p.user_id ?? null,
+        updated_at_server: ms(p.updated_at),
+      });
+    }
+    for (const p of places) {
+      if (!p.current) {
+        if (!first) changes.places!.deleted.push(p.id as string);
+        continue;
+      }
+      put("places", { id: p.id, name: p.name, updated_at_server: ms(p.updated_at) });
+    }
+    for (const c of containers) {
+      if (!c.current) {
+        if (!first) changes.containers!.deleted.push(c.id as string);
+        continue;
+      }
+      put("containers", {
+        id: c.id,
+        name: c.name,
+        place_id: c.place_id ?? null,
+        capacity_l: c.capacity_l === null ? null : Number(c.capacity_l),
+        updated_at_server: ms(c.updated_at),
+      });
     }
     for (const i of interventions) {
       const { periods, targets, inputs, outputs, tools, doers, purposes, notes } = i;

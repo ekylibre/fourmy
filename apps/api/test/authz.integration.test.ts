@@ -114,4 +114,18 @@ describe.skipIf(!url)("autorisations (intégration)", () => {
     expect(out.status).toBe(200);
     expect((await app.request("/api/v1/me/farms", { headers })).status).toBe(401);
   });
+
+  it("l'application mobile se reconnecte malgré un cookie resté sur le téléphone ; une origine étrangère est refusée", async () => {
+    const signIn = (headers: Record<string, string>) =>
+      app.request("/api/auth/sign-in/email", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: "better-auth.session_token=ancien", ...headers },
+        body: JSON.stringify({ email: newcomer.email, password: TEST_PASSWORD }),
+      });
+    expect((await signIn({})).status).toBe(403); // cookie sans origine : refus CSRF de better-auth
+    const mobile = await signIn({ origin: "zeromobile://" });
+    expect(mobile.status).toBe(200);
+    expect(mobile.headers.get("set-auth-token")).toMatch(/\./); // jeton signé pour le Bearer
+    expect((await signIn({ origin: "https://evil.example" })).status).toBe(403);
+  });
 });

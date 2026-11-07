@@ -239,8 +239,11 @@ quand seule une partie de la parcelle est traitée.
 2. ✅ **Fourmy — comptes** : better-auth (comptes locaux), remplacement de
    l'identité de développement, rattachement des personnes aux comptes
    (réalisé le 2026-11-07 ; voir docs/architecture.md, Authentification).
-3. **zero-mobile** : client Fourmy, schéma local v5, formulaire par forme,
-   push par intervention sur `/sync/push`.
+3. ✅ **zero-mobile** : client Fourmy, schéma local v5, formulaire par forme,
+   push par intervention sur `/sync/push` (branche `fourmy-backend` de
+   zero-mobile, 2026-11-07 ; voir son `docs/fourmy-backend.md`). Côté
+   Fourmy : la synchro tire aussi lieux, cuves et le compte rattaché à
+   chaque personne ; l'origine de l'app (`zeromobile://`) est de confiance.
 
 ## 9. Réalisation (étape 1)
 

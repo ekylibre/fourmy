@@ -9,6 +9,8 @@ const app = createApp();
 const parcelId = crypto.randomUUID();
 const articleId = crypto.randomUUID();
 const personId = crypto.randomUUID();
+const placeId = crypto.randomUUID();
+const tankId = crypto.randomUUID();
 const square = (d: number) => ({
   type: "MultiPolygon",
   coordinates: [[[[0.5, 44.8], [0.5 + d, 44.8], [0.5 + d, 44.8 + d], [0.5, 44.8 + d], [0.5, 44.8]]]],
@@ -33,7 +35,12 @@ describe.skipIf(!url)("synchro mobile (intégration)", () => {
       VALUES (${crypto.randomUUID()}, ${parcelId}, ST_SetSRID(ST_GeomFromGeoJSON(${JSON.stringify(square(0.0013))}), 4326),
               10000, tstzrange('2020-01-01', NULL))`;
     await sql`INSERT INTO articles (id, farm_id, name, kind, unit, amm) VALUES (${articleId}, ${farmId}, 'Herbicide Y', 'phyto', 'liter', '2000123')`;
-    await sql`INSERT INTO people (id, farm_id, name) VALUES (${personId}, ${farmId}, 'Dominique')`;
+    await sql`INSERT INTO people (id, farm_id, name, user_id) VALUES (${personId}, ${farmId}, 'Dominique', ${mobile.userId})`;
+    await sql`INSERT INTO places (id, farm_id, name) VALUES (${placeId}, ${farmId}, 'Chai')`;
+    await sql`INSERT INTO place_versions (id, place_id, kind, source, valid) VALUES (${crypto.randomUUID()}, ${placeId}, 'building', 'manual', tstzrange('2000-01-01', NULL))`;
+    await sql`INSERT INTO containers (id, farm_id, place_id, name) VALUES (${tankId}, ${farmId}, ${placeId}, 'Cuve 1')`;
+    await sql`INSERT INTO container_versions (id, container_id, kind, capacity_l, placement, valid)
+      VALUES (${crypto.randomUUID()}, ${tankId}, 'tank', 5000, 'auto', tstzrange('2000-01-01', NULL))`;
     await sql`INSERT INTO equipments (id, farm_id, name, kind) VALUES (${crypto.randomUUID()}, ${farmId}, 'Pulvérisateur', 'sprayer')`;
   });
   afterAll(async () => {
@@ -65,7 +72,13 @@ describe.skipIf(!url)("synchro mobile (intégration)", () => {
     expect(p.shape_svg).toMatch(/^M /);
     expect(r.changes.articles.created).toHaveLength(1);
     expect(r.changes.equipments.created).toHaveLength(1);
-    expect(r.changes.people.created).toEqual([expect.objectContaining({ id: personId, name: "Dominique", active: true })]);
+    expect(r.changes.people.created).toEqual([
+      expect.objectContaining({ id: personId, name: "Dominique", active: true, user_id: mobile.userId }),
+    ]);
+    expect(r.changes.places.created).toEqual([expect.objectContaining({ id: placeId, name: "Chai" })]);
+    expect(r.changes.containers.created).toEqual([
+      expect.objectContaining({ id: tankId, name: "Cuve 1", place_id: placeId, capacity_l: 5000 }),
+    ]);
   });
 
   it("pull incrémental sans changement : vide", async () => {

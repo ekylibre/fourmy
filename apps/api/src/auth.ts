@@ -35,10 +35,16 @@ function secret(): string {
   return "fourmy-developpement-local-uniquement-jamais-en-production";
 }
 
-/** Origines du web autorisées ; en local, aussi le serveur Vite (dev, preview). */
+/**
+ * Origines autorisées : le web (`FOURMY_TRUSTED_ORIGINS`), l'application
+ * mobile (son schéma d'URL, envoyé en `Origin` par zero-mobile — un navigateur
+ * n'émet jamais une telle origine pour une page web) et, en local, Vite.
+ */
 function trustedOrigins(): string[] {
-  const configured = (process.env.FOURMY_TRUSTED_ORIGINS ?? "").split(",").map((o) => o.trim()).filter(Boolean);
-  return isLocalDev() ? [...configured, "http://localhost:5173", "http://localhost:4173"] : configured;
+  const list = (v: string | undefined) => (v ?? "").split(",").map((o) => o.trim()).filter(Boolean);
+  const configured = list(process.env.FOURMY_TRUSTED_ORIGINS);
+  const mobile = list(process.env.FOURMY_MOBILE_ORIGINS ?? "zeromobile://");
+  return [...configured, ...mobile, ...(isLocalDev() ? ["http://localhost:5173", "http://localhost:4173"] : [])];
 }
 
 const snake = <K extends string>(...keys: K[]) =>
@@ -75,7 +81,9 @@ function create() {
       ),
     },
     verification: { modelName: "auth_verifications", fields: snake("expiresAt", "createdAt", "updatedAt") },
-    advanced: { database: { generateId: "uuid" } },
+    // Contrôle d'origine (CSRF) actif partout, tests compris : better-auth le
+    // désactive par défaut sous NODE_ENV=test, les tests ne verraient pas sa règle.
+    advanced: { database: { generateId: "uuid" }, disableOriginCheck: false },
     emailAndPassword: {
       enabled: true,
       disableSignUp: process.env.FOURMY_ALLOW_SIGNUP !== "true",

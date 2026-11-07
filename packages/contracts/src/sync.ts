@@ -18,8 +18,16 @@ import { treatmentPurpose } from "./procedures.js";
  * de zero-mobile ; instants en millisecondes (WatermelonDB).
  */
 
-/** Collections synchronisées dans la première tranche. */
-export const syncCollection = z.enum(["land_parcels", "articles", "equipments", "people", "interventions"]);
+/** Collections synchronisées (pull) ; seules les interventions remontent (push). */
+export const syncCollection = z.enum([
+  "land_parcels",
+  "articles",
+  "equipments",
+  "people",
+  "places",
+  "containers",
+  "interventions",
+]);
 export type SyncCollection = z.infer<typeof syncCollection>;
 
 /** Jeu de changements WatermelonDB pour une collection. */
@@ -70,6 +78,20 @@ export const syncPerson = z.object({
   name: z.string(),
   role: z.string().nullable(),
   active: z.boolean(),
+  /** Compte rattaché : le mobile propose la personne de l'utilisateur connecté. */
+  user_id: uuid.nullable(),
+  updated_at_server: z.number(),
+});
+
+/** Lieu (bâtiment, stockage) : destination possible d'une récolte. */
+export const syncPlace = z.object({ id: uuid, name: z.string(), updated_at_server: z.number() });
+
+/** Cuve en service : destination possible d'une vendange. */
+export const syncContainer = z.object({
+  id: uuid,
+  name: z.string(),
+  place_id: uuid.nullable(),
+  capacity_l: z.number().nullable(),
   updated_at_server: z.number(),
 });
 

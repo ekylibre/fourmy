@@ -232,7 +232,11 @@ en base ne suffit pas). Tables `users` (existante, étendue), `auth_sessions`,
 `auth_accounts`, `auth_verifications` (migration 0007) — inaccessibles au rôle
 applicatif `fourmy_app`. Inscription libre fermée par défaut ; comptes créés
 par l'administrateur (`user:create`), ajoutés à la ferme par son responsable.
-Secret obligatoire dès que la base n'est pas locale. OIDC (SaaS) : plus tard.
+Secret obligatoire dès que la base n'est pas locale. L'application mobile
+envoie `Origin: zeromobile://` (`FOURMY_MOBILE_ORIGINS`) : better-auth exige
+une origine de confiance dès qu'une requête porte un cookie, ce que la pile
+réseau d'un téléphone peut conserver. Le contrôle d'origine reste actif sous
+les tests. OIDC (SaaS) : plus tard.
 
 **Interventions** : la réalisation transforme les paramètres en mouvements
 de stock selon des règles pures du domaine (dose par hectare × surface

@@ -18,7 +18,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 |---|---|
 | [`docs/requirements.md`](docs/requirements.md) | Exigences v1, user stories, fermes pilotes, première tranche de 7 jours |
 | [`docs/architecture.md`](docs/architecture.md) | Choix d'architecture (ADR), modèle de données, API, 3D, plugins, organisation multi-agent |
-| [`docs/interventions.md`](docs/interventions.md) | Interventions et procédures simplifiées (validé, étape 1 réalisée) : 6 formes, catalogue, modèle, correspondance Ekylibre, impacts Fourmy et zero-mobile |
+| [`docs/interventions.md`](docs/interventions.md) | Interventions et procédures simplifiées (validé ; étapes 1 à 3 réalisées) : 6 formes, catalogue, modèle, correspondance Ekylibre, impacts Fourmy et zero-mobile |
 | [`docs/workflow.md`](docs/workflow.md) | Plan d'implémentation de la première tranche : jour 1 des fondations, tâches des 7 agents, recette |
 
 ## État du projet (2026-11-07)
@@ -37,12 +37,13 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | Agent F — plan 3D | ✅ relief et photo IGN, bâtiments (hauteurs BD TOPO), cuverie placée et remplie selon la frise, rejeu 3D des traces, placement manuel des cuves |
 | Interventions et procédures simplifiées (étape 1) | ✅ 6 formes, catalogue, périodes, personnes, motifs, annulation, habitudes de la ferme ; migrateur et formulaire web |
 | Comptes better-auth (étape 2) | ✅ comptes locaux, sessions cookie + bearer (mobile), page Équipe (membres, personnes ↔ comptes) |
-| Agent G — mobile / zero-mobile (étape 3) | ⏳ à faire |
+| zero-mobile (étape 3) | ✅ branche `fourmy-backend` : compte Fourmy, catalogue, formulaire générique par forme, push par intervention ; vérifié contre l'API — reste le passage sur appareil |
 | Jours 6-7 — migration réelle + recette | ⏳ à faire |
 
 ### À reprendre
 
-1. Étape 3 : **zero-mobile** (connexion bearer, client Fourmy, formulaire par forme).
+1. zero-mobile : build EAS et parcours sur appareil (carte, précache), note de
+   version pour les pilotes, puis fusion de `fourmy-backend`.
 2. `apps/worker` : planifier la synchro Traccar (toutes les minutes).
 3. Finitions agent 0 : documentation OpenAPI.
 4. Export PDF du registre phyto (JSON et CSV disponibles).
