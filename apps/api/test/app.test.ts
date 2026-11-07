@@ -17,7 +17,7 @@ describe("api skeleton", () => {
   });
 
   it("renvoie 501 pour une route déclarée mais non implémentée", async () => {
-    const res = await app.request("/api/v1/farms/f1/snapshot", {
+    const res = await app.request("/api/v1/farms/f1/stock", {
       headers: { "x-user-id": "u1" },
     });
     expect(res.status).toBe(501);

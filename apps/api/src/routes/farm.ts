@@ -1,54 +1,105 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
+import { landParcelWrite } from "@fourmy/contracts";
+import type { DomainCtx } from "@fourmy/domain";
+import { DomainError } from "@fourmy/domain";
 import type { Env } from "../context.js";
+import { db } from "../db.js";
+import { listParcelsAt, createParcel, versionParcel } from "../repos/parcels.js";
 
 /**
  * Routes métier sous `/api/v1/farms/:farmId` (architecture §5.1).
- * Déclarées et typées ici, renvoient **501** jusqu'à leur implémentation :
- *   - snapshot, land-parcels, places, containers, stock → agent D
- *   - interventions, registers, sync, imports → agent D (domaine agent A)
- *   - tracks → agent C · terrain → agent F
- * L'agent 0 fige les chemins ; chaque agent remplit les siens dans sa PR.
+ * Implémentées dans cette tranche : parcellaire versionné + snapshot (parcelles).
+ * Les autres restent déclarées en 501 (agents B/C/D/F selon docs/workflow.md).
  */
-const notImplemented = (what: string) => (c: import("hono").Context<Env>) =>
-  c.json(
-    {
-      type: "about:blank",
-      title: "Not Implemented",
-      status: 501,
-      detail: `${what} — à implémenter (voir docs/workflow.md)`,
-    },
-    501,
-    { "content-type": "application/problem+json" },
-  );
+
+const problem = (c: Context<Env>, status: number, title: string, detail?: string) =>
+  c.json({ type: "about:blank", title, status, detail }, status as 400, {
+    "content-type": "application/problem+json",
+  });
+
+const notImplemented = (what: string) => (c: Context<Env>) =>
+  problem(c, 501, "Not Implemented", `${what} — à implémenter (docs/workflow.md)`);
+
+/** Construit le contexte de domaine à partir de la requête. */
+function domainCtx(c: Context<Env>): DomainCtx {
+  return {
+    now: new Date().toISOString(),
+    newId: () => crypto.randomUUID(),
+    actor: c.get("userId"),
+    origin: "web",
+  };
+}
+
+const atOrNow = (c: Context<Env>) => c.req.query("at") ?? new Date().toISOString();
 
 export const farmRoutes = new Hono<Env>()
-  // État consolidé
-  .get("/snapshot", notImplemented("GET /snapshot"))
-  // Parcellaire
-  .get("/land-parcels", notImplemented("GET /land-parcels"))
-  .post("/land-parcels", notImplemented("POST /land-parcels"))
-  .patch("/land-parcels/:id", notImplemented("PATCH /land-parcels/:id"))
-  // Bâtiments et cuves
+  // --- État consolidé -------------------------------------------------------
+  .get("/snapshot", async (c) => {
+    const at = atOrNow(c);
+    const landParcels = await listParcelsAt(db(), c.get("farmId"), at);
+    // places / containers / equipments : à compléter (agent D) — snapshot partiel.
+    return c.json({
+      at,
+      landParcels,
+      productions: [],
+      places: [],
+      containers: [],
+      equipments: [],
+    });
+  })
+
+  // --- Parcellaire ----------------------------------------------------------
+  .get("/land-parcels", async (c) => {
+    const items = await listParcelsAt(db(), c.get("farmId"), atOrNow(c));
+    return c.json({ items, nextCursor: null });
+  })
+  .post("/land-parcels", async (c) => {
+    const parsed = landParcelWrite.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.message);
+    const ctx = domainCtx(c);
+    const id = parsed.data.id ?? ctx.newId();
+    try {
+      const version = await createParcel(db(), c.get("farmId"), ctx, { ...parsed.data, id });
+      return c.json(version, 201);
+    } catch (e) {
+      return problem(c, 409, "Création impossible", String(e));
+    }
+  })
+  .patch("/land-parcels/:id", async (c) => {
+    const parsed = landParcelWrite.omit({ id: true }).safeParse(
+      await c.req.json().catch(() => null),
+    );
+    if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.message);
+    try {
+      const version = await versionParcel(
+        db(),
+        c.get("farmId"),
+        domainCtx(c),
+        c.req.param("id"),
+        parsed.data,
+      );
+      return c.json(version);
+    } catch (e) {
+      if (e instanceof DomainError) return problem(c, 422, "Versionnement refusé", e.message);
+      return problem(c, 409, "Mise à jour impossible", String(e));
+    }
+  })
+
+  // --- Déclarées, non encore implémentées ----------------------------------
   .get("/places", notImplemented("GET /places"))
   .get("/containers", notImplemented("GET /containers"))
   .patch("/containers/:id/placement", notImplemented("PATCH /containers/:id/placement"))
   .get("/containers/:id/contents", notImplemented("GET /containers/:id/contents"))
-  // Stocks
   .get("/stock", notImplemented("GET /stock"))
-  // Interventions
   .get("/interventions", notImplemented("GET /interventions"))
   .post("/interventions", notImplemented("POST /interventions"))
   .post("/interventions/:id/complete", notImplemented("POST /interventions/:id/complete"))
-  // Registres
   .get("/registers/phyto", notImplemented("GET /registers/phyto"))
-  // Traces (agent C)
   .get("/tracks", notImplemented("GET /tracks"))
   .get("/tracks/coverage", notImplemented("GET /tracks/coverage"))
-  // Terrain 3D (agent F)
   .get("/terrain/heightmap/:z/:x/:y", notImplemented("GET /terrain/heightmap"))
-  // Synchro mobile (agent D / G)
   .get("/sync/pull", notImplemented("GET /sync/pull"))
   .post("/sync/push", notImplemented("POST /sync/push"))
-  // Migration (admin, agent B)
   .post("/imports/ekylibre", notImplemented("POST /imports/ekylibre"))
   .get("/imports/:id", notImplemented("GET /imports/:id"));
