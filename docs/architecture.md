@@ -238,6 +238,16 @@ une origine de confiance dès qu'une requête porte un cookie, ce que la pile
 réseau d'un téléphone peut conserver. Le contrôle d'origine reste actif sous
 les tests. OIDC (SaaS) : plus tard.
 
+**Intégrations** (2026-11-07) : les accès aux services externes (Traccar
+d'abord) sont rangés **par ferme** (`integrations`, RLS), configurés par le
+responsable dans l'interface. Le secret est chiffré par l'API (AES-256-GCM,
+clé `FOURMY_SECRETS_KEY` hors base), jamais renvoyé ; la configuration est
+testée avant d'être enregistrée ; l'adresse d'un service externe doit être
+publique et en HTTPS (pas d'appel du serveur vers ses services internes). Un
+worker (même image que l'API) synchronise chaque minute, sous verrou en base.
+Ajouter un fournisseur : sa description (`INTEGRATION_PROVIDERS`, l'interface
+en déduit le formulaire) et son adaptateur (`apps/api/src/integrations`).
+
 **Interventions** : la réalisation transforme les paramètres en mouvements
 de stock selon des règles pures du domaine (dose par hectare × surface
 traitée à la date ; unité incohérente refusée ; lot le mieux pourvu ;

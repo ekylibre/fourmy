@@ -37,6 +37,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@fourmy/connector-traccar':
+        specifier: workspace:*
+        version: link:../../packages/connector-traccar
       '@fourmy/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -70,6 +73,9 @@ importers:
       pg:
         specifier: 8.23.1
         version: 8.23.1
+      postgres:
+        specifier: 3.4.5
+        version: 3.4.5
       zod:
         specifier: 3.24.1
         version: 3.24.1
@@ -77,9 +83,6 @@ importers:
       '@types/pg':
         specifier: 8.23.1
         version: 8.23.1
-      postgres:
-        specifier: 3.4.5
-        version: 3.4.5
       vitest:
         specifier: 2.1.8
         version: 2.1.8(@types/node@22.10.5)(jsdom@29.1.1(@noble/hashes@2.4.0))(lightningcss@1.33.0)(msw@2.7.0(@types/node@22.10.5)(typescript@5.7.3))(sugarss@5.0.2(postcss@8.5.32))

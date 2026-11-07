@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+**/.turbo
+**/test-results
+**/playwright-report
+.git
+.github
+fixtures/raw
+**/*.log
+.env
+.env.*
+!.env.example
+# Sinon tsc -b croit le build à jour sans dist/ (dist est exclu ci-dessus).
+**/*.tsbuildinfo

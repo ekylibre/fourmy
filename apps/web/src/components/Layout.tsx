@@ -1,6 +1,6 @@
 import { AppShell, Badge, Burger, Button, Group, NavLink, Stack, Text } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { Box, Boxes, ClipboardList, Database, FileText, LayoutDashboard, Map, Users, Wine } from "lucide-react";
+import { Box, Boxes, ClipboardList, Database, FileText, LayoutDashboard, Map, Plug, Users, Wine } from "lucide-react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { Wordmark } from "@fourmy/ui-lyvre";
 import { useFarm } from "../app/farm";
@@ -83,6 +83,16 @@ export function Layout() {
               label="Équipe"
               leftSection={<Users size={18} />}
               active={current.startsWith("/equipe")}
+              onClick={close}
+            />
+          )}
+          {farm.role === "owner" && (
+            <NavLink
+              component={Link}
+              to={linkTo("/integrations")}
+              label="Intégrations"
+              leftSection={<Plug size={18} />}
+              active={current.startsWith("/integrations")}
               onClick={close}
             />
           )}

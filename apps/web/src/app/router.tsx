@@ -12,6 +12,7 @@ import { LoginPage } from "../features/login/LoginPage";
 import { RegisterPage } from "../features/register/RegisterPage";
 import { StockPage } from "../features/stock/StockPage";
 import { TeamPage } from "../features/team/TeamPage";
+import { IntegrationsPage } from "../features/integrations/IntegrationsPage";
 import { FarmProvider, useMyFarms } from "./farm";
 import { UNAUTHORIZED_EVENT, useSession } from "./session";
 
@@ -74,6 +75,7 @@ export const routes = [
       { path: "registre", element: <RegisterPage /> },
       { path: "imports", element: <ImportsPage /> },
       { path: "equipe", element: <TeamPage /> },
+      { path: "integrations", element: <IntegrationsPage /> },
     ],
   },
   { path: "*", element: <Navigate to="/fermes" replace /> },

@@ -63,3 +63,31 @@ describe("équipe (responsable)", () => {
     expect(added).toEqual({ email: "salarie@ferme.fr", role: "worker" });
   });
 });
+
+describe("intégrations (responsable)", () => {
+  it("formulaire généré depuis le fournisseur ; le secret part une fois, puis n'est plus affiché", async () => {
+    const user = userEvent.setup();
+    let body: unknown = null;
+    const { http, HttpResponse } = await import("msw");
+    const { server } = await import("./setup");
+    server.use(
+      http.put("*/integrations/traccar", async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({
+          integration: { id: "00000000-0000-7000-8000-000000000901", provider: "traccar", settings: { url: "https://traccar.osfarm.org" }, hasSecret: true, secretHint: "4242", enabled: true, status: "pending", running: false, lastSyncAt: null, lastError: null, lastReport: null },
+          test: { devices: 2, matched: [{ device: "Tracteur", equipment: "Tracteur" }], unmatched: [{ device: "Quad", reason: "aucun matériel de ce nom" }] },
+        });
+      }),
+    );
+    renderApp(`/f/${FARM}/integrations?at=2026-06-30`);
+    expect(await screen.findByRole("heading", { name: "Traccar — traceurs GPS" })).toBeInTheDocument();
+    await user.type(screen.getByRole("textbox", { name: /Adresse du serveur Traccar/ }), "https://traccar.osfarm.org");
+    await user.type(screen.getByLabelText(/^Jeton d'accès/), "jeton-secret-4242");
+    await user.click(screen.getByRole("button", { name: "Tester et activer" }));
+    expect(await screen.findByText("Intégration enregistrée (connexion vérifiée).")).toBeInTheDocument();
+    expect(body).toEqual({ settings: { url: "https://traccar.osfarm.org" }, secret: "jeton-secret-4242" });
+    expect(screen.getByText("Tracteur → Tracteur")).toBeInTheDocument();
+    expect(screen.getByText(/Quad : aucun matériel de ce nom/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Jeton d'accès/)).toHaveValue("");
+  });
+});

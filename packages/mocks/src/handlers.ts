@@ -1,4 +1,5 @@
 import { http, HttpResponse } from "msw";
+import { INTEGRATION_PROVIDERS } from "@fourmy/contracts";
 import {
   demoSnapshot,
   demoLandParcelsAt,
@@ -55,6 +56,7 @@ export const handlers = [
     signedIn = false;
     return HttpResponse.json({ success: true });
   }),
+  http.get(`*${base}/integrations`, () => HttpResponse.json({ providers: INTEGRATION_PROVIDERS, items: [] })),
   http.get(`*${base}/members`, () =>
     page([{ userId: DEMO_USER_ID, email: demoUser.email, name: demoUser.name, role: "owner", personId: null }]),
   ),

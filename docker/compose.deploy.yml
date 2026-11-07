@@ -1,0 +1,77 @@
+# Déploiement Fourmy (Dokploy, ou tout hôte Docker) — docs/deploiement.md.
+# Les valeurs viennent de l'environnement (variables Dokploy) ; aucun secret
+# dans le dépôt. Seul `web` est exposé : il sert l'application et relaie /api.
+name: fourmy
+
+services:
+  db:
+    image: timescale/timescaledb-ha:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fourmy}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis}
+      POSTGRES_DB: ${POSTGRES_DB:-fourmy}
+    volumes:
+      - fourmy_pgdata:/home/postgres/pgdata/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fourmy} -d ${POSTGRES_DB:-fourmy}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-fourmy}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-fourmy}
+      NODE_ENV: production
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET requis (32 caractères au moins)}
+      BETTER_AUTH_URL: ${PUBLIC_URL:?PUBLIC_URL requis (ex. https://fourmy-dev.exemple.fr)}
+      FOURMY_TRUSTED_ORIGINS: ${PUBLIC_URL}
+      FOURMY_MOBILE_ORIGINS: ${FOURMY_MOBILE_ORIGINS:-zeromobile://}
+      FOURMY_ALLOW_SIGNUP: "false"
+      # Chiffrement des secrets d'intégration (jetons Traccar…) : 32 octets base64.
+      # La perdre rend les secrets illisibles (à ressaisir dans Intégrations).
+      FOURMY_SECRETS_KEY: ${FOURMY_SECRETS_KEY:?FOURMY_SECRETS_KEY requis (openssl rand -base64 32)}
+      # Imports Ekylibre depuis l'API : serveur des bases sources restaurées.
+      EKYLIBRE_SOURCES_URL: ${EKYLIBRE_SOURCES_URL:-postgres://${POSTGRES_USER:-fourmy}:${POSTGRES_PASSWORD}@db:5432/}
+
+  # Synchronisation des intégrations des fermes (Traccar : chaque minute).
+  worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: api
+    restart: unless-stopped
+    command: ["node", "apps/api/dist/worker.js"]
+    healthcheck:
+      disable: true
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-fourmy}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-fourmy}
+      NODE_ENV: production
+      FOURMY_SECRETS_KEY: ${FOURMY_SECRETS_KEY}
+
+  web:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    # Hors Dokploy (essai local) : décommenter pour publier le port.
+    # ports:
+    #   - "8080:80"
+
+volumes:
+  fourmy_pgdata:
