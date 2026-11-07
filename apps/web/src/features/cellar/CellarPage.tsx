@@ -58,7 +58,7 @@ export function CellarPage() {
   );
 }
 
-function TankContents({ farmId, containerId, at, capacityL }: { farmId: string; containerId: string; at: string; capacityL: number }) {
+export function TankContents({ farmId, containerId, at, capacityL }: { farmId: string; containerId: string; at: string; capacityL: number }) {
   const contents = useContainerContents(farmId, containerId, at);
   if (contents.isLoading) return <Loading />;
   if (contents.error) return <ErrorAlert error={contents.error} />;

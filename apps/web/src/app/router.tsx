@@ -16,6 +16,8 @@ import { getUserId } from "./session";
 
 // MapLibre est lourd : la carte est chargée à la demande, pas avec l'application.
 const MapPage = lazy(() => import("../features/map/MapPage").then((m) => ({ default: m.MapPage })));
+// Cesium (plusieurs Mo) : le plan 3D n'est chargé que s'il est ouvert.
+const Plan3DPage = lazy(() => import("../3d/Plan3DPage").then((m) => ({ default: m.Plan3DPage })));
 
 function RequireAuth({ children }: { children: ReactNode }) {
   return getUserId() ? <>{children}</> : <Navigate to="/connexion" replace />;
@@ -55,6 +57,7 @@ export const routes = [
     children: [
       { index: true, element: <DashboardPage /> },
       { path: "carte", element: <Suspense fallback={<Loading />}><MapPage /></Suspense> },
+      { path: "plan-3d", element: <Suspense fallback={<Loading />}><Plan3DPage /></Suspense> },
       { path: "interventions", element: <InterventionsPage /> },
       { path: "stocks", element: <StockPage /> },
       { path: "cuverie", element: <CellarPage /> },

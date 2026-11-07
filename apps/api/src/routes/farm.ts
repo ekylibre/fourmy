@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import type { Context } from "hono";
 import type { Env } from "../context.js";
 import { parcelRoutes } from "./parcels.js";
 import { inventoryRoutes } from "./inventory.js";
@@ -9,15 +8,12 @@ import { interventionRoutes } from "./interventions.js";
 import { syncRoutes } from "./sync.js";
 import { importRoutes } from "./imports.js";
 import { articleRoutes } from "./articles.js";
-import { problem } from "./helpers.js";
+import { plan3dRoutes } from "./plan3d.js";
 
 /**
  * Routes métier sous `/api/v1/farms/:farmId` (architecture §5.1), découpées
- * par domaine. Les routes encore déclarées en 501 indiquent l'agent attendu.
+ * par domaine.
  */
-const notImplemented = (what: string) => (c: Context<Env>) =>
-  problem(c, 501, "Not Implemented", `${what} — à implémenter (docs/workflow.md)`);
-
 export const farmRoutes = new Hono<Env>()
   .route("/", parcelRoutes)
   .route("/", inventoryRoutes)
@@ -27,4 +23,4 @@ export const farmRoutes = new Hono<Env>()
   .route("/", syncRoutes)
   .route("/", importRoutes)
   .route("/", articleRoutes)
-  .get("/terrain/heightmap/:z/:x/:y", notImplemented("GET /terrain/heightmap (agent F)"));
+  .route("/", plan3dRoutes);

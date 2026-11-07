@@ -130,3 +130,7 @@ html, body { background: var(--lv-paper); }
 
 /* Frise temporelle : bandeau sous l'en-tête. */
 .fy-timeline { border-bottom: 1px solid var(--lv-line); background: var(--lv-surface); }
+
+/* Plan 3D : pas de logo « Cesium ion » (ion n'est pas utilisé) ; l'attribution
+   des données (IGN) reste affichée. */
+.cesium-credit-logoContainer { display: none !important; }

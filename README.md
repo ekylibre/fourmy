@@ -33,13 +33,13 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | Agent D — API métier | ✅ autorisation par ferme, snapshot, cuves, stocks, interventions (US-2), registre phyto (JSON/CSV), synchro mobile, imports |
 | Agent C — Traccar et traces | ✅ synchro réelle (7 592 positions), rejeu CZML, couverture validée contre Traccar (+1,5 %) |
 | Agent E — interface web | ✅ React + Mantine (charte Lyvre) : tableau de bord, carte IGN + traces, interventions, stocks, cuverie, registre, imports ; parcours e2e en CI |
-| Agents F, G (3D, mobile) | ⏳ à faire |
+| Agent F — plan 3D | ✅ relief et photo IGN, bâtiments (hauteurs BD TOPO), cuverie placée et remplie selon la frise, rejeu 3D des traces, placement manuel des cuves |
+| Agent G — mobile | ⏳ à faire |
 | Jours 6-7 — migration réelle + recette | ⏳ à faire |
 
 ### À reprendre
 
-1. Agents restants : **F** (plan 3D, relief, cuverie en 3D — `/terrain` est
-   la seule route encore en 501), **G** (mobile).
+1. Agent restant : **G** (adapter `zero-mobile` à la synchro Fourmy).
 2. `apps/worker` : planifier la synchro Traccar (toutes les minutes).
 3. Finitions agent 0 : better-auth (l'identité vient encore de `x-user-id` ;
    l'autorisation par ferme est, elle, en place) et documentation OpenAPI.
