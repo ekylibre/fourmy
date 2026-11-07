@@ -131,6 +131,29 @@ async function audit(tx: Tx, farmId: string, ctx: DomainCtx, entityId: string, a
  * Planifie une intervention. Idempotent sur `id` (fourni par le client,
  * UUID v7) : une seconde requête identique renvoie l'intervention existante.
  */
+export async function planInTx(
+  tx: Tx,
+  farmId: string,
+  ctx: DomainCtx,
+  input: InterventionPlanWrite,
+  clientId: string | null = null,
+): Promise<{ intervention: Intervention; created: boolean }> {
+  const id = input.id ?? ctx.newId();
+  const existing = await rows(tx, sql`SELECT 1 FROM interventions WHERE id = ${id}`);
+  if (existing.length > 0) return { intervention: await readOne(tx, id), created: false };
+  await tx.execute(sql`
+    INSERT INTO interventions (id, farm_id, procedure, status, started_at, origin, client_id)
+    VALUES (${id}, ${farmId}, ${input.procedure}, 'planned', ${input.startedAt ?? null}, ${ctx.origin}, ${clientId})`);
+  await insertParameters(tx, id, input.parameters);
+  await audit(tx, farmId, ctx, id, "planned", { procedure: input.procedure, parameters: input.parameters.length });
+  await outbox(tx, farmId, buildEvent(ctx, farmId, "intervention.planned", { interventionId: id }));
+  return { intervention: await readOne(tx, id), created: true };
+}
+
+/**
+ * Planifie une intervention. Idempotent sur `id` (fourni par le client,
+ * UUID v7) : une seconde requête identique renvoie l'intervention existante.
+ */
 export async function planIntervention(
   db: Database,
   farmId: string,
@@ -138,18 +161,7 @@ export async function planIntervention(
   input: InterventionPlanWrite,
   clientId: string | null = null,
 ): Promise<{ intervention: Intervention; created: boolean }> {
-  return withFarm(db, farmId, async (tx) => {
-    const id = input.id ?? ctx.newId();
-    const existing = await rows(tx, sql`SELECT 1 FROM interventions WHERE id = ${id}`);
-    if (existing.length > 0) return { intervention: await readOne(tx, id), created: false };
-    await tx.execute(sql`
-      INSERT INTO interventions (id, farm_id, procedure, status, started_at, origin, client_id)
-      VALUES (${id}, ${farmId}, ${input.procedure}, 'planned', ${input.startedAt ?? null}, ${ctx.origin}, ${clientId})`);
-    await insertParameters(tx, id, input.parameters);
-    await audit(tx, farmId, ctx, id, "planned", { procedure: input.procedure, parameters: input.parameters.length });
-    await outbox(tx, farmId, buildEvent(ctx, farmId, "intervention.planned", { interventionId: id }));
-    return { intervention: await readOne(tx, id), created: true };
-  });
+  return withFarm(db, farmId, (tx) => planInTx(tx, farmId, ctx, input, clientId));
 }
 
 // ---------------------------------------------------------------------------
@@ -239,7 +251,17 @@ export async function completeIntervention(
   interventionId: string,
   input: InterventionCompleteWrite,
 ): Promise<CompletionResult> {
-  return withFarm(db, farmId, async (tx) => {
+  return withFarm(db, farmId, (tx) => completeInTx(tx, farmId, ctx, interventionId, input));
+}
+
+export async function completeInTx(
+  tx: Tx,
+  farmId: string,
+  ctx: DomainCtx,
+  interventionId: string,
+  input: InterventionCompleteWrite,
+): Promise<CompletionResult> {
+  {
     const [current] = await rows<{ status: string }>(
       tx,
       sql`SELECT status FROM interventions WHERE id = ${interventionId} FOR UPDATE`,
@@ -332,5 +354,5 @@ export async function completeIntervention(
       await outbox(tx, farmId, buildEvent(ctx, farmId, "stock.moved", { movementId: m.id, lotId: m.lotId, quantity: m.quantity, unit: m.unit }));
     }
     return { intervention: await readOne(tx, interventionId), movements: plan.movements, warnings };
-  });
+  }
 }

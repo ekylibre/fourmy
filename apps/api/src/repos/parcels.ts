@@ -115,6 +115,8 @@ export async function versionParcel(
       current[0] ? { valid: { lower: current[0].lower, upper: current[0].upper } } : null,
       ctx.now,
     );
+    // Marque la parcelle comme modifiée (synchro mobile incrémentale).
+    await tx.execute(sql`UPDATE land_parcels SET name = ${input.name}, updated_at = now() WHERE id = ${parcelId}`);
     if (change.close) {
       await tx.execute(sql`
         UPDATE land_parcel_versions
