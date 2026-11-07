@@ -5,6 +5,7 @@ import { parcelRoutes } from "./parcels.js";
 import { inventoryRoutes } from "./inventory.js";
 import { registerRoutes } from "./registers.js";
 import { trackRoutes } from "./tracks.js";
+import { interventionRoutes } from "./interventions.js";
 import { problem } from "./helpers.js";
 
 /**
@@ -19,9 +20,7 @@ export const farmRoutes = new Hono<Env>()
   .route("/", inventoryRoutes)
   .route("/", registerRoutes)
   .route("/", trackRoutes)
-  .get("/interventions", notImplemented("GET /interventions"))
-  .post("/interventions", notImplemented("POST /interventions"))
-  .post("/interventions/:id/complete", notImplemented("POST /interventions/:id/complete"))
+  .route("/", interventionRoutes)
   .get("/terrain/heightmap/:z/:x/:y", notImplemented("GET /terrain/heightmap (agent F)"))
   .get("/sync/pull", notImplemented("GET /sync/pull"))
   .post("/sync/push", notImplemented("POST /sync/push"))

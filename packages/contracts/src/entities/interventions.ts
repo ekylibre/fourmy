@@ -52,20 +52,40 @@ export const intervention = z
   .merge(auditFields);
 export type Intervention = z.infer<typeof intervention>;
 
-/** Planification d'une intervention (POST). */
+/**
+ * Indications de stock d'un intrant / d'une sortie. Toutes facultatives pour
+ * un intrant (le serveur choisit lot et lieu) ; le lieu est obligatoire pour
+ * une sortie (on ne range pas une récolte « nulle part »).
+ */
+export const stockHint = z.object({
+  lotId: uuid.optional(),
+  placeId: uuid.optional(),
+  containerId: uuid.optional(),
+  /** Quantité absolue, dans l'unité de l'article (prime sur le calcul dose × surface). */
+  quantity: z.number().positive().optional(),
+});
+export type StockHint = z.infer<typeof stockHint>;
+
+/** Paramètre saisi (sans identifiants serveur), avec indications de stock. */
+export const interventionParameterWrite = interventionParameter
+  .omit({ id: true, interventionId: true })
+  .extend({ stock: stockHint.optional() });
+export type InterventionParameterWrite = z.infer<typeof interventionParameterWrite>;
+
+/** Planification d'une intervention (POST). `id` client → idempotent. */
 export const interventionPlanWrite = z.object({
   id: uuid.optional(),
-  procedure: z.string(),
+  procedure: z.string().min(1),
   startedAt: isoDateTime.optional(),
-  parameters: z.array(interventionParameter.omit({ id: true, interventionId: true })),
+  parameters: z.array(interventionParameterWrite),
 });
 export type InterventionPlanWrite = z.infer<typeof interventionPlanWrite>;
 
-/** Réalisation (POST /:id/complete) : génère les mouvements de stock. */
+/** Réalisation (POST /:id/complete) : paramètres réels, mouvements de stock. */
 export const interventionCompleteWrite = z.object({
   startedAt: isoDateTime,
   stoppedAt: isoDateTime,
-  parameters: z.array(interventionParameter.omit({ id: true, interventionId: true })),
+  parameters: z.array(interventionParameterWrite),
 });
 export type InterventionCompleteWrite = z.infer<typeof interventionCompleteWrite>;
 
