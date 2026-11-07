@@ -11,7 +11,7 @@ export const uuid = z.string().uuid();
 export type Uuid = z.infer<typeof uuid>;
 
 /** Identifiant de ferme — colonne de cloisonnement (RLS, ADR-4). */
-export const farmId = uuid.brand<"FarmId">();
+export const farmId = uuid;
 export type FarmId = z.infer<typeof farmId>;
 
 /** Horodatage ISO-8601 avec fuseau. */
