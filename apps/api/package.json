@@ -1,0 +1,23 @@
+{
+  "name": "@fourmy/api",
+  "version": "0.0.0",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint src",
+    "dev": "node --watch --experimental-strip-types src/server.ts",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@fourmy/contracts": "workspace:*",
+    "@fourmy/db": "workspace:*",
+    "@hono/node-server": "1.13.8",
+    "@hono/zod-openapi": "0.18.3",
+    "hono": "4.6.15",
+    "zod": "3.24.1"
+  },
+  "devDependencies": { "vitest": "2.1.8" }
+}
