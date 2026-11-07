@@ -1,0 +1,22 @@
+{
+  "name": "fourmy",
+  "private": true,
+  "version": "0.0.0",
+  "license": "AGPL-3.0-only",
+  "packageManager": "pnpm@9.15.0",
+  "engines": { "node": ">=22.13" },
+  "type": "module",
+  "scripts": {
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "build": "turbo run build",
+    "migrate": "turbo run migrate --filter=@fourmy/db",
+    "dev": "turbo run dev"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.5",
+    "turbo": "2.3.3",
+    "typescript": "5.7.3"
+  }
+}
