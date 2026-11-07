@@ -26,6 +26,7 @@ describe.skipIf(!url)("RLS", () => {
       });
       expect(rows.map((r) => r.name)).toEqual(["PA"]);
     } finally {
+      await sql`DELETE FROM farms WHERE id IN (${"11111111-1111-7111-8111-1111111111aa"}, ${"22222222-2222-7222-8222-2222222222bb"})`;
       await sql.end();
     }
   });

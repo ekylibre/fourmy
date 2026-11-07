@@ -26,6 +26,14 @@ export const placeVersion = z.object({
 });
 export type PlaceVersion = z.infer<typeof placeVersion>;
 
+/** Lieu avec sa version valide à la date demandée (GET /places?at=). */
+export const placeAt = z.object({
+  id: uuid,
+  name: z.string(),
+  version: placeVersion,
+});
+export type PlaceAt = z.infer<typeof placeAt>;
+
 /** Contenant : cuve, silo, barrique. */
 export const container = z
   .object({ id: uuid, farmId, placeId: uuid, name: z.string().min(1) })

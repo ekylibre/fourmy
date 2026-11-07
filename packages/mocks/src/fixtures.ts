@@ -1,8 +1,11 @@
 import type {
   Snapshot,
   LandParcelVersion,
+  LandParcelAt,
   PlaceVersion,
+  PlaceAt,
   ContainerVersion,
+  ContainerAt,
   Equipment,
   Production,
   ContainerContents,
@@ -106,12 +109,28 @@ export const demoEquipments: Equipment[] = [
   },
 ];
 
+const parcelNames = ["Les Rouffiats", "Grande pièce"];
+export const demoLandParcelsAt: LandParcelAt[] = demoLandParcels.map((v, i) => ({
+  id: v.landParcelId,
+  name: parcelNames[i] ?? `Parcelle ${i + 1}`,
+  version: v,
+}));
+
+export const demoPlacesAt: PlaceAt[] = demoPlaces.map((v) => ({ id: v.placeId, name: "Chai", version: v }));
+
+export const demoContainersAt: ContainerAt[] = demoContainers.map((v, i) => ({
+  id: v.containerId,
+  placeId: demoPlaces[0]!.placeId,
+  name: `Cuve ${i + 1}`,
+  version: v,
+}));
+
 export const demoSnapshot: Snapshot = {
   at: now,
-  landParcels: demoLandParcels,
+  landParcels: demoLandParcelsAt,
   productions: demoProductions,
-  places: demoPlaces,
-  containers: demoContainers.map((c) => ({ ...c, volumeL: c.capacityL * 0.6 })),
+  places: demoPlacesAt,
+  containers: demoContainersAt.map((c) => ({ ...c, volumeL: c.version.capacityL * 0.6 })),
   equipments: demoEquipments,
 };
 

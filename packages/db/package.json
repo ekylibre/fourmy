@@ -16,7 +16,8 @@
     "typecheck": "tsc -b",
     "test": "vitest run --passWithNoTests",
     "lint": "eslint src",
-    "migrate": "node --experimental-strip-types src/migrate.ts"
+    "migrate": "node --experimental-strip-types src/migrate.ts",
+    "seed:dev": "node dist/seed-dev.js"
   },
   "dependencies": {
     "@fourmy/contracts": "workspace:*",

@@ -49,6 +49,14 @@ export const landParcelVersion = z.object({
 });
 export type LandParcelVersion = z.infer<typeof landParcelVersion>;
 
+/** Parcelle avec sa version valide à la date demandée (lectures « à la date »). */
+export const landParcelAt = z.object({
+  id: uuid,
+  name: z.string(),
+  version: landParcelVersion,
+});
+export type LandParcelAt = z.infer<typeof landParcelAt>;
+
 /** Création / mise à jour (le PATCH ouvre une nouvelle version). */
 export const landParcelWrite = z.object({
   id: uuid.optional(), // fourni par le client (UUID v7) pour l'idempotence

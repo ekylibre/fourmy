@@ -1,27 +1,36 @@
 import { Hono } from "hono";
+import { DomainError } from "@fourmy/domain";
 import { auth, farmScope, type Env } from "./context.js";
 import { farmRoutes } from "./routes/farm.js";
+import { BadRequest, NotFound, Conflict } from "./routes/helpers.js";
 
 /**
- * Application Fourmy API. Montée OpenAPI complète (@hono/zod-openapi) à
- * brancher par l'agent 0 sur les schémas de @fourmy/contracts ; ici le
- * squelette expose santé + arbre de routes métier sous garde d'auth + ferme.
+ * Application Fourmy API. Garde : authentification, puis appartenance à la
+ * ferme (rôle owner/worker). Erreurs typées converties en problem+json.
  */
 export function createApp() {
   const app = new Hono<Env>();
 
   app.get("/health", (c) => c.json({ status: "ok", service: "fourmy-api" }));
 
-  app.route(
-    "/api/v1/farms/:farmId",
-    new Hono<Env>().use(auth).use(farmScope).route("/", farmRoutes),
-  );
+  app.route("/api/v1/farms/:farmId", new Hono<Env>().use(auth).use(farmScope).route("/", farmRoutes));
 
-  app.notFound((c) =>
-    c.json({ type: "about:blank", title: "Not Found", status: 404 }, 404, {
-      "content-type": "application/problem+json",
-    }),
-  );
+  const problem = (status: number, title: string, detail?: string) =>
+    new Response(JSON.stringify({ type: "about:blank", title, status, detail }), {
+      status,
+      headers: { "content-type": "application/problem+json" },
+    });
+
+  app.onError((err) => {
+    if (err instanceof BadRequest) return problem(400, "Requête invalide", err.message);
+    if (err instanceof NotFound) return problem(404, "Introuvable", err.message);
+    if (err instanceof Conflict) return problem(409, "Conflit", err.message);
+    if (err instanceof DomainError) return problem(422, "Règle métier", err.message);
+    console.error(err);
+    return problem(500, "Erreur interne");
+  });
+
+  app.notFound(() => problem(404, "Not Found"));
 
   return app;
 }

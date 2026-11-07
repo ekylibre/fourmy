@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import postgres from "postgres";
 import { createApp } from "../src/app.js";
+import { setupFarm, teardown } from "./helpers.js";
 
 /**
  * Traces et couverture sur un cas géométrique connu : une parcelle de
@@ -10,10 +11,11 @@ import { createApp } from "../src/app.js";
  */
 const url = process.env.DATABASE_URL;
 const app = createApp();
-const farmId = crypto.randomUUID();
+let farmId = "";
+let userId = "";
+let headers: Record<string, string> = {};
+let base = "";
 const equipmentId = crypto.randomUUID();
-const headers = { "x-user-id": "testeur" };
-const base = `/api/v1/farms/${farmId}`;
 
 const LAT0 = 44.8;
 const LON0 = 0.5;
@@ -28,7 +30,8 @@ describe.skipIf(!url)("traces (intégration)", () => {
     const parcel = crypto.randomUUID();
     const binding = crypto.randomUUID();
     const ring = [at(0, 0), at(100, 0), at(100, 100), at(0, 100), at(0, 0)].map(([x, y]) => `${x} ${y}`).join(",");
-    await sql`INSERT INTO farms (id, name) VALUES (${farmId}, 'Ferme test traces')`;
+    ({ farmId, userId, headers } = await setupFarm(sql, "Ferme test traces"));
+    base = `/api/v1/farms/${farmId}`;
     await sql`INSERT INTO land_parcels (id, farm_id, name) VALUES (${parcel}, ${farmId}, 'Carré')`;
     await sql`INSERT INTO land_parcel_versions (id, land_parcel_id, shape, area_m2, valid)
       VALUES (${crypto.randomUUID()}, ${parcel}, ST_GeomFromText(${`MULTIPOLYGON(((${ring})))`}, 4326),
@@ -46,14 +49,14 @@ describe.skipIf(!url)("traces (intégration)", () => {
     }
   });
   afterAll(async () => {
-    await sql`DELETE FROM farms WHERE id = ${farmId}`;
+    await teardown(sql, farmId, [userId]);
     await sql.end();
   });
 
-  const window = `equipment=${equipmentId}&from=2026-10-05T00:00:00Z&to=2026-10-06T00:00:00Z`;
+  const win = () => `equipment=${equipmentId}&from=2026-10-05T00:00:00Z&to=2026-10-06T00:00:00Z`;
 
   it("calcule la couverture attendue (1 000 m², 50 s)", async () => {
-    const res = await app.request(`${base}/tracks/coverage?${window}`, { headers });
+    const res = await app.request(`${base}/tracks/coverage?${win()}`, { headers });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.byParcel).toHaveLength(1);
@@ -66,13 +69,13 @@ describe.skipIf(!url)("traces (intégration)", () => {
   });
 
   it("simplifie une trace rectiligne en conservant le temps, et produit du CZML", async () => {
-    const json = await (await app.request(`${base}/tracks?${window}&tolerance=1`, { headers })).json();
+    const json = await (await app.request(`${base}/tracks?${win()}&tolerance=1`, { headers })).json();
     expect(json.rawCount).toBe(13);
     expect(json.samples).toHaveLength(2); // une ligne droite se réduit à ses extrémités
     expect(json.samples[0][0]).toBe("2026-10-05T12:00:00.000Z");
     expect(json.samples[1][0]).toBe("2026-10-05T12:01:00.000Z");
 
-    const czml = await (await app.request(`${base}/tracks?${window}&format=czml&name=Pulvé`, { headers })).json();
+    const czml = await (await app.request(`${base}/tracks?${win()}&format=czml&name=Pulvé`, { headers })).json();
     expect(czml[0].clock.interval).toBe("2026-10-05T12:00:00.000Z/2026-10-05T12:01:00.000Z");
     expect(czml[1].position.cartographicDegrees.slice(0, 1)).toEqual([0]);
     expect(czml[1].position.cartographicDegrees.at(-4)).toBe(60);

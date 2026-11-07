@@ -1,11 +1,7 @@
 import { z } from "zod";
 import { uuid, isoDateTime } from "./primitives.js";
-import { landParcelVersion, production } from "./entities/parcellaire.js";
-import {
-  placeVersion,
-  containerVersion,
-  equipment,
-} from "./entities/batiments.js";
+import { landParcelAt, production } from "./entities/parcellaire.js";
+import { placeAt, containerAt, equipment } from "./entities/batiments.js";
 
 /**
  * Schémas de réponse composés (routes qui renvoient un état consolidé).
@@ -16,12 +12,12 @@ import {
 /** État consolidé de la ferme à une date (GET /snapshot?at=, FR-TIME-1). */
 export const snapshot = z.object({
   at: isoDateTime,
-  landParcels: z.array(landParcelVersion),
+  landParcels: z.array(landParcelAt),
+  /** Productions de la campagne de l'année de `at`. */
   productions: z.array(production),
-  places: z.array(placeVersion),
-  containers: z.array(
-    containerVersion.extend({ volumeL: z.number().nonnegative().optional() }),
-  ),
+  places: z.array(placeAt),
+  /** Cuves et leur volume à la date (somme des mouvements). */
+  containers: z.array(containerAt.extend({ volumeL: z.number() })),
   equipments: z.array(equipment),
 });
 export type Snapshot = z.infer<typeof snapshot>;

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import postgres from "postgres";
 import { createApp } from "../src/app.js";
+import { setupFarm, teardown } from "./helpers.js";
 
 /**
  * Parcellaire de bout en bout contre la vraie base (contrats + db + domaine
@@ -8,10 +9,10 @@ import { createApp } from "../src/app.js";
  */
 const url = process.env.DATABASE_URL;
 const app = createApp();
-const farmId = crypto.randomUUID();
-const userId = crypto.randomUUID();
-const headers = { "x-user-id": userId, "content-type": "application/json" };
-const base = `/api/v1/farms/${farmId}`;
+let farmId = "";
+let userId = "";
+let headers: Record<string, string> = {};
+let base = "";
 
 const square = (d: number) => ({
   type: "MultiPolygon" as const,
@@ -22,10 +23,11 @@ describe.skipIf(!url)("parcellaire (intégration)", () => {
   const sql = postgres(url!, { max: 1 });
 
   beforeAll(async () => {
-    await sql`INSERT INTO farms (id, name) VALUES (${farmId}, 'Ferme de test')`;
+    ({ farmId, userId, headers } = await setupFarm(sql, "Ferme de test"));
+    base = `/api/v1/farms/${farmId}`;
   });
   afterAll(async () => {
-    await sql`DELETE FROM farms WHERE id = ${farmId}`; // CASCADE nettoie le reste
+    await teardown(sql, farmId, [userId]);
     await sql.end();
   });
 
@@ -43,7 +45,8 @@ describe.skipIf(!url)("parcellaire (intégration)", () => {
 
   it("versionne la parcelle : l'ancienne version est close, une nouvelle s'ouvre", async () => {
     const list = await (await app.request(`${base}/land-parcels`, { headers })).json();
-    const parcelId = list.items[0].landParcelId;
+    const parcelId = list.items[0].id;
+    expect(list.items[0].name).toBe("Les Rouffiats");
 
     const patched = await app.request(`${base}/land-parcels/${parcelId}`, {
       method: "PATCH",
@@ -61,12 +64,9 @@ describe.skipIf(!url)("parcellaire (intégration)", () => {
     expect(rows.filter((r) => r.upper === null)).toHaveLength(1);
   });
 
-  it("une ferme voisine ne voit pas la parcelle (RLS)", async () => {
+  it("une ferme dont on n'est pas membre est refusée (403)", async () => {
     const otherFarm = `/api/v1/farms/${crypto.randomUUID()}`;
-    const res = await app.request(`${otherFarm}/land-parcels`, {
-      headers: { "x-user-id": userId },
-    });
-    const body = await res.json();
-    expect(body.items).toHaveLength(0);
+    const res = await app.request(`${otherFarm}/land-parcels`, { headers });
+    expect(res.status).toBe(403);
   });
 });

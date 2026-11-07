@@ -70,7 +70,10 @@ export type StockMovement = z.infer<typeof stockMovement>;
 /** Stock d'un article à une date, par lieu. */
 export const stockLevel = z.object({
   articleId: uuid,
+  articleName: z.string().optional(),
+  articleKind: z.string().optional(),
   lotId: uuid,
+  lotCode: z.string().optional(),
   placeId: uuid.nullable(),
   containerId: uuid.nullable(),
   quantity: z.number(),

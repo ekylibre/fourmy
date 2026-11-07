@@ -48,6 +48,12 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 ```bash
 corepack pnpm install
 docker compose -f docker/compose.dev.yml up -d
-DATABASE_URL=postgres://fourmy:fourmy@localhost:5432/fourmy corepack pnpm migrate
+export DATABASE_URL=postgres://fourmy:fourmy@localhost:5432/fourmy
+corepack pnpm build && corepack pnpm migrate
+corepack pnpm --filter @fourmy/db seed:dev   # utilisateur de dev, owner de toutes les fermes
 corepack pnpm dev
 ```
+
+En attendant better-auth, l'API lit l'identité dans l'en-tête `x-user-id`
+(affiché par `seed:dev`) et vérifie l'appartenance à la ferme (rôles `owner`
+et `worker`).

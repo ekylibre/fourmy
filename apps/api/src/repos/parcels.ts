@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { withFarm, type Database } from "@fourmy/db";
 import { planVersionChange } from "@fourmy/domain";
 import type { DomainCtx } from "@fourmy/domain";
-import type { GeoJsonGeometry, LandParcelVersion } from "@fourmy/contracts";
+import type { GeoJsonGeometry, LandParcelVersion, LandParcelAt } from "@fourmy/contracts";
 
 /**
  * Dépôt « parcellaire » : versionnement réel via @fourmy/domain + PostGIS,
@@ -43,19 +43,15 @@ const selectVersion = (alias = "v") => sql`
   lower(${sql.raw(alias)}.valid) AS lower,
   upper(${sql.raw(alias)}.valid) AS upper`;
 
-/** Parcellaire à une date (versions valides à `at`). */
-export async function listParcelsAt(
-  db: Database,
-  farmId: string,
-  at: string,
-): Promise<LandParcelVersion[]> {
+/** Parcellaire à une date : chaque parcelle, son nom et sa version valide à `at`. */
+export async function listParcelsAt(db: Database, farmId: string, at: string): Promise<LandParcelAt[]> {
   return withFarm(db, farmId, async (tx) => {
     const rows = (await tx.execute(sql`
-      SELECT ${selectVersion()}
-      FROM land_parcel_versions v
-      WHERE v.valid @> ${at}::timestamptz
-      ORDER BY v.land_parcel_id`)) as unknown as Row[];
-    return rows.map(toVersion);
+      SELECT p.name, ${selectVersion()}
+      FROM land_parcels p
+      JOIN land_parcel_versions v ON v.land_parcel_id = p.id AND v.valid @> ${at}::timestamptz
+      ORDER BY p.name`)) as unknown as (Row & { name: string })[];
+    return rows.map((r) => ({ id: r.land_parcel_id, name: r.name, version: toVersion(r) }));
   });
 }
 
