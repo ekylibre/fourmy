@@ -30,6 +30,4 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 
 ### À reprendre
 
-1. Obtenir un **jeton Traccar** qui voit les boîtiers de Pierre (le jeton
-   actuel reçoit 401 sur `/api/devices`).
-2. Lancer `/sc:workflow` pour le plan détaillé de chaque agent.
+1. Lancer `/sc:workflow` pour le plan détaillé de chaque agent.

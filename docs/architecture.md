@@ -298,8 +298,10 @@ flowchart LR
 ### 6.2 Connecteur Traccar (`packages/connector-traccar`)
 
 - Serveur : `traccar.osfarm.org`. Lit `GET /api/devices` et
-  `GET /api/positions?deviceId&from&to` avec un jeton en lecture ; identifiants dans des variables d'environnement, jamais
-  dans le dépôt.
+  `GET /api/positions?deviceId&from&to` avec un jeton en lecture ; identifiants
+  dans des variables d'environnement, jamais dans le dépôt. Supporte aussi
+  l'**authentification HTTP Basic** en repli (c'est ce qu'utilisait Ekylibre).
+  Boîtiers de Pierre : id 1, 3, 5 (tracteurs).
 - Import de l'historique au premier lancement, puis récupération toutes les
   minutes (fenêtre glissante, déduplication sur `(binding_id, time)`).
 - `GET /tracks` simplifie les traces côté serveur (Douglas-Peucker
@@ -464,6 +466,7 @@ relue par l'intégrateur.
 2. ~~Front~~ : React + Mantine, comme Lyvre (ADR-7). *Confirmé le 2026-11-07.*
 3. ~~Format des exports~~ : sauvegarde de tenant Ekylibre (§6.1). *Vérifié
    le 2026-11-07.*
-4. **Accès Traccar** : URL connue (`traccar.osfarm.org`). Le jeton fourni
-   ouvre `GET /api/server` mais reçoit **401** sur `GET /api/devices` : il
-   faut un jeton d'un utilisateur qui voit les boîtiers de Pierre.
+4. ~~Accès Traccar~~ : réglé le 2026-11-07. Serveur `traccar.osfarm.org`,
+   jeton dédié du compte de Pierre (`TRACCAR_TOKEN_PHAURIGOT` hors dépôt),
+   `GET /api/devices` et `/api/positions` en 200. Trois boîtiers (tracteurs
+   Claas Arion 430 et 630, Zetor 10145) avec historique de positions.

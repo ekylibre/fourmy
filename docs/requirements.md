@@ -371,7 +371,7 @@ récolte et registre de cave.
   exports bruts ne servent qu'à la recette des jours 6 et 7, hors du dépôt.
 - ~~Q4 — Marque~~ (2026-11-07) : dépôt INPI reporté, hors du périmètre
   actuel.
-- **Q5 — Jeton Traccar** : le jeton fourni reçoit 401 sur `/api/devices`.
+- ~~Q5 — Jeton Traccar~~ (2026-11-07) : jeton dédié du compte de Pierre créé côté Traccar, `/api/devices` et `/api/positions` accessibles (3 boîtiers).
 
 ## Annexe — Propositions techniques issues du cadrage (non tranchées)
 
