@@ -13,7 +13,8 @@ import { BadRequest, NotFound, Conflict } from "./routes/helpers.js";
 export function createApp() {
   const app = new Hono<Env>();
 
-  app.get("/health", (c) => c.json({ status: "ok", service: "fourmy-api" }));
+  // Version calculée depuis l'historique (packages/release), injectée à la construction.
+  app.get("/health", (c) => c.json({ status: "ok", service: "fourmy-api", version: process.env.FOURMY_VERSION ?? "dev" }));
 
   // Connexion, déconnexion, session (better-auth).
   app.on(["GET", "POST"], "/api/auth/*", (c) => getAuth().handler(c.req.raw));

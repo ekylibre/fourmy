@@ -1,0 +1,19 @@
+# Termes interdits dans le changelog public (docs/site-public-exigences.md AU-3).
+# Un terme trouvé dans une entrée publique fait échouer la génération : on
+# reformule alors le commit avec une ligne « Public: … » (ou « Public: non »).
+# Mots entiers, sans casse ni accents. Ce fichier n'est jamais publié.
+
+# Fermes et exploitants pilotes (tenants Ekylibre, prénoms, noms)
+phaurigot
+haurigot
+entredeuxterres
+entre deux terres
+ferme-des-loubes
+loubes
+pierre
+frédéric
+
+# Jargon interne du développement
+agent0
+sc:workflow
+sc:implement
