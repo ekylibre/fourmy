@@ -126,6 +126,9 @@ obligatoire mais demande l'identification individuelle pour les bovins.
 - **FR-MAT-1 (M)** Inventaire des matériels avec leur état dans le temps.
 - **FR-MAT-2 (M)** Rattacher un traceur GPS à un matériel.
 - **FR-MAT-3 (S)** Bâtiments géolocalisés, avec un modèle 3D optionnel.
+- **FR-MAT-4 à FR-MAT-43** Fiche matériel, relevés d'heures (manuels ou
+  Traccar), plan d'entretien à échéances, journal d'entretien et pièces :
+  voir [`materiels-entretien.md`](materiels-entretien.md) (2026-11-07).
 
 ### 4.6 Traces GPS
 - **FR-GPS-1 (M)** Ingérer les traces des matériels depuis **Traccar**
