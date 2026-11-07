@@ -24,8 +24,10 @@ demandera d'abord de les retirer. Dokploy y accède par l'application GitHub
 | `api` | `Dockerfile`, cible `api` | API Hono ; applique les migrations au démarrage |
 | `worker` | même image, `node apps/api/dist/worker.js` | synchronise les intégrations des fermes (Traccar : chaque minute) |
 | `web` | `Dockerfile`, cible `web` (nginx) | application React + relais `/api` → `api` |
+| `site` | `docker/site.Dockerfile` (nginx) | site public fourmy.org ; relaie seulement `/api/public/` (formulaire de contact) ; `www` → apex |
 
-Seul **`web`** est exposé (domaine + HTTPS par Dokploy/Traefik). Le web et
+Sont exposés **`web`** (dev.fourmy.org, l'application) et **`site`**
+(fourmy.org et www.fourmy.org) — domaines et HTTPS par Dokploy/Traefik. Le web et
 l'API partagent la même origine : cookies de session sans CORS.
 
 ## Variables (Dokploy → Environment)
@@ -37,6 +39,8 @@ l'API partagent la même origine : cookies de session sans CORS.
 | `BETTER_AUTH_SECRET` | oui | signe les sessions (`openssl rand -base64 48`) ; le changer déconnecte tout le monde |
 | `FOURMY_SECRETS_KEY` | oui | chiffre les secrets d'intégration (`openssl rand -base64 32`) ; **la perdre rend les jetons illisibles** (à ressaisir) — la sauvegarder hors du serveur |
 | `FOURMY_MOBILE_ORIGINS` | non | `zeromobile://` par défaut (application mobile) |
+| `FOURMY_SMTP_HOST`, `_PORT`, `_USER`, `_PASSWORD`, `_FROM` | non | envoi du formulaire de contact de fourmy.org vers `FOURMY_CONTACT_TO` (contact@fourmy.org) ; sans eux, le formulaire répond « indisponible » |
+| `SITE_URL` | non | `https://fourmy.org` par défaut (site public) |
 | `EKYLIBRE_SOURCES_URL` | non | serveur des bases Ekylibre restaurées pour les imports depuis l'interface |
 
 Aucun secret dans le dépôt : ils sont générés directement dans Dokploy.
@@ -68,6 +72,15 @@ Essai complet de `compose.deploy.yml` en local, en mode production
 par nginx, connexion à travers le relais (cookie `HttpOnly`), origine
 étrangère refusée, inscription fermée, adresse Traccar non HTTPS refusée,
 worker actif.
+
+## Site public : version et nouveautés
+
+L'image `site` est construite **avec l'historique Git** (son fichier
+d'exclusions garde `.git`) : `packages/release` en calcule la version et les
+nouveautés publiques à chaque déploiement. Si le clone de Dokploy est
+superficiel, la construction échoue avec un message explicite — rien de faux
+n'est publié ; il faudra alors construire l'image du site en CI (historique
+complet) et la faire tirer par Dokploy.
 
 ## Sauvegardes (à mettre en place)
 

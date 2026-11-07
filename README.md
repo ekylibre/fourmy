@@ -40,7 +40,8 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | Interventions et procédures simplifiées (étape 1) | ✅ 6 formes, catalogue, périodes, personnes, motifs, annulation, habitudes de la ferme ; migrateur et formulaire web |
 | Comptes better-auth (étape 2) | ✅ comptes locaux, sessions cookie + bearer (mobile), page Équipe (membres, personnes ↔ comptes) |
 | Intégrations par ferme | ✅ module Intégrations (Traccar) : accès chiffrés par ferme, testés avant enregistrement, worker de synchro chaque minute |
-| Déploiement | 🟡 images Docker + compose prêts, essai local en mode production ; mise en ligne sur Dokploy (dev) à faire |
+| Déploiement | 🟡 Dokploy prêt (dev.fourmy.org, fourmy.org, www) ; premier déploiement au prochain push |
+| Site public fourmy.org | ✅ présentation, fonctionnalités illustrées, roadmap, nouveautés automatiques, contact ; page Fourmy d'ekylibre.com sur une branche |
 | zero-mobile (étape 3) | ✅ branche `fourmy-backend` : compte Fourmy, catalogue, formulaire générique par forme, push par intervention ; vérifié contre l'API — reste le passage sur appareil |
 | Jours 6-7 — migration réelle + recette | ⏳ à faire |
 
@@ -65,6 +66,22 @@ corepack pnpm dev                              # API :3000, web :5173 (relaie /a
 Application web : http://localhost:5173 — connexion avec le compte affiché
 par `seed:dev` (e-mail prérempli en développement). Parcours de bout en bout :
 API + `vite preview` démarrés, puis `DATABASE_URL=… corepack pnpm --filter @fourmy/web e2e`.
+
+### Site public, version et nouveautés
+
+- `apps/site` (Astro) : fourmy.org — `corepack pnpm --filter @fourmy/site dev`.
+- **Version et nouveautés automatiques** (`packages/release`) : calculées depuis
+  les commits conventionnels à chaque construction (`feat` → version mineure,
+  `fix` → correctif ; `docs`, `chore`… ne comptent pas). Le titre du commit
+  devient l'entrée publique, sans sa portée ; le corps n'est jamais publié.
+  Pour l'écrire pour les agriculteurs, ajouter au message une ligne
+  `Public: <texte>` — ou `Public: non` pour ne pas l'afficher. Un nom de
+  pilote ou une adresse e-mail dans une entrée publique fait échouer la
+  construction (`packages/release/denylist.txt`). Aperçu :
+  `node packages/release/dist/cli.js`.
+- **Captures** des fonctionnalités (API et application démarrées) :
+  `CAPTURES=1 DATABASE_URL=… corepack pnpm --filter @fourmy/web exec playwright test e2e/captures.spec.ts`.
+- **Logo** : `packages/ui-lyvre/brand/` (générateur `generate.py`).
 
 ### Comptes
 
