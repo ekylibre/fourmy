@@ -12,7 +12,8 @@ WORKDIR /repo
 FROM base AS build
 COPY . .
 RUN pnpm install --frozen-lockfile
-RUN pnpm build
+# Le site public (apps/site) a sa propre image : docker/site.Dockerfile.
+RUN pnpm turbo run build --filter='!@fourmy/site'
 # Dépendances d'exécution seulement pour l'image API.
 RUN pnpm install --frozen-lockfile --prod --offline
 
