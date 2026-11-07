@@ -20,7 +20,8 @@
         "^build"
       ],
       "env": [
-        "DATABASE_URL"
+        "DATABASE_URL",
+        "MIGRATOR_SOURCE_URL"
       ]
     },
     "migrate": {

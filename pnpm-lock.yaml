@@ -100,6 +100,22 @@ importers:
         specifier: 2.1.8
         version: 2.1.8(@types/node@22.10.5)(msw@2.7.0(@types/node@22.10.5)(typescript@5.7.3))
 
+  packages/migrator-ekylibre:
+    dependencies:
+      '@fourmy/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@fourmy/domain':
+        specifier: workspace:*
+        version: link:../domain
+      postgres:
+        specifier: 3.4.5
+        version: 3.4.5
+    devDependencies:
+      vitest:
+        specifier: 2.1.8
+        version: 2.1.8(@types/node@22.10.5)(msw@2.7.0(@types/node@22.10.5)(typescript@5.7.3))
+
   packages/mocks:
     dependencies:
       '@fourmy/contracts':
