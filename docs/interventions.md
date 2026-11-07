@@ -2,7 +2,7 @@
 
 > Rédigé le 2026-11-07 après lecture de `zero-mobile`, des définitions de
 > procédures d'Ekylibre et de l'usage réel sur les trois fermes migrées.
-> **Statut : proposition à valider** avant de modifier Fourmy et zero-mobile.
+> **Statut : validée le 2026-11-07** (décisions au §7).
 
 ## 1. Constats
 
@@ -217,13 +217,23 @@ quand seule une partie de la parcelle est traitée.
   carte, saisie des intrants).
 - **Supprimé** : analyseur de filtres, miroir des 7 handlers, `reference_name`.
 
-## 7. Questions à trancher
+## 7. Décisions (2026-11-07)
 
-1. **Personnes (intervenants)** : créer une liste de personnes par ferme
-   (nom, rôle, lien éventuel avec un compte), **et** migrer les intervenants
-   d'Ekylibre (données personnelles) ? Sans elles, le mobile ne peut pas
-   saisir le conducteur.
-2. **Motifs de traitement** : liste fermée (herbicide, fongicide,
-   insecticide, régulateur, biostimulant…) facultative — d'accord ?
-3. **Authentification mobile** : l'app a besoin de vrais comptes ; better-auth
-   (ADR-14) devient un prérequis de la mise en pilote de zero-mobile sur Fourmy.
+1. **Personnes** : une liste de personnes par ferme (nom, rôle, lien
+   éventuel avec un compte) ; les intervenants d'Ekylibre sont **migrés**
+   (nom seulement). Les fixtures restent anonymisées.
+2. **Motifs de traitement** : **liste fermée, facultative** (herbicide,
+   fongicide, insecticide, régulateur de croissance, biostimulant…), rien de
+   coché par défaut ; les « actions » d'Ekylibre ne sont pas migrées.
+3. **Authentification** : **better-auth avant zero-mobile** — l'API et le web
+   passent à de vrais comptes, puis l'app mobile s'y connecte.
+
+## 8. Ordre de réalisation
+
+1. **Fourmy — interventions et procédures** : catalogue et règles de forme
+   (contrats + domaine), base (périodes, personnes, motifs), API, migrateur,
+   formulaire web unique.
+2. **Fourmy — comptes** : better-auth (comptes locaux), remplacement de
+   l'identité de développement, rattachement des personnes aux comptes.
+3. **zero-mobile** : client Fourmy, schéma local v5, formulaire par forme,
+   push par intervention sur `/sync/push`.
