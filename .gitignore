@@ -17,3 +17,4 @@ apps/web/test-results/
 apps/web/playwright-report/
 apps/web/dist/
 apps/web/public/cesium/
+apps/site/.astro/

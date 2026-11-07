@@ -1,0 +1,85 @@
+---
+import Base from "../layouts/Base.astro";
+import FeatureFigure from "../components/FeatureFigure.astro";
+import { APP_URL, features, STATUS_LABELS } from "../lib/site";
+import { catalogue } from "../lib/catalogue";
+import { release, formatDate } from "../lib/release";
+
+const highlights = features.filter((f) => f.status === "disponible").slice(0, 6);
+const latest = release.entries.slice(0, 3);
+---
+
+<Base title="Fourmy" description="Fourmy, le jumeau numérique de la ferme : parcelles, interventions, stocks, cuverie et traces GPS, à n'importe quelle date. Logiciel libre, nouvelle génération d'Ekylibre.">
+  <section class="wrap hero">
+    <div>
+      <h1>Le jumeau numérique de votre ferme</h1>
+      <p class="lead">
+        Parcelles, interventions, stocks, cuves, tracteurs : Fourmy tient la ferme à jour, au champ comme au bureau, et vous
+        laisse remonter le temps à n'importe quelle date.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="/fonctionnalites/">Découvrir les fonctionnalités</a>
+        <a class="btn btn-secondary" href="/contact/">Nous écrire</a>
+      </div>
+      <div class="facts">
+        <div><strong>{catalogue.procedures}</strong> procédures prêtes à saisir</div>
+        <div><strong>{catalogue.shapes.length}</strong> formes d'intervention</div>
+        <div><strong>{release.version}</strong> version actuelle</div>
+      </div>
+    </div>
+    <FeatureFigure capture="tableau-de-bord" alt="Tableau de bord de Fourmy sur une ferme de test" eager />
+  </section>
+
+  <section class="section wrap">
+    <h2>Ce que Fourmy fait déjà</h2>
+    <div class="grid">
+      {
+        highlights.map((f) => (
+          <article class="card">
+            <span class={`badge badge-${f.status}`}>{STATUS_LABELS[f.status]}</span>
+            <h3>{f.title}</h3>
+            <p class="muted">{f.text}</p>
+          </article>
+        ))
+      }
+    </div>
+    <p><a href="/fonctionnalites/">Toutes les fonctionnalités, en images →</a></p>
+  </section>
+
+  <section class="section wrap">
+    <div class="grid">
+      <article class="card">
+        <h3>Nouvelle génération d'Ekylibre</h3>
+        <p class="muted">
+          Fourmy reprend Ekylibre, logiciel libre de gestion agricole développé depuis 2008, avec un modèle plus simple et vos
+          données reprises telles quelles.
+        </p>
+      </article>
+      <article class="card">
+        <h3>Libre et réversible</h3>
+        <p class="muted">
+          Code ouvert sous licence AGPL, données exportables : votre ferme ne dépend pas d'un éditeur. La comptabilité reste
+          tenue dans <a href="https://lyvre.org/">Lyvre</a>.
+        </p>
+      </article>
+      <article class="card">
+        <h3>Au champ, même sans réseau</h3>
+        <p class="muted">L'application mobile enregistre hors ligne et envoie au retour de la connexion.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="section wrap">
+    <h2>Dernières nouveautés</h2>
+    <ul>
+      {
+        latest.map((e) => (
+          <li>
+            <strong>{e.text}</strong> <span class="muted">— version {e.version}, {formatDate(e.date)}</span>
+          </li>
+        ))
+      }
+    </ul>
+    <p><a href="/changelog/">Toutes les nouveautés →</a> · <a href={APP_URL}>Se connecter à l'application</a></p>
+  </section>
+</Base>

@@ -1,0 +1,34 @@
+{
+  "name": "@fourmy/site",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Site public fourmy.org : projet, fonctionnalités, roadmap, changelog, contact",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview --port 4321",
+    "typecheck": "astro check",
+    "lint": "eslint src/lib",
+    "captures": "node scripts/captures.mjs",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "@fourmy/contracts": "workspace:*",
+    "@fourmy/release": "workspace:*",
+    "@fourmy/ui-lyvre": "workspace:*",
+    "@fontsource/bricolage-grotesque": "5.3.0",
+    "@fontsource/ibm-plex-sans": "5.3.0",
+    "astro": "7.4.1",
+    "@astrojs/sitemap": "3.7.4",
+    "sharp": "0.35.5",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.12",
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "1.64.1",
+    "typescript": "5.7.3"
+  }
+}

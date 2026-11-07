@@ -1,0 +1,98 @@
+/* Site fourmy.org — charte Lyvre (variables --lv-* de @fourmy/ui-lyvre). */
+:root {
+  --font-text: "IBM Plex Sans", system-ui, sans-serif;
+  --font-title: "Bricolage Grotesque", var(--font-text);
+  --wrap: 72rem;
+  color-scheme: light;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font: 400 1.0625rem/1.6 var(--font-text);
+  color: var(--lv-ink);
+  background: var(--lv-paper);
+  -webkit-font-smoothing: antialiased;
+}
+img { max-width: 100%; height: auto; display: block; }
+a { color: var(--lv-lichen); text-underline-offset: 0.18em; }
+a:hover { color: var(--lv-lichen-strong); }
+:focus-visible { outline: 3px solid var(--lv-focus); outline-offset: 2px; border-radius: 4px; }
+h1, h2, h3 { font-family: var(--font-title); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 0.6em; }
+h1 { font-size: clamp(2.2rem, 5vw, 3.6rem); font-weight: 800; }
+h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); }
+h3 { font-size: 1.25rem; }
+p { margin: 0 0 1em; }
+.wrap { width: min(100% - 2.5rem, var(--wrap)); margin-inline: auto; }
+.muted { color: var(--lv-ink-muted); }
+.skip { position: absolute; left: -999px; top: 0.5rem; background: var(--lv-surface); padding: 0.5rem 1rem; z-index: 10; }
+.skip:focus { left: 0.5rem; }
+
+/* En-tête : logo, navigation, « Se connecter » en haut à droite. */
+.site-header { background: var(--lv-surface); border-bottom: 1px solid var(--lv-line); position: sticky; top: 0; z-index: 5; }
+.site-header .wrap { display: flex; align-items: center; gap: 1.5rem; min-height: 4.25rem; }
+.site-header .logo img { height: 2.25rem; width: auto; }
+.site-nav { display: flex; gap: 1.25rem; flex-wrap: wrap; margin-left: auto; }
+.site-nav a { color: var(--lv-ink); text-decoration: none; font-weight: 500; padding: 0.25rem 0; border-bottom: 2px solid transparent; }
+.site-nav a[aria-current="page"], .site-nav a:hover { border-bottom-color: var(--lv-lichen); }
+.btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1.15rem; border-radius: 10px; font-weight: 600;
+  text-decoration: none; border: 2px solid var(--lv-lichen); line-height: 1.2; cursor: pointer; font: inherit; font-weight: 600; }
+.btn-primary { background: var(--lv-lichen); color: var(--lv-on-lichen); }
+.btn-primary:hover { background: var(--lv-lichen-strong); border-color: var(--lv-lichen-strong); color: var(--lv-on-lichen); }
+.btn-secondary { background: transparent; color: var(--lv-lichen); }
+.login { flex: none; }
+@media (max-width: 52rem) {
+  .site-header .wrap { flex-wrap: wrap; padding-block: 0.75rem; gap: 0.75rem; }
+  .site-nav { order: 3; width: 100%; margin-left: 0; gap: 1rem; font-size: 0.95rem; }
+  .login { margin-left: auto; }
+}
+
+main { padding-block: 3rem 5rem; }
+.hero { padding-block: 2rem 3rem; display: grid; gap: 2.5rem; grid-template-columns: 1.1fr 1fr; align-items: center; }
+.hero .lead { font-size: 1.25rem; color: var(--lv-ink-muted); }
+.hero-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1.5rem; }
+@media (max-width: 52rem) { .hero { grid-template-columns: 1fr; } }
+.section { padding-block: 3rem; }
+.grid { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); }
+.card { background: var(--lv-surface); border: 1px solid var(--lv-line); border-radius: 14px; padding: 1.5rem; }
+.card h3 { margin-bottom: 0.4em; }
+.figure { border-radius: 12px; border: 1px solid var(--lv-line); overflow: hidden; background: var(--lv-surface-sunken); box-shadow: var(--lv-shadow-float); }
+.badge { display: inline-block; font-size: 0.8rem; font-weight: 600; padding: 0.15rem 0.6rem; border-radius: 999px; margin-bottom: 0.75rem; }
+.badge-disponible, .badge-en-cours { background: var(--lv-sauge); color: var(--lv-lichen-strong); }
+.badge-en-test, .badge-prochainement { background: var(--lv-paille-tint); color: var(--lv-paille-ink); }
+.badge-a-venir, .badge-plus-tard { background: var(--lv-ardoise-tint); color: var(--lv-ardoise); }
+.facts { display: flex; gap: 2.5rem; flex-wrap: wrap; margin-top: 1.5rem; }
+.facts strong { display: block; font: 800 2.2rem/1 var(--font-title); color: var(--lv-lichen); }
+
+/* Fonctionnalités : capture + texte, en alternance. */
+.feature { display: grid; grid-template-columns: 1fr 1.25fr; gap: 2.5rem; align-items: center; padding-block: 2.5rem; border-top: 1px solid var(--lv-line); }
+.feature:nth-child(even) .figure { order: 2; }
+@media (max-width: 52rem) { .feature { grid-template-columns: 1fr; } .feature:nth-child(even) .figure { order: 0; } }
+
+/* Changelog et roadmap. */
+.release { border-left: 3px solid var(--lv-lichen); padding: 0 0 1.75rem 1.5rem; margin-left: 0.5rem; }
+.release h2 { font-size: 1.35rem; margin-bottom: 0.2em; }
+.release ul { margin: 0.5rem 0 0; padding-left: 1.2rem; }
+.release li { margin-bottom: 0.35rem; }
+.kind { font-size: 0.8rem; font-weight: 600; color: var(--lv-ink-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-right: 0.4rem; }
+
+/* Formulaire de contact. */
+.form { display: grid; gap: 1.1rem; max-width: 40rem; }
+.form label { display: grid; gap: 0.35rem; font-weight: 500; }
+.form input, .form select, .form textarea { font: inherit; padding: 0.65rem 0.8rem; border: 1px solid var(--lv-line-strong); border-radius: 8px; background: var(--lv-surface); color: var(--lv-ink); }
+.form textarea { min-height: 10rem; resize: vertical; }
+.form .check { display: flex; gap: 0.6rem; align-items: flex-start; font-weight: 400; }
+.form .check input { margin-top: 0.3rem; }
+.hp { position: absolute !important; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.notice { padding: 1rem 1.25rem; border-radius: 10px; }
+.notice-ok { background: var(--lv-sauge); color: var(--lv-lichen-strong); }
+.notice-error { background: var(--lv-brique-tint); color: var(--lv-brique-ink); }
+
+.site-footer { background: var(--lv-night); color: var(--lv-on-night); padding-block: 3rem; font-size: 0.95rem; }
+.site-footer a { color: var(--lv-on-night); }
+.site-footer .wrap { display: grid; gap: 2rem; grid-template-columns: 2fr 1fr 1fr; }
+.site-footer img { height: 2rem; width: auto; margin-bottom: 0.75rem; }
+.site-footer ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+@media (max-width: 52rem) { .site-footer .wrap { grid-template-columns: 1fr; } }
+.prose { max-width: 46rem; }
+.prose h2 { margin-top: 1.8em; font-size: 1.4rem; }

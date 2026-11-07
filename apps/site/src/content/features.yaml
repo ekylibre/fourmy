@@ -1,0 +1,95 @@
+# Fonctionnalités présentées sur fourmy.org (page Fonctionnalités et accueil).
+# status : disponible | en-test | a-venir ; capture : src/assets/captures/<capture>.png
+# (régénérées par `pnpm --filter @fourmy/site captures`) ; since : version d'arrivée.
+features:
+  - id: frise
+    title: La ferme à n'importe quelle date
+    text: >-
+      Une frise en haut de l'écran : faites-la glisser et toute la ferme revient à cette
+      date — parcelles, cuves, stocks, interventions. Rien n'est écrasé, tout est daté.
+    status: disponible
+    capture: tableau-de-bord
+    since: 0.17.0
+  - id: carte
+    title: Carte et parcellaire dans le temps
+    text: >-
+      Parcelles sur la photo aérienne et la carte IGN, versionnées : une parcelle découpée
+      ou agrandie garde son histoire, et les surfaces traitées restent justes.
+    status: disponible
+    capture: carte
+    since: 0.8.0
+  - id: plan-3d
+    title: Plan 3D de l'exploitation
+    text: >-
+      Relief et photo IGN, bâtiments à leur hauteur, cuves qui se remplissent au fil des
+      vendanges, et rejeu des passages de tracteurs.
+    status: disponible
+    capture: plan-3d
+    since: 0.18.0
+  - id: interventions
+    title: Toutes les interventions, un seul formulaire
+    text: >-
+      Labour, semis, traitements, fertilisation, récolte, vendange, entretien du matériel :
+      le formulaire s'adapte à ce que vous faites. Doses à l'hectare ou au total, plusieurs
+      périodes de travail, vos produits et matériels habituels proposés en premier.
+    status: disponible
+    capture: intervention
+    since: 0.19.0
+  - id: stocks
+    title: Stocks tenus tout seuls
+    text: >-
+      Chaque intervention réalisée sort les produits du stock ; une récolte y entre, rangée
+      en cuve ou au bâtiment. Un stock négatif est signalé, jamais caché.
+    status: disponible
+    capture: stocks
+    since: 0.14.0
+  - id: cuverie
+    title: Cuverie
+    text: >-
+      Chaque cuve, ce qu'elle contient, son millésime et son cépage, à n'importe quelle date.
+    status: disponible
+    capture: cuverie
+    since: 0.17.0
+  - id: registre
+    title: Registre phytosanitaire calculé
+    text: >-
+      Le registre se déduit des traitements saisis : rien à ressaisir. Export pour les
+      contrôles.
+    status: disponible
+    capture: registre
+    since: 0.7.0
+  - id: traces
+    title: Traces GPS des tracteurs
+    text: >-
+      Reliez vos boîtiers Traccar : les trajets arrivent chaque minute, et la surface
+      réellement travaillée est calculée.
+    status: disponible
+    capture: integrations
+    since: 0.22.0
+  - id: mobile
+    title: Application mobile hors ligne
+    text: >-
+      Saisie au champ sans réseau, envoi au retour de la connexion, intervention par
+      intervention.
+    status: en-test
+    since: 0.21.0
+  - id: equipe
+    title: Équipe et accès
+    text: >-
+      Comptes personnels, rôles responsable et salarié ; chaque ferme est cloisonnée.
+    status: disponible
+    capture: equipe
+    since: 0.20.0
+  - id: reprise
+    title: Reprise de vos données Ekylibre
+    text: >-
+      Parcelles, interventions, stocks et cuves repris d'Ekylibre ; le registre
+      phytosanitaire reste identique à l'original.
+    status: disponible
+    since: 0.9.0
+  - id: meteo
+    title: Météo et capteurs
+    text: >-
+      Stations météo, sondes et pièges reliés comme les traceurs GPS, relevés rattachés
+      aux parcelles.
+    status: a-venir

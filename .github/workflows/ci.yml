@@ -69,6 +69,7 @@ jobs:
           (cd apps/web && pnpm exec vite preview --port 4173 --strictPort > ../../web.log 2>&1 &)
           for i in $(seq 1 30); do curl -sf localhost:3000/health && curl -sf localhost:4173/ >/dev/null && break; sleep 1; done
       - run: pnpm --filter @fourmy/web e2e
+      - run: pnpm --filter @fourmy/site e2e
       - if: failure()
         uses: actions/upload-artifact@v4
         with:

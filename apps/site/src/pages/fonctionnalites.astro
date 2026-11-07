@@ -1,0 +1,32 @@
+---
+import Base from "../layouts/Base.astro";
+import FeatureFigure from "../components/FeatureFigure.astro";
+import { features, STATUS_LABELS } from "../lib/site";
+import { catalogue } from "../lib/catalogue";
+
+const order = { disponible: 0, "en-test": 1, "a-venir": 2 } as const;
+const sorted = [...features].sort((a, b) => order[a.status] - order[b.status]);
+---
+
+<Base title="Fonctionnalités" description="Ce que fait Fourmy : frise dans le temps, carte, plan 3D, interventions, stocks, cuverie, registre phytosanitaire, traces GPS, application mobile.">
+  <div class="wrap">
+    <h1>Fonctionnalités</h1>
+    <p class="lead muted">
+      {catalogue.procedures} procédures ({catalogue.crops} pour les cultures, {catalogue.vine} pour la vigne) regroupées en
+      {catalogue.shapes.length} formes : {catalogue.shapes.join(", ").toLowerCase()}. Les captures viennent de fermes de test.
+    </p>
+    {
+      sorted.map((f) => (
+        <section class="feature" id={f.id}>
+          <FeatureFigure capture={f.capture} alt={`${f.title} — capture de Fourmy`} />
+          <div>
+            <span class={`badge badge-${f.status}`}>{STATUS_LABELS[f.status]}</span>
+            <h2>{f.title}</h2>
+            <p>{f.text}</p>
+            {f.since && <p class="muted">Depuis la version {f.since}.</p>}
+          </div>
+        </section>
+      ))
+    }
+  </div>
+</Base>

@@ -1,0 +1,27 @@
+---
+import Base from "../layouts/Base.astro";
+import { release, releasesByVersion, formatDate } from "../lib/release";
+---
+
+<Base title="Nouveautés" description="Les nouveautés et corrections de Fourmy, version par version, mises à jour à chaque évolution.">
+  <div class="wrap">
+    <h1>Nouveautés</h1>
+    <p class="lead muted">Version actuelle : <strong>{release.version}</strong>. Cette page se met à jour à chaque évolution du logiciel.</p>
+    {
+      releasesByVersion().map((r) => (
+        <section class="release" id={`v${r.version}`}>
+          <h2>Version {r.version}</h2>
+          <p class="muted">{formatDate(r.date)}</p>
+          <ul>
+            {r.entries.map((e) => (
+              <li>
+                <span class="kind">{e.kind === "feature" ? "Nouveau" : "Correction"}</span>
+                {e.text}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))
+    }
+  </div>
+</Base>

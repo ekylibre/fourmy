@@ -1,0 +1,84 @@
+---
+import Base from "../layouts/Base.astro";
+// Le formulaire est envoyé à /api/public/contact (relayé vers l'API Fourmy,
+// même origine). Sans JavaScript : envoi classique et redirection. Avec : envoi
+// en arrière-plan et message affiché sur place.
+---
+
+<Base title="Contact" description="Écrire à l'équipe Fourmy : essayer Fourmy sur sa ferme, devenir partenaire, contribuer.">
+  <div class="wrap">
+    <h1>Contact</h1>
+    <p class="lead muted">Une question, envie d'essayer Fourmy sur votre ferme, de contribuer ou de devenir partenaire ? Écrivez-nous.</p>
+    <div id="erreur" class="notice notice-error" role="alert" hidden></div>
+    <div id="merci" class="notice notice-ok" role="status" hidden>Merci, votre message est bien parti. Nous vous répondrons rapidement.</div>
+    <form class="form" id="contact" method="post" action="/api/public/contact">
+      <label>Nom <input name="name" required maxlength="120" autocomplete="name" /></label>
+      <label>E-mail <input name="email" type="email" required maxlength="200" autocomplete="email" /></label>
+      <label>Vous êtes
+        <select name="profile">
+          <option value="agriculteur">Agriculteur ou agricultrice</option>
+          <option value="partenaire">Partenaire (conseil, coopérative, constructeur…)</option>
+          <option value="developpeur">Développeur ou développeuse</option>
+          <option value="autre" selected>Autre</option>
+        </select>
+      </label>
+      <label>Message <textarea name="message" required minlength="10" maxlength="5000"></textarea></label>
+      <div class="hp" aria-hidden="true">
+        <label>Site web (laisser vide) <input name="website" tabindex="-1" autocomplete="off" /></label>
+      </div>
+      <input type="hidden" name="startedAt" id="startedAt" />
+      <label class="check">
+        <input type="checkbox" name="consent" value="on" required />
+        <span>J'accepte que mes coordonnées servent à me répondre (voir <a href="/donnees-personnelles/">données personnelles</a>).</span>
+      </label>
+      <button class="btn btn-primary" type="submit">Envoyer</button>
+    </form>
+    <p class="muted" style="margin-top:2rem">Ou directement : <a href="mailto:contact@fourmy.org">contact@fourmy.org</a></p>
+  </div>
+</Base>
+
+<script>
+  const form = document.getElementById("contact") as HTMLFormElement;
+  const started = document.getElementById("startedAt") as HTMLInputElement;
+  const errorBox = document.getElementById("erreur") as HTMLElement;
+  const thanks = document.getElementById("merci") as HTMLElement;
+  started.value = String(Date.now());
+  const params = new URLSearchParams(location.search);
+  const failures: Record<string, string> = {
+    "400": "Le message n'a pas pu être envoyé : vérifiez les champs.",
+    "429": "Trop de messages envoyés depuis votre connexion : réessayez plus tard.",
+    "503": "Le formulaire est momentanément indisponible : écrivez à contact@fourmy.org.",
+  };
+  const show = (message: string) => {
+    errorBox.textContent = message;
+    errorBox.hidden = false;
+  };
+  if (params.get("erreur")) show(failures[params.get("erreur")!] ?? failures["503"]!);
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    errorBox.hidden = true;
+    const data = Object.fromEntries(new FormData(form).entries());
+    const button = form.querySelector("button")!;
+    button.disabled = true;
+    try {
+      const res = await fetch(form.action, {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ ...data, consent: data.consent === "on", startedAt: Number(data.startedAt) }),
+      });
+      if (res.ok) {
+        form.hidden = true;
+        thanks.hidden = false;
+        thanks.focus();
+        return;
+      }
+      const problem = await res.json().catch(() => null);
+      show(problem?.detail ?? failures[String(res.status)] ?? failures["503"]!);
+    } catch {
+      show("Connexion impossible : réessayez, ou écrivez à contact@fourmy.org.");
+    } finally {
+      button.disabled = false;
+    }
+  });
+</script>

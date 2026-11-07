@@ -1,0 +1,83 @@
+---
+// Mise en page commune : en-tête (« Se connecter » en haut à droite), pied de
+// page (version calculée à la construction), métadonnées SEO / Open Graph.
+import "@fontsource/ibm-plex-sans/400.css";
+import "@fontsource/ibm-plex-sans/600.css";
+import "@fontsource/bricolage-grotesque/700.css";
+import "@fontsource/bricolage-grotesque/800.css";
+import "@fourmy/ui-lyvre/lyvre.css";
+import "../styles/site.css";
+import logo from "@fourmy/ui-lyvre/brand/fourmy-logo.svg";
+import logoDark from "@fourmy/ui-lyvre/brand/fourmy-logo-dark.svg";
+import { APP_URL } from "../lib/site";
+import { release } from "../lib/release";
+
+interface Props {
+  title: string;
+  description: string;
+}
+const { title, description } = Astro.props;
+const fullTitle = title === "Fourmy" ? "Fourmy — le jumeau numérique de la ferme" : `${title} — Fourmy`;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const path = Astro.url.pathname;
+const nav = [
+  { href: "/fonctionnalites/", label: "Fonctionnalités" },
+  { href: "/roadmap/", label: "Roadmap" },
+  { href: "/changelog/", label: "Nouveautés" },
+  { href: "/contact/", label: "Contact" },
+];
+const ogImage = new URL("/og.png", Astro.site);
+---
+
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Fourmy" />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:locale" content="fr_FR" />
+    <meta name="theme-color" content="#2F6B4F" />
+  </head>
+  <body>
+    <a class="skip" href="#contenu">Aller au contenu</a>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="logo" href="/" aria-label="Fourmy, accueil"><img src={logo.src} alt="Fourmy" width={logo.width} height={logo.height} /></a>
+        <nav class="site-nav" aria-label="Navigation principale">
+          {nav.map((n) => <a href={n.href} aria-current={path.startsWith(n.href) ? "page" : undefined}>{n.label}</a>)}
+        </nav>
+        <a class="btn btn-primary login" href={APP_URL} data-testid="login">Se connecter</a>
+      </div>
+    </header>
+    <main id="contenu">
+      <slot />
+    </main>
+    <footer class="site-footer">
+      <div class="wrap">
+        <div>
+          <img src={logoDark.src} alt="Fourmy" width={logoDark.width} height={logoDark.height} loading="lazy" />
+          <p>Le jumeau numérique de la ferme. Logiciel libre (GNU AGPL v3), édité par <a href="https://ekylibre.com/">Ekylibre SAS</a>.</p>
+          <p class="version" data-testid="version">Version {release.version}</p>
+        </div>
+        <ul aria-label="Le projet">
+          {nav.map((n) => <li><a href={n.href}>{n.label}</a></li>)}
+          <li><a href={APP_URL}>Se connecter</a></li>
+        </ul>
+        <ul aria-label="Informations">
+          <li><a href="/mentions-legales/">Mentions légales</a></li>
+          <li><a href="/donnees-personnelles/">Données personnelles</a></li>
+          <li><a href="mailto:contact@fourmy.org">contact@fourmy.org</a></li>
+        </ul>
+      </div>
+    </footer>
+  </body>
+</html>

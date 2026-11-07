@@ -1,0 +1,20 @@
+---
+import { Image } from "astro:assets";
+import { captures } from "../lib/captures";
+
+interface Props {
+  capture?: string;
+  alt: string;
+  eager?: boolean;
+}
+const { capture, alt, eager = false } = Astro.props;
+const image = capture ? captures.get(capture) : undefined;
+---
+
+{
+  image && (
+    <figure class="figure">
+      <Image src={image} alt={alt} widths={[640, 960, 1440]} sizes="(max-width: 52rem) 100vw, 40rem" format="webp" loading={eager ? "eager" : "lazy"} />
+    </figure>
+  )
+}

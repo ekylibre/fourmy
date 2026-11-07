@@ -1,0 +1,31 @@
+# Roadmap publique (page Roadmap). status : en-cours | prochainement | plus-tard.
+# Première version à valider (docs/site-public-exigences.md, question ouverte 5).
+roadmap:
+  - title: Tests avec les fermes pilotes
+    text: >-
+      Une grande culture et un domaine viticole utilisent Fourmy sur leurs propres données,
+      reprises d'Ekylibre.
+    status: en-cours
+    horizon: Fin 2026
+  - title: Application mobile sur le terrain
+    text: Essais sur téléphone, cartes hors ligne, puis diffusion aux pilotes.
+    status: en-cours
+    horizon: Fin 2026
+  - title: Mise en production
+    text: Hébergement de production, sauvegardes, ouverture aux premières fermes.
+    status: prochainement
+    horizon: Début 2027
+  - title: Registre phytosanitaire en PDF
+    text: Le registre prêt à imprimer pour les contrôles.
+    status: prochainement
+  - title: Météo, sondes et pièges connectés
+    text: De nouvelles intégrations sur le modèle des traceurs GPS.
+    status: plus-tard
+  - title: API documentée et ouverte
+    text: >-
+      Documentation de l'API pour les partenaires et les outils comme Aiffel, l'assistant
+      agricole.
+    status: plus-tard
+  - title: Comptabilité avec Lyvre
+    text: Les interventions et les stocks transmis à la comptabilité tenue dans Lyvre.
+    status: plus-tard

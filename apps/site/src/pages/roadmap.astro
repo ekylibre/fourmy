@@ -1,0 +1,32 @@
+---
+import Base from "../layouts/Base.astro";
+import { roadmap, STATUS_LABELS } from "../lib/site";
+
+const groups = (["en-cours", "prochainement", "plus-tard"] as const).map((s) => ({
+  status: s,
+  items: roadmap.filter((r) => r.status === s),
+}));
+---
+
+<Base title="Roadmap" description="Où va Fourmy : tests avec les fermes pilotes, application mobile, mise en production et prochaines intégrations.">
+  <div class="wrap">
+    <h1>Roadmap</h1>
+    <p class="lead muted">Ce sur quoi nous travaillons, et ce qui suit. Une idée, un besoin ? <a href="/contact/">Écrivez-nous</a>.</p>
+    {
+      groups.map((g) => (
+        <section class="section">
+          <h2>{STATUS_LABELS[g.status]}</h2>
+          <div class="grid">
+            {g.items.map((r) => (
+              <article class="card">
+                <span class={`badge badge-${r.status}`}>{r.horizon ?? STATUS_LABELS[r.status]}</span>
+                <h3>{r.title}</h3>
+                <p class="muted">{r.text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ))
+    }
+  </div>
+</Base>
