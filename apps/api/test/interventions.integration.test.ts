@@ -21,6 +21,7 @@ describe.skipIf(!url)("interventions (intégration)", () => {
   const sql = postgres(url!, { max: 1, onnotice: () => {} });
   let farmId = "";
   let ownerId = "";
+  let ownerHeaders: Record<string, string> = {};
   let worker: { userId: string; headers: Record<string, string> };
   let base = "";
 
@@ -28,6 +29,7 @@ describe.skipIf(!url)("interventions (intégration)", () => {
     const owner = await setupFarm(sql, "Ferme test interventions");
     farmId = owner.farmId;
     ownerId = owner.userId;
+    ownerHeaders = owner.headers;
     worker = await addMember(sql, farmId, "worker");
     base = `/api/v1/farms/${farmId}`;
     // Parcelle de 1 ha, hangar, cuve, fongicide (AMM) avec 20 L en stock, raisin.
@@ -187,7 +189,6 @@ describe.skipIf(!url)("interventions (intégration)", () => {
   it("une personne de la ferme est désignée comme intervenant (propriétaire seul pour la créer)", async () => {
     const refused = await post("/people", { name: "Camille" });
     expect(refused.status).toBe(403);
-    const ownerHeaders = { "x-user-id": ownerId, "content-type": "application/json" };
     const res = await app.request(`${base}/people`, { method: "POST", headers: ownerHeaders, body: JSON.stringify({ name: "Camille", role: "tractoriste" }) });
     expect(res.status).toBe(201);
     const person = await res.json();

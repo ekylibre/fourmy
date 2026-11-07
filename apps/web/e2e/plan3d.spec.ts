@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { E2E_USER } from "./shared";
+import { login } from "./shared";
 
 /**
  * Plan 3D (US-4, US-9) sur la ferme pilote viticole : la cuverie apparaît,
@@ -10,9 +10,7 @@ test("plan 3D : cuverie placée, remplissage qui suit la frise", async ({ page }
   const crashes: string[] = [];
   page.on("pageerror", (e) => crashes.push(e.message));
 
-  await page.goto("/connexion");
-  await page.getByLabel("Identifiant utilisateur").fill(E2E_USER);
-  await page.getByRole("button", { name: "Se connecter" }).click();
+  await login(page);
   await page.getByRole("link", { name: /Ferme pilote — viticulture/ }).click();
 
   await page.getByLabel("Date de la frise").fill("2021-12-31");

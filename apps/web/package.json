@@ -15,29 +15,32 @@
   },
   "dependencies": {
     "@fourmy/contracts": "workspace:*",
+    "@fourmy/domain": "workspace:*",
     "@fourmy/ui-lyvre": "workspace:*",
     "@mantine/core": "9.7.3",
     "@mantine/dates": "9.7.3",
     "@mantine/hooks": "9.7.3",
     "@mantine/notifications": "9.7.3",
     "@tanstack/react-query": "5.104.5",
+    "better-auth": "1.7.12",
+    "cesium": "1.146.0",
     "dayjs": "1.11.23",
     "lucide-react": "1.61.0",
     "mantine-datatable": "9.4.0",
     "maplibre-gl": "6.16.0",
     "react": "19.2.9",
     "react-dom": "19.2.9",
-    "react-router": "8.5.0",
-    "cesium": "1.146.0",
-    "@fourmy/domain": "workspace:*"
+    "react-router": "8.5.0"
   },
   "devDependencies": {
+    "@fourmy/db": "workspace:*",
     "@fourmy/mocks": "workspace:*",
     "@playwright/test": "1.64.1",
     "@testing-library/dom": "10.4.1",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.8",
+    "@types/geojson": "7946.0.16",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",
     "@vitejs/plugin-react": "6.1.2",
@@ -46,10 +49,8 @@
     "postcss": "8.5.31",
     "postcss-preset-mantine": "1.18.0",
     "postcss-simple-vars": "7.0.1",
+    "postgres": "3.4.5",
     "vite": "8.3.4",
-    "vitest": "4.1.12",
-    "@types/geojson": "7946.0.16",
-    "@fourmy/db": "workspace:*",
-    "postgres": "3.4.5"
+    "vitest": "4.1.12"
   }
 }

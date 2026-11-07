@@ -1,17 +1,21 @@
 import { useState } from "react";
-import { Alert, Button, Center, Paper, Stack, Text, TextInput, Title } from "@mantine/core";
+import { Alert, Button, Center, Paper, PasswordInput, Stack, Text, TextInput, Title } from "@mantine/core";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import { Wordmark } from "@fourmy/ui-lyvre";
-import { DEV_USER_ID, signIn } from "../../app/session";
+import { DEV_EMAIL, signIn } from "../../app/session";
 
 /**
- * Connexion de **développement** : identifiant d'utilisateur (UUID). Sera
- * remplacée par better-auth (comptes locaux, SSO) — l'écran le dit.
+ * Connexion par compte local (better-auth). Les comptes sont créés par
+ * l'administrateur puis rattachés à une ferme par son responsable.
  */
 export function LoginPage() {
-  const [userId, setUserId] = useState(DEV_USER_ID);
+  const [email, setEmail] = useState(DEV_EMAIL);
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   return (
     <Center mih="100vh" p="md">
@@ -19,31 +23,47 @@ export function LoginPage() {
         <Stack>
           <Wordmark style={{ fontSize: "2rem" }} />
           <Title order={2}>Connexion</Title>
-          <Alert color="ardoise" title="Connexion de développement">
-            En attendant les comptes (better-auth), saisissez l'identifiant d'un utilisateur. Celui de{" "}
-            <code>seed:dev</code> est prérempli.
-          </Alert>
+          {DEV_EMAIL && (
+            <Alert color="ardoise" title="Développement">
+              Compte de <code>seed:dev</code> prérempli ; son mot de passe est affiché par la commande.
+            </Alert>
+          )}
           <form
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
-              if (signIn(userId)) navigate("/fermes");
-              else setError("Identifiant invalide : un UUID est attendu.");
+              setError(null);
+              setPending(true);
+              const failure = await signIn(email, password);
+              setPending(false);
+              if (failure) return setError(failure);
+              await queryClient.invalidateQueries({ queryKey: ["session"] });
+              navigate("/fermes");
             }}
           >
             <Stack>
               <TextInput
-                label="Identifiant utilisateur"
-                value={userId}
-                onChange={(e) => setUserId(e.currentTarget.value)}
-                error={error}
-                ff="monospace"
-                autoComplete="off"
+                label="E-mail"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.currentTarget.value)}
+                autoComplete="username"
+                required
               />
-              <Button type="submit">Se connecter</Button>
+              <PasswordInput
+                label="Mot de passe"
+                value={password}
+                onChange={(e) => setPassword(e.currentTarget.value)}
+                autoComplete="current-password"
+                required
+              />
+              {error && <Alert color="brique">{error}</Alert>}
+              <Button type="submit" loading={pending}>
+                Se connecter
+              </Button>
             </Stack>
           </form>
           <Text size="xs" c="dimmed">
-            Fourmy — le jumeau numérique de la ferme.
+            Pas encore de compte ? Demandez-le au responsable de votre ferme.
           </Text>
         </Stack>
       </Paper>

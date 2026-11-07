@@ -420,7 +420,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               )}
               value={doers}
               onChange={setDoers}
-              nothingFoundMessage="Aucune personne — à ajouter dans les réglages de la ferme"
+              nothingFoundMessage="Aucune personne — à ajouter dans Équipe"
             />
             <Textarea label="Notes" autosize minRows={2} maxLength={2000} value={notes} onChange={(e) => setNotes(e.currentTarget.value)} />
           </>

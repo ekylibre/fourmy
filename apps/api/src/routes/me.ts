@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import type { Env } from "../context.js";
 import { db } from "../db.js";
 
-/** Routes de l'utilisateur courant (hors ferme) : ses fermes et son rôle. */
+/** Routes de l'utilisateur courant (hors ferme) : son compte, ses fermes et son rôle. */
 export const meRoutes = new Hono<Env>().get("/farms", async (c) => {
   const items = await db().transaction(async (tx) => {
     await tx.execute(sql`SET LOCAL ROLE fourmy_app`);
@@ -13,5 +13,5 @@ export const meRoutes = new Hono<Env>().get("/farms", async (c) => {
       role: "owner" | "worker";
     }[];
   });
-  return c.json({ userId: c.get("userId"), items });
+  return c.json({ userId: c.get("userId"), user: c.get("user"), items });
 });

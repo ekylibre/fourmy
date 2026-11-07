@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { createBrowserRouter, Navigate } from "react-router";
 import { Alert, Button, Center, Stack } from "@mantine/core";
 import { Layout } from "../components/Layout";
@@ -11,8 +11,9 @@ import { InterventionsPage } from "../features/interventions/InterventionsPage";
 import { LoginPage } from "../features/login/LoginPage";
 import { RegisterPage } from "../features/register/RegisterPage";
 import { StockPage } from "../features/stock/StockPage";
+import { TeamPage } from "../features/team/TeamPage";
 import { FarmProvider, useMyFarms } from "./farm";
-import { getUserId } from "./session";
+import { UNAUTHORIZED_EVENT, useSession } from "./session";
 
 // MapLibre est lourd : la carte est chargée à la demande, pas avec l'application.
 const MapPage = lazy(() => import("../features/map/MapPage").then((m) => ({ default: m.MapPage })));
@@ -20,7 +21,16 @@ const MapPage = lazy(() => import("../features/map/MapPage").then((m) => ({ defa
 const Plan3DPage = lazy(() => import("../3d/Plan3DPage").then((m) => ({ default: m.Plan3DPage })));
 
 function RequireAuth({ children }: { children: ReactNode }) {
-  return getUserId() ? <>{children}</> : <Navigate to="/connexion" replace />;
+  const session = useSession();
+  const { refetch } = session;
+  // Session expirée ou révoquée pendant l'usage : on la relit (→ connexion).
+  useEffect(() => {
+    const onUnauthorized = () => void refetch();
+    globalThis.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+    return () => globalThis.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+  }, [refetch]);
+  if (session.isLoading) return <Loading />;
+  return session.data ? <>{children}</> : <Navigate to="/connexion" replace />;
 }
 
 /** Ferme inconnue ou non autorisée : on le dit, sans fuite d'information. */
@@ -63,6 +73,7 @@ export const routes = [
       { path: "cuverie", element: <CellarPage /> },
       { path: "registre", element: <RegisterPage /> },
       { path: "imports", element: <ImportsPage /> },
+      { path: "equipe", element: <TeamPage /> },
     ],
   },
   { path: "*", element: <Navigate to="/fermes" replace /> },

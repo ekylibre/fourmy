@@ -9,7 +9,6 @@ import { formatLiters } from "@fourmy/ui-lyvre";
 import { api, ApiError, farmPath } from "../app/api";
 import { useAt } from "../app/at";
 import { useFarm } from "../app/farm";
-import { getUserId } from "../app/session";
 import { formatDate } from "../app/labels";
 import { useSnapshot } from "../app/queries";
 import { ErrorAlert, Loading } from "../components/states";
@@ -52,7 +51,7 @@ export function Plan3DPage() {
     const s = new FarmScene(container.current, {
       loadTerrainTile: async (level, x, y) => {
         const res = await fetch(`${location.origin}/api/v1${farmPath(farm.id, `/terrain/heightmap/${level}/${x}/${y}`)}`, {
-          headers: { "x-user-id": getUserId() ?? "" },
+          credentials: "same-origin",
         });
         return { heights: new Float32Array(await res.arrayBuffer()), source: res.headers.get("x-terrain-source") ?? "ign" };
       },

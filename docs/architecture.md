@@ -222,9 +222,17 @@ explicites sur toute quantité.
 **Autorisation** (2026-11-07) : l'utilisateur doit être membre de la ferme
 de l'URL (`memberships`, sinon 403). Rôle `owner` : tout ; rôle `worker` :
 lecture, interventions, synchro mobile. Réservé à `owner` : parcellaire,
-placement et corrections de cuves, imports. La RLS isole les fermes entre
-elles ; l'appartenance décide qui entre. L'identité vient provisoirement de
-l'en-tête `x-user-id` (better-auth ensuite, ADR-14).
+placement et corrections de cuves, imports, membres et personnes. La RLS
+isole les fermes entre elles ; l'appartenance décide qui entre.
+
+**Authentification** (2026-11-07, ADR-14) : better-auth, comptes locaux
+(e-mail + mot de passe, scrypt). Web : cookie de session HttpOnly, même
+origine. Mobile : jeton **signé** en `Authorization: Bearer` (un jeton brut lu
+en base ne suffit pas). Tables `users` (existante, étendue), `auth_sessions`,
+`auth_accounts`, `auth_verifications` (migration 0007) — inaccessibles au rôle
+applicatif `fourmy_app`. Inscription libre fermée par défaut ; comptes créés
+par l'administrateur (`user:create`), ajoutés à la ferme par son responsable.
+Secret obligatoire dès que la base n'est pas locale. OIDC (SaaS) : plus tard.
 
 **Interventions** : la réalisation transforme les paramètres en mouvements
 de stock selon des règles pures du domaine (dose par hectare × surface

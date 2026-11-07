@@ -151,3 +151,13 @@ export const personWrite = z.object({
   active: z.boolean().optional(),
 });
 export type PersonWrite = z.infer<typeof personWrite>;
+
+/** Membre d'une ferme : un compte et son rôle, avec la personne qui lui est rattachée. */
+export const farmMember = z.object({
+  userId: uuid,
+  email: z.string(),
+  name: z.string().nullable(),
+  role: z.enum(["owner", "worker"]),
+  personId: uuid.nullable(),
+});
+export type FarmMember = z.infer<typeof farmMember>;

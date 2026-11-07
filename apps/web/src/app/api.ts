@@ -1,7 +1,7 @@
-import { getUserId } from "./session";
+import { UNAUTHORIZED_EVENT } from "./session";
 
 /**
- * Client de l'API Fourmy. Ajoute l'identité, convertit les réponses
+ * Client de l'API Fourmy (session par cookie, même origine). Convertit les réponses
  * `application/problem+json` en ApiError (titre + détail lisibles).
  */
 export class ApiError extends Error {
@@ -19,15 +19,15 @@ export class ApiError extends Error {
 const BASE = `${globalThis.location?.origin ?? ""}/api/v1`;
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const userId = getUserId();
   const res = await fetch(`${BASE}${path}`, {
     ...init,
+    credentials: "same-origin",
     headers: {
       ...(init.body ? { "content-type": "application/json" } : {}),
-      ...(userId ? { "x-user-id": userId } : {}),
       ...init.headers,
     },
   });
+  if (res.status === 401) globalThis.dispatchEvent?.(new Event(UNAUTHORIZED_EVENT));
   if (!res.ok) {
     let title = `Erreur ${res.status}`;
     let detail: string | undefined;
@@ -47,10 +47,10 @@ export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body: unknown) => request<T>(path, { method: "POST", body: JSON.stringify(body) }),
   patch: <T>(path: string, body: unknown) => request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
+  delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
   /** Téléchargement (CSV…) : renvoie le contenu brut. */
   async download(path: string): Promise<Blob> {
-    const userId = getUserId();
-    const res = await fetch(`${BASE}${path}`, { headers: userId ? { "x-user-id": userId } : {} });
+    const res = await fetch(`${BASE}${path}`, { credentials: "same-origin" });
     if (!res.ok) throw new ApiError(res.status, `Erreur ${res.status}`);
     return res.blob();
   },

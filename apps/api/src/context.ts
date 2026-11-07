@@ -3,6 +3,7 @@ import { createMiddleware } from "hono/factory";
 import { sql } from "drizzle-orm";
 import { withFarm } from "@fourmy/db";
 import { db } from "./db.js";
+import { getAuth } from "./auth.js";
 
 export type Role = "owner" | "worker";
 
@@ -10,6 +11,7 @@ export type Role = "owner" | "worker";
 export type Env = {
   Variables: {
     userId: string;
+    user: { id: string; email: string; name: string | null };
     farmId: string;
     role: Role;
   };
@@ -25,15 +27,18 @@ const deny = (status: 400 | 401 | 403, title: string, detail?: string) =>
   });
 
 /**
- * Authentification — **provisoire**. L'en-tête `x-user-id` porte l'identifiant
- * d'un utilisateur de la table `users`. À remplacer par better-auth (ADR-14) :
- * comptes locaux en auto-hébergé, OIDC vers le SSO commun en SaaS. Seule la
- * source de l'identité changera ; l'autorisation ci-dessous restera.
+ * Authentification : session better-auth (cookie pour le web, jeton signé
+ * `Authorization: Bearer` pour le mobile). L'autorisation par ferme suit.
  */
 export const auth: MiddlewareHandler<Env> = createMiddleware<Env>(async (c, next) => {
-  const userId = c.req.header("x-user-id");
-  if (!isUuid(userId)) return deny(401, "Unauthorized", "Identité absente ou invalide.");
-  c.set("userId", userId);
+  const h = c.req.raw.headers;
+  // Ni cookie ni jeton : inutile d'interroger la base.
+  if (!h.get("cookie") && !h.get("authorization")) return deny(401, "Unauthorized", "Connexion requise.");
+  const session = await getAuth().api.getSession({ headers: h });
+  if (!session) return deny(401, "Unauthorized", "Connexion requise.");
+  const { id, email, name } = session.user;
+  c.set("userId", id);
+  c.set("user", { id, email, name: name || null });
   await next();
 });
 

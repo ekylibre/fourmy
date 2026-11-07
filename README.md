@@ -36,14 +36,13 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | Agent E — interface web | ✅ React + Mantine (charte Lyvre) : tableau de bord, carte IGN + traces, interventions, stocks, cuverie, registre, imports ; parcours e2e en CI |
 | Agent F — plan 3D | ✅ relief et photo IGN, bâtiments (hauteurs BD TOPO), cuverie placée et remplie selon la frise, rejeu 3D des traces, placement manuel des cuves |
 | Interventions et procédures simplifiées (étape 1) | ✅ 6 formes, catalogue, périodes, personnes, motifs, annulation, habitudes de la ferme ; migrateur et formulaire web |
-| Comptes better-auth (étape 2) | ⏳ à faire |
+| Comptes better-auth (étape 2) | ✅ comptes locaux, sessions cookie + bearer (mobile), page Équipe (membres, personnes ↔ comptes) |
 | Agent G — mobile / zero-mobile (étape 3) | ⏳ à faire |
 | Jours 6-7 — migration réelle + recette | ⏳ à faire |
 
 ### À reprendre
 
-1. Étape 2 : **better-auth** (comptes locaux, rattachement des personnes),
-   puis étape 3 : **zero-mobile** (client Fourmy, formulaire par forme).
+1. Étape 3 : **zero-mobile** (connexion bearer, client Fourmy, formulaire par forme).
 2. `apps/worker` : planifier la synchro Traccar (toutes les minutes).
 3. Finitions agent 0 : documentation OpenAPI.
 4. Export PDF du registre phyto (JSON et CSV disponibles).
@@ -55,14 +54,26 @@ corepack pnpm install
 docker compose -f docker/compose.dev.yml up -d
 export DATABASE_URL=postgres://fourmy:fourmy@localhost:5432/fourmy
 corepack pnpm build && corepack pnpm migrate
-corepack pnpm --filter @fourmy/db seed:dev   # utilisateur de dev, owner de toutes les fermes
+corepack pnpm --filter @fourmy/api seed:dev  # compte dev@fourmy.local, owner de toutes les fermes
 corepack pnpm dev                              # API :3000, web :5173 (relaie /api)
 ```
 
-Application web : http://localhost:5173 (identifiant prérempli = utilisateur
-de `seed:dev`). Parcours de bout en bout : API + `vite preview` démarrés,
-puis `DATABASE_URL=… corepack pnpm --filter @fourmy/web e2e`.
+Application web : http://localhost:5173 — connexion avec le compte affiché
+par `seed:dev` (e-mail prérempli en développement). Parcours de bout en bout :
+API + `vite preview` démarrés, puis `DATABASE_URL=… corepack pnpm --filter @fourmy/web e2e`.
 
-En attendant better-auth, l'API lit l'identité dans l'en-tête `x-user-id`
-(affiché par `seed:dev`) et vérifie l'appartenance à la ferme (rôles `owner`
-et `worker`).
+### Comptes
+
+Comptes locaux **better-auth** (e-mail + mot de passe) : cookie de session
+pour le web, jeton signé `Authorization: Bearer` (en-tête `set-auth-token` à
+la connexion) pour le mobile. L'inscription libre est fermée : l'administrateur
+crée les comptes, le responsable de la ferme les y ajoute (page **Équipe**) et
+rattache chaque personne (intervenant) à son compte.
+
+```bash
+# mot de passe lu sur l'entrée standard (jamais en argument)
+corepack pnpm --filter @fourmy/api user:create --email salarie@ferme.fr --name "Camille"
+```
+
+En production : `BETTER_AUTH_SECRET` (obligatoire), `BETTER_AUTH_URL`,
+`FOURMY_TRUSTED_ORIGINS` (voir `.env.example`).

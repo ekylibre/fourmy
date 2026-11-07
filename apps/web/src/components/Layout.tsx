@@ -1,10 +1,10 @@
 import { AppShell, Badge, Burger, Button, Group, NavLink, Stack, Text } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { Box, Boxes, ClipboardList, Database, FileText, LayoutDashboard, Map, Wine } from "lucide-react";
+import { Box, Boxes, ClipboardList, Database, FileText, LayoutDashboard, Map, Users, Wine } from "lucide-react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { Wordmark } from "@fourmy/ui-lyvre";
 import { useFarm } from "../app/farm";
-import { signOut } from "../app/session";
+import { useSession, useSignOut } from "../app/session";
 import { Timeline } from "./Timeline";
 
 const SECTIONS = [
@@ -23,6 +23,8 @@ export function Layout() {
   const [opened, { toggle, close }] = useDisclosure();
   const location = useLocation();
   const navigate = useNavigate();
+  const session = useSession();
+  const signOut = useSignOut();
   const base = `/f/${farm.id}`;
   const current = location.pathname.slice(base.length);
   const linkTo = (path: string) => `${base}${path}${location.search}`; // garde ?at=
@@ -41,16 +43,23 @@ export function Layout() {
             </Text>
             <Badge color={farm.role === "owner" ? "lichen" : "ardoise"}>{farm.role === "owner" ? "Responsable" : "Salarié"}</Badge>
           </Group>
-          <Button
-            variant="subtle"
-            size="xs"
-            onClick={() => {
-              signOut();
-              navigate("/connexion");
-            }}
-          >
-            Se déconnecter
-          </Button>
+          <Group gap="xs" wrap="nowrap">
+            {session.data && (
+              <Text size="sm" c="dimmed" visibleFrom="sm" truncate maw={220}>
+                {session.data.name ?? session.data.email}
+              </Text>
+            )}
+            <Button
+              variant="subtle"
+              size="xs"
+              onClick={async () => {
+                await signOut();
+                navigate("/connexion");
+              }}
+            >
+              Se déconnecter
+            </Button>
+          </Group>
         </Group>
       </AppShell.Header>
 
@@ -67,6 +76,16 @@ export function Layout() {
               onClick={close}
             />
           ))}
+          {farm.role === "owner" && (
+            <NavLink
+              component={Link}
+              to={linkTo("/equipe")}
+              label="Équipe"
+              leftSection={<Users size={18} />}
+              active={current.startsWith("/equipe")}
+              onClick={close}
+            />
+          )}
           {farm.role === "owner" && (
             <NavLink
               component={Link}

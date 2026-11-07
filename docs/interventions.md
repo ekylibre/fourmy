@@ -236,8 +236,9 @@ quand seule une partie de la parcelle est traitée.
 1. ✅ **Fourmy — interventions et procédures** : catalogue et règles de forme
    (contrats + domaine), base (périodes, personnes, motifs), API, migrateur,
    formulaire web unique. Réalisé le 2026-11-07 — voir §9.
-2. **Fourmy — comptes** : better-auth (comptes locaux), remplacement de
-   l'identité de développement, rattachement des personnes aux comptes.
+2. ✅ **Fourmy — comptes** : better-auth (comptes locaux), remplacement de
+   l'identité de développement, rattachement des personnes aux comptes
+   (réalisé le 2026-11-07 ; voir docs/architecture.md, Authentification).
 3. **zero-mobile** : client Fourmy, schéma local v5, formulaire par forme,
    push par intervention sur `/sync/push`.
 

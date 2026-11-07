@@ -1,37 +1,49 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createAuthClient } from "better-auth/react";
+
 /**
- * Session de développement : identité provisoire (UUID d'un utilisateur),
- * envoyée en `x-user-id`. Remplacée par better-auth (ADR-14) ; l'interface ne
- * dépend que de `getUserId()` et `signOut()`.
+ * Session (better-auth, ADR-14) : cookie HttpOnly posé par l'API, même
+ * origine que la page — le code web ne voit jamais le jeton. La session est
+ * lue via TanStack Query (clé `session`).
  */
-const KEY = "fourmy.userId";
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const authClient = createAuthClient({
+  baseURL: globalThis.location?.origin ?? "",
+  // fetch résolu à l'appel (et non capturé au chargement) : intercepteurs de test, polyfills.
+  fetchOptions: { customFetchImpl: (input, init) => globalThis.fetch(input, init) },
+});
 
-/** Utilisateur créé par `pnpm --filter @fourmy/db seed:dev`. */
-export const DEV_USER_ID = import.meta.env.VITE_DEV_USER_ID ?? "00000000-0000-7000-8000-00000000de00";
+/** Compte de `pnpm --filter @fourmy/api seed:dev`, prérempli en développement seulement. */
+export const DEV_EMAIL = import.meta.env.DEV ? (import.meta.env.VITE_DEV_EMAIL ?? "dev@fourmy.local") : "";
 
-export function getUserId(): string | null {
-  try {
-    const v = localStorage.getItem(KEY);
-    return v && UUID.test(v) ? v : null;
-  } catch {
-    return null;
-  }
+export type SessionUser = { id: string; email: string; name: string | null };
+
+export function useSession() {
+  return useQuery({
+    queryKey: ["session"],
+    queryFn: async (): Promise<SessionUser | null> => {
+      const { data } = await authClient.getSession();
+      return data ? { id: data.user.id, email: data.user.email, name: data.user.name || null } : null;
+    },
+    staleTime: 5 * 60_000,
+  });
 }
 
-export function signIn(userId: string): boolean {
-  if (!UUID.test(userId.trim())) return false;
-  try {
-    localStorage.setItem(KEY, userId.trim());
-  } catch {
-    /* stockage indisponible : la session ne survivra pas au rechargement */
-  }
-  return true;
+/** Connexion ; renvoie un message d'erreur lisible, ou null si réussie. */
+export async function signIn(email: string, password: string): Promise<string | null> {
+  const { error } = await authClient.signIn.email({ email: email.trim(), password });
+  if (!error) return null;
+  if (error.status === 401) return "E-mail ou mot de passe incorrect.";
+  if (error.status === 429) return "Trop de tentatives : réessayez dans un instant.";
+  return error.message ?? "Connexion impossible.";
 }
 
-export function signOut(): void {
-  try {
-    localStorage.removeItem(KEY);
-  } catch {
-    /* rien à faire */
-  }
+export function useSignOut() {
+  const client = useQueryClient();
+  return async () => {
+    await authClient.signOut();
+    client.clear(); // aucune donnée de ferme ne survit à la déconnexion
+  };
 }
+
+/** Émis par le client d'API sur un 401 : la session a expiré ou a été révoquée. */
+export const UNAUTHORIZED_EVENT = "fourmy:unauthorized";

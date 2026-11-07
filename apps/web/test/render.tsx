@@ -1,15 +1,14 @@
 import { render } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { DEMO_FARM_ID, DEMO_USER_ID } from "@fourmy/mocks";
+import { DEMO_FARM_ID, setMockSignedIn } from "@fourmy/mocks";
 import { Providers, createQueryClient } from "../src/app/providers";
 import { routes } from "../src/app/router";
-import { signIn } from "../src/app/session";
 
 export const FARM = DEMO_FARM_ID;
 
 /** Rend l'application complète à une URL donnée, utilisateur de démo connecté. */
 export function renderApp(path: string, { signedIn = true } = {}) {
-  if (signedIn) signIn(DEMO_USER_ID);
+  setMockSignedIn(signedIn);
   const router = createMemoryRouter(routes, { initialEntries: [path] });
   const client = createQueryClient();
   client.setDefaultOptions({ queries: { retry: false, staleTime: Infinity } });

@@ -10,6 +10,7 @@ import { importRoutes } from "./imports.js";
 import { articleRoutes } from "./articles.js";
 import { plan3dRoutes } from "./plan3d.js";
 import { peopleRoutes } from "./people.js";
+import { memberRoutes } from "./members.js";
 import { procedureRoutes } from "./procedures.js";
 
 /**
@@ -27,4 +28,5 @@ export const farmRoutes = new Hono<Env>()
   .route("/", articleRoutes)
   .route("/", plan3dRoutes)
   .route("/", peopleRoutes)
+  .route("/", memberRoutes)
   .route("/", procedureRoutes);

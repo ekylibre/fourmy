@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { E2E_USER } from "./shared";
+import { login } from "./shared";
 
 /**
  * Parcours de la tranche (docs/workflow.md, agent E) sur la ferme pilote
@@ -14,9 +14,7 @@ test("connexion, cuverie dans le temps, carte, intervention jusqu'au registre", 
   page.on("response", (r) => r.status() >= 400 && errors.push(`HTTP ${r.status()} ${r.url()}`));
 
   // Connexion de développement puis choix de la ferme.
-  await page.goto("/connexion");
-  await page.getByLabel("Identifiant utilisateur").fill(E2E_USER);
-  await page.getByRole("button", { name: "Se connecter" }).click();
+  await login(page);
   await page.getByRole("link", { name: /Ferme pilote — viticulture/ }).click();
   await expect(page.getByRole("heading", { name: "Aujourd'hui" })).toBeVisible();
 

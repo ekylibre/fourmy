@@ -14,6 +14,7 @@ import {
   demoStock,
   demoPhytoRegister,
   DEMO_FARM_ID,
+  DEMO_USER_ID,
 } from "./fixtures.js";
 
 /**
@@ -24,7 +25,39 @@ import {
 const base = `/api/v1/farms/${DEMO_FARM_ID}`;
 const page = <T>(items: T[]) => HttpResponse.json({ items, nextCursor: null });
 
+/** Session simulée (better-auth) : connectée par défaut ; les tests la pilotent. */
+let signedIn = true;
+export function setMockSignedIn(value: boolean) {
+  signedIn = value;
+}
+/** Mot de passe refusé par la connexion simulée. */
+export const MOCK_WRONG_PASSWORD = "mauvais-mot-de-passe";
+const demoUser = { id: DEMO_USER_ID, email: "demo@fourmy.local", name: "Démo", emailVerified: true, image: null, createdAt: now(), updatedAt: now() };
+function now() {
+  return "2026-06-01T00:00:00.000Z";
+}
+const demoSession = () => ({
+  session: { id: "mock-session", userId: DEMO_USER_ID, token: "mock", expiresAt: "2099-01-01T00:00:00.000Z", createdAt: now(), updatedAt: now() },
+  user: demoUser,
+});
+
 export const handlers = [
+  http.get("*/api/auth/get-session", () => HttpResponse.json(signedIn ? demoSession() : null)),
+  http.post("*/api/auth/sign-in/email", async ({ request }) => {
+    const body = (await request.json()) as { password?: string };
+    if (body.password === MOCK_WRONG_PASSWORD) {
+      return HttpResponse.json({ code: "INVALID_EMAIL_OR_PASSWORD", message: "Invalid email or password" }, { status: 401 });
+    }
+    signedIn = true;
+    return HttpResponse.json({ redirect: false, token: "mock", user: demoUser });
+  }),
+  http.post("*/api/auth/sign-out", () => {
+    signedIn = false;
+    return HttpResponse.json({ success: true });
+  }),
+  http.get(`*${base}/members`, () =>
+    page([{ userId: DEMO_USER_ID, email: demoUser.email, name: demoUser.name, role: "owner", personId: null }]),
+  ),
   http.get("*/health", () => HttpResponse.json({ status: "ok", service: "mock" })),
   http.get("*/api/v1/me/farms", () => HttpResponse.json({ userId: "mock", items: demoMyFarms })),
   http.get(`*${base}/snapshot`, () => HttpResponse.json(demoSnapshot)),

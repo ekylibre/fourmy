@@ -9,23 +9,28 @@
     "test": "vitest run --passWithNoTests",
     "lint": "eslint src",
     "dev": "node --watch --experimental-strip-types src/server.ts",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "user:create": "node dist/cli/create-user.js",
+    "seed:dev": "node dist/cli/seed-dev.js"
   },
   "dependencies": {
     "@fourmy/contracts": "workspace:*",
     "@fourmy/db": "workspace:*",
+    "@fourmy/domain": "workspace:*",
+    "@fourmy/geo-ign": "workspace:*",
+    "@fourmy/migrator-ekylibre": "workspace:*",
     "@hono/node-server": "1.13.8",
     "@hono/zod-openapi": "0.18.3",
-    "hono": "4.6.15",
-    "zod": "3.24.1",
-    "@fourmy/domain": "workspace:*",
+    "better-auth": "1.7.12",
     "drizzle-orm": "0.38.3",
-    "@fourmy/migrator-ekylibre": "workspace:*",
-    "@fourmy/geo-ign": "workspace:*"
+    "hono": "4.6.15",
+    "pg": "8.23.1",
+    "zod": "3.24.1"
   },
   "devDependencies": {
-    "vitest": "2.1.8",
+    "@fourmy/domain": "workspace:*",
+    "@types/pg": "8.23.1",
     "postgres": "3.4.5",
-    "@fourmy/domain": "workspace:*"
+    "vitest": "2.1.8"
   }
 }

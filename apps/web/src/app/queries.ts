@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import type {
   Article,
   ContainerContents,
+  FarmMember,
   Intervention,
   Person,
   PhytoRegisterEntry,
@@ -81,5 +82,14 @@ export function usePeople(farmId: string) {
     queryKey: ["people", farmId],
     queryFn: () => api.get<Page<Person>>(farmPath(farmId, "/people")),
     staleTime: 5 * 60_000,
+  });
+}
+
+/** Membres (comptes) de la ferme — réservé au responsable. */
+export function useMembers(farmId: string, enabled = true) {
+  return useQuery({
+    queryKey: ["members", farmId],
+    queryFn: () => api.get<Page<FarmMember>>(farmPath(farmId, "/members")),
+    enabled,
   });
 }

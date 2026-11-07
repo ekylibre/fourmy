@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createApp } from "../src/app.js";
 
-/** Garde d'entrée, sans base : santé, identité, ferme invalide, 404. */
+/** Garde d'entrée, sans base : santé, session absente, 404. */
 const app = createApp();
 const farm = "/api/v1/farms/00000000-0000-7000-8000-000000000001";
 
@@ -12,18 +12,11 @@ describe("api : garde d'entrée", () => {
     expect(await res.json()).toMatchObject({ status: "ok" });
   });
 
-  it("401 sans identité, ou identité qui n'est pas un UUID", async () => {
+  it("401 sans session ; l'ancien en-tête de développement n'est plus accepté", async () => {
     expect((await app.request(`${farm}/snapshot`)).status).toBe(401);
-    const res = await app.request(`${farm}/snapshot`, { headers: { "x-user-id": "u1" } });
+    const res = await app.request(`${farm}/snapshot`, { headers: { "x-user-id": "00000000-0000-7000-8000-0000000000aa" } });
     expect(res.status).toBe(401);
     expect(res.headers.get("content-type")).toContain("application/problem+json");
-  });
-
-  it("400 si la ferme n'est pas un UUID", async () => {
-    const res = await app.request("/api/v1/farms/f1/snapshot", {
-      headers: { "x-user-id": "00000000-0000-7000-8000-0000000000aa" },
-    });
-    expect(res.status).toBe(400);
   });
 
   it("404 en problem+json pour une route inconnue", async () => {
