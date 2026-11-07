@@ -5,11 +5,16 @@ Docker. Environnements prévus :
 
 | Environnement | Où | Domaine |
 |---|---|---|
-| Dev / tests pilotes | Dokploy (serveur de dev) | `dev.fourmy.org` (proposé) |
+| Dev / tests pilotes | Dokploy `seconde-nature.cloud`, serveur **KMV 8 – Hostinger**, projet « Fourmy », environnement « dev » | `dev.fourmy.org` |
 | Production | Dokploy de l'infrastructure **Eyona** | à définir |
 
 La configuration ne dépend pas du serveur : tout passe par des variables
 d'environnement. Rejouer le même compose ailleurs suffit.
+
+Le dépôt `ekylibre/fourmy` est **privé** (noms des pilotes et contours
+réels de leurs parcelles dans la documentation et les fixtures) ; l'ouvrir
+demandera d'abord de les retirer. Dokploy y accède par l'application GitHub
+« Dokploy-ekylibre-org » et redéploie à chaque push sur `main`.
 
 ## Services
 
