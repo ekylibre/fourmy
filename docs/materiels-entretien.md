@@ -3,7 +3,8 @@
 > Document produit par `/sc:brainstorm` le 2026-11-07. Il précise
 > **FR-MAT** de [`requirements.md`](requirements.md) §4.5.
 > Design : [`materiels-entretien-design.md`](materiels-entretien-design.md).
-> Phase suivante : `/sc:implement`, lot par lot (I → J → K → L).
+> **Réalisé le 2026-11-08** (lots I à M) ; mode d'emploi et API :
+> [`materiels.md`](materiels.md) ; bilan exigence par exigence au §9.
 > Ce document décrit **uniquement les exigences**.
 
 ## 1. Origine
@@ -454,3 +455,54 @@ C et j'indique 4 352 h en fin de chantier.
    - **K** : intervention d'entretien adaptée (FR-MAT-30 à 33 et 50 à 57) ;
    - **L** : Traccar (FR-MAT-13 et 14), pièces à commander (FR-MAT-42) et
      notifications (FR-MAT-25).
+
+## 9. Bilan de réalisation (2026-11-08)
+
+Réalisé en cinq lots, dans l'ordre I → J → K → L → M, puis l'avatar du
+tracteur d'après le kit Ekylibre.
+
+| Lot | Contenu | Migration |
+|---|---|---|
+| I | Fiche matériel, compteur et relevés, logo 2D | 0017 |
+| J | Plan d'entretien, échéances, import de la base Arion | 0018 |
+| K | Interventions d'entretien | 0019 |
+| L | Heures Traccar estimées, pièces à commander, alertes | 0020 |
+| M | Avatar 3D | 0021 |
+
+Légende : ✅ fait, 🟡 en partie, ⏳ à faire.
+
+| Exigences | État | Remarques |
+|---|---|---|
+| FR-MAT-4, 5 | ✅ | Identité, agrégats, options datées, fiche technique sourcée (affichée, remplie par l'import). |
+| FR-MAT-6 | 🟡 | Logo par matériel ou par marque ✅. Le visuel (photo) du matériel attend le lot fichiers. Un tracteur sans logo affiche le dessin du kit. |
+| FR-MAT-7 | ⏳ | Documents rattachés (notice, carte grise…) : lot fichiers, avec les photos. |
+| FR-MAT-8 | ✅ | Import d'un dossier de la base Arion depuis la page Imports. Rejouable, il conserve les ajustements du plan. |
+| FR-MAT-10 à 12 | ✅ | Relevés contrôlés (entre le précédent et le suivant), correction motivée et auditée (saisie fausse ou compteur remplacé), saisie hors ligne par la synchro mobile. |
+| FR-MAT-13, 14 | ✅ | Heures estimées par jour d'activité depuis les positions Traccar, recalées sur le dernier relevé réel. L'écart est signalé, et couper l'intégration ne supprime rien. |
+| FR-MAT-15 | ⏳ | Autres sources (Karnott, télématique constructeur) : plus tard, par plugin. |
+| FR-MAT-20 à 24 | ✅ | Plan par matériel copié du modèle, échéances en heures ou en mois, visites initiales, seuil « bientôt » réglable, tableau de bord de l'entretien. Pour une échéance à renseigner : « Dernière fois », ou « Amorcer le plan » en une fois. |
+| FR-MAT-25 | ✅ | Alertes par e-mail aux membres choisis, une fois par échéance et par état (SMTP requis). |
+| FR-MAT-26 | ✅ | Fluides préconisés : onglet Entretien et colonne de droite de la saisie. |
+| FR-MAT-30 à 33 | ✅ | Intervention `maintenance` : relevé, opérations du plan, pièces, atelier, saisie pré-remplie depuis une échéance, panne sans opération. |
+| FR-MAT-34 | ✅ | Historique du matériel (interventions d'entretien et de champ), relevés. |
+| FR-MAT-35 | 🟡 | Sortie de stock des pièces ✅. Remontée à Lyvre : avec l'intégration Lyvre. |
+| FR-MAT-40 à 42 | ✅ | Référentiel de pièces (articles `part` de la ferme), lien opération ↔ pièces, pièces à commander sur un horizon (export CSV). |
+| FR-MAT-43 | ⏳ | Références équivalentes : plus tard. |
+| FR-MAT-50 à 57 | ✅ | Voir `materiels.md`, « Interventions d'entretien ». |
+| FR-MAT-58 | ⏳ | Photos : lot fichiers. |
+| FR-MAT-59 | 🟡 | Les entretiens migrés se lisent comme curatifs. L'écran pour les rattacher à des opérations du plan reste à faire. |
+| FR-MAT-60 | 🟡 | Le relevé en fin de chantier est accepté par l'API (`tools[].meter`), mais n'est pas encore dans le formulaire. |
+| FR-MAT-61 | ⏳ | Heures estimées depuis la durée des chantiers : plus tard (arbitrage du §8). |
+| FR-MAT-62 | 🟡 | Entretien des bâtiments et des cuves ✅. Pas encore de plan d'entretien pour eux. |
+| FR-MAT-70 à 73 | ✅ | Liste, fiche en onglets, compteur par matériel, menu Matériels et carte du tableau de bord. |
+| FR-MAT-80 à 84 | ✅ | Logo 2D, avatar 3D généré (tracteur d'après le kit Ekylibre), réglage avec la provenance des valeurs, import d'un GLB, avatar orienté au rejeu avec la caméra qui suit le matériel. |
+| FR-MAT-85 | 🟡 | Attelage d'après les interventions ✅. L'attribut `tool` de Traccar n'est pas encore utilisé. |
+| FR-MAT-86 | ✅ | « Tous les matériels suivis » à la date de la frise. |
+
+**Questions du §7, tranchées au design :**
+
+1. **Relevés Traccar estimés** : un par **jour d'activité**.
+2. **Modèles par défaut** : un **catalogue en base**, alimenté par l'import.
+   Chaque modèle reste propre à la ferme qui l'importe, faute de droits
+   clairs sur les notices et les catalogues du constructeur.
+

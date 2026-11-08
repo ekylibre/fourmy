@@ -22,7 +22,7 @@ demandera d'abord de les retirer. Dokploy y accède par l'application GitHub
 |---|---|---|
 | `db` | `timescale/timescaledb-ha:pg17` | PostgreSQL + PostGIS + TimescaleDB, volume `fourmy_pgdata` |
 | `api` | `Dockerfile`, cible `api` | API Hono ; applique les migrations au démarrage |
-| `worker` | même image, `node apps/api/dist/worker.js` | synchronise les intégrations des fermes (Traccar : chaque minute), le référentiel phyto Lexicon (chaque jour), l'eau autour des fermes (BD TOPO, tous les 30 jours), l'IFT et la météo des interventions réalisées |
+| `worker` | même image, `node apps/api/dist/worker.js` | synchronise les intégrations des fermes (Traccar : chaque minute), le référentiel phyto Lexicon (chaque jour), l'eau autour des fermes (BD TOPO, tous les 30 jours), l'IFT et la météo des interventions réalisées, les heures estimées des matériels depuis Traccar (toutes les 15 minutes) et les alertes d'entretien par e-mail (au plus une fois par heure) |
 | `web` | `Dockerfile`, cible `web` (nginx) | application React + relais `/api` → `api` |
 | `site` | `ghcr.io/ekylibre/fourmy-site:main`, construite par la CI depuis `docker/site.Dockerfile` (nginx) | site public fourmy.org ; relaie seulement `/api/public/` (formulaire de contact) ; `www` → apex |
 
@@ -39,7 +39,7 @@ l'API partagent la même origine : cookies de session sans CORS.
 | `BETTER_AUTH_SECRET` | oui | signe les sessions (`openssl rand -base64 48`) ; le changer déconnecte tout le monde |
 | `FOURMY_SECRETS_KEY` | oui | chiffre les secrets d'intégration (`openssl rand -base64 32`) ; **la perdre rend les jetons illisibles** (à ressaisir) — la sauvegarder hors du serveur |
 | `FOURMY_MOBILE_ORIGINS` | non | `zeromobile://` par défaut (application mobile) |
-| `FOURMY_SMTP_HOST`, `_PORT`, `_USER`, `_PASSWORD`, `_FROM` | non | envoi du formulaire de contact de fourmy.org vers `FOURMY_CONTACT_TO` (contact@fourmy.org) ; sans eux, le formulaire répond « indisponible » |
+| `FOURMY_SMTP_HOST`, `_PORT`, `_USER`, `_PASSWORD`, `_FROM` | non | envoi du formulaire de contact de fourmy.org vers `FOURMY_CONTACT_TO` (contact@fourmy.org), et des alertes d'entretien aux membres choisis (page Entretien) ; sans eux, le formulaire répond « indisponible » et les alertes attendent (rien n'est marqué envoyé) |
 | `SITE_IMAGE` | non | image du site, `ghcr.io/ekylibre/fourmy-site:main` par défaut (prod : une étiquette `sha-…` précise) |
 | `FOURMY_LEXICON_PACKAGES_URL` | non | serveur des paquets Lexicon (référentiel phyto, taxonomie, productions de référence et images des activités), `https://lexicon-packages.osfarm.org` par défaut ; `off` pour ne pas synchroniser (`docs/phyto.md`) |
 | — | — | Météo : Open-Meteo sans clé par défaut ; les clés OpenWeather et meteoblue se saisissent par ferme dans **Intégrations** (`docs/meteo.md`), pas en variable du serveur |

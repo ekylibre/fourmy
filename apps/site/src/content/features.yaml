@@ -22,7 +22,8 @@ features:
     title: Plan 3D de l'exploitation
     text: >-
       Relief et photo IGN, bâtiments à leur hauteur, cuves qui se remplissent au fil des
-      vendanges, et rejeu des passages de tracteurs.
+      vendanges, et rejeu des passages de tracteurs : la caméra suit l'avatar 3D du
+      tracteur et de son outil attelé.
     status: disponible
     capture: plan-3d
     since: 0.18.0
@@ -113,6 +114,33 @@ features:
     status: disponible
     capture: integrations
     since: 0.22.0
+  - id: materiels
+    title: Matériels et relevés d'heures
+    text: >-
+      La fiche de chaque matériel : identité, moteur et boîte, options, fiche technique,
+      logo. Les heures se relèvent en deux gestes, au bureau ou au hangar ; une valeur
+      plus basse que la précédente est refusée, sauf correction motivée. Avec Traccar,
+      les heures de chaque journée de travail s'ajoutent toutes seules.
+    status: disponible
+    capture: materiels
+    since: 0.42.0
+  - id: entretien
+    title: Plan d'entretien et échéances
+    text: >-
+      Le plan d'entretien du constructeur repris pour chaque tracteur : vidanges, filtres,
+      graissages, contrôles, à faire toutes les 500 heures ou tous les 12 mois. Fourmy
+      montre ce qui est en retard ou à venir, prépare la saisie avec les bonnes pièces,
+      liste les pièces à commander et prévient par e-mail.
+    status: en-test
+    since: 0.43.0
+  - id: avatar-3d
+    title: Un avatar 3D pour chaque matériel
+    text: >-
+      Chaque tracteur a son avatar à ses dimensions, à ses couleurs et avec son logo ;
+      il parcourt le plan 3D au rejeu des traces GPS.
+    status: disponible
+    capture: avatar-3d
+    since: 0.46.0
   - id: mobile
     title: Application mobile hors ligne
     text: >-

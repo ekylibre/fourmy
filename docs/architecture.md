@@ -99,7 +99,8 @@ fourmy/
 │   ├── domain/               # logique pure : temps, stocks, interventions, registres
 │   ├── connector-traccar/    # client Traccar + mapping positions → traces
 │   ├── migrator-ekylibre/    # lecture base source → commandes de domaine
-│   ├── geo-ign/              # relief et bâtiments IGN
+│   ├── geo-ign/              # relief et bâtiments IGN, API Carto (PAC, cadastre)
+│   ├── equipment-3d/         # avatar 3D des matériels (glTF), pur, API et navigateur
 │   └── ui-lyvre/             # thème Mantine et composants React du design system Lyvre
 ├── services/
 │   └── agro/                 # Python (FastAPI, uv) : méthodes agronomiques, sans état
@@ -211,6 +212,10 @@ Toutes les routes sont préfixées par `/api/v1/farms/:farmId` et acceptent
 | `GET /registers/phyto?campaign=` (+ `?format=csv\|pdf`) | Registre phytosanitaire | FR-REG-1 |
 | `GET /tracks?equipment=&from=&to=&format=czml\|json` | Traces simplifiées pour le rejeu | FR-GPS-2, US-1 |
 | `GET /tracks/coverage?equipment=&from=&to=` | Durée et surface par parcelle traversée | US-1 |
+| `GET /tracks/latest?at=` · `GET /tracks/hitches?equipment=&from=&to=` | Dernière position de chaque matériel suivi ; outils attelés d'après les interventions | FR-MAT-85/86 |
+| `GET /equipments` · `GET /equipments/:id/sheet` · `POST /equipments/:id/readings` | Matériels, fiche, relevés de compteur contrôlés | FR-MAT-4, 10 à 12 |
+| `GET /equipments/:id/maintenance?at=` · `GET /maintenance/due?at=` · `GET /maintenance/parts` | Plan d'entretien et échéances à une date, tableau de bord, pièces à commander | FR-MAT-20 à 24, 42 |
+| `GET /equipments/:id/avatar.glb` | Avatar 3D généré (ETag) ou importé | FR-MAT-81 à 84 |
 | `GET /terrain/heightmap/:z/:x/:y` | Grille d'altitude pour Cesium | ADR-9 |
 | `GET /sync/pull?last_pulled_at=` · `POST /sync/push` | Synchro mobile | ADR-13, FR-INT-2 |
 | `POST /imports/ekylibre` · `GET /imports/:id` | Lancer et suivre une migration (admin) | FR-MIG-1/3 |
@@ -369,6 +374,19 @@ translucides (on voit les cuves), voisins BD TOPO, cuves dont le liquide
 suit la frise, rejeu de la trace du jour sur l'horloge Cesium (posée sur le
 relief), mode « placer les cuves ». Le détail ci-dessous était le plan
 initial ; le relief suit l'ADR-9 révisée.
+
+Ajouté le 2026-11-08 (matériels, lot M, `packages/equipment-3d`) :
+- **Avatar** : chaque matériel a un avatar glTF à l'échelle. Le tracteur
+  est modelé d'après le kit Ekylibre et rendu en aplats.
+- **Rejeu** : il montre l'avatar orienté selon le cap (conservé à l'arrêt),
+  les outils attelés et une caméra qui suit le matériel.
+- **Tracé de la trace** : posé sur les altitudes du relief, sans worker de
+  géométrie.
+- **Tous les matériels** : une case affiche chacun à sa dernière position
+  connue.
+- Détail : [`materiels.md`](materiels.md) et
+  [`materiels-entretien-design.md`](materiels-entretien-design.md) §10 et
+  §13.
 
 - **Relief** : au premier affichage d'une ferme, le worker télécharge le
   RGE ALTI de l'emprise de la ferme (+ 2 km) depuis la Géoplateforme IGN et

@@ -18,6 +18,12 @@ roadmap:
   - title: Registre phytosanitaire en PDF
     text: Le registre prêt à imprimer pour les contrôles.
     status: prochainement
+  - title: Documents et photos des matériels
+    text: Notices, carte grise, contrôle technique et photos joints à chaque matériel et à ses entretiens.
+    status: prochainement
+  - title: Heures des matériels par d'autres boîtiers
+    text: Karnott, télématique des constructeurs, en plus de Traccar.
+    status: plus-tard
   - title: Sondes et pièges connectés
     text: De nouvelles intégrations sur le modèle des traceurs GPS.
     status: plus-tard

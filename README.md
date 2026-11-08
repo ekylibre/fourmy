@@ -22,8 +22,12 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | [`docs/deploiement.md`](docs/deploiement.md) | Déploiement Docker / Dokploy : services, variables, premier démarrage (dev puis production Eyona) |
 | [`docs/interventions.md`](docs/interventions.md) | Interventions et procédures simplifiées (validé ; étapes 1 à 3 réalisées) : 6 formes, catalogue, modèle, correspondance Ekylibre, impacts Fourmy et zero-mobile |
 | [`docs/workflow.md`](docs/workflow.md) | Plan d'implémentation de la première tranche : jour 1 des fondations, tâches des 7 agents, recette |
+| [`docs/phyto.md`](docs/phyto.md) · [`docs/meteo.md`](docs/meteo.md) | Contrôle réglementaire des traitements (E-Phy, ZNT, IFT, mélanges) ; météo des interventions |
+| [`docs/activites.md`](docs/activites.md) · [`docs/parcelles.md`](docs/parcelles.md) · [`docs/carto.md`](docs/carto.md) | Activités et productions ; création de parcelles (PAC, cadastre) et fiche ; outils de cartographie |
+| [`docs/materiels.md`](docs/materiels.md) | Matériels : fiche, compteur et relevés, plan d'entretien et échéances, interventions d'entretien, pièces à commander, alertes, avatar 3D (mode d'emploi et API) |
+| [`docs/materiels-entretien.md`](docs/materiels-entretien.md) · [`docs/materiels-entretien-design.md`](docs/materiels-entretien-design.md) | Matériels et entretien : exigences (et bilan de réalisation), design (et écarts à la réalisation) |
 
-## État du projet (2026-11-07)
+## État du projet (2026-11-08)
 
 | Étape | État |
 |---|---|
@@ -43,14 +47,20 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | Déploiement | 🟡 Dokploy prêt (dev.fourmy.org, fourmy.org, www) ; premier déploiement au prochain push |
 | Site public fourmy.org | ✅ présentation, fonctionnalités illustrées, roadmap, nouveautés automatiques, contact ; page Fourmy d'ekylibre.com sur une branche |
 | zero-mobile (étape 3) | ✅ branche `fourmy-backend` : compte Fourmy, catalogue, formulaire générique par forme, push par intervention ; vérifié contre l'API — reste le passage sur appareil |
+| Retours de test des pilotes (interventions, phyto, activités, parcelles) | ✅ lots A à H : saisie pleine page, contrôle réglementaire, précautions et mélanges, activités, certifications, parcelles depuis la carte (PAC, cadastre) |
+| Matériels et entretien (lots I à M) | ✅ fiche et relevés d'heures, plan d'entretien et échéances, import de la base matériel, interventions d'entretien, heures estimées par Traccar, pièces à commander, alertes, avatar 3D et rejeu dans le plan 3D (`docs/materiels.md`) |
 | Jours 6-7 — migration réelle + recette | ⏳ à faire |
 
 ### À reprendre
 
 1. zero-mobile : build EAS et parcours sur appareil (carte, précache), note de
    version pour les pilotes, puis fusion de `fourmy-backend`.
-3. Finitions agent 0 : documentation OpenAPI.
-4. Export PDF du registre phyto (JSON et CSV disponibles).
+2. Finitions agent 0 : documentation OpenAPI.
+3. Export PDF du registre phyto (JSON et CSV disponibles).
+4. Matériels : documents et photos (lot fichiers), rattachement des
+   entretiens migrés au plan, relevé en fin de chantier dans le formulaire,
+   attelage d'après l'attribut `tool` de Traccar (bilan :
+   `docs/materiels-entretien.md` §9).
 
 ### Démarrage local
 

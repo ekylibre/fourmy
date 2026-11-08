@@ -1,5 +1,5 @@
 {
-  "//": "Textes publics des commits passés (avant la convention « Public: »), par sha court. false = masqué. Les commits suivants utilisent la ligne « Public: » de leur message.",
+  "//": "Textes publics par sha court (false = masqué) : commits passés (avant la convention « Public: »), et lignes « Public: » écrites sur plusieurs lignes (seule la première est lue). Les autres commits utilisent la ligne « Public: » de leur message.",
   "0526a2a": "Intégrations par ferme : chaque exploitation relie ses traceurs GPS (Traccar) avec un accès chiffré, synchronisé chaque minute",
   "78d6eab": "Application mobile : connexion à Fourmy, saisie hors ligne de toutes les interventions, envoi au retour du réseau",
   "0814add": "Comptes personnels : connexion par e-mail et mot de passe, gestion de l'équipe et des accès par le responsable de la ferme",
@@ -20,5 +20,13 @@
   "391d784": false,
   "03bed66": false,
   "ce1ec99": false,
-  "2969074": "Premières fondations de Fourmy"
+  "2969074": "Premières fondations de Fourmy",
+  "90d10a7": "Matériels : fiche de chaque matériel, relevés d'heures contrôlés (avec correction motivée), logo par matériel ou par marque",
+  "a5017f7": "Matériels : plan d'entretien avec échéances en heures ou en mois, tableau de bord de l'entretien, import de la base matériel (plan, fluides, pièces)",
+  "dcbc2c2": "Entretien : interventions liées au plan (opérations cochées, compteur, pièces pré-remplies, atelier) ; les échéances repartent de la réalisation",
+  "1918976": "Matériels : heures des tracteurs estimées avec Traccar, pièces à commander pour les prochaines heures ou les prochains mois, alertes d'entretien par e-mail",
+  "177d47b": "Plan 3D : chaque matériel a son avatar 3D (dimensions, couleur, logo) ; le rejeu des traces montre les tracteurs et leurs outils attelés",
+  "2beb3c6": "Plan 3D : les tracteurs ont un avatar dans le style du kit Ekylibre, à leurs dimensions et à leurs couleurs",
+  "7cd1a69": "Plan 3D : une erreur claire et un bouton pour recharger quand la vue ne peut pas s'afficher",
+  "74d84ac": "Plan 3D : la caméra suit le tracteur pendant le rejeu de sa journée"
 }

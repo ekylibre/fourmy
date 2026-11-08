@@ -6,7 +6,8 @@
 > Il est découpé en lots **I → J → K → L**, dans l'ordre validé.
 > Le lot **M** (avatar 3D, demandé le 2026-11-08) s'ajoute à la suite. Il ne
 > dépend que du lot I et peut donc remonter avant J.
-> Phase suivante : `/sc:implement` lot par lot.
+> **Réalisé le 2026-11-08** (lots I à M) : les écarts avec ce design sont au
+> §13 ; mode d'emploi et API dans [`materiels.md`](materiels.md).
 
 ## 1. Principes
 
@@ -767,3 +768,74 @@ resolveAvatar(equipment, technical, brand):
 - **Attelage par l'attribut `tool`** : il dépend de la façon dont le
   boîtier nomme l'outil. Le rapprochement par `external_ids.traccarTool`
   est à renseigner une fois par outil.
+
+## 13. Écarts à la réalisation (2026-11-08)
+
+Le design a été suivi. Voici ce qui a changé en le réalisant.
+
+**Données**
+- **Catalogue des modèles** : `equipment_models.farm_id` est facultatif.
+  - Un modèle importé appartient à la ferme qui l'importe ; une ligne sans
+    ferme serait un modèle commun.
+  - RLS : un modèle se lit s'il est commun ou à la ferme, et ne s'écrit que
+    s'il est à la ferme.
+  - Le catalogue a aussi une table `model_parts`, en plus de
+    `model_operations` et `model_fluids`.
+- **Pièces d'un matériel** : nouvelle table `equipment_parts` (référentiel
+  du matériel), à côté de `equipment_operation_parts` (pièces d'une
+  opération).
+- **Visites initiales** : chacune devient une opération de type `visit` avec
+  `first_hours`. Une visite antérieure au premier relevé est « non
+  applicable ».
+- **Options absentes d'usine** : une opération dont le libellé désigne une
+  option absente (prise de force avant, relevage avant, freinage
+  pneumatique) arrive retirée (`archived_at`), avec son motif.
+- **Capacités des fluides** : texte de la notice (`capacity`) et litres à
+  prévoir (`capacity_max_l`), au lieu d'un intervalle `numrange`.
+- **Colonnes à valeur par défaut nullable** : `equipments.aggregates` et
+  `external_ids` acceptent NULL, sinon les fixtures, rechargées par
+  `json_populate_recordset`, ne passent pas.
+- **Opérations réalisées** : `intervention_operations` a son propre
+  `farm_id`, pour la RLS.
+- **Fermes parcourues par le worker** : fonctions `SECURITY DEFINER`
+  `fourmy_traccar_farms()` et `fourmy_alert_farms()`.
+- **Avatar** : migration 0021 (`equipments.avatar`, `model_asset_id`).
+
+**Code**
+- **Lecture d'un dossier de la base matériel** : elle est dans
+  `apps/api/src/repos/equipment-bundle.ts`, fonction pure testée, et non
+  dans un paquet `@fourmy/equipment-import`. Le navigateur envoie les
+  fichiers utiles en JSON (pas de zip).
+- **`resolveAvatar`** : dans `@fourmy/equipment-3d` (pur, sans DOM), à côté
+  du générateur, et non dans `@fourmy/domain`.
+- **Échéances** : `computeDue` rend aussi les états `on_demand` (selon
+  besoin), `done` (opération ponctuelle faite) et `not_applicable`.
+- **Amorçage en masse** : `POST /equipments/:id/plan/baseline` (« Amorcer le
+  plan ») complète la « dernière fois connue » opération par opération.
+- **Règles de l'entretien** : sans bloc `maintenance` (ancien mobile,
+  migration), rien de plus n'est exigé, pour rester compatible.
+
+**Avatar et vue 3D**
+- **Tracteur** : modelé d'après le dessin « tracteur bleu » du kit Ekylibre
+  (`apps/web/public/kit/tracteur.svg`). Ce dessin isométrique sert aussi de
+  visuel 2D par défaut.
+- **Rendu en aplats** : sans éclairage (`KHR_materials_unlit`), avec une
+  teinte par face (`COLOR_0`), au lieu du PBR prévu. L'éclairage de Cesium
+  délavait les couleurs. `@gltf-transform/extensions` 4.5.1 a été ajouté.
+- **Trace du rejeu** : posée sur les altitudes du relief, dans une
+  `PolylineCollection`, sans lignes drapées (`clampToGround`). Le worker
+  `createGroundPolylineGeometry` arrêtait la vue sous Firefox.
+- **Caméra qui suit le matériel** : écrite à la main (derrière l'avatar, à
+  25 m, dans son cap). Le `trackedEntity` de Cesium attend un volume
+  englobant, jamais disponible pour un modèle posé sur le relief.
+- **Logo au-dessus du véhicule** : sa version PNG, car un SVG sans
+  dimensions n'est pas une texture WebGL valide.
+- **Attelage** : d'après les interventions seulement, avec la distance
+  d'attelage du tracteur. L'attribut `tool` de Traccar et l'articulation en
+  virage restent à faire.
+- **Erreurs de rendu de Cesium** : affichées dans la page, en français, avec
+  « Recharger », au lieu du dialogue de Cesium.
+- **Copie des fichiers statiques de Cesium** : elle ne réécrit plus rien
+  quand la version est déjà en place, pour ne pas casser une page ouverte
+  pendant un build.
+

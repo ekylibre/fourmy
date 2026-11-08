@@ -159,3 +159,17 @@ test("plan 3D (relief et photo IGN, cuverie)", async ({ page }) => {
   await page.waitForTimeout(6000);
   await snap(page, "plan-3d");
 });
+
+test("matériels et avatar 3D d'un tracteur", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.getByRole("link", { name: "Matériels", exact: true }).click();
+  await expect(page.getByRole("table", { name: "Matériels" })).toBeVisible();
+  await snap(page, "materiels");
+  // Premier tracteur de la liste : onglet 3D (avatar généré d'après le kit).
+  const tractor = page.getByRole("row").filter({ hasText: "Tracteur" }).first().getByRole("link").first();
+  await tractor.click();
+  await page.getByRole("tab", { name: "3D" }).click();
+  await expect(page.getByLabel("Aperçu 3D").locator("canvas")).toBeVisible({ timeout: 30_000 });
+  await page.waitForTimeout(6000);
+  await snap(page, "avatar-3d");
+});
