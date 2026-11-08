@@ -8,7 +8,7 @@ export const article = z
     farmId,
     lexiconRef: z.string().nullable(),
     name: z.string().min(1),
-    kind: z.enum(["phyto", "fertilizer", "seed", "harvest", "wine", "other"]),
+    kind: z.enum(["phyto", "fertilizer", "seed", "harvest", "wine", "part", "fluid", "other"]),
     unit: z.string().min(1),
     amm: z.string().optional(), // n° AMM pour les phytos
     custom: z.record(z.unknown()).optional(),

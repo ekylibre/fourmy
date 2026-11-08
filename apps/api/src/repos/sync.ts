@@ -3,12 +3,14 @@ import { withFarm, type Database, type Tx } from "@fourmy/db";
 import { DomainError, type DomainCtx } from "@fourmy/domain";
 import {
   syncInterventionPushed,
+  syncMeterReadingPushed,
   type SyncChanges,
   type SyncPullResponse,
   type SyncPushRequest,
   type SyncPushResult,
 } from "@fourmy/contracts";
 import { planInTx, completeInTx, readInterventionsWhere } from "./interventions.js";
+import { addReadingInTx } from "./equipments.js";
 import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
 
 /**
@@ -16,7 +18,7 @@ import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
  * Pull : changements depuis `lastPulledAt`, dans une seule transaction ; son
  * instant de début devient le prochain `lastPulledAt` (rien ne se perd entre
  * deux pulls ; au pire un enregistrement revient deux fois).
- * Push : interventions seulement en v1, idempotentes par UUID client.
+ * Push : interventions et relevés de compteur, idempotents par UUID client.
  */
 
 const rows = async <T>(tx: Tx, q: SQL) => (await tx.execute(q)) as unknown as T[];
@@ -46,7 +48,7 @@ export async function pull(db: Database, farmId: string, lastPulledAt: string | 
     );
     const equipments = await rows<Record<string, unknown>>(
       tx,
-      sql`SELECT id, name, kind, state, updated_at FROM equipments WHERE updated_at > ${since}::timestamptz`,
+      sql`SELECT id, name, kind, state, brand, model, meter_unit, updated_at FROM equipments WHERE updated_at > ${since}::timestamptz`,
     );
     const people = await rows<Record<string, unknown>>(
       tx,
@@ -66,6 +68,11 @@ export async function pull(db: Database, farmId: string, lastPulledAt: string | 
           LEFT JOIN container_versions v ON v.container_id = c.id AND v.valid @> now()
           WHERE c.updated_at > ${since}::timestamptz`,
     );
+    const readings = await rows<Record<string, unknown>>(
+      tx,
+      sql`SELECT id, equipment_id, read_at, value, origin, correction, updated_at FROM meter_readings
+          WHERE updated_at > ${since}::timestamptz ${first ? sql`AND read_at > now() - interval '365 days'` : sql``}`,
+    );
     const interventions = await readInterventionsWhere(
       tx,
       sql`i.updated_at > ${since}::timestamptz
@@ -82,6 +89,7 @@ export async function pull(db: Database, farmId: string, lastPulledAt: string | 
       places: bucket(),
       containers: bucket(),
       interventions: bucket(),
+      meter_readings: bucket(),
     };
     const put = (collection: keyof SyncChanges, record: Record<string, unknown>) =>
       changes[collection]![first ? "created" : "updated"].push(record);
@@ -106,7 +114,27 @@ export async function pull(db: Database, farmId: string, lastPulledAt: string | 
       put("articles", { id: a.id, name: a.name, kind: a.kind, unit: a.unit, amm: a.amm ?? null, updated_at_server: ms(a.updated_at) });
     }
     for (const e of equipments) {
-      put("equipments", { id: e.id, name: e.name, kind: e.kind, state: e.state ?? null, updated_at_server: ms(e.updated_at) });
+      put("equipments", {
+        id: e.id,
+        name: e.name,
+        kind: e.kind,
+        state: e.state ?? null,
+        brand: e.brand ?? null,
+        model: e.model ?? null,
+        meter_unit: e.meter_unit ?? null,
+        updated_at_server: ms(e.updated_at),
+      });
+    }
+    for (const r of readings) {
+      put("meter_readings", {
+        id: r.id,
+        equipment_id: r.equipment_id,
+        read_at: ms(r.read_at),
+        value: Number(r.value),
+        origin: r.origin,
+        correction: r.correction ?? null,
+        updated_at_server: ms(r.updated_at),
+      });
     }
     for (const p of people) {
       put("people", {
@@ -224,6 +252,37 @@ export async function push(db: Database, farmId: string, ctx: DomainCtx, body: S
 
   for (const id of deleted) {
     result.failed.push({ id, error: "Suppression d'intervention non autorisée depuis le mobile (v1)." });
+  }
+
+  // Relevés de compteur saisis hors ligne : un par transaction, idempotents.
+  const readings = body.changes.meter_readings;
+  for (const raw of [...(readings?.created ?? []), ...(readings?.updated ?? [])]) {
+    const parsed = syncMeterReadingPushed.safeParse(raw);
+    if (!parsed.success) {
+      result.failed.push({ id: String(raw.id ?? "?"), error: parsed.error.issues.map((i) => `${i.path.join(".")} : ${i.message}`).join(" ; ") });
+      continue;
+    }
+    const r = parsed.data;
+    try {
+      await withFarm(db, farmId, (tx) =>
+        addReadingInTx(tx, farmId, ctx, r.equipment_id, {
+          id: r.id,
+          readAt: new Date(r.read_at).toISOString(),
+          value: r.value,
+          correction: r.correction ?? null,
+          correctionReason: r.correction_reason ?? null,
+          note: r.note ?? null,
+          origin: "manual",
+        }),
+      );
+      result.applied.push({ id: r.id, outcome: "created" });
+    } catch (e) {
+      if (e instanceof BadRequest || e instanceof NotFound || e instanceof Conflict) result.failed.push({ id: r.id, error: e.message });
+      else throw e;
+    }
+  }
+  for (const id of readings?.deleted ?? []) {
+    result.failed.push({ id, error: "Suppression de relevé non autorisée depuis le mobile." });
   }
   return result;
 }

@@ -5,6 +5,9 @@ import type {
   ParcelCertification,
   Article,
   ContainerContents,
+  EquipmentSheet,
+  EquipmentSummary,
+  FarmBrand,
   FarmMember,
   Intervention,
   InterventionDetail,
@@ -155,6 +158,32 @@ export function useCertifications(farmId: string) {
   return useQuery({
     queryKey: ["certifications", farmId],
     queryFn: () => api.get<{ items: ParcelCertification[] }>(farmPath(farmId, "/certifications")),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** Matériels de la ferme (fiche résumée, dernier relevé, logo). */
+export function useEquipments(farmId: string) {
+  return useQuery({
+    queryKey: ["equipments", farmId],
+    queryFn: () => api.get<{ items: EquipmentSummary[] }>(farmPath(farmId, "/equipments")),
+    staleTime: 60_000,
+  });
+}
+
+/** Fiche complète d'un matériel. */
+export function useEquipmentSheet(farmId: string, id: string) {
+  return useQuery({
+    queryKey: ["equipment-sheet", farmId, id],
+    queryFn: () => api.get<EquipmentSheet>(farmPath(farmId, `/equipments/${id}/sheet`)),
+  });
+}
+
+/** Marques de la ferme (logo et couleur partagés). */
+export function useBrands(farmId: string) {
+  return useQuery({
+    queryKey: ["brands", farmId],
+    queryFn: () => api.get<{ items: FarmBrand[] }>(farmPath(farmId, "/brands")),
     staleTime: 5 * 60_000,
   });
 }

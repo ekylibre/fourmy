@@ -20,3 +20,4 @@ export * from "./phyto.js";
 export * from "./activities.js";
 export * from "./certifications.js";
 export * from "./parcels.js";
+export * from "./equipments.js";

@@ -35,6 +35,8 @@ const KIND_LABELS: Record<ArticleKind, string> = {
   seed: "semence ou plant",
   harvest: "récolte",
   wine: "vin",
+  part: "pièce",
+  fluid: "fluide (huile, graisse…)",
   other: "fourniture",
 };
 

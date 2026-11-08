@@ -15,7 +15,7 @@ export type ProcedureShape = z.infer<typeof procedureShape>;
 export const procedureCategory = z.enum(["crops", "vine", "equipment", "general"]);
 export type ProcedureCategory = z.infer<typeof procedureCategory>;
 
-export const articleKind = z.enum(["phyto", "fertilizer", "seed", "harvest", "wine", "other"]);
+export const articleKind = z.enum(["phyto", "fertilizer", "seed", "harvest", "wine", "part", "fluid", "other"]);
 export type ArticleKind = z.infer<typeof articleKind>;
 
 export const procedureDefinition = z.object({
@@ -75,6 +75,8 @@ export const SHAPE_LABELS: Record<ProcedureShape, string> = {
 type Def = [code: string, shape: ProcedureShape, category: ProcedureCategory, inputKinds?: ArticleKind[], outputKinds?: ArticleKind[]];
 
 const WORK_SUPPLIES: ArticleKind[] = ["other"];
+// Entretien : pièces et fluides (huiles, graisses, AdBlue), plus les fournitures.
+const MAINTENANCE_SUPPLIES: ArticleKind[] = ["part", "fluid", "other"];
 
 /** Catalogue v1 : procédures utilisées par les fermes pilotes + procédures courantes. */
 const DEFINITIONS: Def[] = [
@@ -136,8 +138,8 @@ const DEFINITIONS: Def[] = [
   ["manual_vine_harvest", "harvest", "vine", [], ["harvest"]],
   ["mecanical_vine_harvest", "harvest", "vine", [], ["harvest"]], // orthographe d'Ekylibre conservée
   // --- Matériel et bâtiments ---
-  ["equipment_maintenance", "maintenance", "equipment", WORK_SUPPLIES],
-  ["installation_maintenance", "maintenance", "equipment", WORK_SUPPLIES],
+  ["equipment_maintenance", "maintenance", "equipment", MAINTENANCE_SUPPLIES],
+  ["installation_maintenance", "maintenance", "equipment", MAINTENANCE_SUPPLIES],
 ];
 
 const humanize = (code: string) => code.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());

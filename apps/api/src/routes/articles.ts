@@ -6,7 +6,7 @@ import type { Env } from "../context.js";
 import { db } from "../db.js";
 import { BadRequest } from "./helpers.js";
 
-const KINDS = ["phyto", "fertilizer", "seed", "harvest", "wine", "other"];
+const KINDS = ["phyto", "fertilizer", "seed", "harvest", "wine", "part", "fluid", "other"];
 
 /** Catalogue d'articles de la ferme (intrants, sorties), filtrable par nature. */
 export const articleRoutes = new Hono<Env>().get("/articles", async (c) => {

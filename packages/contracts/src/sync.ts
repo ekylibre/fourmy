@@ -27,6 +27,7 @@ export const syncCollection = z.enum([
   "places",
   "containers",
   "interventions",
+  "meter_readings",
 ]);
 export type SyncCollection = z.infer<typeof syncCollection>;
 
@@ -70,6 +71,21 @@ export const syncEquipment = z.object({
   name: z.string(),
   kind: z.string(),
   state: z.string().nullable(),
+  brand: z.string().nullable(),
+  model: z.string().nullable(),
+  /** `hours` : compteur d'heures ; null : pas de compteur. */
+  meter_unit: z.string().nullable(),
+  updated_at_server: z.number(),
+});
+
+/** Relevé de compteur (365 derniers jours au premier pull). */
+export const syncMeterReading = z.object({
+  id: uuid,
+  equipment_id: uuid,
+  read_at: z.number(),
+  value: z.number(),
+  origin: z.string(),
+  correction: z.string().nullable(),
   updated_at_server: z.number(),
 });
 
@@ -135,6 +151,18 @@ export const syncInterventionPushed = z.object({
 });
 export type SyncInterventionPushed = z.infer<typeof syncInterventionPushed>;
 
+/** Relevé saisi sur le mobile. `id` = UUID client, clé d'idempotence. */
+export const syncMeterReadingPushed = z.object({
+  id: uuid,
+  equipment_id: uuid,
+  /** Instant en millisecondes (WatermelonDB) ou ISO-8601. */
+  read_at: z.union([z.number(), isoDateTime]),
+  value: z.number().min(0),
+  correction: z.enum(["fix", "replacement"]).nullable().optional(),
+  correction_reason: z.string().max(500).nullable().optional(),
+  note: z.string().max(500).nullable().optional(),
+});
+
 export const syncPushRequest = z.object({
   changes: z.object({
     interventions: z.object({
@@ -142,6 +170,14 @@ export const syncPushRequest = z.object({
       updated: z.array(z.record(z.unknown())).default([]),
       deleted: z.array(z.string()).default([]),
     }),
+    /** Relevés saisis hors ligne (création seulement, idempotents par `id`). */
+    meter_readings: z
+      .object({
+        created: z.array(z.record(z.unknown())).default([]),
+        updated: z.array(z.record(z.unknown())).default([]),
+        deleted: z.array(z.string()).default([]),
+      })
+      .optional(),
   }),
   lastPulledAt: isoDateTime,
 });

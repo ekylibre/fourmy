@@ -32,6 +32,8 @@ export const ARTICLE_KIND_LABELS: Record<string, string> = {
   seed: "Semence",
   harvest: "Récolte",
   wine: "Vin",
+  part: "Pièce",
+  fluid: "Fluide",
   other: "Autre",
 };
 
