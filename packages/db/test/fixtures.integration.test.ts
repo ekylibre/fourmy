@@ -26,6 +26,16 @@ describe.skipIf(!url)("fixtures pilotes", () => {
   }, 60_000);
   afterAll(() => sql.end());
 
+  it("recharger une fixture retire les périodes et paramètres qui n'y sont plus", async () => {
+    const fixture = fixtures[1]!;
+    const interventionId = fixture.tables.interventions![0]!.id as string;
+    const stale = crypto.randomUUID();
+    await sql`INSERT INTO intervention_periods (id, intervention_id, started_at, stopped_at)
+              VALUES (${stale}, ${interventionId}, '2020-01-01T08:00:00Z', '2020-01-01T09:00:00Z')`;
+    await loadFixture(sql, fixture);
+    expect(await sql`SELECT 1 FROM intervention_periods WHERE id = ${stale}`).toHaveLength(0);
+  }, 60_000);
+
   for (const [i, f] of FILES.entries()) {
     it(`${f} : volumes et registre phyto conformes, sous RLS`, async () => {
       const fixture = fixtures[i]!;
@@ -38,7 +48,9 @@ describe.skipIf(!url)("fixtures pilotes", () => {
           SELECT (SELECT count(*) FROM land_parcels)::int AS land_parcels,
                  (SELECT count(*) FROM interventions)::int AS interventions,
                  (SELECT count(*) FROM stock_movements)::int AS stock_movements,
-                 (SELECT count(*) FROM containers)::int AS containers`;
+                 (SELECT count(*) FROM containers)::int AS containers,
+                 (SELECT count(*) FROM intervention_periods)::int AS intervention_periods,
+                 (SELECT count(*) FROM intervention_parameters)::int AS intervention_parameters`;
         const phyto = await tx<{ year: number; rows: number }[]>`
           SELECT extract(year FROM done_at)::int AS year, count(*)::int AS rows
           FROM phyto_register GROUP BY 1 ORDER BY 1`;
@@ -51,6 +63,8 @@ describe.skipIf(!url)("fixtures pilotes", () => {
         interventions: exp.interventions,
         stock_movements: exp.stock_movements,
         containers: exp.containers,
+        intervention_periods: exp.intervention_periods,
+        intervention_parameters: exp.intervention_parameters,
       });
       expect(Object.fromEntries(result.phyto.map((p) => [String(p.year), p.rows]))).toEqual(
         fixture.meta.expected.phytoRowsByYear,

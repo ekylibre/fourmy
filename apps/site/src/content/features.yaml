@@ -30,11 +30,39 @@ features:
     title: Toutes les interventions, un seul formulaire
     text: >-
       Labour, semis, traitements, fertilisation, récolte, vendange, entretien du matériel :
-      le formulaire s'adapte à ce que vous faites. Doses à l'hectare ou au total, plusieurs
-      périodes de travail, vos produits et matériels habituels proposés en premier.
+      le formulaire s'adapte à ce que vous faites, chaque travail a son icône. Doses à
+      l'hectare ou au total, plusieurs périodes de travail, vos produits et matériels
+      habituels proposés en premier.
     status: disponible
     capture: intervention
     since: 0.19.0
+  - id: interventions-carte
+    title: Les parcelles choisies sur la carte
+    text: >-
+      Cliquez les parcelles sur la photo aérienne, ou prenez-les toutes d'un geste ; dessinez
+      la zone réellement traitée quand une parcelle ne l'est qu'en partie : la dose totale
+      suit la surface exacte.
+    status: disponible
+    capture: intervention-carte
+    since: 0.33.0
+  - id: interventions-semaine
+    title: La semaine des travaux
+    text: >-
+      Les interventions de la semaine en liste, en kanban (planifiées, en cours, réalisées)
+      ou en calendrier ; une recherche rapide retrouve un produit, une parcelle ou un
+      matériel sur toute la campagne.
+    status: disponible
+    capture: interventions-semaine
+    since: 0.31.0
+  - id: interventions-fiche
+    title: Fiche d'intervention et corrections tracées
+    text: >-
+      Chaque intervention a sa fiche : parcelles, doses à l'hectare et au total, matériels,
+      trace GPS. Une erreur de saisie se corrige ; le stock et le registre suivent, et
+      l'historique garde la version d'avant.
+    status: disponible
+    capture: intervention-fiche
+    since: 0.30.0
   - id: stocks
     title: Stocks tenus tout seuls
     text: >-

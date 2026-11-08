@@ -54,7 +54,7 @@ test("carte et parcellaire", async ({ page }) => {
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
   await expect(page.getByText(/9 parcelles/)).toBeVisible();
   // Tuiles IGN : laisser la photo aérienne se charger.
-  await page.waitForLoadState("networkidle").catch(() => undefined);
+  await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
   await page.waitForTimeout(2500);
   await snap(page, "carte");
 });
@@ -68,6 +68,52 @@ test("formulaire d'intervention piloté par la forme (vendange)", async ({ page 
   await page.getByRole("option", { name: "Vendange manuelle" }).click();
   await expect(form.getByPlaceholder(/Rangée où/).first()).toBeVisible();
   await snap(page, "intervention");
+  await page.keyboard.press("Escape");
+});
+
+test("semaine des travaux (calendrier) et fiche d'intervention", async ({ page }) => {
+  await page.getByLabel("Date de la frise").fill("2021-06-30");
+  await page.getByRole("link", { name: "Interventions" }).click();
+  await page.getByText("Calendrier", { exact: true }).click();
+  await expect(page.getByRole("region", { name: /Mardi 29 juin/ }).getByRole("article").first()).toBeVisible();
+  await snap(page, "interventions-semaine");
+
+  await page.getByText("Liste", { exact: true }).click();
+  await page.getByRole("row").filter({ hasText: "Pulvérisation" }).first().click();
+  await expect(page.getByRole("heading", { name: "Historique" })).toBeVisible();
+  // Mini-carte : laisser la photo aérienne se charger.
+  await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
+  await page.waitForTimeout(2500);
+  await snap(page, "intervention-fiche");
+});
+
+test("parcelles choisies sur la carte, zone partielle", async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.getByLabel("Date de la frise").fill("2023-06-15");
+  await page.getByRole("link", { name: "Interventions" }).click();
+  await page.getByRole("button", { name: "Nouvelle intervention" }).click();
+  const form = page.getByRole("dialog");
+  await form.getByRole("combobox", { name: "Intervention" }).fill("sans fertilisation");
+  await page.getByRole("option", { name: "Pulvérisation (sans fertilisation)" }).click();
+  await form.getByText("Carte", { exact: true }).click();
+  const map = form.getByTestId("parcel-picker-map");
+  await expect(form.getByRole("button", { name: "Zone partielle" })).toBeEnabled({ timeout: 30_000 });
+  const box = (await map.boundingBox())!;
+  await page.keyboard.down("Shift");
+  await page.mouse.move(box.x + 5, box.y + 5);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 5, box.y + box.height - 5, { steps: 8 });
+  await page.mouse.up();
+  await page.keyboard.up("Shift");
+  await form.getByRole("button", { name: "Voir Parcelle 008 sur la carte" }).click();
+  await form.getByRole("button", { name: "Zone partielle" }).click();
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  for (const [dx, dy] of [[-60, -40], [50, -55], [70, 35], [-45, 50], [-60, -40]] as const) await page.mouse.click(cx + dx, cy + dy);
+  await expect(form.getByText(/^zone .* sur .* ha$/)).toBeVisible();
+  await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
+  await page.waitForTimeout(2500);
+  await snap(page, "intervention-carte");
   await page.keyboard.press("Escape");
 });
 

@@ -22,6 +22,8 @@ export interface ParcelMapProps {
   parcels: FeatureCollection;
   places: FeatureCollection;
   track: FeatureCollection;
+  /** Zones de travail (interventions), en orange au-dessus des parcelles. */
+  zones?: FeatureCollection;
   basemap: Basemap;
   onSelect?: (properties: Record<string, unknown> | null) => void;
 }
@@ -39,7 +41,7 @@ function bbox(fc: FeatureCollection): LngLatBoundsLike | null {
 }
 
 /** Carte de travail (MapLibre) : parcellaire à la date, bâtiments, trace GPS. */
-export function ParcelMap({ parcels, places, track, basemap, onSelect }: ParcelMapProps) {
+export function ParcelMap({ parcels, places, track, zones = EMPTY, basemap, onSelect }: ParcelMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MlMap | null>(null);
   const [ready, setReady] = useState(false);
@@ -60,6 +62,7 @@ export function ParcelMap({ parcels, places, track, basemap, onSelect }: ParcelM
           parcels: { type: "geojson", data: EMPTY },
           places: { type: "geojson", data: EMPTY },
           track: { type: "geojson", data: EMPTY },
+          zones: { type: "geojson", data: EMPTY },
         },
         layers: [
           { id: "plan", type: "raster", source: "plan" },
@@ -68,6 +71,8 @@ export function ParcelMap({ parcels, places, track, basemap, onSelect }: ParcelM
           { id: "parcels-casing", type: "line", source: "parcels", paint: { "line-color": "#1E2421", "line-width": 3.5, "line-opacity": 0.6 } },
           { id: "parcels-line", type: "line", source: "parcels", paint: { "line-color": ["get", "color"], "line-width": 2 } },
           { id: "places-fill", type: "fill", source: "places", paint: { "fill-color": "#3B5A78", "fill-opacity": 0.7 } },
+          { id: "zones-fill", type: "fill", source: "zones", paint: { "fill-color": "#E85D04", "fill-opacity": 0.3 } },
+          { id: "zones-line", type: "line", source: "zones", paint: { "line-color": "#E85D04", "line-width": 1.5 } },
           {
             id: "track-transport", type: "line", source: "track", filter: ["==", ["get", "working"], false],
             paint: { "line-color": "#3B5A78", "line-width": 2, "line-dasharray": [2, 2] },
@@ -101,6 +106,7 @@ export function ParcelMap({ parcels, places, track, basemap, onSelect }: ParcelM
     if (!m || !ready) return;
     (m.getSource("parcels") as GeoJSONSource).setData(parcels);
     (m.getSource("places") as GeoJSONSource).setData(places);
+    (m.getSource("zones") as GeoJSONSource).setData(zones);
     if (!fitted.current) {
       const b = bbox(parcels);
       if (b) {
@@ -108,7 +114,7 @@ export function ParcelMap({ parcels, places, track, basemap, onSelect }: ParcelM
         fitted.current = true;
       }
     }
-  }, [parcels, places, ready]);
+  }, [parcels, places, zones, ready]);
 
   useEffect(() => {
     const m = map.current;

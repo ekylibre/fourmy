@@ -20,6 +20,7 @@ import { CancelModal } from "./CancelModal";
 import { InterventionForm } from "./InterventionForm";
 import { actionLabel, changeLines, interventionDay, STATUS, targetName, type Names } from "./presenters";
 
+const EMPTY_FC: FeatureCollection = { type: "FeatureCollection", features: [] };
 const ORIGINS: Record<string, string> = { web: "Web", mobile: "Mobile", migration: "Reprise d'Ekylibre", plugin: "Extension" };
 
 /**
@@ -244,7 +245,7 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
             {layers && (
               <Paper withBorder style={{ height: 320, overflow: "hidden" }}>
                 <MapBoundary>
-                  <ParcelMap parcels={layers.parcels} places={layers.zones} track={trackLayer} basemap="ortho" />
+                  <ParcelMap parcels={layers.parcels} places={EMPTY_FC} zones={layers.zones} track={trackLayer} basemap="ortho" />
                 </MapBoundary>
               </Paper>
             )}

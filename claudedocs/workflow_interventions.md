@@ -5,6 +5,26 @@
 > phase par phase. Le **lot 1 (écrans)** est détaillé ; les lots 2 (phyto,
 > IFT) et 3 (météo) sont esquissés, à détailler quand le lot 1 est livré.
 
+## État (2026-11-08)
+
+**Lot 1 réalisé** : P0 `58b427e`, P1 `053c361`, P5 `1a1fbce`, P2 `64745c2`,
+P3 `d5e21d8`, P4 `fa78ee9`, P6 `afd80cf`, P7 (finitions, captures du site,
+chargement des fixtures). Essai complet en lecture seule sur les fermes de
+Pierre (612 interventions, 2015–2026) et de Frédéric (151, 2020–2023) :
+aucun nom non résolu, aucune erreur.
+
+Constaté pendant l'essai, à décider :
+
+- **Cible rattachée à la mauvaise parcelle (migration)** : pour une cible
+  « Plant », la reprise prend la parcelle support de la production
+  Ekylibre ; quand ce lien est faux dans Ekylibre, la zone de travail tombe
+  sur une autre parcelle (ex. semis du 15/01/2021 chez Pierre : zone de
+  2,38 ha entièrement sur Sarthou, rattachée à Monassut). 12 interventions
+  chez Pierre, 2 chez Loubes, 0 chez Frédéric. Correctif possible : préférer
+  la parcelle qui contient la zone de travail, puis remigrer.
+- **Fixtures locales** : d'anciennes périodes restaient à côté des nouvelles
+  après un rechargement (corrigé dans `loadFixture`, P7).
+
 ## 0. Point de départ (constaté dans le code)
 
 | Existant | Où | Ce qu'on en fait |
