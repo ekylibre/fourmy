@@ -7,6 +7,8 @@ import {
   ClassificationType,
   ClockRange,
   HeadingPitchRoll,
+  Material,
+  PolylineCollection,
   Quaternion,
   SampledProperty,
   Transforms,
@@ -141,6 +143,7 @@ export class FarmScene {
   private planEntities: Entity[] = [];
   private trackEntities: Entity[] = [];
   private fleetEntities: Entity[] = [];
+  private trackLines: PolylineCollection | null = null;
   private selectedTank: string | null = null;
   private plan: PlanData | null = null;
   private framed = false;
@@ -347,19 +350,23 @@ export class FarmScene {
     this.clearTrack();
     if (samples.length < 2) return;
     const add = (e: Entity.ConstructorOptions) => this.trackEntities.push(this.viewer.entities.add(e));
-    for (const run of splitRuns(samples)) {
-      add({
-        polyline: {
-          positions: Cartesian3.fromDegreesArray(run.coords.flat()),
-          clampToGround: true,
-          width: run.working ? 4 : 2,
-          material: run.working ? COLORS.work : COLORS.transport.withAlpha(0.8),
-        },
-      });
-    }
     // Altitudes du relief aux points de la trace (niveau 15 : ~5 m).
     const cartos = samples.map(([, lon, lat]) => Cartographic.fromDegrees(lon, lat));
     const grounded = await sampleTerrain(this.viewer.terrainProvider, 15, cartos).catch(() => cartos);
+    // Tracé posé sur ces altitudes (+0,5 m), dans une collection de lignes :
+    // ni lignes « drapées » (clampToGround), ni worker de géométrie. Le worker
+    // createGroundPolylineGeometry échouait sous certains Firefox avec carte
+    // graphique (« d is not a function »), et Cesium arrêtait alors le rendu.
+    const heightAt = new Map(samples.map(([, lon, lat], i) => [`${lon},${lat}`, grounded[i]?.height ?? 0]));
+    const lines = new PolylineCollection();
+    for (const run of splitRuns(samples)) {
+      lines.add({
+        positions: run.coords.map(([lon, lat]) => Cartesian3.fromDegrees(lon, lat, (heightAt.get(`${lon},${lat}`) ?? 0) + 0.5)),
+        width: run.working ? 4 : 2,
+        material: Material.fromType("Color", { color: run.working ? COLORS.work : COLORS.transport.withAlpha(0.8) }),
+      });
+    }
+    this.trackLines = this.viewer.scene.primitives.add(lines);
     // Avatar posé sur le relief (sinon point surélevé), orienté selon le cap.
     const lift = avatar.modelUrl ? 0 : 2;
     const position = new SampledPositionProperty();
@@ -476,6 +483,8 @@ export class FarmScene {
   clearTrack() {
     for (const e of this.trackEntities) this.viewer.entities.remove(e);
     this.trackEntities = [];
+    if (this.trackLines) this.viewer.scene.primitives.remove(this.trackLines);
+    this.trackLines = null;
     this.viewer.clock.shouldAnimate = false;
   }
 
