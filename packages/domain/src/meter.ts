@@ -106,13 +106,31 @@ export function checkReading(existing: readonly MeterReadingLike[], next: MeterR
 
 export interface UsageAt<R extends MeterReadingLike = MeterReadingLike> {
   usage: number | null;
-  /** `read` : relevé à cet instant ; `interpolated` : entre deux relevés ; `after` : depuis le dernier relevé. */
-  kind: "read" | "interpolated" | "after" | "unknown";
+  /**
+   * `read` : relevé à cet instant ; `interpolated` : entre deux relevés ;
+   * `after` : dernier relevé ; `estimated` : dernier relevé + heures estimées
+   * depuis (Traccar).
+   */
+  kind: "read" | "interpolated" | "after" | "estimated" | "unknown";
   since?: R;
+  /** Heures estimées ajoutées au dernier relevé. */
+  estimatedHours?: number;
 }
 
-/** Heures d'usage à une date (interpolation linéaire entre deux relevés valides). */
-export function usageAt<R extends MeterReadingLike>(series: readonly UsagePoint<R>[], at: string): UsageAt<R> {
+/** Heures de fonctionnement estimées d'un jour (AAAA-MM-JJ, heure de Paris). */
+export interface UsageDay {
+  day: string;
+  hours: number;
+}
+
+export const parisDay = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date(iso));
+
+/**
+ * Heures d'usage à une date : interpolation linéaire entre deux relevés
+ * valides ; après le dernier relevé, + heures estimées des jours suivants
+ * (recalage automatique : un nouveau relevé réel repart de sa valeur).
+ */
+export function usageAt<R extends MeterReadingLike>(series: readonly UsagePoint<R>[], at: string, usageDays: readonly UsageDay[] = []): UsageAt<R> {
   const valid = series.filter((p) => p.status === "valid");
   const t = Date.parse(at);
   let prev: UsagePoint<R> | undefined;
@@ -127,7 +145,59 @@ export function usageAt<R extends MeterReadingLike>(series: readonly UsagePoint<
     }
     prev = p;
   }
-  return prev ? { usage: prev.usage, kind: "after", since: prev.reading } : { usage: null, kind: "unknown" };
+  if (!prev) return { usage: null, kind: "unknown" };
+  const from = parisDay(prev.reading.readAt);
+  const to = parisDay(at);
+  const extra = usageDays.filter((d) => d.day > from && d.day <= to).reduce((s, d) => s + d.hours, 0);
+  if (extra > 0) return { usage: Math.round((prev.usage + extra) * 10) / 10, kind: "estimated", since: prev.reading, estimatedHours: Math.round(extra * 10) / 10 };
+  return { usage: prev.usage, kind: "after", since: prev.reading };
+}
+
+export interface PositionLike {
+  time: string;
+  speedKmh: number | null;
+  working: boolean | null;
+}
+
+/**
+ * Durée de fonctionnement par jour, déduite des positions d'un boîtier sans
+ * compteur (FR-MAT-13) : somme des écarts entre positions consécutives quand
+ * le matériel roule (> 1 km/h) ou travaille ; chaque écart plafonné (5 min)
+ * pour ne pas compter un trou de transmission.
+ */
+export function operatingHoursByDay(positions: readonly PositionLike[], opts: { maxGapMin?: number; minSpeedKmh?: number } = {}): UsageDay[] {
+  const maxGap = (opts.maxGapMin ?? 5) * 60_000;
+  const minSpeed = opts.minSpeedKmh ?? 1;
+  const sorted = [...positions].sort((a, b) => a.time.localeCompare(b.time));
+  const byDay = new Map<string, number>();
+  for (let i = 1; i < sorted.length; i++) {
+    const a = sorted[i - 1]!;
+    const b = sorted[i]!;
+    const active = (p: PositionLike) => p.working === true || (p.speedKmh ?? 0) > minSpeed;
+    if (!active(a) && !active(b)) continue;
+    const gap = Math.min(Date.parse(b.time) - Date.parse(a.time), maxGap);
+    if (gap <= 0) continue;
+    const day = parisDay(a.time);
+    byDay.set(day, (byDay.get(day) ?? 0) + gap / 3_600_000);
+  }
+  return [...byDay].map(([day, hours]) => ({ day, hours: Math.min(24, Math.round(hours * 100) / 100) })).sort((x, y) => x.day.localeCompare(y.day));
+}
+
+/**
+ * Écart entre un relevé réel et l'estimation à son instant (FR-MAT-14) :
+ * signalé au-delà de 10 h ou de 10 % des heures estimées depuis le relevé
+ * précédent.
+ */
+export function estimateGap<R extends MeterReadingLike>(
+  series: readonly UsagePoint<R>[],
+  usageDays: readonly UsageDay[],
+  reading: { id: string; readAt: string; usage: number },
+): { estimated: number; estimatedHours: number; gap: number; flagged: boolean } | null {
+  const before = series.filter((p) => p.reading.id !== reading.id && p.status === "valid" && p.reading.readAt < reading.readAt);
+  const est = usageAt(before, reading.readAt, usageDays);
+  if (est.kind !== "estimated" || est.usage === null) return null;
+  const gap = Math.round((reading.usage - est.usage) * 10) / 10;
+  return { estimated: est.usage, estimatedHours: est.estimatedHours ?? 0, gap, flagged: Math.abs(gap) > Math.max(10, 0.1 * (est.estimatedHours ?? 0)) };
 }
 
 /** Message lisible d'un refus de relevé. */

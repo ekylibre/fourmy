@@ -32,8 +32,9 @@ const op = (id: string, label: string, due: Partial<EquipmentMaintenance["operat
 const maintenance: EquipmentMaintenance = {
   equipmentId: EQ,
   at: "2026-11-08T12:00:00.000Z",
-  settings: { soonHours: 50, soonMonths: 1 },
+  settings: { soonHours: 50, soonMonths: 1, notify: [] },
   usageNow: 4321,
+  usageEstimated: true,
   model: { id: "0193a000-0000-7000-8000-0000000000m1".replace("m", "a"), label: "CLAAS ARION 430", warning: "Notice valable à partir de A2111239", sources: [] },
   operations: [
     op("0193a000-0000-7000-8000-00000000c001", "Échange de l'huile moteur", { status: "soon", nextUsage: 4350, remainingHours: 29, nextDate: "2027-03-01T00:00:00.000Z", remainingDays: 113, last: { at: "2026-03-01T00:00:00.000Z", usage: 3850, source: "baseline" }, reason: null }, { parts: [{ articleId: "0193a000-0000-7000-8000-00000000d001", name: "Filtre à huile", reference: "60 0502 874 3", quantity: 1, unit: "Unité" }] }),
@@ -88,6 +89,7 @@ describe("entretien", () => {
     const plan = await screen.findByRole("table", { name: "Plan d'entretien" });
     expect(screen.getByRole("tab", { name: "Entretien (1)" })).toBeInTheDocument();
     expect(screen.getByText("Notice valable à partir de A2111239")).toBeInTheDocument();
+    expect(screen.getByText(/Compteur : ≈ 4\s321 h .* \(estimé avec Traccar\)/)).toBeInTheDocument();
     expect(within(plan).getByText(/dans 29 h ou le 01\/03\/2027/)).toBeInTheDocument();
     expect(within(plan).getByText(/Pièces : 60 0502 874 3/)).toBeInTheDocument();
     expect(within(plan).getAllByText(/Remplacement · NOT-1445-003 p. 330/)).toHaveLength(2);
@@ -227,5 +229,31 @@ describe("intervention d'entretien (lot K)", () => {
     const link = within(block).getByRole("link", { name: "Planifier une réparation" });
     expect(link.getAttribute("href")).toContain("nature=corrective");
     expect(decodeURIComponent(link.getAttribute("href")!.replace(/\+/g, " "))).toContain("Contrôle des freins : plaquettes usées");
+  });
+});
+
+describe("pièces à commander (lot L)", () => {
+  it("horizon en heures ou en mois, stock et quantité à commander", async () => {
+    const queries: string[] = [];
+    server.use(
+      http.get("*/maintenance/parts", ({ request }) => {
+        queries.push(new URL(request.url).search);
+        return HttpResponse.json({
+          at: "2026-11-08T12:00:00.000Z",
+          horizon: { hours: 200, months: null },
+          items: [
+            { articleId: "0193a000-0000-7000-8000-00000000d001", name: "Filtre à huile CLAAS 60 0502 874 3", reference: "60 0502 874 3", family: "filtre_huile_moteur", unit: "Unité", needed: 2, inStock: 1, toOrder: 1, operations: ["Échange de l'huile moteur"], equipments: ["Claas Arion 430"] },
+          ],
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(`/f/${FARM}/maintenance/parts`);
+    const table = await screen.findByRole("table", { name: "Pièces à commander" });
+    expect(within(table).getByText("60 0502 874 3")).toBeInTheDocument();
+    expect(within(table).getByText("Claas Arion 430")).toBeInTheDocument();
+    expect(queries[0]).toContain("hours=200");
+    await user.click(screen.getByRole("radio", { name: "6 mois" }));
+    await vi.waitFor(() => expect(queries.at(-1)).toContain("months=6"));
   });
 });

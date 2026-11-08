@@ -7,6 +7,10 @@ import { dueIntegrations, syncIntegration } from "./integrations/repo.js";
 import { syncFarmWater } from "./repos/phyto.js";
 import { computeInterventionIft, pendingIft } from "./repos/ift.js";
 import { fillInterventionWeather, pendingWeather } from "./repos/weather.js";
+import { computeUsageDays, farmsWithTraccar } from "./repos/usage.js";
+import { farmsWithAlerts } from "./repos/maintenance.js";
+import { sendMaintenanceAlerts } from "./repos/alerts.js";
+import { appMailer } from "./mail.js";
 
 /**
  * Worker : synchronise les intégrations actives de toutes les fermes
@@ -71,8 +75,43 @@ async function weatherTick(): Promise<void> {
   }
 }
 
+// --- Matériels (lot L) ------------------------------------------------------------
+
+const USAGE_EVERY_MS = 15 * 60_000;
+let usageAt = 0;
+/** Heures de fonctionnement estimées depuis les positions Traccar (un relevé estimé par jour d'activité). */
+async function usageTick(): Promise<void> {
+  if (Date.now() - usageAt < USAGE_EVERY_MS) return;
+  usageAt = Date.now();
+  for (const farmId of await farmsWithTraccar(db())) {
+    if (stopping) return;
+    const r = await computeUsageDays(db(), farmId);
+    if (r.days) console.log(`[worker] heures estimées ferme ${farmId.slice(0, 8)} : ${r.days} jour(s), ${r.equipments} matériel(s)`);
+  }
+}
+
+const ALERTS_EVERY_MS = 60 * 60_000;
+let alertsAt = 0;
+/** Alertes d'entretien par e-mail, au plus une fois par heure. */
+async function alertsTick(): Promise<void> {
+  if (Date.now() - alertsAt < ALERTS_EVERY_MS) return;
+  alertsAt = Date.now();
+  for (const farmId of await farmsWithAlerts(db())) {
+    if (stopping) return;
+    const r = await sendMaintenanceAlerts(db(), farmId, appMailer(), { appUrl: process.env.BETTER_AUTH_URL });
+    if (r.items) console.log(`[worker] alertes entretien ferme ${farmId.slice(0, 8)} : ${r.items} échéance(s)${r.skipped ? ` non envoyées (${r.skipped})` : `, ${r.sent} destinataire(s)`}`);
+  }
+}
+
 async function tick(): Promise<void> {
-  for (const [name, job] of [["lexicon", lexiconTick], ["eau", waterTick], ["ift", iftTick], ["météo", weatherTick]] as const) {
+  for (const [name, job] of [
+    ["lexicon", lexiconTick],
+    ["eau", waterTick],
+    ["ift", iftTick],
+    ["météo", weatherTick],
+    ["heures", usageTick],
+    ["alertes", alertsTick],
+  ] as const) {
     if (stopping) return;
     await job().catch((e) => console.warn(`[worker] ${name} : ${e instanceof Error ? e.message : e}`));
   }

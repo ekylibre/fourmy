@@ -90,6 +90,8 @@ export type BaselineWrite = z.infer<typeof baselineWrite>;
 export const maintenanceSettings = z.object({
   soonHours: z.number().min(0).max(1000).default(50),
   soonMonths: z.number().min(0).max(12).default(1),
+  /** Membres prévenus par e-mail des échéances « bientôt » et « en retard » (FR-MAT-25). */
+  notify: z.array(uuid).max(50).default([]),
 });
 export type MaintenanceSettings = z.infer<typeof maintenanceSettings>;
 
@@ -125,6 +127,8 @@ export const equipmentMaintenance = z.object({
   at: isoDateTime,
   settings: maintenanceSettings,
   usageNow: z.number().nullable(),
+  /** Heures du jour = dernier relevé + heures estimées par Traccar. */
+  usageEstimated: z.boolean().default(false),
   model: z.object({ id: uuid, label: z.string(), warning: z.string().nullable(), sources: z.array(z.unknown()) }).nullable(),
   operations: z.array(planOperation.extend({ due })),
   fluids: z.array(equipmentFluid),
@@ -179,3 +183,24 @@ export const equipmentBundleResult = z.object({
   }),
 });
 export type EquipmentBundleResult = z.infer<typeof equipmentBundleResult>;
+
+/** Pièces à commander pour un horizon (FR-MAT-42). */
+export const partsToOrder = z.object({
+  at: isoDateTime,
+  horizon: z.object({ hours: z.number().nullable(), months: z.number().nullable() }),
+  items: z.array(
+    z.object({
+      articleId: uuid,
+      name: z.string(),
+      reference: z.string().nullable(),
+      family: z.string().nullable(),
+      unit: z.string(),
+      needed: z.number(),
+      inStock: z.number(),
+      toOrder: z.number(),
+      operations: z.array(z.string()),
+      equipments: z.array(z.string()),
+    }),
+  ),
+});
+export type PartsToOrder = z.infer<typeof partsToOrder>;

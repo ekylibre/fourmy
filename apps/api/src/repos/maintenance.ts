@@ -1,10 +1,12 @@
 import { sql, type SQL } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
-import { compareDues, computeDue, usageSeries, type Completion, type DomainCtx } from "@fourmy/domain";
+import { compareDues, computeDue, partsForecast, usageAt, usageSeries, type Completion, type DomainCtx, type ForecastOperation, type UsageDay, type UsagePoint } from "@fourmy/domain";
+import { usageDaysOf } from "./usage.js";
 import type {
   EquipmentMaintenance,
   FarmDueItem,
   MaintenanceSettings,
+  PartsToOrder,
   PlanOperation,
   PlanOperationWrite,
 } from "@fourmy/contracts";
@@ -31,7 +33,7 @@ async function audit(tx: Tx, farmId: string, ctx: DomainCtx, entity: string, ent
 // Réglages
 // ---------------------------------------------------------------------------
 
-const DEFAULT_SETTINGS: MaintenanceSettings = { soonHours: 50, soonMonths: 1 };
+const DEFAULT_SETTINGS: MaintenanceSettings = { soonHours: 50, soonMonths: 1, notify: [] };
 
 async function settingsTx(tx: Tx): Promise<MaintenanceSettings> {
   const [s] = await rows<{ maintenance: MaintenanceSettings }>(tx, sql`SELECT maintenance FROM farm_settings`);
@@ -77,7 +79,14 @@ const toOp = (r: OpRow): Omit<PlanOperation, "parts"> => ({
 
 /** Données de calcul des échéances d'un ensemble de matériels. */
 async function dueInputs(tx: Tx, equipmentIds: string[]) {
-  if (!equipmentIds.length) return { readings: new Map(), options: new Map(), completions: [] as Completion[] };
+  if (!equipmentIds.length) {
+    return {
+      readings: new Map<string, UsagePoint[]>(),
+      options: new Map<string, { code: string; from: string; to: string | null }[]>(),
+      completions: [] as Completion[],
+      usageDays: new Map<string, UsageDay[]>(),
+    };
+  }
   const ids = sql.join(
     equipmentIds.map((id) => sql`${id}::uuid`),
     sql`, `,
@@ -116,7 +125,7 @@ async function dueInputs(tx: Tx, equipmentIds: string[]) {
     const point = d.reading_id ? series.get(d.equipment_id)?.find((p) => p.reading.id === d.reading_id) : undefined;
     return { operationId: d.operation_id, at: iso(d.stopped_at)!, usage: point && point.status === "valid" ? point.usage : null };
   });
-  return { readings: series, options: opts, completions };
+  return { readings: series, options: opts, completions, usageDays: await usageDaysOf(tx, equipmentIds) };
 }
 
 export async function maintenanceView(db: Database, farmId: string, equipmentId: string, at: string): Promise<EquipmentMaintenance> {
@@ -138,6 +147,7 @@ export async function maintenanceView(db: Database, farmId: string, equipmentId:
     const ctx = {
       completions: inputs.completions,
       series: inputs.readings.get(equipmentId) ?? [],
+      usageDays: inputs.usageDays.get(equipmentId) ?? [],
       options: inputs.options.get(equipmentId) ?? [],
       commissionedAt: iso(e.commissioned_at),
       at,
@@ -174,7 +184,8 @@ export async function maintenanceView(db: Database, farmId: string, equipmentId:
       equipmentId,
       at,
       settings,
-      usageNow: plan[0]?.due.usageNow ?? null,
+      usageNow: plan[0]?.due.usageNow ?? usageAt(ctx.series, at, ctx.usageDays).usage,
+      usageEstimated: usageAt(ctx.series, at, ctx.usageDays).kind === "estimated",
       model: model ? { id: model.id, label: `${model.brand} ${model.model}`, warning: model.warning, sources: model.sources ?? [] } : null,
       operations: plan,
       fluids: fluids.map((f) => ({
@@ -226,6 +237,7 @@ export async function farmDues(db: Database, farmId: string, at: string): Promis
       const ctx = {
         completions: inputs.completions,
         series: inputs.readings.get(e.id) ?? [],
+        usageDays: inputs.usageDays.get(e.id) ?? [],
         options: inputs.options.get(e.id) ?? [],
         commissionedAt: iso(e.commissioned_at),
         at,
@@ -550,5 +562,130 @@ export async function importBundle(db: Database, farmId: string, ctx: DomainCtx,
     const full = { ...report, warnings: [...(bundle.model.warning ? [bundle.model.warning] : []), ...bundle.warnings], model: `${bundle.model.brand} ${bundle.model.model}` };
     await tx.execute(sql`UPDATE import_runs SET status = 'completed', finished_at = now(), report = ${JSON.stringify({ equipmentId: id, ...full })}::jsonb WHERE id = ${runId}`);
     return { runId, equipmentId: id, modelId, created, report: full };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Pièces à commander (FR-MAT-42)
+// ---------------------------------------------------------------------------
+
+export async function partsToOrder(db: Database, farmId: string, at: string, horizon: { hours: number | null; months: number | null }): Promise<PartsToOrder> {
+  return withFarm(db, farmId, async (tx) => {
+    const settings = await settingsTx(tx);
+    const eqs = await rows<{ id: string; name: string; commissioned_at: string | null }>(
+      tx,
+      sql`SELECT e.id, e.name, e.commissioned_at FROM equipments e
+          WHERE coalesce(e.state, 'active') = 'active'
+            AND EXISTS (SELECT 1 FROM equipment_operations o JOIN equipment_operation_parts p ON p.operation_id = o.id WHERE o.equipment_id = e.id)`,
+    );
+    const ops = await rows<OpRow>(tx, sql`SELECT * FROM equipment_operations WHERE archived_at IS NULL`);
+    const parts = await rows<{ operation_id: string; article_id: string; quantity: string }>(tx, sql`SELECT operation_id, article_id, quantity FROM equipment_operation_parts`);
+    const inputs = await dueInputs(
+      tx,
+      eqs.map((e) => e.id),
+    );
+    const need = new Map<string, { needed: number; operations: Set<string>; equipments: Set<string> }>();
+    for (const e of eqs) {
+      const series = inputs.readings.get(e.id) ?? [];
+      const usageDays = inputs.usageDays.get(e.id) ?? [];
+      const ctx = { completions: inputs.completions, series, usageDays, options: inputs.options.get(e.id) ?? [], commissionedAt: iso(e.commissioned_at), at, soonHours: settings.soonHours, soonMonths: settings.soonMonths };
+      // Rythme d'usage : heures de la dernière année (relevés et estimations), sinon 0 (horizon en mois seul).
+      const yearAgo = new Date(Date.parse(at) - 365 * 86_400_000).toISOString();
+      const now = usageAt(series, at, usageDays).usage;
+      const then = usageAt(series, yearAgo, usageDays).usage ?? series.find((p) => p.status === "valid")?.usage ?? null;
+      const firstAt = series.find((p) => p.status === "valid")?.reading.readAt;
+      const spanDays = firstAt ? Math.max(1, Math.min(365, (Date.parse(at) - Date.parse(firstAt > yearAgo ? firstAt : yearAgo)) / 86_400_000)) : 365;
+      const hoursPerDay = now !== null && then !== null ? Math.max(0, (now - then) / spanDays) : 0;
+      const list: ForecastOperation[] = ops
+        .filter((o) => o.equipment_id === e.id)
+        .map((r) => {
+          const op = toOp(r);
+          return { op, due: computeDue(op, ctx), parts: parts.filter((p) => p.operation_id === op.id).map((p) => ({ articleId: p.article_id, quantity: Number(p.quantity) })) };
+        });
+      for (const line of partsForecast(list, horizon, hoursPerDay)) {
+        const n = need.get(line.articleId) ?? { needed: 0, operations: new Set(), equipments: new Set() };
+        n.needed += line.needed;
+        line.operations.forEach((o) => n.operations.add(o));
+        n.equipments.add(e.name);
+        need.set(line.articleId, n);
+      }
+    }
+    if (!need.size) return { at, horizon, items: [] };
+    const ids = sql.join(
+      [...need.keys()].map((id) => sql`${id}::uuid`),
+      sql`, `,
+    );
+    const arts = await rows<{ id: string; name: string; unit: string; reference: string | null; family: string | null; stock: string | null }>(
+      tx,
+      sql`SELECT a.id, a.name, a.unit, a.custom->>'reference' AS reference, a.custom->>'family' AS family,
+                 (SELECT sum(m.quantity) FROM stock_movements m JOIN lots l ON l.id = m.lot_id WHERE l.article_id = a.id AND m.occurred_at <= ${at}::timestamptz) AS stock
+          FROM articles a WHERE a.id IN (${ids})`,
+    );
+    const items = arts
+      .map((a) => {
+        const n = need.get(a.id)!;
+        const inStock = Math.max(0, Number(a.stock ?? 0));
+        return {
+          articleId: a.id,
+          name: a.name,
+          reference: a.reference,
+          family: a.family,
+          unit: a.unit,
+          needed: n.needed,
+          inStock,
+          toOrder: Math.max(0, n.needed - inStock),
+          operations: [...n.operations],
+          equipments: [...n.equipments],
+        };
+      })
+      .sort((x, y) => (x.family ?? "").localeCompare(y.family ?? "") || x.name.localeCompare(y.name));
+    return { at, horizon, items };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Alertes (FR-MAT-25) : nouvelles échéances « bientôt » ou « en retard »
+// ---------------------------------------------------------------------------
+
+/**
+ * Échéances passées à « bientôt » ou « en retard » et pas encore signalées,
+ * avec les adresses des membres à prévenir. `markSent` les enregistre une
+ * fois le message parti : une échéance n'est signalée qu'une fois par état.
+ */
+export async function pendingAlerts(db: Database, farmId: string, at: string) {
+  const { items } = await farmDues(db, farmId, at);
+  return withFarm(db, farmId, async (tx) => {
+    const settings = await settingsTx(tx);
+    const [farm] = await rows<{ name: string }>(tx, sql`SELECT name FROM farms WHERE id = ${farmId}`);
+    const notify = settings.notify ?? [];
+    const recipients = notify.length
+      ? await rows<{ email: string; name: string | null }>(
+          tx,
+          sql`SELECT u.email, u.name FROM memberships m JOIN users u ON u.id = m.user_id
+              WHERE u.id::text IN (SELECT jsonb_array_elements_text(${JSON.stringify(notify)}::jsonb))`,
+        )
+      : [];
+    const sent = await rows<{ operation_id: string; status: string; due_key: string }>(tx, sql`SELECT operation_id, status, due_key FROM maintenance_alerts`);
+    const key = (i: FarmDueItem) => (i.due.nextUsage !== null ? `h:${i.due.nextUsage}` : `d:${i.due.nextDate?.slice(0, 10)}`);
+    const fresh = items.filter((i) => !sent.some((s) => s.operation_id === i.operationId && s.status === i.due.status && s.due_key === key(i)));
+    return { farmName: farm?.name ?? "", recipients, items: fresh.map((i) => ({ ...i, dueKey: key(i) })) };
+  });
+}
+
+export async function markAlertsSent(db: Database, farmId: string, items: { operationId: string; due: { status: string }; dueKey: string }[]) {
+  await withFarm(db, farmId, async (tx) => {
+    for (const i of items) {
+      await tx.execute(sql`
+        INSERT INTO maintenance_alerts (farm_id, operation_id, status, due_key) VALUES (${farmId}, ${i.operationId}, ${i.due.status}, ${i.dueKey})
+        ON CONFLICT DO NOTHING`);
+    }
+  });
+}
+
+/** Fermes qui ont des membres à prévenir. */
+export async function farmsWithAlerts(db: Database): Promise<string[]> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SET LOCAL ROLE fourmy_app`);
+    return (await rows<{ farm_id: string }>(tx, sql`SELECT farm_id FROM fourmy_alert_farms()`)).map((r) => r.farm_id);
   });
 }

@@ -11,6 +11,7 @@ import {
   importBundle,
   listModels,
   maintenanceView,
+  partsToOrder,
   putSettings,
   setBaseline,
   updateOperation,
@@ -56,6 +57,15 @@ export const maintenanceRoutes = new Hono<Env>()
     const parsed = equipmentBundleWrite.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.issues.map((i) => i.message).join(" ; "));
     return c.json(await importBundle(db(), c.get("farmId"), domainCtx(c), parsed.data.files, parsed.data.equipmentId ?? null), 201);
+  })
+  .get("/maintenance/parts", async (c) => {
+    const n = (k: string) => {
+      const v = c.req.query(k);
+      return v && Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : null;
+    };
+    const horizon = { hours: n("hours"), months: n("months") };
+    if (!horizon.hours && !horizon.months) horizon.months = 3;
+    return c.json(await partsToOrder(db(), c.get("farmId"), atOrNow(c), horizon));
   })
   .get("/settings/maintenance", async (c) => c.json(await getSettings(db(), c.get("farmId"))))
   .put("/settings/maintenance", requireOwner, async (c) => {

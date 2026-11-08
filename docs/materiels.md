@@ -248,3 +248,61 @@ d'intervention s'adapte à cette forme.
 - **Relevé en fin de chantier** (FR-MAT-60) : le contrat et l'API
   l'acceptent déjà (`tools[].meter`), mais le champ n'apparaît pas encore
   dans le formulaire des interventions de champ.
+
+## Traccar, pièces à commander, alertes (lot L)
+
+### Heures estimées (FR-MAT-13 et 14)
+
+- **Constat** : les boîtiers du pilote ne remontent pas de compteur.
+- **Calcul** : toutes les 15 minutes, le worker déduit des positions
+  Traccar la **durée de fonctionnement de chaque jour**. C'est la somme des
+  écarts entre positions consécutives quand le matériel roule (> 1 km/h)
+  ou travaille.
+  - Chaque écart est plafonné à 5 minutes, pour ne pas compter un trou de
+    transmission.
+  - Les jours sont en heure de Paris.
+  - Le résultat va dans `equipment_usage_days`.
+  - On ne parcourt que les matériels à compteur des fermes dont
+    l'intégration Traccar est active. Les deux derniers jours sont
+    recalculés, pour les positions arrivées en retard.
+- **Heures du jour** : dernier relevé réel + heures des jours qui le
+  suivent, affichées « ≈ 4 337 h (estimé) ». Un nouveau relevé saisi recale
+  l'estimation sans rien réécrire.
+- **Écart** : un relevé réel éloigné de l'estimation de plus de 10 h, ou de
+  10 % des heures estimées, est accepté avec un avertissement. Le relevé
+  saisi fait foi.
+- **Coupure** : couper l'intégration arrête le calcul, mais rien n'est
+  supprimé.
+
+### Pièces à commander (`/f/:ferme/maintenance/parts`)
+
+- **Horizon** : 100 h, 200 h, 3, 6 ou 12 mois.
+- **Pièces retenues** : celles des opérations dont l'échéance tombe dans
+  l'horizon, en retard ou à renseigner comprises.
+  - Elles sont regroupées par article (référence constructeur).
+  - On voit le besoin, le stock à la date et ce qu'il reste à commander.
+- **Calcul** :
+  - les heures sont projetées sur le rythme d'usage de la dernière année
+    (relevés et estimations) ;
+  - une opération qui revient plusieurs fois dans l'horizon compte autant
+    de fois.
+- **Export** : CSV (point-virgule, UTF-8).
+
+### Alertes par e-mail (FR-MAT-25)
+
+- **Réglage** : sur la page Entretien, le responsable choisit les membres
+  à prévenir.
+- **Envoi** : toutes les heures au plus, le worker envoie un récapitulatif
+  par ferme des opérations passées à « bientôt » ou « en retard ».
+  - Le SMTP utilisé est celui déjà configuré (`FOURMY_SMTP_*`).
+  - Chaque échéance n'est signalée qu'**une fois par état**
+    (`maintenance_alerts`).
+- **Sans SMTP ou sans destinataire** : rien n'est marqué envoyé. L'envoi
+  part dès que la configuration est faite.
+
+### API (lot L)
+
+| Route | Droits |
+|---|---|
+| `GET /maintenance/parts?hours=&months=&at=` | membre |
+| `PUT /settings/maintenance` (`notify` : membres à prévenir) | responsable |

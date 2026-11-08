@@ -8,7 +8,7 @@
  *   connue » saisie, sinon mise en service.
  * - Visite initiale (`firstHours`) : une seule fois, depuis la mise en service.
  */
-import { usageAt, type UsagePoint } from "./meter.js";
+import { usageAt, type UsageDay, type UsagePoint } from "./meter.js";
 
 export interface PlanOperationLike {
   id: string;
@@ -38,6 +38,8 @@ export interface MountedOption {
 export interface DueContext {
   completions: readonly Completion[];
   series: readonly UsagePoint[];
+  /** Heures estimées par jour (Traccar), après le dernier relevé réel. */
+  usageDays?: readonly UsageDay[];
   options: readonly MountedOption[];
   commissionedAt: string | null;
   at: string;
@@ -88,7 +90,7 @@ export function computeDue(op: PlanOperationLike, ctx: DueContext): Due {
   if (op.requiresOption && !optionMounted(ctx.options, op.requiresOption, ctx.at)) {
     return { ...base, status: "not_applicable", reason: "Option non montée à cette date." };
   }
-  const now = usageAt(ctx.series, ctx.at);
+  const now = usageAt(ctx.series, ctx.at, ctx.usageDays ?? []);
   const usageNow = now.usage;
   base.usageNow = usageNow;
 
@@ -180,4 +182,52 @@ export function dueLabel(due: Due): string {
       return parts.join(" ou ");
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Pièces à commander (FR-MAT-42)
+// ---------------------------------------------------------------------------
+
+export interface ForecastOperation {
+  op: PlanOperationLike & { label: string };
+  due: Due;
+  parts: readonly { articleId: string; quantity: number }[];
+}
+
+export interface ForecastLine {
+  articleId: string;
+  needed: number;
+  operations: string[];
+}
+
+/**
+ * Pièces des opérations qui tombent dans l'horizon (heures et/ou mois) :
+ * la consommation d'heures est projetée sur `hoursPerDay` (moyenne récente) ;
+ * une opération qui revient plusieurs fois dans l'horizon compte autant de
+ * fois. Les opérations « à renseigner » ou en retard comptent une fois.
+ */
+export function partsForecast(ops: readonly ForecastOperation[], horizon: { hours?: number | null; months?: number | null }, hoursPerDay: number): ForecastLine[] {
+  const H = horizon.hours ?? null;
+  const days = horizon.months ? horizon.months * 30 : H !== null && hoursPerDay > 0 ? H / hoursPerDay : 0;
+  const hoursIn = H ?? days * hoursPerDay;
+  const lines = new Map<string, ForecastLine>();
+  for (const { op, due, parts } of ops) {
+    if (!parts.length || due.status === "not_applicable" || due.status === "on_demand" || due.status === "done") continue;
+    let times = 0;
+    if (due.status === "overdue" || due.status === "unknown") times = 1;
+    else {
+      const byHours = due.remainingHours !== null && op.everyHours ? (hoursIn >= due.remainingHours ? 1 + Math.floor((hoursIn - due.remainingHours) / op.everyHours) : 0) : 0;
+      const byDays = due.remainingDays !== null && op.everyMonths ? (days >= due.remainingDays ? 1 + Math.floor((days - due.remainingDays) / (op.everyMonths * 30)) : 0) : 0;
+      const once = !op.everyHours && !op.everyMonths && due.remainingHours !== null && hoursIn >= due.remainingHours ? 1 : 0;
+      times = Math.max(byHours, byDays, once);
+    }
+    if (!times) continue;
+    for (const p of parts) {
+      const line = lines.get(p.articleId) ?? { articleId: p.articleId, needed: 0, operations: [] };
+      line.needed += p.quantity * times;
+      if (!line.operations.includes(op.label)) line.operations.push(op.label);
+      lines.set(p.articleId, line);
+    }
+  }
+  return [...lines.values()];
 }

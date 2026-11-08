@@ -117,7 +117,11 @@ export function MaintenanceTab({ equipmentId, hasMeter }: { equipmentId: string;
             </Button>
           )}
           <Text size="sm" c="dimmed">
-            {hasMeter ? (m.usageNow !== null ? `Compteur : ${formatHours(m.usageNow)} au ${formatDate(m.at)}` : "Aucun relevé de compteur") : "Sans compteur : échéances en mois"}
+            {hasMeter
+              ? m.usageNow !== null
+                ? `Compteur : ${m.usageEstimated ? "≈ " : ""}${formatHours(m.usageNow)} au ${formatDate(m.at)}${m.usageEstimated ? " (estimé avec Traccar)" : ""}`
+                : "Aucun relevé de compteur"
+              : "Sans compteur : échéances en mois"}
             {m.model ? ` · plan ${m.model.label}` : ""}
           </Text>
         </Group>

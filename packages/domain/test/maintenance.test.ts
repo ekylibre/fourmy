@@ -71,3 +71,50 @@ describe("échéances", () => {
     expect(addMonths("2026-01-31T00:00:00.000Z", 1)).toBe("2026-02-28T00:00:00.000Z");
   });
 });
+
+import { estimateGap, operatingHoursByDay, usageAt as usageAtL } from "../src/meter.js";
+import { partsForecast } from "../src/maintenance.js";
+
+describe("heures estimées (Traccar, lot L)", () => {
+  it("durée de fonctionnement par jour : en mouvement ou au travail, écarts plafonnés", () => {
+    const p = (t: string, speedKmh: number, working: boolean | null = null) => ({ time: `2026-11-03T${t}:00.000Z`, speedKmh, working });
+    const days = operatingHoursByDay([p("08:00", 0), p("08:01", 8), p("08:31", 9), p("09:31", 7), p("12:00", 0), p("12:30", 0)]);
+    // 08:00→08:01 (1 min) + 08:01→08:31 (30 min, plafonné à 5) + 08:31→09:31 (plafonné à 5) + 09:31→12:00 (plafonné à 5)
+    expect(days).toEqual([{ day: "2026-11-03", hours: 0.27 }]);
+  });
+
+  it("le dernier relevé réel + les heures estimées depuis ; un écart est signalé", () => {
+    const s = usageSeries([{ id: "r1", readAt: "2026-11-01T18:00:00.000Z", value: 4300 }]);
+    const days = [
+      { day: "2026-11-01", hours: 5 }, // jour du relevé : déjà compté dans le relevé
+      { day: "2026-11-02", hours: 6 },
+      { day: "2026-11-03", hours: 4 },
+    ];
+    expect(usageAtL(s, "2026-11-03T20:00:00.000Z", days)).toMatchObject({ usage: 4310, kind: "estimated", estimatedHours: 10 });
+    const withManual = usageSeries([{ id: "r1", readAt: "2026-11-01T18:00:00.000Z", value: 4300 }, { id: "r2", readAt: "2026-11-04T08:00:00.000Z", value: 4340 }]);
+    expect(estimateGap(withManual, days, { id: "r2", readAt: "2026-11-04T08:00:00.000Z", usage: 4340 })).toMatchObject({ estimated: 4310, gap: 30, flagged: true });
+    expect(estimateGap(withManual, days, { id: "r2", readAt: "2026-11-04T08:00:00.000Z", usage: 4312 })).toMatchObject({ flagged: false });
+    // Recalage : après le relevé manuel, seules les heures des jours suivants s'ajoutent.
+    expect(usageAtL(withManual, "2026-11-05T20:00:00.000Z", [...days, { day: "2026-11-05", hours: 3 }])).toMatchObject({ usage: 4343 });
+  });
+});
+
+describe("pièces à commander", () => {
+  it("compte les opérations qui tombent dans l'horizon, autant de fois qu'elles reviennent", () => {
+    const due = (remainingHours: number, status = "ok") => ({ ...computeDue({ id: "x" }, ctx()), status, remainingHours, remainingDays: null }) as never;
+    const lines = partsForecast(
+      [
+        { op: { id: "a", label: "Filtre gasoil", everyHours: 100 }, due: due(30), parts: [{ articleId: "f", quantity: 1 }] },
+        { op: { id: "b", label: "Vidange", everyHours: 500 }, due: due(250), parts: [{ articleId: "f", quantity: 2 }, { articleId: "j", quantity: 1 }] },
+        { op: { id: "c", label: "Courroie", everyHours: 2000 }, due: due(900), parts: [{ articleId: "c", quantity: 1 }] },
+        { op: { id: "d", label: "Freins", everyHours: 1000 }, due: due(-5, "overdue"), parts: [{ articleId: "p", quantity: 4 }] },
+      ],
+      { hours: 200 },
+      4,
+    );
+    expect(lines).toEqual([
+      { articleId: "f", needed: 2, operations: ["Filtre gasoil"] }, // à 30 h puis 130 h
+      { articleId: "p", needed: 4, operations: ["Freins"] },
+    ]);
+  });
+});

@@ -172,5 +172,9 @@ export const equipmentSheet = equipmentSummary.extend({
   readings: z.array(meterReading),
   history: z.array(equipmentHistoryEntry),
   trackers: z.array(z.object({ deviceId: z.string(), from: isoDateTime, to: isoDateTime.nullable() })),
+  /** Heures estimées aujourd'hui (Traccar) : dernier relevé + heures de fonctionnement des jours suivants. */
+  estimate: z.object({ usage: z.number(), estimatedHours: z.number(), since: isoDateTime }).nullable().optional(),
+  /** Heures de fonctionnement par jour (Traccar), 90 derniers jours. */
+  usageDays: z.array(z.object({ day: z.string(), hours: z.number() })).optional(),
 });
 export type EquipmentSheet = z.infer<typeof equipmentSheet>;

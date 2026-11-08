@@ -540,6 +540,21 @@ function Readings({ sheet: s }: { sheet: EquipmentSheet }) {
   const replaced = s.readings.some((r) => r.correction === "replacement");
   return (
     <Stack>
+      {s.estimate && (
+        <Alert color="ardoise" variant="light" title={`Aujourd'hui ≈ ${formatHours(s.estimate.usage)} (estimé)`}>
+          Dernier relevé le {formatDate(s.estimate.since)} + {formatHours(s.estimate.estimatedHours)} de fonctionnement relevées par Traccar depuis (déplacements et
+          travail). Un relevé saisi fait foi et recale l'estimation.
+          {s.usageDays && s.usageDays.length > 0 && (
+            <Text size="xs" mt={4} c="dimmed">
+              Derniers jours d'activité :{" "}
+              {s.usageDays
+                .slice(-7)
+                .map((d) => `${d.day.slice(8, 10)}/${d.day.slice(5, 7)} : ${d.hours.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} h`)
+                .join(" · ")}
+            </Text>
+          )}
+        </Alert>
+      )}
       <Paper withBorder p="md">
         <UsageChart readings={s.readings} />
         {replaced && (

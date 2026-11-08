@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { sql, type SQL } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
-import { checkReading, readingCheckMessage, usageSeries, type DomainCtx } from "@fourmy/domain";
+import { checkReading, estimateGap, readingCheckMessage, usageAt, usageSeries, type DomainCtx } from "@fourmy/domain";
+import { usageDaysOf } from "./usage.js";
 import type {
   EquipmentHistoryEntry,
   EquipmentOption,
@@ -118,6 +119,10 @@ export async function equipmentSheet(db: Database, farmId: string, id: string): 
       sql`SELECT device_id, lower(valid) AS "from", upper(valid) AS "to" FROM tracker_bindings WHERE equipment_id = ${id} ORDER BY lower(valid) DESC`,
     );
     const brandInfo = s.brandId ? (await listBrandsTx(tx, s.brandId))[0] ?? null : null;
+    const readings = await readingsOf(tx, id);
+    const days = (await usageDaysOf(tx, [id])).get(id) ?? [];
+    const series = readings.map((r) => ({ reading: r, usage: r.usage, status: r.status }));
+    const now = usageAt(series, new Date().toISOString(), days);
     return {
       ...toSummary(s),
       manufacturerType: (x!.manufacturer_type as string) ?? null,
@@ -128,7 +133,9 @@ export async function equipmentSheet(db: Database, farmId: string, id: string): 
       notes: (x!.notes as string) ?? null,
       brandInfo,
       options: options.map((o) => ({ id: o.id as string, code: o.code as string, label: o.label as string, from: iso(o.from)!, to: iso(o.to) })),
-      readings: await readingsOf(tx, id),
+      readings,
+      estimate: now.kind === "estimated" ? { usage: now.usage!, estimatedHours: now.estimatedHours ?? 0, since: now.since!.readAt } : null,
+      usageDays: days.slice(-90),
       history: history.map(
         (h): EquipmentHistoryEntry => ({
           interventionId: h.id as string,
@@ -264,11 +271,21 @@ export async function addReadingInTx(
             ${ctx.actor}, ${body.note || null})`);
   if (body.correction) await audit(tx, farmId, ctx, "meter_reading", id, `correction_${body.correction}`, { equipmentId, ...body });
   await tx.execute(sql`UPDATE equipments SET updated_at = now() WHERE id = ${equipmentId}`);
-  const reading = (await readingsOf(tx, equipmentId)).find((r) => r.id === id)!;
+  const after = await readingsOf(tx, equipmentId);
+  const reading = after.find((r) => r.id === id)!;
+  // Écart avec l'estimation Traccar (FR-MAT-14) : le relevé réel prime, l'écart est signalé.
+  const days = (await usageDaysOf(tx, [equipmentId])).get(equipmentId) ?? [];
+  const gap = estimateGap(
+    after.map((r) => ({ reading: r, usage: r.usage, status: r.status })),
+    days,
+    { id, readAt: reading.readAt, usage: reading.usage },
+  );
   const warning =
     check.warning?.code === "too_fast"
       ? `Le compteur avance de ${check.warning.hours.toLocaleString("fr-FR")} h depuis le relevé du ${new Date(check.warning.neighbour.readAt).toLocaleDateString("fr-FR")} : vérifiez la saisie.`
-      : null;
+      : gap?.flagged
+        ? `Écart de ${gap.gap > 0 ? "+" : ""}${gap.gap.toLocaleString("fr-FR")} h avec l'estimation Traccar (${gap.estimated.toLocaleString("fr-FR")} h) : le relevé saisi fait foi.`
+        : null;
   return { reading, warning };
 }
 

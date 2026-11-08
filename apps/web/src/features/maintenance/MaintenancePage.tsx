@@ -1,16 +1,16 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router";
-import { Button, Group, NumberInput, Paper, Stack, Table, Text, Title } from "@mantine/core";
+import { Button, Group, MultiSelect, NumberInput, Paper, Stack, Table, Text, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Package } from "lucide-react";
 import { dueLabel } from "@fourmy/domain";
 import { OPERATION_KIND_LABELS, PERFORMER_LABELS, type MaintenanceSettings } from "@fourmy/contracts";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
 import { formatDate } from "../../app/labels";
-import { useEquipments, useFarmDues } from "../../app/queries";
+import { useEquipments, useFarmDues, useMembers } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
 import { EquipmentLogo } from "../equipments/EquipmentLogo";
 import { DueBadge } from "./Maintenance";
@@ -41,7 +41,12 @@ export function MaintenancePage() {
       <Button component={Link} to={`/f/${farm.id}/equipments${location.search}`} variant="subtle" size="compact-sm" leftSection={<ArrowLeft size={14} />} w="fit-content">
         Matériels
       </Button>
-      <Title order={1}>Entretien{isToday ? "" : ` au ${formatDate(at)}`}</Title>
+      <Group justify="space-between">
+        <Title order={1}>Entretien{isToday ? "" : ` au ${formatDate(at)}`}</Title>
+        <Button component={Link} to={`/f/${farm.id}/maintenance/parts${location.search}`} variant="light" leftSection={<Package size={16} />}>
+          Pièces à commander
+        </Button>
+      </Group>
       <Paper withBorder>
         <Table aria-label="Échéances d'entretien" verticalSpacing="xs" highlightOnHover>
           <Table.Thead>
@@ -116,10 +121,17 @@ export function MaintenancePage() {
 function SettingsPanel({ farmId }: { farmId: string }) {
   const queryClient = useQueryClient();
   const q = useQuery({ queryKey: ["maintenance-settings", farmId], queryFn: () => api.get<MaintenanceSettings>(farmPath(farmId, "/settings/maintenance")) });
+  const members = useMembers(farmId);
   const [hours, setHours] = useState<number | string | null>(null);
   const [months, setMonths] = useState<number | string | null>(null);
+  const [notify, setNotify] = useState<string[] | null>(null);
   const save = useMutation({
-    mutationFn: () => api.put(farmPath(farmId, "/settings/maintenance"), { soonHours: Number(hours ?? q.data?.soonHours), soonMonths: Number(months ?? q.data?.soonMonths) }),
+    mutationFn: () =>
+      api.put(farmPath(farmId, "/settings/maintenance"), {
+        soonHours: Number(hours ?? q.data?.soonHours),
+        soonMonths: Number(months ?? q.data?.soonMonths),
+        notify: notify ?? q.data?.notify ?? [],
+      }),
     onSuccess: () => {
       notifications.show({ color: "lichen", message: "Seuils enregistrés." });
       void queryClient.invalidateQueries({ queryKey: ["maintenance-settings"] });
@@ -132,15 +144,24 @@ function SettingsPanel({ farmId }: { farmId: string }) {
   return (
     <Paper withBorder p="md">
       <Title order={4} mb="xs">
-        Seuil « bientôt »
+        Réglages
       </Title>
       <Group align="flex-end">
-        <NumberInput label="Heures avant l'échéance" value={hours ?? q.data.soonHours} onChange={setHours} min={0} suffix=" h" w={180} />
+        <NumberInput label="« Bientôt » : heures avant l'échéance" value={hours ?? q.data.soonHours} onChange={setHours} min={0} suffix=" h" w={240} />
         <NumberInput label="ou mois avant" value={months ?? q.data.soonMonths} onChange={setMonths} min={0} max={12} w={140} />
-        <Button variant="default" onClick={() => save.mutate()} loading={save.isPending} disabled={hours === null && months === null}>
-          Enregistrer
-        </Button>
       </Group>
+      <MultiSelect
+        mt="sm"
+        label="Prévenir par e-mail"
+        description="Un récapitulatif quand une opération passe à « bientôt » ou « en retard » (une fois par échéance)."
+        data={(members.data?.items ?? []).map((m) => ({ value: m.userId, label: m.name ? `${m.name} (${m.email})` : m.email }))}
+        value={notify ?? q.data.notify ?? []}
+        onChange={setNotify}
+        maw={520}
+      />
+      <Button mt="sm" variant="default" onClick={() => save.mutate()} loading={save.isPending} disabled={hours === null && months === null && notify === null}>
+        Enregistrer
+      </Button>
     </Paper>
   );
 }
