@@ -13,6 +13,7 @@ import { useFarm } from "../app/farm";
 import { formatDate } from "../app/labels";
 import { useEquipments, useSnapshot } from "../app/queries";
 import { ErrorAlert, Loading } from "../components/states";
+import { ErrorPanel } from "../components/RouteError";
 import { TankContents } from "../features/cellar/CellarPage";
 import { FarmScene, TERRAIN_TILE_BYTES, type PlanData } from "./FarmScene";
 import { placementFromClick } from "./geometry";
@@ -36,6 +37,7 @@ export function Plan3DPage() {
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState("60");
   const [clock, setClock] = useState<string | null>(null);
+  const [renderError, setRenderError] = useState<unknown>(null);
   const handlers = useRef({ ground: (_p: Pt) => {} });
 
   const plan = useQuery({
@@ -65,6 +67,7 @@ export function Plan3DPage() {
     if (!container.current) return;
     let lastTick = 0;
     const s = new FarmScene(container.current, {
+      onRenderError: (e) => setRenderError(e ?? new Error("Erreur de rendu")),
       loadTerrainTile: async (level, x, y) => {
         const res = await fetch(`${location.origin}/api/v1${farmPath(farm.id, `/terrain/heightmap/${level}/${x}/${y}`)}`, {
           credentials: "same-origin",
@@ -176,7 +179,13 @@ export function Plan3DPage() {
       )}
       <Grid>
         <Grid.Col span={{ base: 12, lg: 8 }}>
-          <div ref={container} style={{ height: "72vh", minHeight: 480, borderRadius: 14, overflow: "hidden", position: "relative" }} />
+          <div ref={container} style={{ height: "72vh", minHeight: 480, borderRadius: 14, overflow: "hidden", position: "relative" }}>
+            {renderError ? (
+              <div style={{ position: "absolute", inset: 0, zIndex: 2, background: "var(--mantine-color-body)" }}>
+                <ErrorPanel error={renderError} what="la vue 3D" />
+              </div>
+            ) : null}
+          </div>
           {!p && <Loading />}
         </Grid.Col>
         <Grid.Col span={{ base: 12, lg: 4 }}>

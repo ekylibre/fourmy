@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { createBrowserRouter, Navigate, useLocation } from "react-router";
+import { RouteError } from "../components/RouteError";
+import { MapBoundary } from "../components/MapBoundary";
 import { Alert, Button, Center, Stack } from "@mantine/core";
 import { Layout } from "../components/Layout";
 import { Loading } from "../components/states";
@@ -114,11 +116,12 @@ export const routes = [
         </FarmProvider>
       </RequireAuth>
     ),
+    errorElement: <RouteError />,
     children: [
       { index: true, element: <DashboardPage /> },
       { path: "map", element: <Suspense fallback={<Loading />}><MapPage /></Suspense> },
       { path: "map/tools", element: <Suspense fallback={<Loading />}><CartoLabPage /></Suspense> },
-      { path: "3d-plan", element: <Suspense fallback={<Loading />}><Plan3DPage /></Suspense> },
+      { path: "3d-plan", element: <MapBoundary what="la vue 3D"><Suspense fallback={<Loading />}><Plan3DPage /></Suspense></MapBoundary> },
       { path: "interventions", element: <InterventionsPage /> },
       { path: "interventions/new", element: <InterventionNewPage /> },
       { path: "interventions/:interventionId/complete", element: <InterventionCompletePage /> },

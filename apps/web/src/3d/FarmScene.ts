@@ -132,6 +132,8 @@ export interface FarmSceneOptions {
   onGroundClick: (lonLat: Pt) => void;
   onTerrainFallback: () => void;
   onClockTick?: (iso: string) => void;
+  /** Erreur de rendu (Cesium s'arrête) : affichée par la page, en français, à la place du dialogue de Cesium. */
+  onRenderError?: (error: unknown) => void;
 }
 
 export class FarmScene {
@@ -165,6 +167,11 @@ export class FarmScene {
       fullscreenButton: false,
       infoBox: false,
       selectionIndicator: false,
+      showRenderLoopErrors: false,
+    });
+    this.viewer.scene.renderError.addEventListener((_scene, error) => {
+      console.error("[vue 3D]", error);
+      opts.onRenderError?.(error);
     });
     this.viewer.imageryLayers.addImageryProvider(IGN_ORTHO);
     this.viewer.scene.globe.depthTestAgainstTerrain = true; // clic sur le relief, cuves masquées par les collines

@@ -1,6 +1,7 @@
 import "./cesium-base";
 import "cesium/Build/Cesium/Widgets/widgets.css";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ErrorPanel } from "../components/RouteError";
 import { Cartesian3, Color, HeadingPitchRange, HeadingPitchRoll, Math as CesiumMath, Transforms, Viewer, type Entity } from "cesium";
 
 /**
@@ -12,6 +13,7 @@ export default function AvatarPreview({ glb, height = 320, sizeM = 6, centerM = 
   const container = useRef<HTMLDivElement>(null);
   const viewer = useRef<Viewer | null>(null);
   const entity = useRef<Entity | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
     if (!container.current) return;
@@ -30,6 +32,11 @@ export default function AvatarPreview({ glb, height = 320, sizeM = 6, centerM = 
       fullscreenButton: false,
       infoBox: false,
       selectionIndicator: false,
+      showRenderLoopErrors: false,
+    });
+    v.scene.renderError.addEventListener((_scene, error) => {
+      console.error("[aperçu 3D]", error);
+      setError(error ?? new Error("Erreur de rendu"));
     });
     v.scene.backgroundColor = Color.fromCssColorString("#EEF1EC");
     viewer.current = v;
@@ -64,5 +71,13 @@ export default function AvatarPreview({ glb, height = 320, sizeM = 6, centerM = 
     return () => URL.revokeObjectURL(url);
   }, [glb, sizeM, centerM]);
 
-  return <div ref={container} style={{ height, borderRadius: 12, overflow: "hidden" }} aria-label="Aperçu 3D" />;
+  return (
+    <div ref={container} style={{ height, borderRadius: 12, overflow: "hidden", position: "relative" }} aria-label="Aperçu 3D">
+      {error ? (
+        <div style={{ position: "absolute", inset: 0, zIndex: 2, background: "var(--mantine-color-body)" }}>
+          <ErrorPanel error={error} what="l'aperçu 3D" />
+        </div>
+      ) : null}
+    </div>
+  );
 }
