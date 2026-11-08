@@ -2,8 +2,8 @@
 
 > Document produit par `/sc:brainstorm` le 2026-11-07. Il précise
 > **FR-MAT** de [`requirements.md`](requirements.md) §4.5.
-> Phase suivante : `/sc:design` (modèle de données, API, écrans web et
-> `zero-mobile`).
+> Design : [`materiels-entretien-design.md`](materiels-entretien-design.md).
+> Phase suivante : `/sc:implement`, lot par lot (I → J → K → L).
 > Ce document décrit **uniquement les exigences**.
 
 ## 1. Origine
