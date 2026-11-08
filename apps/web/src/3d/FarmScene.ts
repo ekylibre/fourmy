@@ -6,6 +6,8 @@ import {
   Cartographic,
   ClassificationType,
   ClockRange,
+  HeadingPitchRange,
+  Matrix4,
   HeadingPitchRoll,
   Material,
   PolylineCollection,
@@ -144,6 +146,12 @@ export class FarmScene {
   private trackEntities: Entity[] = [];
   private fleetEntities: Entity[] = [];
   private trackLines: PolylineCollection | null = null;
+  /** Cap boussole (degrés) du matériel le long de la trace, pour la caméra qui le suit. */
+  private trackHeading: SampledProperty | null = null;
+  private following = false;
+  /** Vue d'ensemble de la trace chargée. */
+  private trackView: (() => void) | null = null;
+  private readonly followRange = 25;
   private selectedTank: string | null = null;
   private plan: PlanData | null = null;
   private framed = false;
@@ -178,7 +186,10 @@ export class FarmScene {
     });
     this.viewer.imageryLayers.addImageryProvider(IGN_ORTHO);
     this.viewer.scene.globe.depthTestAgainstTerrain = true; // clic sur le relief, cuves masquées par les collines
-    this.viewer.clock.onTick.addEventListener((clock) => opts.onClockTick?.(JulianDate.toIso8601(clock.currentTime, 0)));
+    this.viewer.clock.onTick.addEventListener((clock) => {
+      opts.onClockTick?.(JulianDate.toIso8601(clock.currentTime, 0));
+      this.followTick();
+    });
 
     this.handler = new ScreenSpaceEventHandler(this.viewer.scene.canvas);
     this.handler.setInputAction((e: { position: Cartesian2 }) => {
@@ -372,12 +383,14 @@ export class FarmScene {
     const position = new SampledPositionProperty();
     const orientation = new SampledProperty(Quaternion);
     const caps = headings(samples);
+    this.trackHeading = new SampledProperty(Number);
     samples.forEach(([t], i) => {
       const c = grounded[i]!;
       const when = JulianDate.fromIso8601(t);
       const at = Cartesian3.fromRadians(c.longitude, c.latitude, (c.height ?? 0) + lift);
       position.addSample(when, at);
       orientation.addSample(when, Transforms.headingPitchRollQuaternion(at, new HeadingPitchRoll(cesiumHeading(caps[i]!), 0, 0)));
+      this.trackHeading!.addSample(when, caps[i]!);
     });
     const start = JulianDate.fromIso8601(samples[0]![0]);
     const stop = JulianDate.fromIso8601(samples.at(-1)![0]);
@@ -443,11 +456,14 @@ export class FarmScene {
     const lons = samples.map((s) => s[1]);
     const lats = samples.map((s) => s[2]);
     const v = initialView({ west: Math.min(...lons), south: Math.min(...lats), east: Math.max(...lons), north: Math.max(...lats) });
-    this.viewer.camera.flyTo({
-      destination: Cartesian3.fromDegrees(v.lon, v.lat, v.altitude),
-      orientation: { heading: 0, pitch: CesiumMath.toRadians(v.pitchDeg), roll: 0 },
-      duration: 1.2,
-    });
+    this.trackView = () =>
+      this.viewer.camera.flyTo({
+        destination: Cartesian3.fromDegrees(v.lon, v.lat, v.altitude),
+        orientation: { heading: 0, pitch: CesiumMath.toRadians(v.pitchDeg), roll: 0 },
+        duration: 1.2,
+      });
+    if (this.following) this.followTick();
+    else this.trackView();
   }
 
   /** Tous les matériels suivis à leur dernière position connue (FR-MAT-86). */
@@ -480,7 +496,39 @@ export class FarmScene {
     }
   }
 
+  /**
+   * Caméra qui suit le matériel pendant le rejeu (vue de trois quarts arrière,
+   * à quelques dizaines de mètres), ou retour à la vue d'ensemble de la trace.
+   */
+  follow(on: boolean) {
+    this.following = on;
+    if (on) {
+      this.viewer.camera.cancelFlight();
+      this.followTick();
+    } else {
+      this.viewer.camera.lookAtTransform(Matrix4.IDENTITY);
+      this.trackView?.();
+    }
+  }
+
+  /**
+   * Caméra derrière le matériel, tournée dans son cap. (Le suivi intégré de
+   * Cesium attend le volume englobant du modèle, jamais disponible pour un
+   * modèle posé sur le relief.)
+   */
+  private followTick() {
+    if (!this.following || !this.trackHeading) return;
+    const vehicle = this.viewer.entities.getById("track:vehicle");
+    const time = this.viewer.clock.currentTime;
+    const at = vehicle?.position?.getValue(time);
+    if (!at) return;
+    const cap = this.trackHeading.getValue(time) as number | undefined;
+    this.viewer.camera.lookAt(at, new HeadingPitchRange(CesiumMath.toRadians(cap ?? 0), CesiumMath.toRadians(-22), this.followRange));
+  }
+
   clearTrack() {
+    if (this.following) this.viewer.camera.lookAtTransform(Matrix4.IDENTITY);
+    this.trackHeading = null;
     for (const e of this.trackEntities) this.viewer.entities.remove(e);
     this.trackEntities = [];
     if (this.trackLines) this.viewer.scene.primitives.remove(this.trackLines);

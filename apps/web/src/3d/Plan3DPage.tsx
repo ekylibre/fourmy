@@ -11,7 +11,7 @@ import { api, ApiError, farmPath } from "../app/api";
 import { useAt } from "../app/at";
 import { useFarm } from "../app/farm";
 import { formatDate } from "../app/labels";
-import { useEquipments, useSnapshot } from "../app/queries";
+import { useSnapshot } from "../app/queries";
 import { ErrorAlert, Loading } from "../components/states";
 import { ErrorPanel } from "../components/RouteError";
 import { TankContents } from "../features/cellar/CellarPage";
@@ -38,6 +38,7 @@ export function Plan3DPage() {
   const [speed, setSpeed] = useState("60");
   const [clock, setClock] = useState<string | null>(null);
   const [renderError, setRenderError] = useState<unknown>(null);
+  const [following, setFollowing] = useState(true);
   const handlers = useRef({ ground: (_p: Pt) => {} });
 
   const plan = useQuery({
@@ -46,7 +47,6 @@ export function Plan3DPage() {
     placeholderData: (prev) => prev,
   });
   const snap = useSnapshot(farm.id, at);
-  const equipments = useEquipments(farm.id);
   const modelUrl = (id: string, hash: string) => `${location.origin}/api/v1${farmPath(farm.id, `/equipments/${id}/avatar.glb?v=${hash}`)}`;
   // Tous les matériels suivis, à leur dernière position connue à la date (FR-MAT-86).
   const [fleetOn, setFleetOn] = useState(false);
@@ -154,8 +154,10 @@ export function Plan3DPage() {
         api.get<AvatarInfo>(farmPath(farm.id, `/equipments/${equipment}/avatar`)).catch(() => null),
         api.get<{ items: Hitch[] }>(farmPath(farm.id, `/tracks/hitches?equipment=${equipment}&from=${encodeURIComponent(t.from)}&to=${encodeURIComponent(t.to)}`)).catch(() => null),
       ]);
-      const logo = equipments.data?.items.find((e) => e.id === equipment)?.logoAssetId;
+      // Logo au-dessus du véhicule : la version PNG (un SVG sans dimensions n'est pas une texture valide).
+      const logo = avatar?.logoAssetId;
       const offset = Number((avatar?.params as { hitchOffsetM?: number } | undefined)?.hitchOffsetM ?? 1);
+      scene.current?.follow(following);
       await scene.current?.setTrack(t.samples, name, {
         modelUrl: avatar ? modelUrl(equipment!, avatar.hash) : undefined,
         logoUrl: logo ? assetUrl(farm.id, logo) : undefined,
@@ -262,6 +264,17 @@ export function Plan3DPage() {
                   Charger
                 </Button>
               </Group>
+              {loadTrack.data && loadTrack.data.samples.length > 1 && (
+                <Switch
+                  mt="sm"
+                  label="Suivre le matériel (caméra derrière son avatar)"
+                  checked={following}
+                  onChange={(e) => {
+                    setFollowing(e.currentTarget.checked);
+                    scene.current?.follow(e.currentTarget.checked);
+                  }}
+                />
+              )}
               <Switch
                 mt="sm"
                 label="Tous les matériels suivis (dernière position connue)"

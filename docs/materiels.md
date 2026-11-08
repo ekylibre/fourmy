@@ -379,6 +379,16 @@ d'intervention s'adapte à cette forme.
     points de la trace et conservé à l'arrêt.
   - Il garde une taille minimale à l'écran quand on dézoome.
   - Le logo s'affiche au-dessus jusqu'à 2 km de distance.
+- **« Suivre le matériel »** (activé par défaut) : la caméra se place
+  derrière l'avatar, à 25 m, et tourne avec son cap pendant la lecture.
+  Couper l'interrupteur revient à la vue d'ensemble de la trace. Le suivi
+  intégré de Cesium n'est pas utilisé : il attend le volume englobant du
+  modèle, qui n'est jamais disponible pour un modèle posé sur le relief.
+- **Tracé de la trace** : posé sur les altitudes du relief (+0,5 m), dans
+  une collection de lignes, sans worker de géométrie. Les lignes drapées
+  arrêtaient la vue sous Firefox.
+- **Logo au-dessus du véhicule** : c'est sa version PNG. Un SVG sans
+  dimensions n'est pas une texture WebGL valide.
 - **Attelage** : les autres matériels (non tracteurs) des interventions
   réalisées qui utilisent ce matériel, sur leurs périodes de travail, sont
   attelés derrière lui. Ils sont reculés de la distance d'attelage du
