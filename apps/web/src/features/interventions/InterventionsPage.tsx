@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
-import { ActionIcon, Button, Drawer, Group, SegmentedControl, Stack, Switch, Text, Title, Tooltip } from "@mantine/core";
+import { ActionIcon, Button, CloseButton, Drawer, Group, SegmentedControl, Stack, Switch, Text, TextInput, Title, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { CalendarDays, ChevronLeft, ChevronRight, Columns3, List, Plus } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Columns3, List, Plus, Search } from "lucide-react";
 import type { Intervention } from "@fourmy/contracts";
 import { todayIso, useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
@@ -11,6 +11,7 @@ import { ErrorAlert, Loading } from "../../components/states";
 import { CancelModal } from "./CancelModal";
 import { InterventionForm } from "./InterventionForm";
 import type { Names } from "./presenters";
+import { makeMatcher, searchText } from "./search";
 import { CalendarView, KanbanView, ListView, type ViewActions } from "./views";
 import { addDays, inWeek, weekLabel, weekOf } from "./week";
 
@@ -41,6 +42,7 @@ export function InterventionsPage() {
   const location = useLocation();
   const view: View = VIEWS.includes(params.get("vue") as View) ? (params.get("vue") as View) : (stored() ?? "liste");
   const [wholeCampaign, setWholeCampaign] = useState(false);
+  const query = params.get("q") ?? "";
   const [showCancelled, setShowCancelled] = useState(false);
   const [completing, setCompleting] = useState<Intervention | "new" | null>(null);
   const [cancelling, setCancelling] = useState<Intervention | null>(null);
@@ -56,6 +58,17 @@ export function InterventionsPage() {
   const people = usePeople(farm.id);
   const catalogue = useProcedures(farm.id);
   const parcelNames = useParcelNames(farm.id);
+
+  const setParam = (key: string, value: string) =>
+    setParams(
+      (p) => {
+        const n = new URLSearchParams(p);
+        if (value) n.set(key, value);
+        else n.delete(key);
+        return n;
+      },
+      { replace: true },
+    );
 
   const setView = (v: View) => {
     try {
@@ -79,14 +92,16 @@ export function InterventionsPage() {
   const names: Names = {
     parcel: parcelNames.data ?? new Map(),
     equipment: new Map(snap.data?.equipments.map((e) => [e.id, e.name])),
-    article: new Map(articles.data?.items.map((a) => [a.id, { name: a.name, unit: a.unit }])),
+    article: new Map(articles.data?.items.map((a) => [a.id, { name: a.name, unit: a.unit, amm: a.amm }])),
     person: new Map(people.data?.items.map((p) => [p.id, p.name])),
   };
   const now = new Date().toISOString();
   const campaign = list.data!.items;
   const pool = edgeYear ? [...campaign, ...(edge.data?.items ?? []).filter((i) => !campaign.some((c) => c.id === i.id))] : campaign;
-  const listWhole = view === "liste" && wholeCampaign;
-  const scoped = listWhole ? campaign : pool.filter((i) => inWeek(i, week));
+  // Recherche (vue Liste) : toujours sur toute la campagne.
+  const matcher = view === "liste" ? makeMatcher(query) : null;
+  const listWhole = view === "liste" && (wholeCampaign || matcher !== null);
+  const scoped = matcher ? campaign.filter((i) => matcher(searchText(i, names))) : listWhole ? campaign : pool.filter((i) => inWeek(i, week));
   const visible = showCancelled || view === "kanban" ? scoped : scoped.filter((i) => i.status !== "cancelled");
   const cancelledCount = scoped.filter((i) => i.status === "cancelled").length;
 
@@ -138,11 +153,19 @@ export function InterventionsPage() {
 
       <Group justify="space-between">
         <Text c="dimmed" size="sm">
-          {visible.length} intervention(s) {listWhole ? `sur la campagne ${year}` : "cette semaine"}.
+          {matcher
+            ? `${visible.length} intervention(s) trouvée(s) sur la campagne ${year}.`
+            : `${visible.length} intervention(s) ${listWhole ? `sur la campagne ${year}` : "cette semaine"}.`}
         </Text>
         <Group gap="md">
           {view === "liste" && (
-            <Switch size="xs" label={`Toute la campagne ${year}`} checked={wholeCampaign} onChange={(e) => setWholeCampaign(e.currentTarget.checked)} />
+            <Switch
+              size="xs"
+              label={`Toute la campagne ${year}`}
+              checked={wholeCampaign || matcher !== null}
+              disabled={matcher !== null}
+              onChange={(e) => setWholeCampaign(e.currentTarget.checked)}
+            />
           )}
           {view !== "kanban" && cancelledCount > 0 && (
             <Switch size="xs" label={`Afficher les annulées (${cancelledCount})`} checked={showCancelled} onChange={(e) => setShowCancelled(e.currentTarget.checked)} />
@@ -150,7 +173,19 @@ export function InterventionsPage() {
         </Group>
       </Group>
 
-      {view === "liste" && <ListView items={visible} names={names} actions={actions} now={now} />}
+      {view === "liste" && (
+        <>
+          <TextInput
+            aria-label="Rechercher dans la campagne"
+            placeholder={`Rechercher dans la campagne ${year} : intervention, parcelle, produit ou AMM, matériel, personne, notes`}
+            leftSection={<Search size={16} />}
+            rightSection={query ? <CloseButton aria-label="Effacer la recherche" onClick={() => setParam("q", "")} /> : null}
+            value={query}
+            onChange={(e) => setParam("q", e.currentTarget.value)}
+          />
+          <ListView items={visible} names={names} actions={actions} now={now} />
+        </>
+      )}
       {view === "kanban" && (
         <KanbanView items={visible} names={names} actions={actions} now={now} onRefused={(message) => notifications.show({ color: "paille", message })} />
       )}

@@ -358,3 +358,13 @@ Exigence INT-UI-4.
   intervention planifiée sans période à sa date prévue.
 - Code : `apps/web/src/features/interventions/week.ts` (semaine, créneaux),
   `views.tsx` (trois vues).
+
+## 13. Recherche rapide (2026-11-08)
+
+Exigence INT-UI-5. Champ de recherche de la vue Liste, sur **toute la
+campagne** de la frise (pas seulement la semaine) : intervention, parcelle,
+produit (nom ou n° AMM), matériel, intervenant, motif, notes. Insensible aux
+accents et à la casse ; tous les mots tapés doivent se retrouver
+(« monassut semis »). La requête est dans l'adresse (`?q=`), donc partageable.
+Filtrage côté client (`search.ts`) : 2 000 interventions indexées et filtrées
+en moins de 200 ms (test).

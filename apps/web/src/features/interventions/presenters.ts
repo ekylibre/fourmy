@@ -17,7 +17,7 @@ export const STATUS: Record<InterventionDisplayStatus, { label: string; color: s
 export interface Names {
   parcel: Map<string, string>;
   equipment: Map<string, string>;
-  article: Map<string, { name: string; unit: string }>;
+  article: Map<string, { name: string; unit: string; amm?: string | null }>;
   person: Map<string, string>;
 }
 

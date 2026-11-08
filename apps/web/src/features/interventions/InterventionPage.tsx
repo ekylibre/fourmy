@@ -54,7 +54,7 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
   const names: Names = {
     parcel: parcelNames.data ?? new Map(),
     equipment: new Map(snap.data?.equipments.map((e) => [e.id, e.name])),
-    article: new Map(articles.data?.items.map((a) => [a.id, { name: a.name, unit: a.unit }])),
+    article: new Map(articles.data?.items.map((a) => [a.id, { name: a.name, unit: a.unit, amm: a.amm }])),
     person: new Map(people.data?.items.map((p) => [p.id, p.name])),
   };
 
