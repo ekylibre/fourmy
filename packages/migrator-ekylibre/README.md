@@ -33,7 +33,8 @@ node packages/migrator-ekylibre/dist/cli.js \
 | `activity_productions` pérennes (vigne, sans campagne) | une production par campagne couverte par `[started_on, stopped_on]` |
 | `Building`, `BuildingDivision` | `places` (plus grand polygone comme emprise) |
 | produits `variety = tank…` + `nominal_storable_net_volume` | `containers` (capacité en litres) |
-| cible `Plant` | parcelle support de sa production |
+| cible `Plant` | parcelle support de sa production — sauf si la zone de travail tombe à plus de 50 % sur une autre parcelle à la date : celle-ci fait foi (avertissement au rapport) |
+| cible `LandParcel` avec zone de travail | même règle : la parcelle qui contient la zone fait foi |
 | intrant : variante avec n° AMM non vide | article `phyto` (un AMM vide = engrais) |
 | `quantity_population` | mouvement de stock (quantité absolue) ; la dose saisie va au registre |
 | `wine_incoming_harvest_storages` | lots de vendange + mouvements d'entrée en cuve (US-9) |

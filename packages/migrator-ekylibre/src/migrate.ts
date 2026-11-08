@@ -464,6 +464,27 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
               } else {
                 refType = (pt ?? "other").toLowerCase();
               }
+              // La zone de travail fait foi : quand elle tombe surtout sur une autre
+              // parcelle à la date, la cible Ekylibre (parcelle, ou support de la
+              // culture) est fausse — constaté chez deux pilotes, 2026-11-08.
+              const at = stoppedAt ?? iso(it.started_at);
+              if (refType === "land_parcel" && p.working_zone && at) {
+                const [best] = await tx<{ id: string; share: number }[]>`
+                  WITH z AS (SELECT ST_SetSRID(ST_GeomFromGeoJSON(${geo(p.working_zone)}), 4326) AS g)
+                  SELECT v.land_parcel_id AS id,
+                         (ST_Area(ST_Intersection(v.shape, z.g)::geography) / NULLIF(ST_Area(z.g::geography), 0))::float8 AS share
+                  FROM land_parcel_versions v JOIN land_parcels lp ON lp.id = v.land_parcel_id, z
+                  WHERE lp.farm_id = ${farmId} AND v.valid @> ${at}::timestamptz AND ST_Intersects(v.shape, z.g)
+                  ORDER BY share DESC NULLS LAST LIMIT 1`;
+                if (best && best.id !== refId && best.share >= 0.5) {
+                  warnings.push({
+                    entity: "intervention_parameter",
+                    id: String(p.id),
+                    message: `${it.procedure_name} du ${at.slice(0, 10)} : cible rattachée à la parcelle de sa zone de travail (${Math.round(best.share * 100)} % de la zone) plutôt qu'à la cible Ekylibre (${pt === "Plant" ? "support de la culture" : "parcelle"})`,
+                  });
+                  refId = best.id;
+                }
+              }
             } else if (role === "input" || role === "output") {
               const lot = p.product_id ? lotByMatter.get(p.product_id) : undefined;
               if (lot) {
