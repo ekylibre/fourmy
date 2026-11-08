@@ -11,6 +11,8 @@ import { InterventionsPage } from "../features/interventions/InterventionsPage";
 import { InterventionCompletePage, InterventionEditPage, InterventionNewPage } from "../features/interventions/InterventionEditPage";
 import { PhytoProductsPage } from "../features/phyto/PhytoProductsPage";
 import { ActivitiesPage } from "../features/activities/ActivitiesPage";
+import { ParcelCreatePage } from "../features/parcels/ParcelCreatePage";
+import { ParcelSheetPage } from "../features/parcels/ParcelSheetPage";
 import { LoginPage } from "../features/login/LoginPage";
 import { RegisterPage } from "../features/register/RegisterPage";
 import { StockPage } from "../features/stock/StockPage";
@@ -123,6 +125,8 @@ export const routes = [
       { path: "register", element: <RegisterPage /> },
       { path: "phyto", element: <PhytoProductsPage /> },
       { path: "activities", element: <ActivitiesPage /> },
+      { path: "land-parcels/new", element: <Suspense fallback={<Loading />}><ParcelCreatePage /></Suspense> },
+      { path: "land-parcels/:parcelId", element: <Suspense fallback={<Loading />}><ParcelSheetPage /></Suspense> },
       { path: "imports", element: <ImportsPage /> },
       { path: "team", element: <TeamPage /> },
       { path: "integrations", element: <IntegrationsPage /> },

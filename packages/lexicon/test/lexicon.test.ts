@@ -98,6 +98,7 @@ function fakeServer(phytoVersion: string) {
         { name: "master_productions", rows: 2, files: [{ path: "data/mp_0.csv.gz" }] },
         { name: "productions__translations", rows: 2, files: [{ path: "data/ptr_0.csv.gz" }] },
         { name: "master_crop_production_tfi_codes", rows: 1, files: [{ path: "data/tfi_0.csv.gz" }] },
+        { name: "master_crop_production_cap_codes", rows: 1, files: [{ path: "data/cap_0.csv.gz" }] },
       ],
     }),
     "productions/pr1/structure.sql": `
@@ -107,13 +108,16 @@ function fakeServer(phytoVersion: string) {
         idea_output_family character varying, color character varying, translation_id character varying);
       CREATE TABLE productions__translations (id character varying, fra character varying, eng character varying);
       CREATE TABLE master_crop_production_tfi_codes (tfi_code character varying, tfi_label character varying, production character varying,
-        tfi_crop_group character varying, campaign integer);`,
+        tfi_crop_group character varying, campaign integer);
+      CREATE TABLE master_crop_production_cap_codes (cap_code character varying, cap_label character varying, production character varying,
+        cap_precision character varying, cap_category character varying, is_seed boolean, year integer);`,
     "productions/pr1/data/mp_0.csv.gz": csv([
       `grain_corn,plant_farming,zea_mays,grain,2000-03-01,2000-11-30,ZMA,,,hectare,,,,#F5D33D,ptr1`,
       `vine,vine_farming,vitis,fruit,2000-11-01,2001-10-31,ZMO,,P50Y,hectare,,,,,ptr2`,
     ]),
     "productions/pr1/data/ptr_0.csv.gz": csv([`ptr1,Maïs grain,Grain corn`, `ptr2,Vigne,Vine`]),
     "productions/pr1/data/tfi_0.csv.gz": csv([`1112,Maïs,grain_corn,GCU1,2020`]),
+    "productions/pr1/data/cap_0.csv.gz": csv([`MIS,Maïs,grain_corn,,,f,2024`]),
     "agricultural_pictures/pi1/manifest.json": JSON.stringify({
       name: "agricultural_pictures",
       version: "pi1",
@@ -147,13 +151,14 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", () => {
         expect(first).toEqual([
           { name: "phytosanitary", version: "v1", status: "loaded", rows: 10 },
           { name: "taxonomy", version: "t1", status: "loaded", rows: 4 },
-          { name: "productions", version: "pr1", status: "loaded", rows: 5 },
+          { name: "productions", version: "pr1", status: "loaded", rows: 6 },
           { name: "agricultural_pictures", version: "pi1", status: "loaded", rows: 2 },
         ]);
         expect(await tx`SELECT reference_name, family, specie, label, color, life_years::float8 AS life FROM lexicon_productions ORDER BY 1`).toEqual([
           { reference_name: "grain_corn", family: "plant_farming", specie: "zea_mays", label: "Maïs grain", color: "#F5D33D", life: null },
           { reference_name: "vine", family: "vine_farming", specie: "vitis", label: "Vigne", color: null, life: 50 },
         ]);
+        expect(await tx`SELECT cap_code, cap_label, production, year FROM lexicon_cap_codes`).toEqual([{ cap_code: "MIS", cap_label: "Maïs", production: "grain_corn", year: 2024 }]);
         expect(await tx`SELECT production, ift_culture, campaign FROM lexicon_production_ift`).toEqual([{ production: "grain_corn", ift_culture: "1112", campaign: 2020 }]);
         const pics = await tx`SELECT domain, name, encode(picture, 'hex') AS hex FROM lexicon_pictures ORDER BY 1`;
         expect(pics).toEqual([

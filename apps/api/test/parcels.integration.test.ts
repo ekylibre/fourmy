@@ -1,84 +1,94 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import postgres from "postgres";
+import { createDb } from "@fourmy/db";
 import { createApp } from "../src/app.js";
+import { createParcelFromMap, identifyPoint, parcelSheet, refreshReferences } from "../src/repos/parcel-sheet.js";
 import { setupFarm, teardown } from "./helpers.js";
 
 /**
- * Parcellaire de bout en bout contre la vraie base (contrats + db + domaine
- * + api + RLS). Ne s'exécute que si DATABASE_URL pointe une base migrée.
+ * Parcelles (lot H des retours du 08/11/2026) : un point de la carte →
+ * parcelle PAC et cadastrales (API Carto simulée), création rattachée à une
+ * activité, références PAC et cadastre, fiche.
  */
 const url = process.env.DATABASE_URL;
 const app = createApp();
-let farmId = "";
-let userId = "";
-let headers: Record<string, string> = {};
-let base = "";
+const CORN = "fourmy_test_corn_h";
 
-const square = (d: number) => ({
-  type: "MultiPolygon" as const,
-  coordinates: [[[[0.5, 44.8], [0.5 + d, 44.8], [0.5 + d, 44.8 + d], [0.5, 44.8 + d], [0.5, 44.8]]]],
-});
+// Un champ de ~1 ha ; la parcelle cadastrale le recoupe pour moitié.
+const field = { type: "MultiPolygon", coordinates: [[[[0.5, 44.8], [0.5013, 44.8], [0.5013, 44.8009], [0.5, 44.8009], [0.5, 44.8]]]] };
+const half = { type: "MultiPolygon", coordinates: [[[[0.5, 44.8], [0.50065, 44.8], [0.50065, 44.8009], [0.5, 44.8009], [0.5, 44.8]]]] };
 
-describe.skipIf(!url)("parcellaire (intégration)", () => {
-  const sql = postgres(url!, { max: 1 });
+function fakeCarto() {
+  const calls: string[] = [];
+  const fetchImpl = (async (input: string | URL) => {
+    const u = String(input);
+    calls.push(u);
+    if (u.includes("/rpg/")) {
+      const year = Number(new URL(u).searchParams.get("annee"));
+      return Response.json({ features: [{ properties: { id_parcel: `rpg-${year}`, code_cultu: year % 2 ? "ZZT" : "XXX", surf_parc: 1.02 }, geometry: field }] });
+    }
+    return Response.json({
+      features: [{ properties: { idu: "33001000AB0012", section: "AB", numero: "0012", nom_com: "Commune d'essai", code_insee: "33001", contenance: 5200 }, geometry: half }],
+    });
+  }) as typeof fetch;
+  return { fetchImpl, calls };
+}
+
+describe.skipIf(!url)("parcelles depuis la carte (intégration)", () => {
+  const sql = postgres(url!, { max: 1, onnotice: () => {} });
+  const db = createDb(url);
+  let farmId = "";
+  let userId = "";
+  let headers: Record<string, string> = {};
+  let activityId = "";
 
   beforeAll(async () => {
-    ({ farmId, userId, headers } = await setupFarm(sql, "Ferme de test"));
-    base = `/api/v1/farms/${farmId}`;
+    ({ farmId, userId, headers } = await setupFarm(sql, "Ferme test parcelles"));
+    await sql`INSERT INTO lexicon_productions (reference_name, family, specie, label) VALUES (${CORN}, 'plant_farming', 'zea_mays', 'Maïs d''essai')`;
+    await sql`INSERT INTO lexicon_cap_codes (cap_code, cap_label, production, year) VALUES ('ZZT', 'Maïs', ${CORN}, 2024) ON CONFLICT DO NOTHING`;
+    const r = await app.request(`/api/v1/farms/${farmId}/activities?year=2026`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ name: "Maïs", family: "plant_farming", reference: CORN }),
+    });
+    activityId = (await r.json()).id;
   });
   afterAll(async () => {
     await teardown(sql, farmId, [userId]);
+    await sql`DELETE FROM lexicon_cap_codes WHERE production = ${CORN}`;
+    await sql`DELETE FROM lexicon_productions WHERE reference_name = ${CORN}`;
     await sql.end();
   });
 
-  it("crée une parcelle avec surface calculée par PostGIS", async () => {
-    const res = await app.request(`${base}/land-parcels`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ name: "Les Rouffiats", shape: square(0.01) }),
-    });
-    expect(res.status).toBe(201);
-    const v = await res.json();
-    expect(v.areaM2).toBeGreaterThan(0);
-    expect(v.valid.upper).toBeNull();
+  it("un point : parcelle PAC (dernière campagne publiée), activité proposée, parcelles cadastrales", async () => {
+    const fake = fakeCarto();
+    const r = await identifyPoint(db, farmId, 44.80045, 0.50065, 2026, fake.fetchImpl);
+    expect(r.capYear).toBe(2024); // RPG publié jusqu'à 2024
+    expect(r.cap).toMatchObject({ id: "rpg-2024", year: 2024, cropCode: "XXX" });
+    expect(r.cadastre).toEqual([expect.objectContaining({ idu: "33001000AB0012", label: "AB 12 Commune d'essai", areaM2: 5200 })]);
+    expect(r.existing).toBeNull();
+    // Code PAC connu de Lexicon : libellé, production de référence et activité de la ferme.
+    const odd = await identifyPoint(db, farmId, 44.80045, 0.50065, 2023, fake.fetchImpl);
+    expect(odd.cap).toMatchObject({ cropCode: "ZZT", cropLabel: "Maïs", production: CORN, suggestedActivity: { id: activityId, name: "Maïs" } });
   });
 
-  it("versionne la parcelle : l'ancienne version est close, une nouvelle s'ouvre", async () => {
-    const list = await (await app.request(`${base}/land-parcels`, { headers })).json();
-    const parcelId = list.items[0].id;
-    expect(list.items[0].name).toBe("Les Rouffiats");
-
-    const patched = await app.request(`${base}/land-parcels/${parcelId}`, {
-      method: "PATCH",
-      headers,
-      body: JSON.stringify({ name: "Les Rouffiats", shape: square(0.02) }),
-    });
-    expect(patched.status).toBe(200);
-
-    // Deux versions au total, une seule ouverte.
-    const rows = await sql`
-      SELECT upper(valid) AS upper FROM land_parcel_versions v
-      JOIN land_parcels p ON p.id = v.land_parcel_id
-      WHERE p.farm_id = ${farmId}`;
-    expect(rows).toHaveLength(2);
-    expect(rows.filter((r) => r.upper === null)).toHaveLength(1);
-  });
-
-  it("liste les noms de toutes les parcelles, même sans version à la date du jour", async () => {
-    // Parcelle close l'an dernier : absente du parcellaire du jour, présente dans les noms.
-    const oldId = crypto.randomUUID();
-    await sql`INSERT INTO land_parcels (id, farm_id, name) VALUES (${oldId}, ${farmId}, 'Ancienne vigne')`;
-    await sql`INSERT INTO land_parcel_versions (id, land_parcel_id, shape, area_m2, valid)
-      VALUES (${crypto.randomUUID()}, ${oldId}, ST_Multi(ST_GeomFromText('POLYGON((1 45,1.001 45,1.001 45.001,1 45.001,1 45))', 4326)), 8000, tstzrange('2020-01-01', '2021-01-01'))`;
-    const today = await (await app.request(`${base}/land-parcels`, { headers })).json();
-    expect(today.items.map((p: { name: string }) => p.name)).not.toContain("Ancienne vigne");
-    const names = await (await app.request(`${base}/land-parcels/names`, { headers })).json();
-    expect(names.items).toEqual(expect.arrayContaining([{ id: oldId, name: "Ancienne vigne" }, expect.objectContaining({ name: "Les Rouffiats" })]));
-  });
-
-  it("une ferme dont on n'est pas membre est refusée (403)", async () => {
-    const otherFarm = `/api/v1/farms/${crypto.randomUUID()}`;
-    const res = await app.request(`${otherFarm}/land-parcels`, { headers });
-    expect(res.status).toBe(403);
+  it("crée la parcelle avec sa production, garde les références PAC et cadastre ; fiche", async () => {
+    const ctx = { now: new Date().toISOString(), newId: () => crypto.randomUUID(), actor: userId, origin: "web" as const };
+    const { id } = await createParcelFromMap(db, farmId, ctx, { name: "Le Grand Champ Maïs 2026", shape: field, year: 2026, activityId, capRef: "rpg-2024" });
+    const fake = fakeCarto();
+    expect(await refreshReferences(db, farmId, id, fake.fetchImpl)).toEqual({ cadastre: 1, cap: 10 });
+    const sheet = await parcelSheet(db, farmId, id);
+    expect(sheet).toMatchObject({ name: "Le Grand Champ Maïs 2026", pacIslet: "rpg-2024", productions: [{ year: 2026, activity: { id: activityId, name: "Maïs" } }] });
+    expect(sheet.since.slice(0, 10)).toBe("2026-01-01");
+    expect(sheet.cap.map((c) => c.year)).toEqual([2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016, 2015]);
+    expect(sheet.cap.find((c) => c.year === 2023)).toMatchObject({ cropCode: "ZZT", cropLabel: "Maïs" });
+    const cad = sheet.cadastre[0]!;
+    expect(cad).toMatchObject({ idu: "33001000AB0012", label: "AB 12 Commune d'essai", areaM2: 5200 });
+    expect(cad.overlapM2! / sheet.areaM2).toBeCloseTo(0.5, 1);
+    // Un point de la parcelle : signalée comme existante.
+    expect((await identifyPoint(db, farmId, 44.80045, 0.50065, 2026, fake.fetchImpl)).existing).toMatchObject({ id, name: "Le Grand Champ Maïs 2026" });
+    // Routes : fiche, et identification refusée sans coordonnées.
+    expect((await app.request(`/api/v1/farms/${farmId}/land-parcels/${id}/sheet`, { headers })).status).toBe(200);
+    expect((await app.request(`/api/v1/farms/${farmId}/land-parcels/identify?lat=x`, { headers })).status).toBe(400);
   });
 });

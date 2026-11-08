@@ -71,6 +71,8 @@ export interface ParcelWriteInput {
   shape: GeoJsonGeometry;
   pacIslet?: string;
   viti?: LandParcelVersion["viti"];
+  /** Début de validité de la première version (début de campagne) ; `ctx.now` sinon. */
+  validFrom?: string;
 }
 
 /** Crée une parcelle et sa première version (ouverte à `ctx.now`). */
@@ -94,7 +96,7 @@ export async function createParcel(
         ST_Area(ST_SetSRID(ST_GeomFromGeoJSON(${geo}), 4326)::geography),
         ${input.pacIslet ?? null},
         ${input.viti ? JSON.stringify(input.viti) : null}::jsonb,
-        tstzrange(${ctx.now}::timestamptz, NULL)
+        tstzrange(${input.validFrom ?? ctx.now}::timestamptz, NULL)
       )
       RETURNING id, land_parcel_id,
         ST_AsGeoJSON(shape)::json AS shape, area_m2, pac_islet, viti,

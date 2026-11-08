@@ -32,6 +32,10 @@ export interface ParcelMapProps {
   minHeight?: number;
   basemap: Basemap;
   onSelect?: (properties: Record<string, unknown> | null) => void;
+  /** Clic n'importe où sur la carte (création d'une parcelle). */
+  onMapClick?: (lngLat: { lng: number; lat: number }) => void;
+  /** Forme proposée (parcelle PAC ou cadastrale), en surbrillance. */
+  highlight?: FeatureCollection;
 }
 
 function bbox(...fcs: FeatureCollection[]): [[number, number], [number, number]] | null {
@@ -47,7 +51,9 @@ function bbox(...fcs: FeatureCollection[]): [[number, number], [number, number]]
 }
 
 /** Carte de travail (MapLibre) : parcellaire à la date, bâtiments, trace GPS. */
-export function ParcelMap({ parcels, places, track, zones = EMPTY, water = EMPTY, buffer = EMPTY, minHeight = 480, basemap, onSelect }: ParcelMapProps) {
+export function ParcelMap({ parcels, places, track, zones = EMPTY, water = EMPTY, buffer = EMPTY, minHeight = 480, basemap, onSelect, onMapClick, highlight = EMPTY }: ParcelMapProps) {
+  const clickRef = useRef(onMapClick);
+  clickRef.current = onMapClick;
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MlMap | null>(null);
   const [ready, setReady] = useState(false);
@@ -74,6 +80,7 @@ export function ParcelMap({ parcels, places, track, zones = EMPTY, water = EMPTY
           zones: { type: "geojson", data: EMPTY },
           water: { type: "geojson", data: EMPTY },
           buffer: { type: "geojson", data: EMPTY },
+          highlight: { type: "geojson", data: EMPTY },
         },
         layers: [
           { id: "plan", type: "raster", source: "plan" },
@@ -95,6 +102,8 @@ export function ParcelMap({ parcels, places, track, zones = EMPTY, water = EMPTY
           { id: "places-fill", type: "fill", source: "places", paint: { "fill-color": "#3B5A78", "fill-opacity": 0.7 } },
           { id: "zones-fill", type: "fill", source: "zones", paint: { "fill-color": "#E85D04", "fill-opacity": 0.3 } },
           { id: "zones-line", type: "line", source: "zones", paint: { "line-color": "#E85D04", "line-width": 1.5 } },
+          { id: "highlight-fill", type: "fill", source: "highlight", paint: { "fill-color": "#00B4D8", "fill-opacity": 0.3 } },
+          { id: "highlight-line", type: "line", source: "highlight", paint: { "line-color": "#00B4D8", "line-width": 3 } },
           {
             id: "track-transport", type: "line", source: "track", filter: ["==", ["get", "working"], false],
             paint: { "line-color": "#3B5A78", "line-width": 2, "line-dasharray": [2, 2] },
@@ -109,6 +118,7 @@ export function ParcelMap({ parcels, places, track, zones = EMPTY, water = EMPTY
     m.addControl(new NavigationControl({ showCompass: false }), "top-right");
     m.addControl(new ScaleControl({ unit: "metric" }), "bottom-left");
     m.on("load", () => setReady(true));
+    m.on("click", (e) => clickRef.current?.({ lng: e.lngLat.lng, lat: e.lngLat.lat }));
     // Un geste de l'utilisateur (pas un fitBounds) : on ne recadre plus de soi-même.
     m.on("movestart", (e) => {
       if ((e as { originalEvent?: unknown }).originalEvent) moved.current = true;
@@ -144,6 +154,8 @@ export function ParcelMap({ parcels, places, track, zones = EMPTY, water = EMPTY
     (m.getSource("zones") as GeoJSONSource).setData(zones);
     (m.getSource("water") as GeoJSONSource).setData(water);
     (m.getSource("buffer") as GeoJSONSource).setData(buffer);
+    (m.getSource("highlight") as GeoJSONSource).setData(highlight);
+    if (onMapClick) m.getCanvas().style.cursor = "crosshair";
     // Cadrage sur les parcelles et la bande de ZNT ; refait quand la bande arrive.
     const b = bbox(parcels, buffer);
     if (b && (!fitted.current || (buffer.features.length > 0 && !moved.current))) {
@@ -151,7 +163,8 @@ export function ParcelMap({ parcels, places, track, zones = EMPTY, water = EMPTY
       m.fitBounds(b, { padding: 40, duration: 0 });
       fitted.current = true;
     }
-  }, [parcels, places, zones, water, buffer, ready]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parcels, places, zones, water, buffer, highlight, ready]);
 
   useEffect(() => {
     const m = map.current;

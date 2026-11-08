@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router";
 import { Alert, Badge, Button, ColorInput, Group, Modal, MultiSelect, Paper, Select, SimpleGrid, Stack, Switch, Text, TextInput, Title } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
@@ -261,7 +262,9 @@ function ParcelsForm({ activity, year, at, onDone }: { activity: Activity; year:
             return (
               <Group key={id} justify="space-between" wrap="nowrap" gap="xs">
                 <Group gap="xs" wrap="nowrap">
-                  <Text size="sm">{name}</Text>
+                  <Text size="sm" component={Link} to={`/f/${farm.id}/land-parcels/${id}`} c="inherit">
+                    {name}
+                  </Text>
                   <CertificationBadges certs={certs} />
                 </Group>
                 <Button size="compact-xs" variant="subtle" onClick={() => setCertifying({ id, name })}>
@@ -274,7 +277,10 @@ function ParcelsForm({ activity, year, at, onDone }: { activity: Activity; year:
       )}
       <ParcelCertificationsModal parcel={certifying} onClose={() => setCertifying(null)} />
       {save.error && <Alert color="brique">{save.error}</Alert>}
-      <Group justify="flex-end">
+      <Group justify="space-between">
+        <Button component={Link} to={`/f/${farm.id}/land-parcels/new?activity=${activity.id}`} variant="subtle" leftSection={<Plus size={14} />}>
+          Nouvelle parcelle sur la carte
+        </Button>
         <Button onClick={() => save.mutate(undefined)} loading={save.isPending}>
           Enregistrer
         </Button>

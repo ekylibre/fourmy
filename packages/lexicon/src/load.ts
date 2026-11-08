@@ -27,12 +27,13 @@ const REQUIRED: Record<string, string[]> = {
   productions__translations: ["id", "fra", "eng"],
   master_crop_production_tfi_codes: ["tfi_code", "tfi_label", "production", "tfi_crop_group", "campaign"],
   master_agricultural_pictures: ["domain", "name", "extension", "picture"],
+  master_crop_production_cap_codes: ["cap_code", "cap_label", "production", "is_seed", "year"],
 };
 
 const PACKAGES: { name: string; tables: string[] }[] = [
   { name: "phytosanitary", tables: ["registered_phytosanitary_products", "registered_phytosanitary_usages", "registered_phytosanitary_cropsets", "registered_phytosanitary_target_name_to_pfi_targets", "registered_phytosanitary_risks", "registered_phytosanitary_symbols"] },
   { name: "taxonomy", tables: ["master_taxonomy", "taxonomy__translations"] },
-  { name: "productions", tables: ["master_productions", "productions__translations", "master_crop_production_tfi_codes"] },
+  { name: "productions", tables: ["master_productions", "productions__translations", "master_crop_production_tfi_codes", "master_crop_production_cap_codes"] },
   { name: "agricultural_pictures", tables: ["master_agricultural_pictures"] },
 ];
 
@@ -85,7 +86,7 @@ const TRANSFORMS: Record<string, string[]> = {
   ],
   // Productions de référence (activités) et leur culture IFT (migration 0011).
   productions: [
-    `TRUNCATE lexicon_productions, lexicon_production_ift`,
+    `TRUNCATE lexicon_productions, lexicon_production_ift, lexicon_cap_codes`,
     `INSERT INTO lexicon_productions (reference_name, family, specie, usage, label, label_en, color, life_years, support_unit)
      SELECT p.reference_name, p.activity_family, nullif(p.specie, ''), nullif(p.usage, ''),
             coalesce(tr.fra, p.reference_name), tr.eng, nullif(p.color, ''),
@@ -94,6 +95,9 @@ const TRANSFORMS: Record<string, string[]> = {
     `INSERT INTO lexicon_production_ift (production, ift_culture, ift_label, crop_group, campaign)
      SELECT production, tfi_code, tfi_label, tfi_crop_group, campaign::int
      FROM lx_master_crop_production_tfi_codes WHERE coalesce(production, '') <> ''`,
+    `INSERT INTO lexicon_cap_codes (cap_code, cap_label, production, is_seed, year)
+     SELECT cap_code, cap_label, production, coalesce(nullif(is_seed, '')::boolean, false), year::int
+     FROM lx_master_crop_production_cap_codes ON CONFLICT DO NOTHING`,
   ],
   // Images (familles d'activité, variétés) ; une seule par nom.
   agricultural_pictures: [

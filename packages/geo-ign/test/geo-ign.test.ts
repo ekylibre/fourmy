@@ -137,3 +137,23 @@ describe("eau de la BD TOPO", () => {
     expect(waterUrl("BDTOPO_V3:troncon_hydrographique", { west: -0.2, south: 43.3, east: -0.1, north: 43.4 }, 1000)).toContain("STARTINDEX=1000");
   });
 });
+
+describe("API Carto (RPG, cadastre)", () => {
+  it("parcelles PAC et cadastrales ramenées à un format commun", async () => {
+    const { fetchCapParcels, fetchCadastralParcels } = await import("../src/index.js");
+    const urls: string[] = [];
+    const geometry = { type: "MultiPolygon", coordinates: [[[[0, 0], [1, 0], [1, 1], [0, 0]]]] };
+    const fake = (async (u: string) => {
+      urls.push(u);
+      if (u.includes("/rpg/")) return Response.json({ features: [{ id: "x", properties: { id_parcel: "3445757", code_cultu: "TRN", surf_parc: 6.29 }, geometry }] });
+      return Response.json({ features: [{ properties: { idu: "17387000ZA0001", section: "ZA", numero: "0001", nom_com: "Saint-Porchaire", code_insee: "17387", contenance: 97600 }, geometry }] });
+    }) as unknown as typeof fetch;
+    const point = { type: "Point", coordinates: [-0.787, 45.8295] };
+    expect(await fetchCapParcels(point, 2024, fake)).toEqual([{ id: "3445757", year: 2024, cropCode: "TRN", areaHa: 6.29, geometry }]);
+    expect(urls[0]).toMatch(/\/rpg\/v2\?annee=2024&geom=%7B/);
+    expect(await fetchCapParcels(point, 2025, fake)).toEqual([]); // pas encore publié
+    expect(await fetchCadastralParcels(point, fake)).toEqual([
+      { idu: "17387000ZA0001", section: "ZA", numero: "0001", commune: "Saint-Porchaire", inseeCode: "17387", areaM2: 97600, geometry },
+    ]);
+  });
+});

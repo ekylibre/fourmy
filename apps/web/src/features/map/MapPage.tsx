@@ -135,6 +135,9 @@ export function MapPage() {
                 <Text c="dimmed">{NATURE_LABELS[String(selected.nature)] ?? "Sans production cette campagne"}</Text>
                 {typeof selected.variety === "string" && selected.variety !== "null" && <Badge color="lichen">{selected.variety}</Badge>}
                 <ParcelDelays farmId={farm.id} parcelId={String(selected.id)} at={at} />
+                <Button component={Link} to={`/f/${farm.id}/land-parcels/${String(selected.id)}${location.search}`} variant="light" size="xs" w="fit-content">
+                  Fiche de la parcelle
+                </Button>
               </Paper>
             )}
             <Paper p="md">
