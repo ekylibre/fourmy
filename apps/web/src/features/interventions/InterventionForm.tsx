@@ -38,13 +38,14 @@ import type {
 import { formatHa } from "@fourmy/ui-lyvre";
 import { api, ApiError, farmPath } from "../../app/api";
 import { unitLabel } from "../../app/labels";
-import { invalidateAfterIntervention } from "../../app/queries";
+import { invalidateAfterIntervention, useActivities } from "../../app/queries";
+import { ActivityBadge, activityOfParcel } from "../activities/ActivityBadge";
 import { MapBoundary } from "../../components/MapBoundary";
 import { ProcedureIcon } from "../../components/ProcedureIcon";
 import { treatedAreaM2 } from "./zones";
 import { durationMinutes, formatDuration, parseDuration, withDuration, withStart } from "./periods";
 import { ComplianceSummary, TreatmentCheckView, useComplianceCheck, type ComplianceDraft } from "./CompliancePanel";
-import type { InterventionWeather } from "@fourmy/contracts";
+import type { Activity, InterventionWeather } from "@fourmy/contracts";
 import { SprayingConditions, WeatherFields, type WeatherRequestDraft } from "../weather/Weather";
 
 // La carte (MapLibre, terra-draw) n'est chargée qu'en mode « Carte ».
@@ -160,6 +161,15 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
     snapshot.landParcels.map((p) => [p.id, { id: p.id, name: p.name, shape: p.version.shape as unknown as import("@fourmy/carto").Area, areaM2: p.version.areaM2 }]),
   );
   const treatedM2 = treatedAreaM2(parcels, parcelShapes, targetExtras);
+  // Activité des parcelles choisies (production de la campagne) : désigne la culture contrôlée.
+  const activities = useActivities(farmId, Number(snapshot.at.slice(0, 4)));
+  const parcelActivities = [
+    ...parcels
+      .map((id) => activityOfParcel(id, snapshot.productions, activities.data?.items))
+      .filter((a): a is Activity => a !== null)
+      .reduce((m, a) => m.set(a.id, { activity: a, count: (m.get(a.id)?.count ?? 0) + 1 }), new Map<string, { activity: Activity; count: number }>())
+      .values(),
+  ];
   const [inputs, setInputs] = useState<QuantityRow[]>(
     planned?.inputs.map((i) => ({ articleId: i.articleId, quantity: i.quantity, per: i.per, to: null, keep: { lotId: i.lotId, from: i.from } })) ?? [],
   );
@@ -616,12 +626,29 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
                     />
                   </Group>
                   <MultiSelect
-                      aria-label="Parcelles"
-                      searchable
-                      data={snapshot.landParcels.map((p) => ({ value: p.id, label: `${p.name} (${formatHa(p.version.areaM2)})` }))}
-                      value={parcels}
-                      onChange={setParcels}
-                    />
+                    aria-label="Parcelles"
+                    searchable
+                    data={snapshot.landParcels.map((p) => ({ value: p.id, label: `${p.name} (${formatHa(p.version.areaM2)})` }))}
+                    value={parcels}
+                    onChange={setParcels}
+                  />
+                  {parcelActivities.length > 0 && (
+                    <Group gap="md" aria-label="Activités des parcelles">
+                      {parcelActivities.map(({ activity, count }) => (
+                        <Group key={activity.id} gap={4} wrap="nowrap">
+                          <ActivityBadge activity={activity} size={22} />
+                          <Text size="xs" c="dimmed">
+                            ({count})
+                          </Text>
+                        </Group>
+                      ))}
+                      {inputKinds.includes("phyto") && (
+                        <Text size="xs" c="dimmed">
+                          Les usages phytosanitaires proposés suivent l'activité des parcelles.
+                        </Text>
+                      )}
+                    </Group>
+                  )}
                 </Stack>
               ))}
 

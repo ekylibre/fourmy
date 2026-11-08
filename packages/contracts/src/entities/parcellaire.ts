@@ -76,6 +76,8 @@ export const production = z
     landParcelId: uuid,
     nature: z.enum(["field_crop", "vine", "grassland"]),
     species: z.string().optional(), // référence Lexicon
+    /** Activité de la ferme (Maïs, Jachère, Vignes AOP…). */
+    activityId: uuid.nullable().optional(),
   })
   .merge(auditFields);
 export type Production = z.infer<typeof production>;

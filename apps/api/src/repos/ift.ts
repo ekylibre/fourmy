@@ -65,20 +65,28 @@ export async function computeInterventionIft(db: Database, farmId: string, inter
           FROM intervention_parameters p JOIN articles a ON a.id = p.ref_id
           WHERE p.intervention_id = ${interventionId} AND p.role = 'input' AND a.kind = 'phyto'`,
     );
-    const parcels = await rows<{ id: string; area: number | null; worked: number | null; zone_area: number | null; labels: string[] | null }>(
+    const parcels = await rows<{ id: string; area: number | null; worked: number | null; zone_area: number | null; labels: string[] | null; ift_code: string | null }>(
       tx,
       sql`SELECT t.ref_id AS id,
                  (SELECT area_m2::float8 FROM land_parcel_versions v WHERE v.land_parcel_id = t.ref_id AND v.valid @> ${i.stopped_at}::timestamptz LIMIT 1) AS area,
                  (t.attrs->>'workedAreaM2')::float8 AS worked,
                  CASE WHEN t.working_zone IS NULL THEN NULL ELSE ST_Area(t.working_zone::geography) END AS zone_area,
                  (WITH RECURSIVE l AS (
-                    SELECT reference_name, parent, label, 0 AS depth FROM taxonomy
-                    WHERE reference_name = (SELECT coalesce(p.cultivation, CASE p.nature WHEN 'vine' THEN 'vitis' END) FROM productions p JOIN campaigns c ON c.id = p.campaign_id
-                                            WHERE p.land_parcel_id = t.ref_id AND ${i.stopped_at}::timestamptz::date BETWEEN c.starts_on AND c.stops_on
-                                            ORDER BY coalesce(p.cultivation, CASE p.nature WHEN 'vine' THEN 'vitis' END) NULLS LAST LIMIT 1)
+                    SELECT reference_name, parent, label, 0 AS depth FROM taxonomy WHERE reference_name = prod.cultivation
                     UNION ALL SELECT x.reference_name, x.parent, x.label, l.depth + 1 FROM taxonomy x JOIN l ON x.reference_name = l.parent WHERE l.depth < 30)
-                  SELECT array_agg(label ORDER BY depth) FROM l) AS labels
+                  SELECT array_agg(label ORDER BY depth) FROM l) AS labels,
+                 -- Culture IFT de la production de référence de l'activité (Lexicon), campagne la plus proche.
+                 (SELECT x.ift_culture FROM lexicon_production_ift x WHERE x.production = prod.reference
+                   ORDER BY (x.campaign <= ${new Date(i.stopped_at).getFullYear()}) DESC, abs(x.campaign - ${new Date(i.stopped_at).getFullYear()}), x.ift_culture LIMIT 1) AS ift_code
           FROM intervention_parameters t
+          -- Production de la campagne : culture et production de référence de son activité.
+          LEFT JOIN LATERAL (
+            SELECT coalesce(a.cultivation, lx.specie, p.cultivation, CASE p.nature WHEN 'vine' THEN 'vitis' END) AS cultivation, a.reference
+            FROM productions p JOIN campaigns c ON c.id = p.campaign_id
+            LEFT JOIN activities a ON a.id = p.activity_id
+            LEFT JOIN lexicon_productions lx ON lx.reference_name = a.reference
+            WHERE p.land_parcel_id = t.ref_id AND ${i.stopped_at}::timestamptz::date BETWEEN c.starts_on AND c.stops_on
+            ORDER BY (a.id IS NULL), 1 NULLS LAST LIMIT 1) prod ON true
           WHERE t.intervention_id = ${interventionId} AND t.role = 'target' AND t.ref_type = 'land_parcel'`,
     );
     return { stoppedAt: i.stopped_at, inputs, parcels };
@@ -100,7 +108,8 @@ export async function computeInterventionIft(db: Database, farmId: string, inter
       for (const parcel of context.parcels) {
         const line = { articleId: input.article_id, parcelId: parcel.id, ift: null as number | null, segment: null as string | null, doseReference: null as number | null, warning: null as string | null };
         lines.push(line);
-        const culture = (parcel.labels ?? []).map((l) => (l ? cultures!.get(normalize(l)) : undefined)).find(Boolean);
+        // Culture IFT : celle de l'activité (Lexicon), sinon par le libellé de la culture et de ses ancêtres.
+        const culture = parcel.ift_code ?? (parcel.labels ?? []).map((l) => (l ? cultures!.get(normalize(l)) : undefined)).find(Boolean);
         const base = articleUnitBase(input.article_unit);
         if (!input.amm) {
           line.warning = "Produit sans n° AMM.";

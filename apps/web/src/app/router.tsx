@@ -10,6 +10,7 @@ import { ImportsPage } from "../features/imports/ImportsPage";
 import { InterventionsPage } from "../features/interventions/InterventionsPage";
 import { InterventionCompletePage, InterventionEditPage, InterventionNewPage } from "../features/interventions/InterventionEditPage";
 import { PhytoProductsPage } from "../features/phyto/PhytoProductsPage";
+import { ActivitiesPage } from "../features/activities/ActivitiesPage";
 import { LoginPage } from "../features/login/LoginPage";
 import { RegisterPage } from "../features/register/RegisterPage";
 import { StockPage } from "../features/stock/StockPage";
@@ -121,6 +122,7 @@ export const routes = [
       { path: "cellar", element: <CellarPage /> },
       { path: "register", element: <RegisterPage /> },
       { path: "phyto", element: <PhytoProductsPage /> },
+      { path: "activities", element: <ActivitiesPage /> },
       { path: "imports", element: <ImportsPage /> },
       { path: "team", element: <TeamPage /> },
       { path: "integrations", element: <IntegrationsPage /> },

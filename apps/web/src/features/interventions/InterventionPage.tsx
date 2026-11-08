@@ -11,7 +11,8 @@ import { formatHa } from "@fourmy/ui-lyvre";
 import { api, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { formatDateTime, formatNumber, formatPeriod, procedureLabel, unitLabel } from "../../app/labels";
-import { useArticles, useIntervention, useParcelNames, usePeople, useSnapshot } from "../../app/queries";
+import { useActivities, useArticles, useIntervention, useParcelNames, usePeople, useSnapshot } from "../../app/queries";
+import { ActivityBadge, activityOfParcel } from "../activities/ActivityBadge";
 import { ErrorAlert, Loading } from "../../components/states";
 import { MapBoundary } from "../../components/MapBoundary";
 import { ProcedureIcon } from "../../components/ProcedureIcon";
@@ -47,6 +48,7 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
   const articles = useArticles(farm.id);
   const people = usePeople(farm.id);
   const parcelNames = useParcelNames(farm.id);
+  const activities = useActivities(farm.id, Number(day.slice(0, 4)));
   const [cancelling, setCancelling] = useState(false);
   const status = displayStatus(i, new Date().toISOString());
   const list = `/f/${farm.id}/interventions${location.search}`;
@@ -172,15 +174,19 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
               </Title>
               <Table aria-label="Cibles">
                 <Table.Tbody>
-                  {i.targets.map((t) => (
-                    <Table.Tr key={t.id}>
-                      <Table.Td>{targetName(names, t)}</Table.Td>
-                      <Table.Td ta="right" className="lv-num">
-                        {t.kind === "land_parcel" && areaOf(t) !== null ? formatHa(areaOf(t)!) : ""}
-                        {t.workedAreaM2 ? " (surface travaillée)" : ""}
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
+                  {i.targets.map((t) => {
+                    const activity = t.kind === "land_parcel" ? activityOfParcel(t.id, snap.data?.productions ?? [], activities.data?.items) : null;
+                    return (
+                      <Table.Tr key={t.id}>
+                        <Table.Td>{targetName(names, t)}</Table.Td>
+                        <Table.Td>{activity && <ActivityBadge activity={activity} />}</Table.Td>
+                        <Table.Td ta="right" className="lv-num">
+                          {t.kind === "land_parcel" && areaOf(t) !== null ? formatHa(areaOf(t)!) : ""}
+                          {t.workedAreaM2 ? " (surface travaillée)" : ""}
+                        </Table.Td>
+                      </Table.Tr>
+                    );
+                  })}
                 </Table.Tbody>
               </Table>
             </Paper>

@@ -85,6 +85,22 @@ export const productions = pgTable("productions", {
   species: text("species"),
   /** Culture (taxonomie Lexicon : zea_mays, vitis…) ; `species` garde la variété saisie. */
   cultivation: text("cultivation"),
+  /** Activité de la ferme (migration 0011). */
+  activityId: uuid("activity_id"),
+  ...audit,
+});
+
+/** Activités de la ferme (Maïs, Jachère, Vignes AOP…), production de référence Lexicon. */
+export const activities = pgTable("activities", {
+  id: uuid("id").primaryKey(),
+  farmId: uuid("farm_id").notNull(),
+  name: text("name").notNull(),
+  family: text("family").notNull(),
+  reference: text("reference"),
+  cultivation: text("cultivation"),
+  color: text("color"),
+  suspended: boolean("suspended").notNull().default(false),
+  deduced: boolean("deduced").notNull().default(false),
   ...audit,
 });
 

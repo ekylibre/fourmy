@@ -14,7 +14,7 @@ export async function snapshotAt(db: Database, farmId: string, at: string): Prom
     withFarm(db, farmId, async (tx) => {
       const productions = (await tx.execute(sql`
         SELECT p.id, p.farm_id AS "farmId", p.campaign_id AS "campaignId", p.land_parcel_id AS "landParcelId",
-               p.nature, p.species, p.created_at AS "createdAt", p.updated_at AS "updatedAt"
+               p.nature, p.species, p.activity_id AS "activityId", p.created_at AS "createdAt", p.updated_at AS "updatedAt"
         FROM productions p JOIN campaigns c ON c.id = p.campaign_id
         WHERE c.year = extract(year FROM ${at}::timestamptz)::int`)) as unknown as Production[];
       const equipments = (await tx.execute(sql`

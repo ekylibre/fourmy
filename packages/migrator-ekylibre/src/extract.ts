@@ -42,8 +42,24 @@ export const landParcels = (s: Sql) =>
     SELECT id, name, work_number, born_at, dead_at, ${multiPolygon("initial_shape")} AS shape
     FROM products WHERE type = 'LandParcel' ORDER BY id`);
 
+export type ActivityRow = {
+  id: number;
+  name: string;
+  family: string;
+  reference_name: string | null;
+  cultivation_variety: string | null;
+  suspended: boolean;
+};
+/** Activités (Maïs, Jachère, Vignes AOP…) : famille, production de référence, variété cultivée. */
+export const activities = (s: Sql) =>
+  s<ActivityRow[]>`
+    SELECT id, name, family, nullif(reference_name, '') AS reference_name,
+           nullif(cultivation_variety, '') AS cultivation_variety, coalesce(suspended, false) AS suspended
+    FROM activities ORDER BY id`;
+
 export type ProductionRow = {
   id: number;
+  activity_id: number;
   campaign_id: number | null;
   support_id: number | null;
   started_on: string | null;
@@ -55,7 +71,7 @@ export type ProductionRow = {
 /** Productions + cépage/espèce de la culture (Plant) rattachée. */
 export const productions = (s: Sql) =>
   s<ProductionRow[]>`
-    SELECT ap.id, ap.campaign_id, ap.support_id,
+    SELECT ap.id, ap.activity_id, ap.campaign_id, ap.support_id,
            ap.started_on::text AS started_on, ap.stopped_on::text AS stopped_on,
            a.family, a.cultivation_variety,
            (SELECT coalesce(nullif(p.specie_variety->>'specie_variety_name', ''), p.variety) FROM products p

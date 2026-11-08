@@ -35,7 +35,7 @@ const url = process.env.DATABASE_URL;
 function fakeServer(phytoVersion: string) {
   const csv = (lines: string[]) => gzipSync(lines.join("\n") + "\n");
   const files: Record<string, string | Buffer> = {
-    "index.json": JSON.stringify({ datasources: { phytosanitary: { current: phytoVersion, versions: [phytoVersion] }, taxonomy: { current: "t1", versions: ["t1"] } } }),
+    "index.json": JSON.stringify({ datasources: { phytosanitary: { current: phytoVersion, versions: [phytoVersion] }, taxonomy: { current: "t1", versions: ["t1"] }, productions: { current: "pr1", versions: ["pr1"] }, agricultural_pictures: { current: "pi1", versions: ["pi1"] } } }),
     [`phytosanitary/${phytoVersion}/manifest.json`]: JSON.stringify({
       name: "phytosanitary",
       version: phytoVersion,
@@ -80,6 +80,37 @@ function fakeServer(phytoVersion: string) {
       CREATE TABLE taxonomy__translations (id character varying, fra character varying, eng character varying);`,
     "taxonomy/t1/data/m_0.csv.gz": csv([`zea_mays,zea,specie,tr1`, `zea,poaceae,genus,tr2`]),
     "taxonomy/t1/data/tr_0.csv.gz": csv([`tr1,Maïs,Corn`, `tr2,Maïs (genre),Corn genus`]),
+    "productions/pr1/manifest.json": JSON.stringify({
+      name: "productions",
+      version: "pr1",
+      tables: [
+        { name: "master_productions", rows: 2, files: [{ path: "data/mp_0.csv.gz" }] },
+        { name: "productions__translations", rows: 2, files: [{ path: "data/ptr_0.csv.gz" }] },
+        { name: "master_crop_production_tfi_codes", rows: 1, files: [{ path: "data/tfi_0.csv.gz" }] },
+      ],
+    }),
+    "productions/pr1/structure.sql": `
+      CREATE TABLE master_productions (reference_name character varying, activity_family character varying, specie character varying,
+        usage character varying, started_on date, stopped_on date, agroedi_crop_code character varying, season character varying,
+        life_duration interval, support_unit character varying, idea_botanic_family character varying, idea_specie_family character varying,
+        idea_output_family character varying, color character varying, translation_id character varying);
+      CREATE TABLE productions__translations (id character varying, fra character varying, eng character varying);
+      CREATE TABLE master_crop_production_tfi_codes (tfi_code character varying, tfi_label character varying, production character varying,
+        tfi_crop_group character varying, campaign integer);`,
+    "productions/pr1/data/mp_0.csv.gz": csv([
+      `grain_corn,plant_farming,zea_mays,grain,2000-03-01,2000-11-30,ZMA,,,hectare,,,,#F5D33D,ptr1`,
+      `vine,vine_farming,vitis,fruit,2000-11-01,2001-10-31,ZMO,,P50Y,hectare,,,,,ptr2`,
+    ]),
+    "productions/pr1/data/ptr_0.csv.gz": csv([`ptr1,Maïs grain,Grain corn`, `ptr2,Vigne,Vine`]),
+    "productions/pr1/data/tfi_0.csv.gz": csv([`1112,Maïs,grain_corn,GCU1,2020`]),
+    "agricultural_pictures/pi1/manifest.json": JSON.stringify({
+      name: "agricultural_pictures",
+      version: "pi1",
+      tables: [{ name: "master_agricultural_pictures", rows: 2, files: [{ path: "data/pic_0.csv.gz" }] }],
+    }),
+    "agricultural_pictures/pi1/structure.sql": `
+      CREATE TABLE master_agricultural_pictures (id integer, domain character varying, name character varying, extension character varying, picture bytea);`,
+    "agricultural_pictures/pi1/data/pic_0.csv.gz": csv([`1,varieties,zea,jpg,\\xffd8ff`, `2,activity_families,plant_farming,png,\\x89504e47`]),
   };
   const requested: string[] = [];
   const fetchImpl = (async (input: string | URL) => {
@@ -105,6 +136,18 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", () => {
         expect(first).toEqual([
           { name: "phytosanitary", version: "v1", status: "loaded", rows: 5 },
           { name: "taxonomy", version: "t1", status: "loaded", rows: 4 },
+          { name: "productions", version: "pr1", status: "loaded", rows: 5 },
+          { name: "agricultural_pictures", version: "pi1", status: "loaded", rows: 2 },
+        ]);
+        expect(await tx`SELECT reference_name, family, specie, label, color, life_years::float8 AS life FROM lexicon_productions ORDER BY 1`).toEqual([
+          { reference_name: "grain_corn", family: "plant_farming", specie: "zea_mays", label: "Maïs grain", color: "#F5D33D", life: null },
+          { reference_name: "vine", family: "vine_farming", specie: "vitis", label: "Vigne", color: null, life: 50 },
+        ]);
+        expect(await tx`SELECT production, ift_culture, campaign FROM lexicon_production_ift`).toEqual([{ production: "grain_corn", ift_culture: "1112", campaign: 2020 }]);
+        const pics = await tx`SELECT domain, name, encode(picture, 'hex') AS hex FROM lexicon_pictures ORDER BY 1`;
+        expect(pics).toEqual([
+          { domain: "activity_families", name: "plant_farming", hex: "89504e47" },
+          { domain: "varieties", name: "zea", hex: "ffd8ff" },
         ]);
         const [p] = await tx`SELECT amm, name, other_names, reentry_delay_hours, natures FROM phyto_products`;
         expect(p).toEqual({ amm: "9999001", name: "GLISTER TEST", other_names: ["BARBARIAN TEST"], reentry_delay_hours: 6, natures: ["Herbicide"] });
@@ -121,7 +164,7 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", () => {
         // Même version : rien n'est retéléchargé.
         const again = fakeServer("v1");
         const second = await syncLexiconIn(tx, { base: "http://lexicon.test", fetchImpl: again.fetchImpl });
-        expect(second.map((r) => r.status)).toEqual(["up-to-date", "up-to-date"]);
+        expect(second.map((r) => r.status)).toEqual(["up-to-date", "up-to-date", "up-to-date", "up-to-date"]);
         expect(again.requested).toEqual(["index.json"]);
         throw new Rollback();
       })

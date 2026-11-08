@@ -32,6 +32,19 @@ export function articleKind(v: { variety: string | null; france_maaid: string | 
 }
 
 /** Nature de production à partir de la famille d'activité Ekylibre. */
+/** Familles d'activité reprises (celles d'Ekylibre). */
+export const ACTIVITY_FAMILIES = new Set([
+  "plant_farming",
+  "vine_farming",
+  "animal_farming",
+  "plant_nursery",
+  "processing",
+  "wine_making",
+  "administering",
+  "tool_maintaining",
+  "service_delivering",
+]);
+
 export function productionNature(
   family: string | null,
 ): "field_crop" | "vine" | "grassland" | null {

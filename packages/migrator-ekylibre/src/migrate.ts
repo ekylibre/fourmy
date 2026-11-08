@@ -11,6 +11,7 @@ import {
   containerKind,
   capacityFromLabel,
   cultivationOf,
+  ACTIVITY_FAMILIES,
 } from "./rules.js";
 
 /**
@@ -81,6 +82,7 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
     const data = await x.read(src, async (s) => ({
       campaigns: await x.campaigns(s),
       landParcels: await x.landParcels(s),
+      activities: await x.activities(s),
       productions: await x.productions(s),
       places: await x.places(s),
       containers: await x.containers(s),
@@ -176,6 +178,32 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
           inc("land_parcels");
         }
 
+        // ---- Activités -----------------------------------------------------
+        // Celles de la ferme d'origine. Une activité de même nom créée avant
+        // la reprise (activités déduites, migration 0011) lui cède ses
+        // productions puis disparaît.
+        const migratedActivities = new Set<number>();
+        for (const a of data.activities) {
+          if (!ACTIVITY_FAMILIES.has(a.family)) {
+            reject("activity", a.id, `famille d'activité inconnue : ${a.family}`);
+            continue;
+          }
+          const aid = id("activities", a.id);
+          const [other] = await tx<{ id: string }[]>`SELECT id FROM activities WHERE farm_id = ${farmId} AND name = ${a.name} AND id <> ${aid}`;
+          if (other) await tx`UPDATE activities SET name = name || ' (' || id || ')' WHERE id = ${other.id}`;
+          await tx`
+            INSERT INTO activities (id, farm_id, name, family, reference, cultivation, suspended)
+            VALUES (${aid}, ${farmId}, ${a.name}, ${a.family}, ${a.reference_name}, ${a.cultivation_variety?.trim().toLowerCase() || null}, ${a.suspended})
+            ON CONFLICT (id) DO UPDATE SET name = excluded.name, family = excluded.family, reference = excluded.reference,
+              cultivation = excluded.cultivation, suspended = excluded.suspended, updated_at = now()`;
+          if (other) {
+            await tx`UPDATE productions SET activity_id = ${aid} WHERE activity_id = ${other.id}`;
+            await tx`DELETE FROM activities WHERE id = ${other.id}`;
+          }
+          migratedActivities.add(a.id);
+          inc("activities");
+        }
+
         // ---- Productions ---------------------------------------------------
         for (const p of data.productions) {
           const nature = productionNature(p.family);
@@ -208,14 +236,19 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
           }
           for (const t of targets) {
             await tx`
-              INSERT INTO productions (id, farm_id, campaign_id, land_parcel_id, nature, species, cultivation)
+              INSERT INTO productions (id, farm_id, campaign_id, land_parcel_id, nature, species, cultivation, activity_id)
               VALUES (${t.pid}, ${farmId}, ${t.campaignId}, ${id("products", p.support_id)}, ${nature},
-                      ${p.plant_variety ?? p.cultivation_variety}, ${cultivationOf(p.cultivation_variety, nature)})
+                      ${p.plant_variety ?? p.cultivation_variety}, ${cultivationOf(p.cultivation_variety, nature)},
+                      ${migratedActivities.has(p.activity_id) ? id("activities", p.activity_id) : null})
               ON CONFLICT (id) DO UPDATE SET nature = excluded.nature, species = excluded.species,
-                cultivation = excluded.cultivation`;
+                cultivation = excluded.cultivation, activity_id = excluded.activity_id`;
             inc("productions");
           }
         }
+
+        // Activités déduites avant la reprise, désormais vides : remplacées.
+        await tx`DELETE FROM activities a WHERE a.farm_id = ${farmId} AND a.deduced
+                 AND NOT EXISTS (SELECT 1 FROM productions p WHERE p.activity_id = a.id)`;
 
         // ---- Bâtiments ------------------------------------------------------
         const placeIds = new Set<number>();

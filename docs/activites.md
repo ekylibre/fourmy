@@ -1,0 +1,58 @@
+# Activités
+
+Lot C des retours de test du 08/11/2026. Comme dans Ekylibre, une
+**activité** de la ferme (Maïs, Jachère, Vignes AOP, Chai…) regroupe ses
+productions : une production = une parcelle × une campagne.
+
+## Modèle (migration 0011)
+
+| Table | Contenu |
+|---|---|
+| `activities` (RLS) | nom (unique par ferme), famille (`plant_farming`, `vine_farming`, `animal_farming`, `plant_nursery`, `processing`, `wine_making`, `administering`, `tool_maintaining`, `service_delivering`), production de référence, variété cultivée, couleur, en sommeil, `deduced` |
+| `productions.activity_id` | activité de la production |
+| `lexicon_productions` | 473 productions de référence Lexicon (`grain_corn`, `fallow`, `vine`…) : famille, espèce, libellé, couleur |
+| `lexicon_production_ift` | production de référence → culture de l'API IFT (`grain_corn` → 1112 Maïs) |
+| `lexicon_pictures` | images d'Ekylibre : 9 familles d'activité, ~230 variétés (nom latin) |
+
+- Référentiel : paquets Lexicon `productions` et `agricultural_pictures`,
+  synchronisés par le worker avec `phytosanitary` et `taxonomy`.
+- Image d'une activité (`fourmy_activity_picture`) : sa variété cultivée ou
+  l'ancêtre le plus proche dans la taxonomie (`zea_mays` → `zea`), sinon sa
+  famille. Servie sans session : `GET /api/v1/lexicon/pictures/:domaine/:nom`.
+- Fermes sans activités (antérieures, fixtures) : `fourmy_ensure_activities`
+  en déduit une par (nature, culture), marquée `deduced`. La reprise
+  d'Ekylibre crée les activités de la ferme d'origine (même famille,
+  référence, variété) et retire les activités déduites devenues vides.
+
+## Ce que l'activité décide
+
+- **Culture contrôlée** (usages E-Phy) : variété de l'activité, sinon celle
+  de sa production de référence, sinon celle de la production.
+- **Jachère** (référence `fallow`…) : espèce générique « plant », usages
+  « Jachères et cultures intermédiaires » et « Traitements généraux »
+  seulement. À l'inverse, une culture en place n'admet pas les usages
+  génériques des jachères, Jevi et jardins d'amateur.
+- **Usage retenu d'office** quand un seul usage du produit vaut pour
+  l'activité des parcelles (modifiable s'il y en a plusieurs).
+- **Culture IFT** : celle de la production de référence (Lexicon), sinon
+  rapprochement par libellé.
+- **Image** sur la fiche d'une intervention (parcelles) et dans le
+  formulaire (activités des parcelles choisies).
+
+## Écran « Activités » (`/f/:ferme/activities`)
+
+Par famille : image, nom, référence, culture, parcelles et surface de la
+campagne de la frise. Le responsable crée une activité depuis une
+production de référence (nom, famille, culture et couleur pré-remplis),
+la modifie, la met en sommeil, la supprime (si elle n'a plus de
+productions) et choisit ses parcelles d'une campagne
+(`PUT /activities/:id/parcels`) : une production par parcelle ajoutée ; les
+productions des autres activités (cultures successives) ne bougent pas.
+
+## Pilotes (reprise locale du 08/11/2026)
+
+- Pierre : Maïs (`grain_corn`, 116 productions), Jachère (`fallow`, 36),
+  Avoine, Triticale, Prairie temporaire. Les 36 jachères, auparavant
+  « culture inconnue », sont contrôlées sur les usages des jachères.
+- Frédéric : Vignes AOP, Plantations nouvelles (`vine`), Chai, Gestion
+  administrative, Maintenance équipements.

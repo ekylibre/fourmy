@@ -5,6 +5,8 @@ import { getAuth } from "./auth.js";
 import { contactRoutes } from "./contact.js";
 import { farmRoutes } from "./routes/farm.js";
 import { meRoutes } from "./routes/me.js";
+import { readPicture } from "./repos/activities.js";
+import { db } from "./db.js";
 import { BadRequest, NotFound, Conflict } from "./routes/helpers.js";
 
 /**
@@ -23,6 +25,14 @@ export function createApp() {
   // Connexion, déconnexion, session (better-auth).
   app.on(["GET", "POST"], "/api/auth/*", (c) => getAuth().handler(c.req.raw));
 
+  // Images du référentiel Lexicon (activités, variétés) : données publiques, sans session.
+  app.get("/api/v1/lexicon/pictures/:domain/:name", async (c) => {
+    const { domain, name } = c.req.param();
+    if (!/^(varieties|activity_families)$/.test(domain) || !/^[a-z0-9_]{1,80}$/.test(name)) return c.notFound();
+    const pic = await readPicture(db(), domain, name);
+    if (!pic) return c.notFound();
+    return c.body(pic.bytes as unknown as ArrayBuffer, 200, { "content-type": pic.type, "cache-control": "public, max-age=604800" });
+  });
   app.route("/api/v1/me", new Hono<Env>().use(auth).route("/", meRoutes));
   app.route("/api/v1/farms/:farmId", new Hono<Env>().use(auth).use(farmScope).route("/", farmRoutes));
 

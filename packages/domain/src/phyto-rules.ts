@@ -57,6 +57,12 @@ export interface ParcelContext {
   /** Culture (taxonomie) et ses ancêtres, du plus précis au plus général ; null si inconnue. */
   lineage: string[] | null;
   cultivationLabel: string | null;
+  /**
+   * Libellés de culture E-Phy admis, quand l'activité les restreint : une
+   * jachère (espèce générique « plant ») n'admet que les usages « Jachères et
+   * cultures intermédiaires » et « Traitements généraux ».
+   */
+  cropLabels?: string[] | null;
   /** Données d'eau chargées autour de la ferme. */
   waterLoaded: boolean;
   /** Distance (m) entre la zone traitée et l'eau la plus proche ; null si aucune à proximité. */
@@ -95,6 +101,8 @@ export interface TreatmentCheck {
   reentryAllowedFrom: string | null;
   /** Largeur de la ZNT eau retenue (m), si l'usage en fixe une. */
   zntM: number | null;
+  /** Usage retenu : celui choisi, ou le seul possible. */
+  usageId: string | null;
 }
 
 const RANK: Record<ComplianceLevel, number> = { ok: 0, info: 1, warning: 2, danger: 3 };
@@ -164,6 +172,19 @@ export function usageCovers(u: PhytoUsageRef, lineage: string[], cropsets: Recor
   return u.species.some((s) => names.has(s) || (cropsets[s] ?? []).some((c) => names.has(c) || names.has(c.replace(/^x_/, ""))));
 }
 
+/**
+ * Usages génériques (espèce « plant ») qui ne visent pas une culture en place :
+ * proposés seulement quand l'activité les admet (jachère : `cropLabels`).
+ */
+export const NON_CROP_USAGE_LABELS = ["Jachères et cultures intermédiaires", "Jevi", "Jardin d'amateur"];
+
+/** L'usage vaut-il pour la parcelle : lignée de sa culture et libellés admis par son activité. */
+export function usageFitsParcel(u: PhytoUsageRef, p: Pick<ParcelContext, "lineage" | "cropLabels">, cropsets: Record<string, string[]>): boolean {
+  if (!p.lineage || !usageCovers(u, p.lineage, cropsets)) return false;
+  const label = u.cropLabel ?? "";
+  return p.cropLabels ? p.cropLabels.includes(label) : !NON_CROP_USAGE_LABELS.includes(label);
+}
+
 const usageLabel = (u: PhytoUsageRef) => [u.cropLabel, u.targetLabel].filter(Boolean).join(" — ");
 
 // --- Contrôle -----------------------------------------------------------------
@@ -179,6 +200,7 @@ export function checkTreatment(input: TreatmentCheckInput): TreatmentCheck {
     harvestAllowedFrom: null,
     reentryAllowedFrom: null,
     zntM: null,
+    usageId: null,
     ...extra,
   });
 
@@ -206,7 +228,7 @@ export function checkTreatment(input: TreatmentCheckInput): TreatmentCheck {
       message: `Culture inconnue sur ${unknown.map((p) => p.name).join(", ")} : autorisation non vérifiable.`,
     });
   }
-  const byParcel = new Map(known.map((p) => [p.id, valid.filter((u) => usageCovers(u, p.lineage!, cropsets))]));
+  const byParcel = new Map(known.map((p) => [p.id, valid.filter((u) => usageFitsParcel(u, p, cropsets))]));
   const uncovered = known.filter((p) => byParcel.get(p.id)!.length === 0);
   if (uncovered.length) {
     indicators.push({
@@ -220,7 +242,8 @@ export function checkTreatment(input: TreatmentCheckInput): TreatmentCheck {
 
   // Usages communs à toutes les parcelles connues (choix de la cible).
   const common = known.length ? valid.filter((u) => known.every((p) => byParcel.get(p.id)!.includes(u))) : valid;
-  const chosen = input.usageId ? common.find((u) => u.id === input.usageId) ?? null : null;
+  // Un seul usage possible pour l'activité des parcelles : il est retenu d'office.
+  const chosen = input.usageId ? (common.find((u) => u.id === input.usageId) ?? null) : common.length === 1 ? common[0]! : null;
   const applicable = chosen ? [chosen] : common;
   const choiceNote = chosen ? "" : applicable.length > 1 ? " (cible non précisée : valeur la plus permissive des usages possibles)" : "";
 
@@ -323,5 +346,6 @@ export function checkTreatment(input: TreatmentCheckInput): TreatmentCheck {
     harvestAllowedFrom,
     reentryAllowedFrom,
     zntM,
+    usageId: chosen?.id ?? null,
   });
 }

@@ -6,8 +6,9 @@ import { fetchIndex, fetchManifest, fetchStructure, packageUrl, parseStructure, 
 
 /**
  * Copie des paquets Lexicon dans les tables de référence de Fourmy
- * (migration 0009) : `phytosanitary` (produits, usages, ensembles de
- * cultures, cibles PFI) et `taxonomy` (parenté des espèces). Une version
+ * (migrations 0009, 0011) : `phytosanitary` (produits, usages, ensembles de
+ * cultures, cibles PFI), `taxonomy` (parenté des espèces), `productions`
+ * (activités de référence, culture IFT) et `agricultural_pictures` (images). Une version
  * déjà chargée n'est pas retéléchargée ; une nouvelle version remplace
  * l'ancienne d'un bloc, dans une transaction (tout ou rien).
  */
@@ -20,11 +21,17 @@ const REQUIRED: Record<string, string[]> = {
   registered_phytosanitary_target_name_to_pfi_targets: ["ephy_name", "pfi_id", "pfi_name"],
   master_taxonomy: ["reference_name", "parent", "taxonomic_rank", "translation_id"],
   taxonomy__translations: ["id", "fra"],
+  master_productions: ["reference_name", "activity_family", "specie", "usage", "life_duration", "support_unit", "color", "translation_id"],
+  productions__translations: ["id", "fra", "eng"],
+  master_crop_production_tfi_codes: ["tfi_code", "tfi_label", "production", "tfi_crop_group", "campaign"],
+  master_agricultural_pictures: ["domain", "name", "extension", "picture"],
 };
 
 const PACKAGES: { name: string; tables: string[] }[] = [
   { name: "phytosanitary", tables: ["registered_phytosanitary_products", "registered_phytosanitary_usages", "registered_phytosanitary_cropsets", "registered_phytosanitary_target_name_to_pfi_targets"] },
   { name: "taxonomy", tables: ["master_taxonomy", "taxonomy__translations"] },
+  { name: "productions", tables: ["master_productions", "productions__translations", "master_crop_production_tfi_codes"] },
+  { name: "agricultural_pictures", tables: ["master_agricultural_pictures"] },
 ];
 
 /** Passage des tables temporaires (texte) aux tables de Fourmy, typées. */
@@ -62,6 +69,26 @@ const TRANSFORMS: Record<string, string[]> = {
     `INSERT INTO taxonomy (reference_name, parent, rank, label)
      SELECT t.reference_name, t.parent, t.taxonomic_rank, tr.fra
      FROM lx_master_taxonomy t LEFT JOIN lx_taxonomy__translations tr ON tr.id = t.translation_id`,
+  ],
+  // Productions de référence (activités) et leur culture IFT (migration 0011).
+  productions: [
+    `TRUNCATE lexicon_productions, lexicon_production_ift`,
+    `INSERT INTO lexicon_productions (reference_name, family, specie, usage, label, label_en, color, life_years, support_unit)
+     SELECT p.reference_name, p.activity_family, nullif(p.specie, ''), nullif(p.usage, ''),
+            coalesce(tr.fra, p.reference_name), tr.eng, nullif(p.color, ''),
+            round((extract(epoch FROM nullif(p.life_duration, '')::interval) / 31557600)::numeric, 1), p.support_unit
+     FROM lx_master_productions p LEFT JOIN lx_productions__translations tr ON tr.id = p.translation_id`,
+    `INSERT INTO lexicon_production_ift (production, ift_culture, ift_label, crop_group, campaign)
+     SELECT production, tfi_code, tfi_label, tfi_crop_group, campaign::int
+     FROM lx_master_crop_production_tfi_codes WHERE coalesce(production, '') <> ''`,
+  ],
+  // Images (familles d'activité, variétés) ; une seule par nom.
+  agricultural_pictures: [
+    `TRUNCATE lexicon_pictures`,
+    `INSERT INTO lexicon_pictures (domain, name, extension, picture)
+     SELECT DISTINCT ON (domain, name) domain, name, extension, decode(substr(picture, 3), 'hex')
+     FROM lx_master_agricultural_pictures WHERE left(picture, 2) = '\\x'
+     ORDER BY domain, name, (extension = 'png') DESC`,
   ],
 };
 

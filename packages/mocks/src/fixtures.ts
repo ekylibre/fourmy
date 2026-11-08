@@ -13,7 +13,7 @@ import type {
   TrackCoverage,
 } from "@fourmy/contracts";
 import { PROCEDURES, SHAPE_LABELS, TREATMENT_PURPOSE_LABELS } from "@fourmy/contracts";
-import type { Article, Intervention, Person, PhytoRegisterEntry, ProcedureCatalogue, StockLevel } from "@fourmy/contracts";
+import type { Activity, Article, Intervention, Person, PhytoRegisterEntry, ProcedureCatalogue, StockLevel } from "@fourmy/contracts";
 
 /**
  * Jeu de données de démonstration — anonymisé, inspiré d'une petite ferme
@@ -59,8 +59,27 @@ export const demoProductions: Production[] = [
     landParcelId: "00000000-0000-7000-8000-0000000000a0",
     nature: "vine",
     species: "Vitis vinifera",
+    activityId: "00000000-0000-7000-8000-0000000000f1",
     createdAt: now,
     updatedAt: now,
+  },
+];
+
+/** Activité de la parcelle de démonstration (lot C). */
+export const demoActivities: Activity[] = [
+  {
+    id: "00000000-0000-7000-8000-0000000000f1",
+    name: "Vignes AOP",
+    family: "vine_farming",
+    reference: "vine",
+    referenceLabel: "Vigne",
+    cultivation: "vitis",
+    cultivationLabel: "Vigne",
+    color: null,
+    suspended: false,
+    pictureUrl: null,
+    parcelIds: ["00000000-0000-7000-8000-0000000000a0"],
+    areaM2: 12_000,
   },
 ];
 

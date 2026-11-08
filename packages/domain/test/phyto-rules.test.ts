@@ -176,5 +176,23 @@ describe("contrôle d'un traitement", () => {
     const usages = [usage({ id: "all", species: ["plant"] }), usage({ id: "vine", species: ["vitis"], doseQuantity: 1 })];
     const r = checkTreatment(base({ usages, parcels: [parcel(), parcel({ id: "p2", name: "Vigne", lineage: VINE, cultivationLabel: "Vigne" })] }));
     expect(r.usages.map((u) => u.id)).toEqual(["all"]);
+    // Un seul usage possible : retenu d'office (dose, ZNT, délais de cet usage).
+    expect(r.usageId).toBe("all");
+  });
+
+  it("jachère (activité) : seuls les usages « Jachères et cultures intermédiaires » et « Traitements généraux »", () => {
+    const usages = [
+      usage({ id: "fallow", cropLabel: "Jachères et cultures intermédiaires", doseQuantity: 2 }),
+      usage({ id: "jevi", cropLabel: "Jevi" }),
+      usage({ id: "general", cropLabel: "Traitements généraux", doseQuantity: 4 }),
+    ];
+    const fallow = parcel({ name: "Monassut Jachère 2023", lineage: ["plant", "bioproduct"], cultivationLabel: "Jachère", cropLabels: ["Jachères et cultures intermédiaires", "Traitements généraux"] });
+    const r = checkTreatment(base({ usages, parcels: [fallow] }));
+    expect(r.usages.map((u) => u.id).sort()).toEqual(["fallow", "general"]);
+    expect(r.indicators.find((i) => i.code === "authorization")).toMatchObject({ level: "ok", message: "GLISTER ULTRA 360 autorisé sur Jachère." });
+    expect(r.usageId).toBeNull(); // deux usages : à préciser
+    // Sur du maïs, les usages des jachères et des Jevi ne valent pas.
+    const maize = checkTreatment(base({ usages }));
+    expect(maize.usages.map((u) => u.id)).toEqual(["general"]);
   });
 });

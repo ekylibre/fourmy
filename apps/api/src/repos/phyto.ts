@@ -124,7 +124,17 @@ async function parcelContext(
   waterLoaded: boolean,
 ): Promise<Omit<ParcelContext, "previousApplications"> & { cultivation: string | null }> {
   const zone = target.workingZone ? JSON.stringify(target.workingZone) : null;
-  const [r] = await rows<{ name: string; area: number | null; zone_area: number | null; cultivation: string | null; water_name: string | null; water_m: number | null; next_harvest: string | null }>(
+  const [r] = await rows<{
+    name: string;
+    area: number | null;
+    zone_area: number | null;
+    cultivation: string | null;
+    activity: string | null;
+    reference: string | null;
+    water_name: string | null;
+    water_m: number | null;
+    next_harvest: string | null;
+  }>(
     tx,
     sql`WITH v AS (SELECT shape, area_m2 FROM land_parcel_versions WHERE land_parcel_id = ${target.id} AND valid @> ${at}::timestamptz LIMIT 1),
              z AS (SELECT coalesce(${zone ? sql`ST_SetSRID(ST_GeomFromGeoJSON(${zone}), 4326)` : sql`NULL::geometry`}, (SELECT shape FROM v)) AS g),
@@ -134,9 +144,7 @@ async function parcelContext(
         SELECT lp.name,
                (SELECT area_m2::float8 FROM v) AS area,
                (SELECT ST_Area(g::geography) FROM z) AS zone_area,
-               (SELECT coalesce(p.cultivation, CASE p.nature WHEN 'vine' THEN 'vitis' END) FROM productions p JOIN campaigns c ON c.id = p.campaign_id
-                 WHERE p.land_parcel_id = lp.id AND ${at}::timestamptz::date BETWEEN c.starts_on AND c.stops_on
-                 ORDER BY coalesce(p.cultivation, CASE p.nature WHEN 'vine' THEN 'vitis' END) NULLS LAST LIMIT 1) AS cultivation,
+               prod.cultivation, prod.activity, prod.reference,
                (SELECT name FROM w ORDER BY d LIMIT 1) AS water_name,
                (SELECT d FROM w ORDER BY d LIMIT 1) AS water_m,
                (SELECT min(coalesce(i.started_at, i.stopped_at)) FROM interventions i
@@ -144,17 +152,31 @@ async function parcelContext(
                  WHERE i.procedure = ANY(${`{${HARVEST_CODES.join(",")}}`}::text[]) AND i.status <> 'cancelled'
                    AND coalesce(i.started_at, i.stopped_at) > ${at}::timestamptz
                    ${selfId ? sql`AND i.id <> ${selfId}` : sql``}) AS next_harvest
-        FROM land_parcels lp WHERE lp.id = ${target.id}`,
+        FROM land_parcels lp
+        -- Production de la campagne et son activité : la culture vient de l'activité
+        -- (variété cultivée, sinon celle de sa production de référence), sinon de la production.
+        LEFT JOIN LATERAL (
+          SELECT coalesce(a.cultivation, lx.specie, p.cultivation, CASE p.nature WHEN 'vine' THEN 'vitis' END) AS cultivation,
+                 a.name AS activity, a.reference
+          FROM productions p JOIN campaigns c ON c.id = p.campaign_id
+          LEFT JOIN activities a ON a.id = p.activity_id
+          LEFT JOIN lexicon_productions lx ON lx.reference_name = a.reference
+          WHERE p.land_parcel_id = lp.id AND ${at}::timestamptz::date BETWEEN c.starts_on AND c.stops_on
+          ORDER BY (a.id IS NULL), 1 NULLS LAST LIMIT 1) prod ON true
+        WHERE lp.id = ${target.id}`,
   );
-  const cultivation = r?.cultivation ?? null;
-  const lin = cultivation ? await lineage(tx, cultivation) : null;
+  const fallow = isFallow(r?.reference ?? null, r?.activity ?? null);
+  // Jachère : espèce générique « plant », usages E-Phy des jachères (et traitements généraux).
+  const cultivation = fallow ? "plant" : (r?.cultivation ?? null);
+  const lin = cultivation && (fallow || cultivation !== "plant") ? await lineage(tx, cultivation) : null;
   const treatedM2 = target.workedAreaM2 ?? r?.zone_area ?? r?.area ?? 0;
   return {
     id: target.id,
     name: r?.name ?? "parcelle inconnue",
     treatedHa: treatedM2 / 10_000,
     lineage: lin?.names ?? null,
-    cultivationLabel: lin?.label ?? null,
+    cultivationLabel: fallow ? (r?.activity ?? "Jachère") : (lin?.label ?? null),
+    cropLabels: fallow ? FALLOW_CROP_LABELS : null,
     cultivation,
     waterLoaded,
     waterDistanceM: r?.water_m ?? null,
@@ -162,6 +184,11 @@ async function parcelContext(
     nextHarvestAt: iso(r?.next_harvest),
   };
 }
+
+/** Libellés E-Phy des usages admis sur une jachère. */
+const FALLOW_CROP_LABELS = ["Jachères et cultures intermédiaires", "Traitements généraux"];
+/** Activité de jachère : production de référence `fallow`, `spring_fallow`… ou nommée ainsi. */
+export const isFallow = (reference: string | null, name: string | null) => /fallow/.test(reference ?? "") || /^jach[èe]re/i.test(name ?? "");
 
 /** Applications du même produit (n° AMM) sur la parcelle dans la campagne de la date, l'intervention exclue. */
 async function previousApplications(tx: Tx, parcelId: string, amm: string, at: string, selfId: string | null): Promise<number> {
@@ -231,7 +258,7 @@ export async function checkCompliance(tx: Tx, body: CheckableBody, selfId: strin
       result.indicators.unshift({ code: "authorization", level: "warning", message: "Référentiel phytosanitaire (Lexicon) non chargé : contrôle impossible." });
       result.level = worstLevel(result.indicators.map((i) => i.level));
     }
-    checks.push({ articleId: input.articleId, ...result, usageId: usageId && result.usages.some((u) => u.id === usageId) ? usageId : null });
+    checks.push({ articleId: input.articleId, ...result });
   }
   return { level: worstLevel(checks.map((c) => c.level)), checkedAt, referential: version, checks, reason: body.compliance?.reason ?? null };
 }

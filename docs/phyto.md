@@ -49,6 +49,12 @@ est jugé sur la réglementation de 2016) :
 - **Unités** des articles repris (« Litre », « Kg », « Sac de 12 kg »)
   ramenées au litre ou au kilo.
 
+## Activités
+
+La culture contrôlée vient de l'**activité** de la parcelle (docs/activites.md) :
+jachère → usages des jachères ; usage retenu d'office s'il est le seul
+possible ; culture IFT de la production de référence.
+
 ## Saisie, fiche, registre
 
 - **Formulaire** : contrôle en direct (`POST /phyto/check`) affiché sous

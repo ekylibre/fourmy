@@ -1,6 +1,6 @@
 import { AppShell, Badge, Burger, Button, Group, NavLink, Stack, Text } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { Box, Boxes, ClipboardList, Database, FileText, LayoutDashboard, Map, Plug, Users, Wine, FlaskConical } from "lucide-react";
+import { Box, Boxes, ClipboardList, Database, FileText, LayoutDashboard, Map, Plug, Users, Wine, FlaskConical, Sprout } from "lucide-react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { Wordmark } from "@fourmy/ui-lyvre";
 import { useFarm } from "../app/farm";
@@ -11,6 +11,7 @@ const SECTIONS = [
   { path: "", label: "Tableau de bord", icon: LayoutDashboard },
   { path: "/map", label: "Carte", icon: Map },
   { path: "/3d-plan", label: "Plan 3D", icon: Box },
+  { path: "/activities", label: "Activités", icon: Sprout },
   { path: "/interventions", label: "Interventions", icon: ClipboardList },
   { path: "/stocks", label: "Stocks", icon: Boxes },
   { path: "/cellar", label: "Cuverie", icon: Wine },

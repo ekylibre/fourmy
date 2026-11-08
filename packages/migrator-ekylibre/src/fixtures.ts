@@ -35,6 +35,7 @@ export const FIXTURE_TABLES = [
   "campaigns",
   "land_parcels",
   "land_parcel_versions",
+  "activities",
   "productions",
   "places",
   "place_versions",

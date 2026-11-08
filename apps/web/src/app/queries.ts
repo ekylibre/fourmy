@@ -1,5 +1,6 @@
 import { useQuery, type QueryClient } from "@tanstack/react-query";
 import type {
+  Activity,
   Article,
   ContainerContents,
   FarmMember,
@@ -126,5 +127,14 @@ export function useMembers(farmId: string, enabled = true) {
     queryKey: ["members", farmId],
     queryFn: () => api.get<Page<FarmMember>>(farmPath(farmId, "/members")),
     enabled,
+  });
+}
+
+/** Activités de la ferme, avec leurs parcelles de la campagne `year`. */
+export function useActivities(farmId: string, year: number) {
+  return useQuery({
+    queryKey: ["activities", farmId, year],
+    queryFn: () => api.get<{ items: Activity[] }>(farmPath(farmId, `/activities?year=${year}`)),
+    staleTime: 5 * 60_000,
   });
 }

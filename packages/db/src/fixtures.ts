@@ -45,6 +45,8 @@ export async function loadFixture(sql: Sql, fixture: FixtureFile): Promise<void>
         [JSON.stringify(rows)],
       );
     }
+    // Fixture antérieure aux activités (migration 0011) : activités déduites des productions.
+    for (const farm of fixture.tables.farms ?? []) await tx`SELECT fourmy_ensure_activities(${farm.id as string})`;
     const interventionIds = (fixture.tables.interventions ?? []).map((r) => r.id as string);
     if (interventionIds.length) {
       for (const child of CHILDREN_OF_INTERVENTIONS) {
