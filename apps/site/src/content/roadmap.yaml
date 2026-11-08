@@ -18,17 +18,6 @@ roadmap:
   - title: Registre phytosanitaire en PDF
     text: Le registre prêt à imprimer pour les contrôles.
     status: prochainement
-  - title: Réglementation phytosanitaire à la saisie
-    text: >-
-      Autorisation du produit sur la culture, dose maximale, zones non traitées près des
-      cours d'eau, délais avant récolte et de ré-entrée signalés dans le formulaire ; IFT
-      calculé par le service du ministère.
-    status: prochainement
-  - title: Météo des interventions
-    text: >-
-      Température, hygrométrie, vent et pluie enregistrés avec chaque intervention, et
-      créneaux favorables à la pulvérisation (Open-Meteo, OpenWeather, meteoblue).
-    status: prochainement
   - title: Sondes et pièges connectés
     text: De nouvelles intégrations sur le modèle des traceurs GPS.
     status: plus-tard

@@ -63,6 +63,25 @@ features:
     status: disponible
     capture: intervention-fiche
     since: 0.30.0
+  - id: controle-phyto
+    title: Contrôle réglementaire des traitements
+    text: >-
+      En saisissant un traitement, Fourmy vérifie l'autorisation du produit sur la culture,
+      la dose maximale, le nombre d'applications, la zone non traitée au bord des cours
+      d'eau et les délais avant récolte et de ré-entrée, d'après le catalogue officiel
+      E-Phy. Un feu rouge demande un motif, conservé avec l'intervention.
+    status: disponible
+    capture: controle-phyto
+    since: 0.34.0
+  - id: meteo-interventions
+    title: Météo des interventions
+    text: >-
+      La météo de chaque intervention est remplie toute seule (température, hygrométrie,
+      vent, pluie), et les créneaux favorables à la pulvérisation des prochains jours
+      s'affichent. Open-Meteo par défaut, ou votre clé OpenWeather ou meteoblue.
+    status: disponible
+    capture: meteo
+    since: 0.35.0
   - id: stocks
     title: Stocks tenus tout seuls
     text: >-
@@ -79,10 +98,10 @@ features:
     capture: cuverie
     since: 0.17.0
   - id: registre
-    title: Registre phytosanitaire calculé
+    title: Registre phytosanitaire et IFT calculés
     text: >-
       Le registre se déduit des traitements saisis : rien à ressaisir. Export pour les
-      contrôles.
+      contrôles, et l'IFT de la campagne calculé par le service du ministère.
     status: disponible
     capture: registre
     since: 0.7.0
@@ -115,8 +134,8 @@ features:
       phytosanitaire reste identique à l'original.
     status: disponible
     since: 0.9.0
-  - id: meteo
-    title: Météo et capteurs
+  - id: capteurs
+    title: Stations, sondes et pièges connectés
     text: >-
       Stations météo, sondes et pièges reliés comme les traceurs GPS, relevés rattachés
       aux parcelles.

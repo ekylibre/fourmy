@@ -117,6 +117,30 @@ test("parcelles choisies sur la carte, zone partielle", async ({ page }) => {
   await page.keyboard.press("Escape");
 });
 
+test("contrôle réglementaire d'un traitement (référentiel E-Phy chargé)", async ({ page }) => {
+  await page.getByLabel("Date de la frise").fill("2023-06-15");
+  await page.getByRole("link", { name: "Interventions" }).click();
+  await page.getByRole("button", { name: "Nouvelle intervention" }).click();
+  const form = page.getByRole("dialog");
+  await form.getByRole("combobox", { name: "Intervention" }).fill("sans fertilisation");
+  await page.getByRole("option", { name: "Pulvérisation (sans fertilisation)" }).click();
+  await form.getByRole("combobox", { name: "Parcelles" }).click();
+  await page.getByRole("option").first().click();
+  await page.keyboard.press("Escape");
+  await form.getByRole("combobox", { name: "Produit", exact: true }).click();
+  await page.getByRole("option", { name: /AMM/ }).first().click();
+  await form.getByRole("textbox", { name: "Quantité" }).fill("3");
+  await expect(form.getByLabel("Contrôle réglementaire").getByRole("listitem").first()).toBeVisible({ timeout: 15_000 });
+  await form.getByLabel("Contrôle réglementaire").scrollIntoViewIfNeeded();
+  await snap(page, "controle-phyto");
+  await page.keyboard.press("Escape");
+});
+
+test("conditions de pulvérisation (tableau de bord du jour)", async ({ page }) => {
+  await expect(page.getByLabel("Conditions de pulvérisation")).toBeVisible({ timeout: 20_000 });
+  await snap(page, "meteo");
+});
+
 test("équipe et intégrations", async ({ page }) => {
   await page.getByRole("link", { name: "Équipe" }).click();
   await expect(page.getByRole("heading", { name: "Personnes" })).toBeVisible();
