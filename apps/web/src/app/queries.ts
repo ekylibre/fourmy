@@ -2,6 +2,7 @@ import { useQuery, type QueryClient } from "@tanstack/react-query";
 import type {
   Activity,
   FarmPhytoArticle,
+  ParcelCertification,
   Article,
   ContainerContents,
   FarmMember,
@@ -146,5 +147,14 @@ export function usePhytoArticles(farmId: string) {
     queryKey: ["phyto-articles", farmId],
     queryFn: () => api.get<{ items: FarmPhytoArticle[] }>(farmPath(farmId, "/phyto/articles")),
     staleTime: 10 * 60_000,
+  });
+}
+
+/** Certifications des parcelles de la ferme (toutes dates). */
+export function useCertifications(farmId: string) {
+  return useQuery({
+    queryKey: ["certifications", farmId],
+    queryFn: () => api.get<{ items: ParcelCertification[] }>(farmPath(farmId, "/certifications")),
+    staleTime: 5 * 60_000,
   });
 }

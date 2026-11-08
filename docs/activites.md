@@ -63,3 +63,18 @@ productions des autres activités (cultures successives) ne bougent pas.
   « culture inconnue », sont contrôlées sur les usages des jachères.
 - Frédéric : Vignes AOP, Plantations nouvelles (`vine`), Chai, Gestion
   administrative, Maintenance équipements.
+
+## Certifications des parcelles (lot G)
+
+`parcel_certifications` (migration 0015, RLS) : AB (en conversion,
+certifiée), HVE 1 à 3, AOP/AOC, IGP, Label Rouge, STG, GLOBALG.A.P.,
+Rainforest Alliance, autre cahier des charges ; début, fin, organisme, n°.
+
+- Saisie : « Parcelles » d'une activité → « Certifications » d'une parcelle
+  (`POST /land-parcels/:id/certifications`, `PUT|DELETE /certifications/:id`).
+- **Récapitulatif par activité** : par certification, parcelles certifiées
+  pendant la campagne (« AB · 3/8 »).
+- Fiche d'une intervention : certifications de chaque parcelle à sa date.
+- **Contrôle phyto** : une parcelle AB (ou en conversion) à la date du
+  traitement n'admet que les produits « utilisables en agriculture
+  biologique » (mention E-Phy) ; sinon feu rouge.

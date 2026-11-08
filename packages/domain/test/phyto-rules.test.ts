@@ -226,3 +226,15 @@ describe("mélanges (arrêté de 2015, règle d'Ekylibre)", () => {
     expect(dangerMessages({ checks: [{ indicators: [{ level: "danger", message: "Dose" }] }], mixture: checkMixture([a, c]) })).toHaveLength(2);
   });
 });
+
+describe("agriculture biologique", () => {
+  it("parcelle AB : produit non utilisable en AB → feu rouge ; utilisable → vert", () => {
+    const abParcel = parcel({ organic: true });
+    const r = checkTreatment(base({ parcels: [abParcel] }));
+    expect(r.indicators.find((i) => i.code === "organic")).toMatchObject({ level: "danger", message: expect.stringMatching(/n'est pas utilisable en agriculture biologique/) });
+    expect(r.level).toBe("danger");
+    const ok = checkTreatment(base({ parcels: [abParcel], product: { ...glister, organic: true } }));
+    expect(ok.indicators.find((i) => i.code === "organic")).toMatchObject({ level: "ok" });
+    expect(checkTreatment(base()).indicators.some((i) => i.code === "organic")).toBe(false);
+  });
+});

@@ -18,3 +18,4 @@ export * from "./procedure-icons.js";
 export * from "./integrations.js";
 export * from "./phyto.js";
 export * from "./activities.js";
+export * from "./certifications.js";

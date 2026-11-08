@@ -78,16 +78,17 @@ async function productByAmm(tx: Tx, amm: string): Promise<{ id: number; ref: Phy
     reentry_delay_hours: number | null;
     natures: string[];
     mix_codes: number[];
+    organic: boolean;
   }>(
     tx,
-    sql`SELECT id, amm, name, state, started_on::text, stopped_on::text, reentry_delay_hours, natures, mix_codes
+    sql`SELECT id, amm, name, state, started_on::text, stopped_on::text, reentry_delay_hours, natures, mix_codes, organic
         FROM phyto_products WHERE amm = ${amm}
         ORDER BY (state = 'authorized') DESC, stopped_on DESC NULLS FIRST LIMIT 1`,
   );
   if (!p) return null;
   return {
     id: p.id,
-    ref: { amm: p.amm, name: p.name, state: p.state, startedOn: p.started_on, stoppedOn: p.stopped_on, reentryDelayHours: p.reentry_delay_hours, natures: p.natures },
+    ref: { amm: p.amm, name: p.name, state: p.state, startedOn: p.started_on, stoppedOn: p.stopped_on, reentryDelayHours: p.reentry_delay_hours, natures: p.natures, organic: p.organic },
     mixCodes: p.mix_codes ?? [],
   };
 }
@@ -135,6 +136,7 @@ async function parcelContext(
     cultivation: string | null;
     activity: string | null;
     reference: string | null;
+    organic: boolean;
     water_name: string | null;
     water_m: number | null;
     next_harvest: string | null;
@@ -149,6 +151,8 @@ async function parcelContext(
                (SELECT area_m2::float8 FROM v) AS area,
                (SELECT ST_Area(g::geography) FROM z) AS zone_area,
                prod.cultivation, prod.activity, prod.reference,
+               EXISTS (SELECT 1 FROM parcel_certifications pc WHERE pc.land_parcel_id = lp.id AND pc.kind = 'organic'
+                         AND pc.started_on <= ${at}::timestamptz::date AND (pc.stopped_on IS NULL OR pc.stopped_on >= ${at}::timestamptz::date)) AS organic,
                (SELECT name FROM w ORDER BY d LIMIT 1) AS water_name,
                (SELECT d FROM w ORDER BY d LIMIT 1) AS water_m,
                (SELECT min(coalesce(i.started_at, i.stopped_at)) FROM interventions i
@@ -181,6 +185,7 @@ async function parcelContext(
     lineage: lin?.names ?? null,
     cultivationLabel: fallow ? (r?.activity ?? "Jachère") : (lin?.label ?? null),
     cropLabels: fallow ? FALLOW_CROP_LABELS : null,
+    organic: r?.organic ?? false,
     cultivation,
     waterLoaded,
     waterDistanceM: r?.water_m ?? null,

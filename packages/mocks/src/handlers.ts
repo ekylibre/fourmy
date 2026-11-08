@@ -113,6 +113,13 @@ export const handlers = [
   http.get(`*${base}/phyto/ift`, () => HttpResponse.json({ campaign: 2026, total: 0, segments: {}, pendingInterventions: 0, parcels: [] })),
   http.get(`*${base}/phyto/parcels/:id/delays`, () => HttpResponse.json({ reentry: null, harvest: null })),
   http.get(`*${base}/activities`, () => HttpResponse.json({ items: demoActivities })),
+  http.get(`*${base}/certifications`, () =>
+    HttpResponse.json({
+      items: [
+        { id: "00000000-0000-7000-8000-0000000000f9", landParcelId: "00000000-0000-7000-8000-0000000000a0", kind: "organic", level: "certified", label: null, certifier: "Ecocert", reference: null, startedOn: "2020-01-01", stoppedOn: null },
+      ],
+    }),
+  ),
   http.get(`*${base}/phyto/status`, () =>
     HttpResponse.json({
       referential: { phytosanitary: "2026.11.07.1", taxonomy: "2026.10.07.1", loadedAt: "2026-11-08T11:00:00.000Z" },

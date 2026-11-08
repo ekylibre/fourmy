@@ -142,6 +142,24 @@ describe.skipIf(!url)("activités (intégration)", () => {
     expect((await send("DELETE", `/activities/${corn.id}`)).status).toBe(204);
   });
 
+  it("certification AB de la parcelle : produit non utilisable en AB → feu rouge, à la date", async () => {
+    const write = { kind: "organic", level: "certified", certifier: "Ecocert", startedOn: "2025-01-01" };
+    expect((await send("POST", `/land-parcels/${parcelId}/certifications`, write, worker)).status).toBe(403);
+    expect((await send("POST", `/land-parcels/${parcelId}/certifications`, { ...write, stoppedOn: "2024-01-01" })).status).toBe(400);
+    const created = await send("POST", `/land-parcels/${parcelId}/certifications`, write);
+    expect(created.status).toBe(201);
+    const cert = await created.json();
+    expect(cert).toMatchObject({ landParcelId: parcelId, kind: "organic", level: "certified", startedOn: "2025-01-01", stoppedOn: null });
+    const organic = (await check()).indicators.find((i: { code: string }) => i.code === "organic");
+    expect(organic).toMatchObject({ level: "danger", message: "ACTI TEST n'est pas utilisable en agriculture biologique : Le Champ certifiée(s) AB." });
+    // Fin de la certification avant le traitement : plus de contrôle AB.
+    await send("PUT", `/certifications/${cert.id}`, { ...write, stoppedOn: "2025-03-31" });
+    expect((await check()).indicators.some((i: { code: string }) => i.code === "organic")).toBe(false);
+    const list = await (await send("GET", "/certifications")).json();
+    expect(list.items).toHaveLength(1);
+    expect((await send("DELETE", `/certifications/${cert.id}`)).status).toBe(204);
+  });
+
   it("images du référentiel servies sans session, avec cache", async () => {
     const r = await app.request("/api/v1/lexicon/pictures/varieties/fourmy_test");
     expect(r.status).toBe(200);

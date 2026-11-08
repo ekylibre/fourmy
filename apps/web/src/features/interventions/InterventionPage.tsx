@@ -12,8 +12,9 @@ import { formatHa } from "@fourmy/ui-lyvre";
 import { api, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { formatDateTime, formatNumber, formatPeriod, procedureLabel, unitLabel } from "../../app/labels";
-import { useActivities, useArticles, useIntervention, useParcelNames, usePeople, usePhytoArticles, useSnapshot } from "../../app/queries";
+import { useActivities, useCertifications, useArticles, useIntervention, useParcelNames, usePeople, usePhytoArticles, useSnapshot } from "../../app/queries";
 import { RegulatoryPictos } from "../phyto/Hazards";
+import { activeDuring, CertificationBadges } from "../certifications/Certifications";
 import { ActivityBadge, activityOfParcel } from "../activities/ActivityBadge";
 import { ErrorAlert, Loading } from "../../components/states";
 import { MapBoundary } from "../../components/MapBoundary";
@@ -51,6 +52,7 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
   const people = usePeople(farm.id);
   const parcelNames = useParcelNames(farm.id);
   const activities = useActivities(farm.id, Number(day.slice(0, 4)));
+  const certifications = useCertifications(farm.id);
   // Pictogrammes réglementaires des intrants phyto : produit (mentions H, ré-entrée) et contrôle (ZNT, DAR).
   const phytoArticles = usePhytoArticles(farm.id);
   const liveCompliance = useQuery({
@@ -224,7 +226,14 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
                     return (
                       <Table.Tr key={t.id}>
                         <Table.Td>{targetName(names, t)}</Table.Td>
-                        <Table.Td>{activity && <ActivityBadge activity={activity} />}</Table.Td>
+                        <Table.Td>
+                          <Group gap="xs">
+                            {activity && <ActivityBadge activity={activity} />}
+                            <CertificationBadges
+                              certs={(certifications.data?.items ?? []).filter((c) => c.landParcelId === t.id && activeDuring(c, day.slice(0, 10), day.slice(0, 10)))}
+                            />
+                          </Group>
+                        </Table.Td>
                         <Table.Td ta="right" className="lv-num">
                           {t.kind === "land_parcel" && areaOf(t) !== null ? formatHa(areaOf(t)!) : ""}
                           {t.workedAreaM2 ? " (surface travaillée)" : ""}

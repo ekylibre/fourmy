@@ -20,7 +20,7 @@ export const complianceWrite = z.object({
 export type ComplianceWrite = z.infer<typeof complianceWrite>;
 
 export const complianceIndicator = z.object({
-  code: z.enum(["authorization", "dose", "applications", "znt", "dar", "reentry"]),
+  code: z.enum(["authorization", "organic", "dose", "applications", "znt", "dar", "reentry"]),
   level: complianceLevel,
   message: z.string(),
 });

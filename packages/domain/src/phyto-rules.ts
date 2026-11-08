@@ -14,7 +14,7 @@
  */
 
 export type ComplianceLevel = "ok" | "info" | "warning" | "danger";
-export type ComplianceCode = "authorization" | "dose" | "applications" | "znt" | "dar" | "reentry";
+export type ComplianceCode = "authorization" | "organic" | "dose" | "applications" | "znt" | "dar" | "reentry";
 
 export interface ComplianceIndicator {
   code: ComplianceCode;
@@ -30,6 +30,8 @@ export interface PhytoProductRef {
   stoppedOn: string | null;
   reentryDelayHours: number | null;
   natures: string[];
+  /** Utilisable en agriculture biologique (mention E-Phy). */
+  organic?: boolean;
 }
 
 export interface PhytoUsageRef {
@@ -65,6 +67,8 @@ export interface ParcelContext {
    * cultures intermédiaires » et « Traitements généraux ».
    */
   cropLabels?: string[] | null;
+  /** Parcelle certifiée (ou en conversion) AB à la date du traitement. */
+  organic?: boolean;
   /** Données d'eau chargées autour de la ferme. */
   waterLoaded: boolean;
   /** Distance (m) entre la zone traitée et l'eau la plus proche ; null si aucune à proximité. */
@@ -243,6 +247,18 @@ export function checkTreatment(input: TreatmentCheckInput): TreatmentCheck {
     });
   } else if (validity.valid && known.length) {
     indicators.push({ code: "authorization", level: "ok", message: `${product.name} autorisé sur ${[...new Set(known.map((p) => p.cultivationLabel))].join(", ")}.` });
+  }
+
+  // Agriculture biologique : sur une parcelle certifiée AB (ou en conversion),
+  // seuls les produits utilisables en AB (mention E-Phy).
+  const organicParcels = parcels.filter((p) => p.organic);
+  if (organicParcels.length) {
+    const names = organicParcels.map((p) => p.name).join(", ");
+    indicators.push(
+      product.organic
+        ? { code: "organic", level: "ok", message: `${product.name} utilisable en agriculture biologique (${names}).` }
+        : { code: "organic", level: "danger", message: `${product.name} n'est pas utilisable en agriculture biologique : ${names} certifiée(s) AB.` },
+    );
   }
 
   // Usages communs à toutes les parcelles connues (choix de la cible).

@@ -41,6 +41,32 @@ describe("activités", () => {
     expect(created).toMatchObject({ name: "Maïs grain", family: "plant_farming", reference: "grain_corn", cultivation: "zea_mays", color: "#F5D33D" });
   });
 
+  it("récapitulatif des certifications par activité ; certification ajoutée à une parcelle", async () => {
+    const user = userEvent.setup();
+    let posted: Record<string, unknown> | null = null;
+    server.use(
+      http.post("*/land-parcels/:id/certifications", async ({ request }) => {
+        posted = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({}, { status: 201 });
+      }),
+    );
+    renderApp(`/f/${FARM}/activities?at=2026-06-10`);
+    const card = await screen.findByLabelText("Activité Vignes AOP");
+    expect(await within(card).findByText("AB · 1/1")).toBeInTheDocument();
+    await user.click(within(card).getByRole("button", { name: "Parcelles 2026" }));
+    const dialog = await screen.findByRole("dialog", { name: /Vignes AOP : parcelles 2026/ });
+    await user.click(await within(dialog).findByRole("button", { name: "Certifications" }));
+    const certs = await screen.findByRole("dialog", { name: /Certifications :/ });
+    expect(within(certs).getByText("Ecocert")).toBeInTheDocument();
+    await user.click(within(certs).getByRole("button", { name: "Ajouter une certification" }));
+    const form = within(certs).getByRole("form", { name: "Certification" });
+    await user.click(within(form).getByRole("combobox", { name: "Certification" }));
+    await user.click(await screen.findByRole("option", { name: "Haute Valeur Environnementale (HVE)" }));
+    await user.click(within(form).getByRole("button", { name: "Enregistrer" }));
+    expect(await screen.findByText("Certification ajoutée.")).toBeInTheDocument();
+    expect(posted).toMatchObject({ kind: "hve", level: "3" });
+  });
+
   it("la fiche d'une intervention montre l'activité de chaque parcelle", async () => {
     renderApp(`/f/${FARM}/interventions/${demoInterventions[0]!.id}?at=2026-06-10`);
     const targets = await screen.findByRole("table", { name: "Cibles" });

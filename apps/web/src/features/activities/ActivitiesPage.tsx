@@ -9,9 +9,10 @@ import { formatHa } from "@fourmy/ui-lyvre";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
-import { useActivities, useSnapshot } from "../../app/queries";
+import { useActivities, useCertifications, useSnapshot } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
 import { ActivityPicture } from "./ActivityBadge";
+import { activeDuring, CertificationBadges, CertificationRecap, ParcelCertificationsModal } from "../certifications/Certifications";
 
 /**
  * Activités de la ferme (lot C des retours du 08/11/2026) : comme dans
@@ -74,6 +75,7 @@ export function ActivitiesPage() {
                           {a.parcelIds.length} parcelle(s){a.areaM2 ? ` · ${formatHa(a.areaM2)}` : ""}
                         </Text>
                       )}
+                      <CertificationRecap parcelIds={a.parcelIds} year={year} />
                     </Stack>
                   </Group>
                   {owner && (
@@ -233,6 +235,8 @@ function ParcelsForm({ activity, year, at, onDone }: { activity: Activity; year:
   const farm = useFarm();
   const snap = useSnapshot(farm.id, at);
   const [selected, setSelected] = useState<string[]>(activity.parcelIds);
+  const certifications = useCertifications(farm.id);
+  const [certifying, setCertifying] = useState<{ id: string; name: string } | null>(null);
   const save = useSave(
     () => api.put(farmPath(farm.id, `/activities/${activity.id}/parcels`), { year, parcelIds: selected }),
     "Parcelles enregistrées.",
@@ -249,6 +253,26 @@ function ParcelsForm({ activity, year, at, onDone }: { activity: Activity; year:
         Une parcelle peut porter plusieurs activités dans la campagne (cultures successives) ; retirer une parcelle supprime sa production pour cette activité.
       </Text>
       <MultiSelect label="Parcelles" searchable data={data} value={selected} onChange={setSelected} />
+      {selected.length > 0 && (
+        <Stack gap={4} aria-label="Parcelles et certifications">
+          {selected.map((id) => {
+            const name = known.get(id) ?? "Parcelle d'une autre date";
+            const certs = (certifications.data?.items ?? []).filter((c) => c.landParcelId === id && activeDuring(c, `${year}-01-01`, `${year}-12-31`));
+            return (
+              <Group key={id} justify="space-between" wrap="nowrap" gap="xs">
+                <Group gap="xs" wrap="nowrap">
+                  <Text size="sm">{name}</Text>
+                  <CertificationBadges certs={certs} />
+                </Group>
+                <Button size="compact-xs" variant="subtle" onClick={() => setCertifying({ id, name })}>
+                  Certifications
+                </Button>
+              </Group>
+            );
+          })}
+        </Stack>
+      )}
+      <ParcelCertificationsModal parcel={certifying} onClose={() => setCertifying(null)} />
       {save.error && <Alert color="brique">{save.error}</Alert>}
       <Group justify="flex-end">
         <Button onClick={() => save.mutate(undefined)} loading={save.isPending}>
