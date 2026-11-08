@@ -3,14 +3,15 @@ import { Alert, Badge, Button, Grid, Group, Paper, SegmentedControl, Select, Sta
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pause, Play } from "lucide-react";
-import type { TrackReplay } from "@fourmy/contracts";
+import type { AvatarInfo, Hitch, LatestPosition, TrackReplay } from "@fourmy/contracts";
+import { assetUrl } from "../features/equipments/EquipmentLogo";
 import type { Pt } from "@fourmy/domain";
 import { formatLiters } from "@fourmy/ui-lyvre";
 import { api, ApiError, farmPath } from "../app/api";
 import { useAt } from "../app/at";
 import { useFarm } from "../app/farm";
 import { formatDate } from "../app/labels";
-import { useSnapshot } from "../app/queries";
+import { useEquipments, useSnapshot } from "../app/queries";
 import { ErrorAlert, Loading } from "../components/states";
 import { TankContents } from "../features/cellar/CellarPage";
 import { FarmScene, TERRAIN_TILE_BYTES, type PlanData } from "./FarmScene";
@@ -43,6 +44,21 @@ export function Plan3DPage() {
     placeholderData: (prev) => prev,
   });
   const snap = useSnapshot(farm.id, at);
+  const equipments = useEquipments(farm.id);
+  const modelUrl = (id: string, hash: string) => `${location.origin}/api/v1${farmPath(farm.id, `/equipments/${id}/avatar.glb?v=${hash}`)}`;
+  // Tous les matériels suivis, à leur dernière position connue à la date (FR-MAT-86).
+  const [fleetOn, setFleetOn] = useState(false);
+  const fleet = useQuery({
+    queryKey: ["tracks-latest", farm.id, at],
+    queryFn: () => api.get<{ items: LatestPosition[] }>(farmPath(farm.id, `/tracks/latest?at=${encodeURIComponent(at)}`)),
+    enabled: fleetOn,
+  });
+  useEffect(() => {
+    scene.current?.setFleet(
+      fleetOn ? (fleet.data?.items ?? []).map((f) => ({ id: f.equipmentId, name: f.name, lon: f.lon, lat: f.lat, heading: f.heading, modelUrl: modelUrl(f.equipmentId, f.avatarHash) })) : [],
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fleetOn, fleet.data]);
 
   // Scène Cesium : créée une fois, détruite au départ de la page.
   useEffect(() => {
@@ -130,7 +146,18 @@ export function Plan3DPage() {
         return;
       }
       const name = snap.data?.equipments.find((e) => e.id === equipment)?.name ?? "Matériel";
-      await scene.current?.setTrack(t.samples, name);
+      // Avatar 3D (lot M) : modèle du matériel, son logo, outils attelés ce jour-là.
+      const [avatar, hitched] = await Promise.all([
+        api.get<AvatarInfo>(farmPath(farm.id, `/equipments/${equipment}/avatar`)).catch(() => null),
+        api.get<{ items: Hitch[] }>(farmPath(farm.id, `/tracks/hitches?equipment=${equipment}&from=${encodeURIComponent(t.from)}&to=${encodeURIComponent(t.to)}`)).catch(() => null),
+      ]);
+      const logo = equipments.data?.items.find((e) => e.id === equipment)?.logoAssetId;
+      const offset = Number((avatar?.params as { hitchOffsetM?: number } | undefined)?.hitchOffsetM ?? 1);
+      await scene.current?.setTrack(t.samples, name, {
+        modelUrl: avatar ? modelUrl(equipment!, avatar.hash) : undefined,
+        logoUrl: logo ? assetUrl(farm.id, logo) : undefined,
+        hitches: (hitched?.items ?? []).map((h) => ({ name: h.toolName, url: modelUrl(h.toolId, h.avatarHash), offsetM: offset, from: h.from, to: h.to })),
+      });
     },
   });
 
@@ -226,6 +253,17 @@ export function Plan3DPage() {
                   Charger
                 </Button>
               </Group>
+              <Switch
+                mt="sm"
+                label="Tous les matériels suivis (dernière position connue)"
+                checked={fleetOn}
+                onChange={(e) => setFleetOn(e.currentTarget.checked)}
+              />
+              {fleetOn && fleet.data && (
+                <Text size="xs" c="dimmed">
+                  {fleet.data.items.length ? fleet.data.items.map((f) => `${f.name} (${new Date(f.time).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })})`).join(" · ") : "Aucune position dans les 30 jours précédents."}
+                </Text>
+              )}
               {loadTrack.data && loadTrack.data.samples.length > 1 && (
                 <Group mt="sm" wrap="nowrap">
                   <Button

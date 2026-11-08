@@ -19,6 +19,9 @@
     },
     {
       "path": "../../packages/geo-ign"
+    },
+    {
+      "path": "../../packages/equipment-3d"
     }
   ],
   "include": [

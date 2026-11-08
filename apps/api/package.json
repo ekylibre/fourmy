@@ -19,6 +19,7 @@
     "@fourmy/contracts": "workspace:*",
     "@fourmy/db": "workspace:*",
     "@fourmy/domain": "workspace:*",
+    "@fourmy/equipment-3d": "workspace:*",
     "@fourmy/geo-ign": "workspace:*",
     "@fourmy/lexicon": "workspace:*",
     "@fourmy/migrator-ekylibre": "workspace:*",

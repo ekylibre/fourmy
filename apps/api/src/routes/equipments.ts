@@ -1,5 +1,6 @@
 import { Hono, type Context } from "hono";
-import { equipmentOptionWrite, equipmentWrite, farmBrandWrite, meterReadingWrite } from "@fourmy/contracts";
+import { avatarWrite, equipmentOptionWrite, equipmentWrite, farmBrandWrite, meterReadingWrite } from "@fourmy/contracts";
+import { avatarGlb, avatarInfo, saveAvatar, setModel } from "../repos/avatar.js";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import {
@@ -87,6 +88,26 @@ export const equipmentRoutes = new Hono<Env>()
     c.json(await setLogo(db(), c.get("farmId"), domainCtx(c), { brandId: uuidParam(c, "id") }, await logoUpload(c))),
   )
   .delete("/brands/:id/logo", requireOwner, async (c) => c.json(await setLogo(db(), c.get("farmId"), domainCtx(c), { brandId: uuidParam(c, "id") }, null)))
+  // Avatar 3D (lot M) : paramètres, GLB (généré ou importé), réglage, import.
+  .get("/equipments/:id/avatar", async (c) => c.json(await avatarInfo(db(), c.get("farmId"), uuidParam(c, "id"))))
+  .get("/equipments/:id/avatar.glb", async (c) => {
+    const { bytes, etag } = await avatarGlb(db(), c.get("farmId"), uuidParam(c, "id"));
+    const tag = `"${etag}"`;
+    const headers = { etag: tag, "cache-control": "private, max-age=0, must-revalidate", "content-type": "model/gltf-binary" };
+    if (c.req.header("if-none-match") === tag) return c.body(null, 304, headers);
+    return c.body(bytes, 200, headers);
+  })
+  .put("/equipments/:id/avatar", requireOwner, async (c) => {
+    const parsed = avatarWrite.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.message);
+    return c.json(await saveAvatar(db(), c.get("farmId"), domainCtx(c), uuidParam(c, "id"), parsed.data));
+  })
+  .put("/equipments/:id/model", requireOwner, async (c) => {
+    const body = await c.req.parseBody().catch(() => null);
+    if (!(body?.file instanceof File)) throw new BadRequest("Fichier « file » attendu (multipart/form-data).");
+    return c.json(await setModel(db(), c.get("farmId"), domainCtx(c), uuidParam(c, "id"), new Uint8Array(await body.file.arrayBuffer())));
+  })
+  .delete("/equipments/:id/model", requireOwner, async (c) => c.json(await setModel(db(), c.get("farmId"), domainCtx(c), uuidParam(c, "id"), null)))
   // Fichier : adressé par un identifiant neuf à chaque envoi, donc immuable.
   // Un SVG n'est jamais exécuté : servi en sandbox, sans scripts.
   .get("/assets/:id", async (c) => {

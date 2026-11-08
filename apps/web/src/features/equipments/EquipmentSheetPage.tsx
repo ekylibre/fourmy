@@ -14,8 +14,9 @@ import { ProcedureIcon } from "../../components/ProcedureIcon";
 import { EquipmentLogo, uploadLogo } from "./EquipmentLogo";
 import { EquipmentFormModal, formatHours, ReadingModal } from "./EquipmentForms";
 import { MaintenanceTab, PartsTab } from "../maintenance/Maintenance";
+import { AvatarTab } from "./AvatarTab";
 
-const TABS = ["general", "maintenance", "parts", "technical", "readings", "history"] as const;
+const TABS = ["general", "maintenance", "parts", "technical", "readings", "history", "3d"] as const;
 type Tab = (typeof TABS)[number];
 
 /**
@@ -110,6 +111,7 @@ function Sheet({ sheet: s }: { sheet: EquipmentSheet }) {
           <Tabs.Tab value="technical">Technique</Tabs.Tab>
           <Tabs.Tab value="readings">Relevés ({s.readings.length})</Tabs.Tab>
           <Tabs.Tab value="history">Historique ({s.history.length})</Tabs.Tab>
+          <Tabs.Tab value="3d">3D</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="general" pt="md">
           <General sheet={s} />
@@ -128,6 +130,9 @@ function Sheet({ sheet: s }: { sheet: EquipmentSheet }) {
         </Tabs.Panel>
         <Tabs.Panel value="history" pt="md">
           <History sheet={s} />
+        </Tabs.Panel>
+        <Tabs.Panel value="3d" pt="md">
+          <AvatarTab sheet={s} />
         </Tabs.Panel>
       </Tabs>
       {editing && <EquipmentFormModal farmId={farm.id} sheet={s} onClose={() => setEditing(false)} />}

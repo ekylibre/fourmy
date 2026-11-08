@@ -49,6 +49,9 @@ importers:
       '@fourmy/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@fourmy/equipment-3d':
+        specifier: workspace:*
+        version: link:../../packages/equipment-3d
       '@fourmy/geo-ign':
         specifier: workspace:*
         version: link:../../packages/geo-ign
@@ -156,6 +159,9 @@ importers:
       '@fourmy/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@fourmy/equipment-3d':
+        specifier: workspace:*
+        version: link:../../packages/equipment-3d
       '@fourmy/ui-lyvre':
         specifier: workspace:*
         version: link:../../packages/ui-lyvre
@@ -359,6 +365,16 @@ importers:
       '@fourmy/contracts':
         specifier: workspace:*
         version: link:../contracts
+    devDependencies:
+      vitest:
+        specifier: 2.1.8
+        version: 2.1.8(@types/node@24.19.2)(jsdom@29.1.1(@noble/hashes@2.4.0))(lightningcss@1.33.0)(msw@2.7.0(@types/node@24.19.2)(typescript@5.7.3))(sugarss@5.0.2(postcss@8.5.32))
+
+  packages/equipment-3d:
+    dependencies:
+      '@gltf-transform/core':
+        specifier: 4.5.1
+        version: 4.5.1
     devDependencies:
       vitest:
         specifier: 2.1.8
@@ -1388,6 +1404,9 @@ packages:
 
   '@fontsource/ibm-plex-sans@5.3.0':
     resolution: {integrity: sha512-CbE4CbbEEZJX860XyUiRpsksXIQR8Rp2XDva2VO53NJox9tVNtusrysd2x5YkUEY3ErQ66W1IiiQL8/wihhw5w==}
+
+  '@gltf-transform/core@4.5.1':
+    resolution: {integrity: sha512-OWgBYssKHKoXMIrMb2N20jXqWRnMP9HdtcTFQBEAJtz4P+OOxx5fozl5eAeK7nktIs5uDE/lu4NbkE5VCZaR9g==}
 
   '@hono/node-server@1.13.8':
     resolution: {integrity: sha512-fsn8ucecsAXUoVxrUil0m13kOEq4mkX4/4QozCqmY+HpGfKl74OYSn8JcMA8GnG0ClfdRI4/ZSeG7zhFaVg+wg==}
@@ -3838,6 +3857,9 @@ packages:
   prop-types@15.8.1:
     resolution: {integrity: sha512-oj87CgZICdulUohogVAR7AjlC0327U4el4L6eAvOqCeudMDVU0NThNaV+b9Df4dXgSP1gXMTnPdhfe/2qDH5cg==}
 
+  property-graph@4.1.0:
+    resolution: {integrity: sha512-AvPcP7XECNWy4LGmFQ77k7un4lSKM4eS29PTvW4ck95uYeLxXPWJM7hLuBqK91FaHqCcgJvIUCuNJjjxKE7VKQ==}
+
   property-information@7.2.0:
     resolution: {integrity: sha512-IAtzIB6sUiWaJYrX9smp3V46pBGbBeLFRGdh25kg1334VcBlD8HzhPeNIWQH9zhGmo2itIe25EHt9dQP7G5hmg==}
 
@@ -5681,6 +5703,10 @@ snapshots:
   '@fontsource/ibm-plex-mono@5.3.0': {}
 
   '@fontsource/ibm-plex-sans@5.3.0': {}
+
+  '@gltf-transform/core@4.5.1':
+    dependencies:
+      property-graph: 4.1.0
 
   '@hono/node-server@1.13.8(hono@4.6.15)':
     dependencies:
@@ -8212,6 +8238,8 @@ snapshots:
       loose-envify: 1.4.0
       object-assign: 4.1.1
       react-is: 16.13.1
+
+  property-graph@4.1.0: {}
 
   property-information@7.2.0: {}
 

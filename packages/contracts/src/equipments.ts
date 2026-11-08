@@ -178,3 +178,59 @@ export const equipmentSheet = equipmentSummary.extend({
   usageDays: z.array(z.object({ day: z.string(), hours: z.number() })).optional(),
 });
 export type EquipmentSheet = z.infer<typeof equipmentSheet>;
+
+// ---------------------------------------------------------------------------
+// Avatar 3D (lot M)
+// ---------------------------------------------------------------------------
+
+export const avatarTemplate = z.enum(["tractor", "self_propelled", "trailed_tool", "trailed_sprayer", "mounted_tool", "trailer", "box"]);
+const meters = z.number().positive().max(60).nullable().optional();
+const color = z.string().regex(/^#[0-9A-Fa-f]{6}$/).nullable().optional();
+
+/** Réglage de l'avatar : seulement les valeurs saisies (null = valeur déduite). */
+export const avatarWrite = z.object({
+  template: avatarTemplate.nullable().optional(),
+  lengthM: meters,
+  widthM: meters,
+  heightM: meters,
+  wheelbaseM: meters,
+  frontWheelDiameterM: meters,
+  rearWheelDiameterM: meters,
+  workingWidthM: meters,
+  hitchOffsetM: meters,
+  colors: z.object({ body: color, cab: color, wheels: color, accent: color }).partial().nullable().optional(),
+  logo: z.enum(["sides", "none"]).nullable().optional(),
+});
+export type AvatarWrite = z.infer<typeof avatarWrite>;
+
+export const avatarInfo = z.object({
+  /** Paramètres résolus (saisie > fiche technique > défaut). */
+  params: z.record(z.unknown()),
+  provenance: z.record(z.enum(["input", "technical", "default"])),
+  saved: avatarWrite.nullable(),
+  hash: z.string(),
+  /** Modèle GLB importé à la place de l'avatar généré. */
+  imported: z.boolean(),
+  /** Logo PNG utilisé comme texture (celui du matériel ou de sa marque). */
+  logoAssetId: uuid.nullable(),
+});
+export type AvatarInfo = z.infer<typeof avatarInfo>;
+
+/** Dernière position connue d'un matériel suivi, à une date (FR-MAT-86). */
+export const latestPosition = z.object({
+  equipmentId: uuid,
+  name: z.string(),
+  kind: z.string(),
+  time: isoDateTime,
+  lon: z.number(),
+  lat: z.number(),
+  /** Cap (degrés, 0 = nord, sens horaire), si connu. */
+  heading: z.number().nullable(),
+  speedKmh: z.number().nullable(),
+  avatarHash: z.string(),
+});
+export type LatestPosition = z.infer<typeof latestPosition>;
+
+/** Outil attelé à un matériel pendant une période (interventions réalisées, FR-MAT-85). */
+export const hitch = z.object({ toolId: uuid, toolName: z.string(), from: isoDateTime, to: isoDateTime, hitchOffsetM: z.number(), avatarHash: z.string() });
+export type Hitch = z.infer<typeof hitch>;

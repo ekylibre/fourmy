@@ -306,3 +306,73 @@ d'intervention s'adapte à cette forme.
 |---|---|
 | `GET /maintenance/parts?hours=&months=&at=` | membre |
 | `PUT /settings/maintenance` (`notify` : membres à prévenir) | responsable |
+
+## Logo 2D et avatar 3D (lot M)
+
+### Avatar généré (`@fourmy/equipment-3d`)
+
+- **Modèle** : un modèle glTF à l'échelle réelle, en formes simples (un
+  tracteur fait environ 700 triangles). Il donne la silhouette et les
+  proportions, **pas le dessin du constructeur**.
+- **Gabarits** :
+  - tracteur ;
+  - automoteur ;
+  - outil traîné ;
+  - pulvérisateur traîné, avec sa rampe dépliée à la largeur de travail ;
+  - outil porté ;
+  - remorque ;
+  - équipement fixe.
+- **Valeurs** : chacune indique sa provenance. La valeur saisie l'emporte
+  sur la fiche technique, qui l'emporte sur le défaut du gabarit.
+  - **Dimensions** : longueur, empattement, largeur, et hauteur (hauteur
+    de cabine + rayon arrière).
+  - **Roues** : diamètre calculé depuis les pneus. En métrique,
+    « 420/85 R38 » donne 1,68 m. En pouces, « 16.9 R38 » se calcule avec
+    une série 85 implicite.
+  - **Couleur** : la couleur de la marque de la ferme, sinon celle du
+    gabarit.
+- **Logo** : le logo PNG du matériel ou de sa marque, posé sur les flancs.
+  Pour un SVG, c'est sa version PNG qui sert.
+- **Repère** : l'avant suit +Z en glTF.
+  - Le cap Cesium vaut le cap boussole − 90°. Ce sens est vérifié sur
+    l'aperçu.
+  - Origine : au sol sous l'essieu arrière (tracteur), au point d'attelage
+    (outil).
+- **Génération** : le même code tourne dans l'API et dans le navigateur.
+  - L'API génère à la demande (`GET /equipments/:id/avatar.glb`), avec un
+    ETag qui est l'empreinte des paramètres et du logo, et un cache en
+    mémoire.
+  - Le navigateur recalcule l'aperçu à chaque réglage.
+
+### Onglet 3D de la fiche
+
+- **Aperçu** : Cesium, de trois quarts avant.
+- **Réglage** (responsable) : gabarit, dimensions, couleurs, logo. Les
+  valeurs non saisies restent déduites. « Tout déduire » efface la saisie.
+- **Modèle importé** : un GLB de 5 Mo et 100 000 triangles au plus, dont
+  l'en-tête est vérifié. Il remplace l'avatar généré, et on peut rétablir
+  l'avatar généré ensuite.
+
+### Plan 3D
+
+- **Rejeu d'une trace** : l'avatar remplace le point.
+  - Il est posé sur le relief et orienté selon le cap, calculé entre deux
+    points de la trace et conservé à l'arrêt.
+  - Il garde une taille minimale à l'écran quand on dézoome.
+  - Le logo s'affiche au-dessus jusqu'à 2 km de distance.
+- **Attelage** : les autres matériels (non tracteurs) des interventions
+  réalisées qui utilisent ce matériel, sur leurs périodes de travail, sont
+  attelés derrière lui. Ils sont reculés de la distance d'attelage du
+  tracteur, le long du cap (`GET /tracks/hitches`).
+- **« Tous les matériels suivis »** : la dernière position connue de chaque
+  matériel rattaché à un boîtier, à la date de la frise, sur 30 jours au
+  plus (`GET /tracks/latest`).
+
+### Limites
+
+- **Attribut `tool` de Traccar** : il n'est pas encore utilisé pour
+  l'attelage. Seules les interventions servent.
+- **Outil traîné** : il suit le cap du tracteur, sans articulation en
+  virage.
+- **Logo JPEG** : il n'est pas plaqué sur l'avatar. Il faut un PNG ou un
+  SVG.

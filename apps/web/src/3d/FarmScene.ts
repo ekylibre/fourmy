@@ -6,6 +6,10 @@ import {
   Cartographic,
   ClassificationType,
   ClockRange,
+  HeadingPitchRoll,
+  Quaternion,
+  SampledProperty,
+  Transforms,
   Color,
   CustomHeightmapTerrainProvider,
   DistanceDisplayCondition,
@@ -31,7 +35,14 @@ import {
 } from "cesium";
 import { outerRing, type Pt } from "@fourmy/domain";
 import type { GeoJsonGeometry } from "@fourmy/contracts";
-import { initialView, splitRuns, type Sample } from "./geometry";
+import { behind, cesiumHeading, headings, initialView, splitRuns, type Sample } from "./geometry";
+
+/** Avatar 3D d'un rejeu (lot M) : modèle, logo, outils attelés. */
+export interface TrackAvatar {
+  modelUrl?: string;
+  logoUrl?: string;
+  hitches?: { name: string; url: string; offsetM: number; from: string; to: string }[];
+}
 
 /** Échantillons par côté d'une tuile de relief (API /terrain/heightmap). */
 const TERRAIN_SIZE = 65;
@@ -127,6 +138,7 @@ export class FarmScene {
   readonly viewer: Viewer;
   private planEntities: Entity[] = [];
   private trackEntities: Entity[] = [];
+  private fleetEntities: Entity[] = [];
   private selectedTank: string | null = null;
   private plan: PlanData | null = null;
   private framed = false;
@@ -324,7 +336,7 @@ export class FarmScene {
    * Trace d'un matériel pour la journée : lignes drapées (travail / transport)
    * et point mobile posé sur le relief, animé par l'horloge Cesium.
    */
-  async setTrack(samples: Sample[], label: string) {
+  async setTrack(samples: Sample[], label: string, avatar: TrackAvatar = {}) {
     this.clearTrack();
     if (samples.length < 2) return;
     const add = (e: Entity.ConstructorOptions) => this.trackEntities.push(this.viewer.entities.add(e));
@@ -341,19 +353,60 @@ export class FarmScene {
     // Altitudes du relief aux points de la trace (niveau 15 : ~5 m).
     const cartos = samples.map(([, lon, lat]) => Cartographic.fromDegrees(lon, lat));
     const grounded = await sampleTerrain(this.viewer.terrainProvider, 15, cartos).catch(() => cartos);
+    // Avatar posé sur le relief (sinon point surélevé), orienté selon le cap.
+    const lift = avatar.modelUrl ? 0 : 2;
     const position = new SampledPositionProperty();
+    const orientation = new SampledProperty(Quaternion);
+    const caps = headings(samples);
     samples.forEach(([t], i) => {
       const c = grounded[i]!;
-      position.addSample(JulianDate.fromIso8601(t), Cartesian3.fromRadians(c.longitude, c.latitude, (c.height ?? 0) + 2));
+      const when = JulianDate.fromIso8601(t);
+      const at = Cartesian3.fromRadians(c.longitude, c.latitude, (c.height ?? 0) + lift);
+      position.addSample(when, at);
+      orientation.addSample(when, Transforms.headingPitchRollQuaternion(at, new HeadingPitchRoll(cesiumHeading(caps[i]!), 0, 0)));
     });
     const start = JulianDate.fromIso8601(samples[0]![0]);
     const stop = JulianDate.fromIso8601(samples.at(-1)![0]);
+    // Outils attelés (interventions) : même trace, reculée de la distance d'attelage le long du cap.
+    for (const h of avatar.hitches ?? []) {
+      const from = JulianDate.fromIso8601(h.from);
+      const to = JulianDate.fromIso8601(h.to);
+      const toolPos = new SampledPositionProperty();
+      samples.forEach(([t, lon, lat], i) => {
+        const [blon, blat] = behind(lon, lat, caps[i]!, h.offsetM);
+        toolPos.addSample(JulianDate.fromIso8601(t), Cartesian3.fromDegrees(blon, blat, grounded[i]!.height ?? 0));
+      });
+      add({
+        id: `track:tool:${h.from}`,
+        name: h.name,
+        availability: new TimeIntervalCollection([new TimeInterval({ start: JulianDate.greaterThan(from, start) ? from : start, stop: JulianDate.lessThan(to, stop) ? to : stop })]),
+        position: toolPos,
+        orientation,
+        model: { uri: h.url, minimumPixelSize: 32, maximumScale: 20, heightReference: HeightReference.CLAMP_TO_GROUND },
+      });
+    }
     add({
       id: "track:vehicle",
       name: label,
       availability: new TimeIntervalCollection([new TimeInterval({ start, stop })]),
       position,
-      point: { pixelSize: 14, color: COLORS.work, outlineColor: Color.WHITE, outlineWidth: 2, disableDepthTestDistance: Number.POSITIVE_INFINITY },
+      ...(avatar.modelUrl
+        ? {
+            orientation,
+            model: { uri: avatar.modelUrl, minimumPixelSize: 48, maximumScale: 20, heightReference: HeightReference.CLAMP_TO_GROUND },
+            billboard: avatar.logoUrl
+              ? {
+                  image: avatar.logoUrl,
+                  height: 22,
+                  width: 66,
+                  verticalOrigin: VerticalOrigin.BOTTOM,
+                  pixelOffset: new Cartesian2(0, -40),
+                  distanceDisplayCondition: new DistanceDisplayCondition(0, 2000),
+                  disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                }
+              : undefined,
+          }
+        : { point: { pixelSize: 14, color: COLORS.work, outlineColor: Color.WHITE, outlineWidth: 2, disableDepthTestDistance: Number.POSITIVE_INFINITY } }),
       label: {
         text: label,
         font: "600 13px 'IBM Plex Sans', sans-serif",
@@ -381,6 +434,36 @@ export class FarmScene {
       orientation: { heading: 0, pitch: CesiumMath.toRadians(v.pitchDeg), roll: 0 },
       duration: 1.2,
     });
+  }
+
+  /** Tous les matériels suivis à leur dernière position connue (FR-MAT-86). */
+  setFleet(items: { id: string; name: string; lon: number; lat: number; heading: number | null; modelUrl: string }[]) {
+    for (const e of this.fleetEntities) this.viewer.entities.remove(e);
+    this.fleetEntities = [];
+    for (const f of items) {
+      const at = Cartesian3.fromDegrees(f.lon, f.lat, 0);
+      this.fleetEntities.push(
+        this.viewer.entities.add({
+          id: `fleet:${f.id}`,
+          name: f.name,
+          position: at,
+          orientation: Transforms.headingPitchRollQuaternion(at, new HeadingPitchRoll(cesiumHeading(f.heading ?? 0), 0, 0)),
+          model: { uri: f.modelUrl, minimumPixelSize: 40, maximumScale: 20, heightReference: HeightReference.CLAMP_TO_GROUND },
+          label: {
+            text: f.name,
+            font: "600 12px 'IBM Plex Sans', sans-serif",
+            fillColor: Color.WHITE,
+            outlineColor: Color.fromCssColorString("#1E2421"),
+            outlineWidth: 3,
+            style: LabelStyle.FILL_AND_OUTLINE,
+            pixelOffset: new Cartesian2(0, -36),
+            heightReference: HeightReference.CLAMP_TO_GROUND,
+            distanceDisplayCondition: new DistanceDisplayCondition(0, 5000),
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          },
+        }),
+      );
+    }
   }
 
   clearTrack() {

@@ -17,6 +17,7 @@
     "@fourmy/carto": "workspace:*",
     "@fourmy/contracts": "workspace:*",
     "@fourmy/domain": "workspace:*",
+    "@fourmy/equipment-3d": "workspace:*",
     "@fourmy/ui-lyvre": "workspace:*",
     "@mantine/core": "9.7.3",
     "@mantine/dates": "9.7.3",

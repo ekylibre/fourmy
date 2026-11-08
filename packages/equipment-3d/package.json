@@ -1,0 +1,18 @@
+{
+  "name": "@fourmy/equipment-3d",
+  "version": "0.0.0",
+  "description": "Avatar 3D des matériels (glTF) généré depuis la nature, les dimensions, la couleur et le logo",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "lint": "eslint src"
+  },
+  "dependencies": { "@gltf-transform/core": "4.5.1" },
+  "devDependencies": { "vitest": "2.1.8" }
+}

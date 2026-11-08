@@ -39,3 +39,29 @@ describe("géométrie du plan 3D", () => {
     expect(v.altitude).toBeGreaterThan(400);
   });
 });
+
+import { behind, bearing, headings } from "../src/3d/geometry";
+
+describe("avatar dans la vue 3D", () => {
+  it("cap le long d'une trace, conservé à l'arrêt", () => {
+    expect(bearing(0.5, 44.8, 0.5, 44.81)).toBeCloseTo(0); // nord
+    expect(bearing(0.5, 44.8, 0.51, 44.8)).toBeCloseTo(90); // est
+    const s = [
+      ["2026-11-03T08:00:00Z", 0.5, 44.8, true],
+      ["2026-11-03T08:01:00Z", 0.5, 44.8, true], // à l'arrêt
+      ["2026-11-03T08:02:00Z", 0.5, 44.801, true],
+      ["2026-11-03T08:03:00Z", 0.501, 44.801, true],
+      ["2026-11-03T08:04:00Z", 0.501, 44.801, true], // arrêt : garde l'est
+    ] as [string, number, number, boolean][];
+    const h = headings(s).map(Math.round);
+    expect(h).toEqual([0, 0, 90, 90, 90]);
+  });
+
+  it("l'outil se place derrière le tracteur", () => {
+    const [lon, lat] = behind(0.5, 44.8, 0, 111.32); // cap nord, 111 m derrière
+    expect(lon).toBeCloseTo(0.5, 6);
+    expect(lat).toBeCloseTo(44.799, 5);
+    const [lon2] = behind(0.5, 44.8, 90, 10); // cap est : l'outil à l'ouest
+    expect(lon2).toBeLessThan(0.5);
+  });
+});
