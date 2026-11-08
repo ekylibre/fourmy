@@ -36,9 +36,21 @@ export type WorkPeriod = z.infer<typeof workPeriod>;
 export const targetKind = z.enum(["land_parcel", "equipment", "place", "container"]);
 export type TargetKind = z.infer<typeof targetKind>;
 
+/** Relevé du compteur d'un matériel à la fin de l'intervention (entretien, fin de chantier). */
+export const meterWrite = z
+  .object({
+    value: z.number().min(0).max(1_000_000),
+    correction: z.enum(["fix", "replacement"]).nullable().optional(),
+    correctionReason: z.string().trim().max(500).nullable().optional(),
+  })
+  .refine((m) => !m.correction || !!m.correctionReason, { message: "Une correction de compteur doit être motivée." });
+export type MeterWrite = z.infer<typeof meterWrite>;
+
 export const interventionTarget = z.object({
   kind: targetKind,
   id: uuid,
+  /** Matériel entretenu : relevé de son compteur. */
+  meter: meterWrite.optional(),
   /** Surface réellement traitée si l'intervention ne couvre qu'une partie de la parcelle. */
   workedAreaM2: z.number().positive().optional(),
   /** Zone de travail (ex. tirée de la trace GPS). */
@@ -58,6 +70,8 @@ export const interventionInput = z.object({
   lotId: uuid.optional(),
   /** Lieu de prélèvement ; à défaut, celui du lot. */
   from: location.optional(),
+  /** Entretien de plusieurs matériels : celui qui reçoit la pièce ou le fluide. */
+  equipmentId: uuid.optional(),
 });
 export type InterventionInput = z.infer<typeof interventionInput>;
 
@@ -71,8 +85,26 @@ export const interventionOutput = z.object({
 });
 export type InterventionOutput = z.infer<typeof interventionOutput>;
 
-export const interventionTool = z.object({ equipmentId: uuid });
+export const interventionTool = z.object({
+  equipmentId: uuid,
+  /** Heures relevées en fin de chantier (FR-MAT-60). */
+  meter: meterWrite.optional(),
+});
 export const interventionDoer = z.object({ personId: uuid });
+
+/** Entretien (FR-MAT-30 à 33, 50 à 55) : nature, problème, atelier, opérations du plan réalisées. */
+export const maintenanceNature = z.enum(["preventive", "corrective"]);
+export type MaintenanceNature = z.infer<typeof maintenanceNature>;
+export const operationResult = z.enum(["done", "ok", "anomaly"]);
+export const maintenanceBlock = z.object({
+  nature: maintenanceNature.optional(),
+  problem: z.string().trim().max(2000).nullable().optional(),
+  workshop: z.object({ name: z.string().trim().min(1).max(160), reference: z.string().trim().max(80).nullable().optional() }).nullable().optional(),
+  operations: z
+    .array(z.object({ equipmentId: uuid, operationId: uuid, result: operationResult.default("done"), note: z.string().trim().max(500).nullable().optional() }))
+    .default([]),
+});
+export type MaintenanceBlock = z.infer<typeof maintenanceBlock>;
 
 /** Corps commun de saisie (planification ou réalisation). */
 const interventionBody = z.object({
@@ -89,6 +121,8 @@ const interventionBody = z.object({
   compliance: complianceWrite.optional(),
   /** Météo pendant l'intervention (pré-remplie depuis le fournisseur, modifiable). */
   weather: interventionWeather.optional(),
+  /** Forme `maintenance` : nature, problème, atelier, opérations du plan. */
+  maintenance: maintenanceBlock.optional(),
 });
 
 /** Planification (POST /interventions). `id` client → idempotent. */
@@ -119,6 +153,16 @@ export const interventionUpdateWrite = interventionBody.extend({
 });
 export type InterventionUpdateWrite = z.infer<typeof interventionUpdateWrite>;
 
+export const maintenanceRead = z.object({
+  nature: maintenanceNature,
+  problem: z.string().nullable(),
+  workshop: z.object({ name: z.string(), reference: z.string().nullable().optional() }).nullable(),
+  operations: z.array(
+    z.object({ equipmentId: uuid, operationId: uuid, label: z.string(), kind: z.string(), result: operationResult, note: z.string().nullable() }),
+  ),
+});
+export type MaintenanceRead = z.infer<typeof maintenanceRead>;
+
 /** Intervention telle que lue (quantités accompagnées de l'unité de l'article). */
 export const intervention = z
   .object({
@@ -144,6 +188,8 @@ export const intervention = z
     ift: iftResult.nullable().optional(),
     /** Météo pendant l'intervention. */
     weather: interventionWeather.nullable().optional(),
+    /** Entretien : nature, problème, atelier, opérations réalisées (libellés compris). */
+    maintenance: maintenanceRead.nullable().optional(),
   })
   .merge(auditFields);
 export type Intervention = z.infer<typeof intervention>;

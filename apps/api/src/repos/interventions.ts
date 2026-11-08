@@ -17,6 +17,7 @@ import {
   type DomainCtx,
   type ResolvedStockLine,
   dangerMessages,
+  deriveNature,
 } from "@fourmy/domain";
 import {
   getProcedure,
@@ -33,6 +34,7 @@ import {
 } from "@fourmy/contracts";
 import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
 import { checkCompliance, type CheckableBody } from "./phyto.js";
+import { addReadingInTx } from "./equipments.js";
 
 /**
  * Interventions (docs/interventions.md). L'API parle la forme structurée
@@ -71,6 +73,14 @@ function toIntervention(r: Record<string, unknown>): Intervention {
   }));
   const of = (role: string) => params.filter((p) => p.role === role && p.ref_id);
   const a = (p: ParamRow) => p.attrs ?? {};
+  const meters = new Map(
+    ((r.meters as { equipment_id: string; value: string; correction: string | null; correction_reason: string | null }[]) ?? []).map((m) => [
+      m.equipment_id,
+      { value: Number(m.value), ...(m.correction ? { correction: m.correction as "fix" | "replacement", correctionReason: m.correction_reason } : {}) },
+    ]),
+  );
+  const maint = r.maintenance as { nature?: string; problem?: string | null; workshop?: { name: string; reference?: string | null } | null } | null;
+  const ops = (r.operations as { equipment_id: string; operation_id: string; label: string; kind: string; result: string; note: string | null }[]) ?? [];
   return {
     id: r.id as string,
     farmId: r.farm_id as string,
@@ -86,6 +96,7 @@ function toIntervention(r: Record<string, unknown>): Intervention {
         id: p.ref_id!,
         ...(typeof a(p).workedAreaM2 === "number" ? { workedAreaM2: a(p).workedAreaM2 as number } : {}),
         ...(p.working_zone ? { workingZone: p.working_zone as never } : {}),
+        ...(p.ref_type === "equipment" && meters.has(p.ref_id!) ? { meter: meters.get(p.ref_id!)! } : {}),
       })),
     inputs: of("input")
       .filter((p) => p.ref_type === "article" && p.quantity !== null)
@@ -98,6 +109,7 @@ function toIntervention(r: Record<string, unknown>): Intervention {
           unit,
           ...(a(p).lotId ? { lotId: a(p).lotId as string } : {}),
           ...(a(p).from ? { from: a(p).from as never } : {}),
+          ...(a(p).equipmentId ? { equipmentId: a(p).equipmentId as string } : {}),
         };
       }),
     outputs: of("output")
@@ -113,7 +125,9 @@ function toIntervention(r: Record<string, unknown>): Intervention {
           ...(a(p).to ? { to: a(p).to as never } : {}),
         };
       }),
-    tools: of("tool").filter((p) => p.ref_type === "equipment").map((p) => ({ equipmentId: p.ref_id! })),
+    tools: of("tool")
+      .filter((p) => p.ref_type === "equipment")
+      .map((p) => ({ equipmentId: p.ref_id!, ...(meters.has(p.ref_id!) ? { meter: meters.get(p.ref_id!)! } : {}) })),
     doers: of("doer").filter((p) => p.ref_type === "person").map((p) => ({ personId: p.ref_id! })),
     purposes: (r.purposes as TreatmentPurpose[]) ?? [],
     notes: (r.notes as string | null) ?? null,
@@ -122,6 +136,15 @@ function toIntervention(r: Record<string, unknown>): Intervention {
     compliance: (r.compliance as Intervention["compliance"]) ?? null,
     ift: (r.ift as Intervention["ift"]) ?? null,
     weather: (r.weather as Intervention["weather"]) ?? null,
+    maintenance:
+      maint || ops.length
+        ? {
+            nature: (maint?.nature as "preventive" | "corrective") ?? (ops.length ? "preventive" : "corrective"),
+            problem: maint?.problem ?? null,
+            workshop: maint?.workshop ?? null,
+            operations: ops.map((o) => ({ equipmentId: o.equipment_id, operationId: o.operation_id, label: o.label, kind: o.kind, result: o.result as "done", note: o.note })),
+          }
+        : null,
     createdAt: iso(r.created_at)!,
     updatedAt: iso(r.updated_at)!,
   };
@@ -132,7 +155,14 @@ async function readInterventions(tx: Tx, where: SQL, limit = 1000): Promise<Inte
     tx,
     sql`
       SELECT i.id, i.farm_id, i.procedure, i.status, i.started_at, i.stopped_at, i.origin, i.client_id,
-             i.purposes, i.notes, i.compliance, i.ift, i.weather, i.created_at, i.updated_at,
+             i.purposes, i.notes, i.compliance, i.ift, i.weather, i.maintenance, i.created_at, i.updated_at,
+             (SELECT coalesce(json_agg(json_build_object('equipment_id', m.equipment_id, 'value', m.value, 'correction', m.correction,
+                                                         'correction_reason', m.correction_reason)), '[]')
+                FROM meter_readings m WHERE m.intervention_id = i.id) AS meters,
+             (SELECT coalesce(json_agg(json_build_object('equipment_id', io.equipment_id, 'operation_id', io.operation_id, 'label', eo.label,
+                                                         'kind', eo.kind, 'result', io.result, 'note', io.note) ORDER BY eo.position), '[]')
+                FROM intervention_operations io JOIN equipment_operations eo ON eo.id = io.operation_id
+               WHERE io.intervention_id = i.id) AS operations,
              (SELECT coalesce(json_agg(json_build_object('startedAt', w.started_at, 'stoppedAt', w.stopped_at)
                         ORDER BY w.started_at), '[]') FROM intervention_periods w WHERE w.intervention_id = i.id) AS periods,
              (SELECT coalesce(json_agg(json_build_object(
@@ -253,7 +283,11 @@ async function writeBody(tx: Tx, interventionId: string, body: Body, articles: M
   }
   for (const i of body.inputs) {
     const a = articles.get(i.articleId)!;
-    await insert("input", "article", i.articleId, i.quantity, storedUnit(a.unit, i.per), { ...(i.lotId ? { lotId: i.lotId } : {}), ...(i.from ? { from: i.from } : {}) });
+    await insert("input", "article", i.articleId, i.quantity, storedUnit(a.unit, i.per), {
+      ...(i.lotId ? { lotId: i.lotId } : {}),
+      ...(i.from ? { from: i.from } : {}),
+      ...(i.equipmentId ? { equipmentId: i.equipmentId } : {}),
+    });
   }
   for (const o of body.outputs) {
     const a = articles.get(o.articleId)!;
@@ -265,6 +299,45 @@ async function writeBody(tx: Tx, interventionId: string, body: Body, articles: M
     await tx.execute(sql`
       INSERT INTO intervention_periods (id, intervention_id, started_at, stopped_at)
       VALUES (${crypto.randomUUID()}, ${interventionId}, ${p.startedAt}::timestamptz, ${p.stoppedAt}::timestamptz)`);
+  }
+}
+
+/**
+ * Entretien (lot K) : bloc (nature, problème, atelier), opérations du plan
+ * réalisées, relevés de compteur. Les relevés n'existent que pour une
+ * intervention réalisée ; ils sont recréés à chaque correction et contrôlés
+ * comme un relevé saisi (FR-MAT-12, 409 si incohérent).
+ */
+async function writeMaintenance(tx: Tx, farmId: string, ctx: DomainCtx, interventionId: string, body: Body, done: boolean, at: string | null) {
+  const m = body.maintenance;
+  await tx.execute(sql`DELETE FROM intervention_operations WHERE intervention_id = ${interventionId}`);
+  await tx.execute(sql`DELETE FROM meter_readings WHERE intervention_id = ${interventionId}`);
+  await tx.execute(sql`
+    UPDATE interventions SET maintenance = ${
+      m ? JSON.stringify({ nature: m.nature ?? deriveNature(m.operations), problem: m.problem?.trim() || null, workshop: m.workshop ?? null }) : null
+    }::jsonb WHERE id = ${interventionId}`);
+  for (const o of m?.operations ?? []) {
+    const [op] = await rows<{ id: string }>(tx, sql`SELECT id FROM equipment_operations WHERE id = ${o.operationId} AND equipment_id = ${o.equipmentId}`);
+    if (!op) throw new BadRequest("Opération du plan inconnue pour ce matériel.");
+    await tx.execute(sql`
+      INSERT INTO intervention_operations (id, farm_id, intervention_id, equipment_id, operation_id, result, note)
+      VALUES (${crypto.randomUUID()}, ${farmId}, ${interventionId}, ${o.equipmentId}, ${o.operationId}, ${o.result}, ${o.note || null})
+      ON CONFLICT (intervention_id, operation_id) DO UPDATE SET result = excluded.result, note = excluded.note`);
+  }
+  if (!done || !at) return;
+  const meters = [
+    ...body.targets.filter((t) => t.kind === "equipment" && t.meter).map((t) => ({ equipmentId: t.id, meter: t.meter! })),
+    ...(body.tools ?? []).filter((t) => t.meter).map((t) => ({ equipmentId: t.equipmentId, meter: t.meter! })),
+  ];
+  for (const { equipmentId, meter } of meters) {
+    await addReadingInTx(
+      tx,
+      farmId,
+      ctx,
+      equipmentId,
+      { readAt: at, value: meter.value, correction: meter.correction ?? null, correctionReason: meter.correctionReason ?? null, origin: "manual" },
+      { origin: "intervention", interventionId },
+    );
   }
 }
 
@@ -321,6 +394,7 @@ export async function planInTx(
     VALUES (${id}, ${farmId}, ${input.procedure}, 'planned', ${bounds.startedAt ?? input.plannedAt ?? null}, ${bounds.stoppedAt},
             ${ctx.origin}, ${clientId}, ${sql`ARRAY[${sql.join(input.purposes.map((p) => sql`${p}`), sql`, `)}]::text[]`}, ${input.notes ?? null})`);
   await writeBody(tx, id, input, articles);
+  await writeMaintenance(tx, farmId, ctx, id, input, false, null);
   await recordCompliance(tx, ctx, id, input, "plan");
   await audit(tx, farmId, ctx, id, "planned", { procedure: input.procedure });
   await outbox(tx, farmId, buildEvent(ctx, farmId, "intervention.planned", { interventionId: id }));
@@ -463,6 +537,7 @@ async function applyCompletion(
   const articles = await validate(tx, procedure, input, "complete");
   const { startedAt, stoppedAt } = periodBounds(input.periods);
   await writeBody(tx, interventionId, input, articles);
+  await writeMaintenance(tx, farmId, ctx, interventionId, input, true, stoppedAt);
   await recordCompliance(tx, ctx, interventionId, { ...input, procedure }, "done");
   // Contenu (re)écrit : l'IFT sera recalculé (worker, ou à la demande depuis la fiche).
   await tx.execute(sql`UPDATE interventions SET ift = NULL WHERE id = ${interventionId}`);
@@ -600,6 +675,7 @@ export async function updateIntervention(
       const articles = await validate(tx, input.procedure, input, "plan");
       const bounds = periodBounds(input.periods);
       await writeBody(tx, interventionId, input, articles);
+      await writeMaintenance(tx, farmId, ctx, interventionId, input, false, null);
       await recordCompliance(tx, ctx, interventionId, input, "plan");
       await tx.execute(sql`
         UPDATE interventions SET procedure = ${input.procedure},
@@ -691,6 +767,8 @@ export async function cancelIntervention(
       await stockEvents(tx, farmId, ctx, plan.movements);
     }
     await tx.execute(sql`UPDATE interventions SET status = 'cancelled', updated_at = now() WHERE id = ${interventionId}`);
+    // Ses relevés de compteur disparaissent avec elle ; ses opérations ne comptent plus (annulée).
+    await tx.execute(sql`DELETE FROM meter_readings WHERE intervention_id = ${interventionId}`);
     await audit(tx, farmId, ctx, interventionId, "cancelled", { reason, previousStatus: current.status });
     return readIntervention(tx, interventionId);
   });

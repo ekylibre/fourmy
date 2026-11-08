@@ -76,7 +76,7 @@ distingue « labour » de « hersage », c'est le **nom**, pas la structure.
 | `fertilization` — fertilisation | parcelles (≥ 1) | **fertilisants ≥ 1** | — | plan de fumure (après la tranche) |
 | `sowing` — semis, plantation | parcelles (≥ 1) | **semences / plants ≥ 1** (kg/ha, milliers/ha…) | — | démarre la **production** de la campagne (espèce, variété) |
 | `harvest` — récolte | parcelles (≥ 1) | — | **récolte ≥ 1**, totale ou rendement/ha | **destination obligatoire** (lieu ou cuve) |
-| `maintenance` — entretien | matériel ou bâtiment (≥ 1) | facultatifs | — | pas de parcelle |
+| `maintenance` — entretien | matériel ou bâtiment (≥ 1), relevé de compteur par matériel | pièces, fluides, fournitures (rattachés au matériel) | — | pas de parcelle ; bloc `maintenance` : nature (préventif / curatif, problème exigé en curatif), atelier, opérations du plan réalisées, qui remettent à zéro les échéances (voir [`materiels.md`](materiels.md)) |
 
 Une procédure peut **élargir** sa forme : `vine_spraying_with_fertilizing` est
 un `treatment` qui accepte aussi des fertilisants.

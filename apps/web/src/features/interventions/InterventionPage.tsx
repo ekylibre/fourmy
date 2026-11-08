@@ -1,3 +1,4 @@
+import { MaintenanceSummary } from "../maintenance/MaintenanceFields";
 import { useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import { Badge, Box, Button, Grid, Group, Paper, Stack, Table, Text, Timeline, Title } from "@mantine/core";
@@ -244,6 +245,8 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
                 </Table.Tbody>
               </Table>
             </Paper>
+
+            <MaintenanceSummary farmId={farm.id} intervention={i} names={names.equipment} />
 
             {(i.inputs.length > 0 || i.outputs.length > 0) && (
               <Paper p="md" withBorder>

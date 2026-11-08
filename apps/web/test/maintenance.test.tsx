@@ -126,3 +126,106 @@ describe("entretien", () => {
     expect(Object.keys(files).sort()).toEqual(["entretien/plan_entretien.json", "machine.json"]);
   });
 });
+
+describe("intervention d'entretien (lot K)", () => {
+  const TRACTOR = "00000000-0000-7000-8000-000000000101"; // matériel de démonstration
+  const OIL = "0193a000-0000-7000-8000-00000000c101";
+  const BRAKES = "0193a000-0000-7000-8000-00000000c102";
+  const PART = "00000000-0000-7000-8000-000000000301"; // article de démonstration servant de pièce
+
+  it("depuis une échéance : opération cochée, pièce ajoutée, compteur, contrôle avec anomalie", async () => {
+    const plan: EquipmentMaintenance = {
+      ...maintenance,
+      equipmentId: TRACTOR,
+      model: null,
+      operations: [
+        op(OIL, "Échange de l'huile moteur", { status: "overdue", remainingHours: -12 }, { parts: [{ articleId: PART, name: "Filtre", reference: "60 0502 874 3", quantity: 1, unit: "Unité" }] }),
+        op(BRAKES, "Contrôle des freins", { status: "soon", remainingHours: 20 }, { kind: "inspection" }),
+      ],
+    };
+    const calls: { url: string; body: Record<string, unknown> }[] = [];
+    server.use(
+      http.get("*/equipments/:id/maintenance", () => HttpResponse.json(plan)),
+      http.post("*/interventions", async ({ request }) => {
+        calls.push({ url: request.url, body: (await request.json()) as Record<string, unknown> });
+        return HttpResponse.json({ id: "0193a000-0000-7000-8000-00000000aaaa" }, { status: 201 });
+      }),
+      http.post("*/interventions/:id/complete", async ({ request }) => {
+        calls.push({ url: request.url, body: (await request.json()) as Record<string, unknown> });
+        return HttpResponse.json({ intervention: { id: "0193a000-0000-7000-8000-00000000aaaa" }, movements: [], warnings: [] });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(`/f/${FARM}/interventions/new?procedure=equipment_maintenance&equipment=${TRACTOR}&operations=${OIL}&status=done&at=2026-06-10`);
+    const card = await screen.findByLabelText("Entretien de Tracteur Claas Arion 430");
+    expect(await within(card).findByRole("checkbox", { name: "Échange de l'huile moteur" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Préventif (plan)" })).toBeChecked();
+    // Le contrôle des freins : coché, résultat « anomalie » avec une note.
+    await user.click(within(card).getByRole("checkbox", { name: "Contrôle des freins" }));
+    await user.click(within(card).getByRole("radio", { name: "Anomalie" }));
+    await user.type(within(card).getByRole("textbox", { name: "Anomalie : Contrôle des freins" }), "plaquettes usées");
+    await user.type(within(card).getByRole("textbox", { name: "Compteur de Tracteur Claas Arion 430" }), "4330");
+    await user.type(screen.getByRole("textbox", { name: "Atelier externe" }), "Garage du Lot");
+    // La vidange, cochée par l'adresse, a apporté sa pièce dans les intrants (une seule fois).
+    expect(screen.getAllByRole("combobox", { name: "Produit" })).toHaveLength(1);
+    expect(screen.queryByRole("combobox", { name: "Matériels" })).not.toBeInTheDocument(); // pas d'outils pour un entretien
+    await user.click(screen.getByRole("button", { name: "Enregistrer" }));
+    await vi.waitFor(() => expect(calls).toHaveLength(2));
+    expect(calls[1]!.body).toMatchObject({
+      targets: [{ kind: "equipment", id: TRACTOR, meter: { value: 4330 } }],
+      inputs: [{ articleId: PART, quantity: 1, per: "total", equipmentId: TRACTOR }],
+      tools: [],
+      maintenance: {
+        nature: "preventive",
+        workshop: { name: "Garage du Lot", reference: null },
+        operations: [
+          { equipmentId: TRACTOR, operationId: OIL, result: "done" },
+          { equipmentId: TRACTOR, operationId: BRAKES, result: "anomaly", note: "plaquettes usées" },
+        ],
+      },
+    });
+  });
+
+  it("réparation : le problème est exigé avant l'envoi", async () => {
+    server.use(http.get("*/equipments/:id/maintenance", () => HttpResponse.json({ ...maintenance, equipmentId: TRACTOR, operations: [], model: null })));
+    const user = userEvent.setup();
+    renderApp(`/f/${FARM}/interventions/new?procedure=equipment_maintenance&equipment=${TRACTOR}&nature=corrective&status=done&at=2026-06-10`);
+    await screen.findByLabelText("Entretien de Tracteur Claas Arion 430");
+    expect(screen.getByRole("radio", { name: "Curatif (panne, réparation)" })).toBeChecked();
+    // Champ obligatoire : le navigateur bloque l'envoi tant qu'il est vide.
+    const problem = screen.getByRole("textbox", { name: /Problème constaté/ });
+    expect(problem).toBeRequired();
+    let sent = false;
+    server.use(http.post("*/interventions", () => ((sent = true), HttpResponse.json({}, { status: 201 }))));
+    await user.click(screen.getByRole("button", { name: "Enregistrer" }));
+    expect(sent).toBe(false);
+  });
+
+  it("fiche : bloc entretien et réparation à planifier depuis une anomalie", async () => {
+    const { demoInterventions } = await import("@fourmy/mocks");
+    const base = demoInterventions[0]!;
+    const i = {
+      ...base,
+      procedure: "equipment_maintenance",
+      targets: [{ kind: "equipment", id: TRACTOR, meter: { value: 4330 } }],
+      inputs: [],
+      outputs: [],
+      compliance: null,
+      maintenance: {
+        nature: "preventive",
+        problem: null,
+        workshop: { name: "Garage du Lot", reference: "BL-42" },
+        operations: [{ equipmentId: TRACTOR, operationId: BRAKES, label: "Contrôle des freins", kind: "inspection", result: "anomaly", note: "plaquettes usées" }],
+      },
+      history: [],
+    };
+    server.use(http.get(`*/interventions/${base.id}`, () => HttpResponse.json(i)));
+    renderApp(`/f/${FARM}/interventions/${base.id}?at=2026-06-10`);
+    const block = await screen.findByLabelText("Entretien");
+    expect(within(block).getByText(/Garage du Lot/)).toHaveTextContent("Garage du Lot (bon BL-42)");
+    expect(within(block).getByText(/4\s330 h/)).toBeInTheDocument();
+    const link = within(block).getByRole("link", { name: "Planifier une réparation" });
+    expect(link.getAttribute("href")).toContain("nature=corrective");
+    expect(decodeURIComponent(link.getAttribute("href")!.replace(/\+/g, " "))).toContain("Contrôle des freins : plaquettes usées");
+  });
+});

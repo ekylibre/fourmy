@@ -14,6 +14,7 @@ import {
   demoInterventionHistory,
   demoPeople,
   demoProcedures,
+  demoEquipments,
   demoStock,
   demoPhytoRegister,
   DEMO_FARM_ID,
@@ -133,6 +134,41 @@ export const handlers = [
       operatorProtection: "Pendant le mélange/chargement : gants en nitrile.", restrictedMentions: null, mixCodes: [1, 3], organic: false, biocontrol: false }] }),
   ),
   http.get(`*${base}/procedures`, () => HttpResponse.json(demoProcedures)),
+  // Matériels et entretien (lots I à K) : liste résumée, plan vide, aucune échéance.
+  http.get(`*${base}/equipments`, () =>
+    HttpResponse.json({
+      items: demoEquipments.map((e) => ({
+        id: e.id,
+        name: e.name,
+        kind: e.kind,
+        state: e.state ?? null,
+        brand: null,
+        brandId: null,
+        model: null,
+        serialNumber: null,
+        year: null,
+        meterUnit: e.kind === "tractor" ? "hours" : null,
+        logoAssetId: null,
+        logoSource: null,
+        lastReading: null,
+        tracked: false,
+        due: null,
+      })),
+    }),
+  ),
+  http.get(`*${base}/equipments/:id/maintenance`, ({ params, request }) =>
+    HttpResponse.json({
+      equipmentId: params.id,
+      at: new URL(request.url).searchParams.get("at") ?? new Date().toISOString(),
+      settings: { soonHours: 50, soonMonths: 1 },
+      usageNow: null,
+      model: null,
+      operations: [],
+      fluids: [],
+      parts: [],
+    }),
+  ),
+  http.get(`*${base}/maintenance/due`, () => HttpResponse.json({ items: [], byEquipment: {} })),
   http.get(`*${base}/people`, () => page(demoPeople)),
   http.get(`*${base}/registers/phyto`, ({ request }) => {
     const url = new URL(request.url);

@@ -1,4 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
+import type { MaintenanceNature } from "@fourmy/contracts";
+import { draftFrom, draftNature, maintenanceBody, MaintenanceAside, MaintenanceFields, type MaintenanceDraft } from "../maintenance/MaintenanceFields";
 import {
   ActionIcon,
   Alert,
@@ -38,7 +40,7 @@ import type {
 import { formatHa } from "@fourmy/ui-lyvre";
 import { api, ApiError, farmPath } from "../../app/api";
 import { unitLabel } from "../../app/labels";
-import { invalidateAfterIntervention, useActivities, usePhytoArticles } from "../../app/queries";
+import { invalidateAfterIntervention, useActivities, useEquipments, usePhytoArticles } from "../../app/queries";
 import { RegulatoryPictos } from "../phyto/Hazards";
 import { PrecautionsPanel } from "../phyto/Precautions";
 import { dangerMessages } from "@fourmy/domain";
@@ -62,6 +64,8 @@ type QuantityRow = {
   per: QuantityPer;
   to: string | null;
   keep?: { lotId?: string; from?: InterventionInput["from"] };
+  /** Entretien : matériel qui reçoit la pièce ou le fluide. */
+  equipmentId?: string;
 };
 type PeriodRow = { startedAt: string; stoppedAt: string };
 
@@ -81,6 +85,17 @@ export interface InterventionFormProps {
   defaultDay: string;
   /** Après l'enregistrement, avec l'identifiant de l'intervention. */
   onDone: (id?: string) => void;
+  /** Nouvelle intervention pré-remplie (depuis une échéance d'entretien, une anomalie). */
+  initial?: FormInitial;
+}
+
+export interface FormInitial {
+  procedure?: string;
+  equipmentId?: string;
+  operationIds?: string[];
+  mode?: "planned" | "done";
+  nature?: MaintenanceNature | null;
+  problem?: string;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -117,7 +132,7 @@ function withSuggestions<T extends { value: string }>(options: T[], suggested: s
  * personnes habituels de la ferme sont proposés en premier. Planifier, ou
  * réaliser directement (une ou plusieurs périodes de travail).
  */
-export function InterventionForm({ farmId, snapshot, articles, people, catalogue, planned: toComplete, editing, defaultDay, onDone }: InterventionFormProps) {
+export function InterventionForm({ farmId, snapshot, articles, people, catalogue, planned: toComplete, editing, defaultDay, onDone, initial }: InterventionFormProps) {
   const queryClient = useQueryClient();
   // Formulaire prérempli : intervention à réaliser ou à modifier.
   const planned = toComplete ?? editing;
@@ -132,12 +147,12 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   const [askOverride, setAskOverride] = useState(false);
   // Météo pendant l'intervention : pré-remplie (fournisseur), modifiable.
   const [weather, setWeather] = useState<InterventionWeather | null>((toComplete ?? editing)?.weather ?? null);
-  const [code, setCode] = useState<string | null>(planned?.procedure ?? null);
+  const [code, setCode] = useState<string | null>(planned?.procedure ?? initial?.procedure ?? null);
   const procedure: ProcedureCatalogueItem | undefined = catalogue.items.find((p) => p.code === code);
   const shape = procedure?.shape;
   const start = planned?.startedAt ? local(planned.startedAt) : `${defaultDay}T08:00`;
   // Nouvelle intervention : réalisée si son début est passé, à planifier sinon (modifiable).
-  const [mode, setMode] = useState<"done" | "planned">(() => (!planned && new Date(start).getTime() > Date.now() ? "planned" : "done"));
+  const [mode, setMode] = useState<"done" | "planned">(() => initial?.mode ?? (!planned && new Date(start).getTime() > Date.now() ? "planned" : "done"));
   const followStart = (startedAt: string) => {
     if (planned) return;
     const t = new Date(startedAt).getTime();
@@ -151,7 +166,12 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       : [{ startedAt: start, stoppedAt: `${start.slice(0, 10)}T10:00` }],
   );
   const [parcels, setParcels] = useState<string[]>(planned?.targets.filter((t) => t.kind === "land_parcel").map((t) => t.id) ?? []);
-  const [maintained, setMaintained] = useState<string[]>(planned?.targets.filter((t) => t.kind === "equipment").map((t) => t.id) ?? []);
+  const [maintained, setMaintained] = useState<string[]>(
+    planned?.targets.filter((t) => t.kind === "equipment").map((t) => t.id) ?? (initial?.equipmentId ? [initial.equipmentId] : []),
+  );
+  // Entretien (lot K) : relevés, opérations du plan, nature, problème, atelier.
+  const [maint, setMaint] = useState<MaintenanceDraft>(() => draftFrom(planned, initial));
+  const equipmentList = useEquipments(farmId);
   // Surface travaillée et zone de travail des cibles : conservées telles quelles.
   // Surface travaillée et zone de travail des cibles : conservées, ou dessinées sur la carte.
   const [targetExtras, setTargetExtras] = useState(
@@ -176,7 +196,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       .values(),
   ];
   const [inputs, setInputs] = useState<QuantityRow[]>(
-    planned?.inputs.map((i) => ({ articleId: i.articleId, quantity: i.quantity, per: i.per, to: null, keep: { lotId: i.lotId, from: i.from } })) ?? [],
+    planned?.inputs.map((i) => ({ articleId: i.articleId, quantity: i.quantity, per: i.per, to: null, keep: { lotId: i.lotId, from: i.from }, equipmentId: i.equipmentId })) ?? [],
   );
   const [outputs, setOutputs] = useState<QuantityRow[]>(
     planned?.outputs.map((o) => ({
@@ -193,6 +213,11 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   const [notes, setNotes] = useState(planned?.notes ?? "");
   const [error, setError] = useState<string | null>(null);
 
+  // Échéances lues au jour de l'intervention.
+  const maintenanceAt = (() => {
+    const d = periods[0]?.startedAt?.slice(0, 10);
+    return d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d}T23:59:59.000Z` : snapshot.at;
+  })();
   const article = (id: string | null) => articles.find((a) => a.id === id);
   const inputKinds = procedure?.inputKinds ?? [];
   const outputKinds = procedure?.outputKinds ?? [];
@@ -228,7 +253,8 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
     setInputs((rows) => (p.inputKinds.length === 0 ? [] : rows.length ? rows : [emptyRow(p.shape === "harvest" ? "total" : "hectare")]));
     setOutputs((rows) => (p.outputKinds.length === 0 ? [] : rows.length ? rows : [emptyRow("total")]));
     if (p.shape !== "treatment") setPurposes([]);
-    if (tools.length === 0) setTools(p.suggestions.tools.slice(0, 1));
+    if (p.shape === "maintenance") setTools([]);
+    else if (tools.length === 0) setTools(p.suggestions.tools.slice(0, 1));
     if (doers.length === 0) setDoers(p.suggestions.doers.slice(0, 1));
   };
 
@@ -243,7 +269,11 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       periods: periods.map((p) => ({ startedAt: toIso(p.startedAt), stoppedAt: toIso(p.stoppedAt) })),
       targets:
         shape === "maintenance"
-          ? maintained.map((id) => ({ kind: "equipment" as const, id }))
+          ? maintained.map((id) => ({
+              kind: "equipment" as const,
+              id,
+              ...(completing && maint.meters[id] !== undefined && maint.meters[id] !== "" ? { meter: { value: Number(maint.meters[id]) } } : {}),
+            }))
           : parcels.map((id): InterventionTarget => {
               const extra = targetExtras.get(id);
               return {
@@ -259,6 +289,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         per: r.per,
         ...(r.keep?.lotId ? { lotId: r.keep.lotId } : {}),
         ...(r.keep?.from ? { from: r.keep.from } : {}),
+        ...(shape === "maintenance" && r.equipmentId && maintained.includes(r.equipmentId) ? { equipmentId: r.equipmentId } : {}),
       })),
       outputs: quantity(outputs).map((r) => ({
         articleId: r.articleId!,
@@ -267,7 +298,8 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         ...(r.keep?.lotId ? { lotId: r.keep.lotId } : {}),
         ...(r.to ? { to: location(r.to) } : {}),
       })),
-      tools: tools.map((equipmentId) => ({ equipmentId })),
+      tools: shape === "maintenance" ? [] : tools.map((equipmentId) => ({ equipmentId })),
+      ...(shape === "maintenance" ? { maintenance: maintenanceBody(maint, maintained) } : {}),
       doers: doers.map((personId) => ({ personId })),
       purposes,
       ...(notes.trim() ? { notes: notes.trim() } : {}),
@@ -475,6 +507,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   const aside = (
     <Stack gap="md" style={{ position: "sticky", top: 16 }}>
       {shape === "treatment" && sprayWindow && <SprayingConditions farmId={farmId} from={sprayWindow.from} days={sprayWindow.days} />}
+      {shape === "maintenance" && <MaintenanceAside farmId={farmId} at={maintenanceAt} equipments={equipmentList.data?.items ?? []} selected={maintained} />}
       {procedure && shape !== "maintenance" && parcelMode === "map" && (
         <Paper withBorder p="xs" aria-label="Carte des parcelles">
           <MapBoundary>
@@ -524,6 +557,9 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         setError(null);
         if (!code) return setError("Choisissez une intervention.");
         if (periods.some((p) => !p.startedAt || (completing && !p.stoppedAt))) return setError("Renseignez les dates.");
+        if (shape === "maintenance" && completing && draftNature(maint) === "corrective" && !maint.problem.trim()) {
+          return setError("Une réparation (entretien curatif) demande la description du problème.");
+        }
         // Feu rouge sur une réalisation : motif obligatoire (alerte + motif).
         if (completing && dangers.length > 0 && overrideReason.trim().length < 3) return setAskOverride(true);
         submit.mutate();
@@ -636,12 +672,25 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
 
             {procedure &&
               (shape === "maintenance" ? (
-                <MultiSelect
-                  label="Matériels entretenus"
-                  searchable
-                  data={snapshot.equipments.map((e) => ({ value: e.id, label: e.name }))}
-                  value={maintained}
-                  onChange={setMaintained}
+                <MaintenanceFields
+                  farmId={farmId}
+                  at={maintenanceAt}
+                  equipments={equipmentList.data?.items ?? snapshot.equipments.map((e) => ({ ...e, state: e.state ?? null, brand: null, brandId: null, model: null, serialNumber: null, year: null, meterUnit: null, logoAssetId: null, logoSource: null, lastReading: null, tracked: false }))}
+                  selected={maintained}
+                  onSelect={setMaintained}
+                  value={maint}
+                  onChange={setMaint}
+                  completing={completing}
+                  prefill={!planned}
+                  onParts={(parts) =>
+                    setInputs((rows) => {
+                      const kept = rows.filter((r) => r.articleId);
+                      const added = parts
+                        .filter((p) => !kept.some((r) => r.articleId === p.articleId && r.equipmentId === p.equipmentId))
+                        .map((p): QuantityRow => ({ articleId: p.articleId, quantity: p.quantity, per: "total", to: null, equipmentId: p.equipmentId }));
+                      return [...kept, ...added];
+                    })
+                  }
                 />
               ) : (
                 <Stack gap={6}>
@@ -694,7 +743,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
 
             {inputKinds.length > 0 && (
               <>
-                <Divider label="Intrants" labelPosition="left" />
+                <Divider label={shape === "maintenance" ? "Pièces et fluides" : "Intrants"} labelPosition="left" />
                 {quantityRows("input", inputs, setInputs, articleOptions(inputKinds, procedure!.suggestions.inputs))}
                 <Button variant="subtle" size="xs" leftSection={<Plus size={14} />} onClick={() => setInputs([...inputs, emptyRow("hectare")])}>
                   Ajouter un intrant
@@ -721,18 +770,20 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               />
             )}
 
-            {procedure && <WeatherFields farmId={farmId} request={weatherRequest} value={weather} onChange={setWeather} />}
+            {procedure && shape !== "maintenance" && <WeatherFields farmId={farmId} request={weatherRequest} value={weather} onChange={setWeather} />}
 
             {procedure && (
               <>
                 <Divider label="Moyens" labelPosition="left" />
-                <MultiSelect
-                  label="Matériels"
-                  searchable
-                  data={withSuggestions(snapshot.equipments.map((e) => ({ value: e.id, label: e.name })), procedure.suggestions.tools)}
-                  value={tools}
-                  onChange={setTools}
-                />
+                {shape !== "maintenance" && (
+                  <MultiSelect
+                    label="Matériels"
+                    searchable
+                    data={withSuggestions(snapshot.equipments.map((e) => ({ value: e.id, label: e.name })), procedure.suggestions.tools)}
+                    value={tools}
+                    onChange={setTools}
+                  />
+                )}
                 <MultiSelect
                   label="Intervenants"
                   searchable

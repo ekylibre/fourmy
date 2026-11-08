@@ -178,3 +178,73 @@ qui les utilisent.
 | `GET /equipments/:id/maintenance?at=` · `GET /maintenance/due?at=` · `GET /equipment-models` · `GET /settings/maintenance` | membre |
 | `PUT /plan-operations/:id/baseline` · `POST /equipments/:id/plan/baseline` | membre |
 | `POST /equipments/:id/plan` · `PUT /plan-operations/:id` · `POST /equipments/:id/plan/apply-model` · `POST /imports/equipment-bundle` · `PUT /settings/maintenance` | responsable |
+
+## Interventions d'entretien (lot K)
+
+Une opération d'entretien réalisée **est une intervention** de forme
+`maintenance` (procédure « Réparation et maintenance »). Le formulaire
+d'intervention s'adapte à cette forme.
+
+### Saisie
+
+- **Matériels entretenus** : une carte par matériel, avec :
+  - le **compteur** (heures), qui rappelle le dernier relevé. Il est
+    facultatif mais demandé, et il n'est saisi que pour une intervention
+    réalisée ;
+  - les **opérations du plan** : en retard et bientôt d'abord, les autres
+    dans « Autres opérations du plan » ;
+  - pour un **contrôle**, le résultat : RAS ou anomalie, avec ce qui a été
+    constaté.
+- **Nature** :
+  - **préventive** dès qu'une opération du plan est cochée, **curative**
+    sinon ;
+  - modifiable ;
+  - une intervention curative réalisée demande le **problème constaté**.
+- **Atelier externe** : un nom libre et un n° de bon ou de facture
+  facultatif, pour le rapprochement dans Lyvre.
+- **Pièces et fluides** : ce sont des intrants. Cocher une opération ajoute
+  ses pièces une seule fois, rattachées au matériel. Elles sortent du stock
+  comme tout intrant.
+- **Champs masqués** pour un entretien : « Matériels » (outils) et
+  « Météo ».
+- **Colonne de droite** : pour chaque matériel, le dernier relevé, les
+  échéances en retard ou proches et les fluides préconisés.
+
+### Pré-remplissage (FR-MAT-55)
+
+- **Onglet Entretien d'un matériel** :
+  - « Réaliser » ou « Planifier » sur une opération ouvre
+    `interventions/new?procedure=equipment_maintenance&equipment=…&operations=…&status=done|planned`
+    pré-rempli, pièces comprises ;
+  - « Réparation » ouvre une saisie curative.
+- **Fiche d'une intervention avec une anomalie** : « Planifier une
+  réparation » ouvre une saisie curative planifiée. Le problème y est déjà
+  rempli.
+
+### Effets
+
+- **Seule une intervention réalisée** remet à zéro les échéances des
+  opérations cochées.
+  - L'échéance repart des heures relevées par l'intervention.
+  - Sans relevé, les heures sont interpolées entre deux relevés, sinon
+    l'échéance ne suit que les mois.
+- **Relevé créé** : le compteur saisi devient un relevé d'origine
+  `intervention`, contrôlé comme un relevé saisi (409 s'il est plus bas que
+  le précédent).
+  - Il est recréé à chaque correction de l'intervention.
+  - Il est supprimé si l'intervention est annulée, et les échéances
+    reviennent à la réalisation précédente.
+- **Fiche d'intervention** : un bloc « Entretien » montre la nature, le
+  problème, l'atelier, le compteur et les opérations avec leur résultat.
+- **Compatibilité** : sans bloc `maintenance` (ancien mobile, interventions
+  migrées d'Ekylibre), rien de plus n'est exigé. Une intervention
+  d'entretien sans opération se lit comme curative.
+
+### Hors lot K
+
+- **Fluides en intrants** : les fluides préconisés ne sont pas encore
+  rattachés à des articles. On les ajoute à la main comme intrants de
+  nature « fluide ».
+- **Relevé en fin de chantier** (FR-MAT-60) : le contrat et l'API
+  l'acceptent déjà (`tools[].meter`), mais le champ n'apparaît pas encore
+  dans le formulaire des interventions de champ.

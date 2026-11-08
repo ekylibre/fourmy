@@ -21,7 +21,7 @@ export interface RuleContext {
 }
 
 type Body = Pick<InterventionCompleteWrite, "periods" | "targets" | "inputs" | "outputs" | "purposes"> &
-  Partial<Pick<InterventionPlanWrite, "procedure">>;
+  Partial<Pick<InterventionPlanWrite, "procedure" | "maintenance" | "tools">>;
 
 const MIN_INPUT_KIND: Partial<Record<ProcedureDefinition["shape"], ArticleKind>> = {
   treatment: "phyto",
@@ -89,6 +89,8 @@ export function validateIntervention(
     errors.push("Une récolte demande au moins un produit récolté.");
   }
 
+  errors.push(...validateMaintenance(procedure.shape, body, mode));
+
   // Motifs : réservés aux traitements.
   if (body.purposes.length > 0 && procedure.shape !== "treatment") {
     errors.push("Les motifs (herbicide, fongicide…) ne concernent que les traitements.");
@@ -104,6 +106,45 @@ export function validateIntervention(
   });
 
   return [...new Set(errors)];
+}
+
+/**
+ * Nature d'un entretien (FR-MAT-52) : préventif dès qu'une opération du plan
+ * est réalisée ou contrôlée, curatif sinon (panne, réparation).
+ */
+export function deriveNature(operations: readonly { result?: string }[] | undefined): "preventive" | "corrective" {
+  return (operations ?? []).length > 0 ? "preventive" : "corrective";
+}
+
+/** Règles propres à l'entretien (FR-MAT-50 à 54). */
+export function validateMaintenance(shape: ProcedureDefinition["shape"], body: Body, mode: "plan" | "complete"): string[] {
+  const errors: string[] = [];
+  const m = body.maintenance;
+  const equipments = new Set(body.targets.filter((t) => t.kind === "equipment").map((t) => t.id));
+  if (shape !== "maintenance") {
+    if (m && (m.operations.length > 0 || m.problem || m.workshop)) errors.push("Le bloc entretien ne concerne que les interventions d'entretien.");
+    if (body.targets.some((t) => t.meter)) errors.push("Un relevé de compteur se saisit sur un matériel.");
+    return errors;
+  }
+  for (const t of body.targets) if (t.meter && t.kind !== "equipment") errors.push("Un relevé de compteur se saisit sur un matériel.");
+  for (const o of m?.operations ?? []) {
+    if (!equipments.has(o.equipmentId)) {
+      errors.push("Une opération du plan doit viser un matériel entretenu.");
+      break;
+    }
+  }
+  for (const i of body.inputs) {
+    if (i.equipmentId && !equipments.has(i.equipmentId)) {
+      errors.push("Une pièce ou un fluide est rattaché à un matériel qui n'est pas entretenu.");
+      break;
+    }
+  }
+  // Sans bloc entretien (mobile d'avant le lot K, migration) : rien de plus exigé.
+  const nature = m ? (m.nature ?? deriveNature(m.operations)) : null;
+  if (mode === "complete" && nature === "corrective" && !m?.problem?.trim()) {
+    errors.push("Une réparation (entretien curatif) demande la description du problème.");
+  }
+  return errors;
 }
 
 /** Début de la première période, fin de la dernière. */

@@ -135,4 +135,65 @@ describe.skipIf(!url)("plan d'entretien (intégration)", () => {
     m = await view();
     expect(m.operations.filter((o: { due: { status: string } }) => o.due.status === "unknown")).toEqual([]);
   });
+
+  it("intervention d'entretien : relevé, opérations, pièces ; seule la réalisation remet à zéro ; l'annulation recalcule", async () => {
+    const m0 = await (await app.request(`${base()}/equipments/${equipmentId}/maintenance?at=2026-11-20T00:00:00.000Z`, { headers: worker })).json();
+    const oil = m0.operations.find((o: { code: string }) => o.code === "OP02");
+    const [part] = await sql`SELECT id FROM articles WHERE farm_id = ${farmId} AND kind = 'part'`;
+    const body = (extra: object = {}) => ({
+      procedure: "equipment_maintenance",
+      periods: [{ startedAt: "2026-11-10T08:00:00.000Z", stoppedAt: "2026-11-10T10:00:00.000Z" }],
+      targets: [{ kind: "equipment", id: equipmentId, meter: { value: 2495 } }],
+      inputs: [{ articleId: part!.id, quantity: 1, per: "total", equipmentId }],
+      maintenance: { operations: [{ equipmentId, operationId: oil.id, result: "done" }], workshop: { name: "Garage du Lot", reference: "BL-42" } },
+      ...extra,
+    });
+    // Planifiée : rien n'avance.
+    const planned = await (await app.request(`${base()}/interventions`, { method: "POST", headers: worker, body: JSON.stringify(body()) })).json();
+    let due = (await (await app.request(`${base()}/equipments/${equipmentId}/maintenance?at=2026-11-20T00:00:00.000Z`, { headers: worker })).json()).operations.find(
+      (o: { code: string }) => o.code === "OP02",
+    ).due;
+    expect(due.status).toBe("overdue");
+    // Réalisée : l'échéance repart de 2 495 h, le relevé « intervention » est créé, la pièce sort du stock.
+    const { procedure: _p, ...complete } = body();
+    const done = await app.request(`${base()}/interventions/${planned.id}/complete`, { method: "POST", headers: worker, body: JSON.stringify(complete) });
+    expect(done.status).toBe(200);
+    const sheet = await (await app.request(`${base()}/interventions/${planned.id}`, { headers: worker })).json();
+    expect(sheet.maintenance).toMatchObject({ nature: "preventive", workshop: { name: "Garage du Lot", reference: "BL-42" }, operations: [{ label: "Vidange moteur", result: "done" }] });
+    expect(sheet.targets[0].meter).toEqual({ value: 2495 });
+    expect(sheet.inputs[0].equipmentId).toBe(equipmentId);
+    due = (await (await app.request(`${base()}/equipments/${equipmentId}/maintenance?at=2026-11-20T00:00:00.000Z`, { headers: worker })).json()).operations.find(
+      (o: { code: string }) => o.code === "OP02",
+    ).due;
+    expect(due).toMatchObject({ status: "ok", last: { source: "intervention", usage: 2495 }, nextUsage: 2895 });
+    const [reading] = await sql`SELECT origin FROM meter_readings WHERE intervention_id = ${planned.id}`;
+    expect(reading!.origin).toBe("intervention");
+    const [move] = await sql`SELECT quantity FROM stock_movements WHERE intervention_id = ${planned.id}`;
+    expect(Number(move!.quantity)).toBe(-1);
+    // Annulée : relevé supprimé, l'échéance revient en retard.
+    await app.request(`${base()}/interventions/${planned.id}/cancel`, { method: "POST", headers: owner, body: JSON.stringify({ reason: "saisie en double" }) });
+    expect(await sql`SELECT 1 FROM meter_readings WHERE intervention_id = ${planned.id}`).toHaveLength(0);
+    due = (await (await app.request(`${base()}/equipments/${equipmentId}/maintenance?at=2026-11-20T00:00:00.000Z`, { headers: worker })).json()).operations.find(
+      (o: { code: string }) => o.code === "OP02",
+    ).due;
+    expect(due.status).toBe("overdue");
+  });
+
+  it("réparation : le problème est exigé ; compteur incohérent refusé", async () => {
+    const repair = async (maintenance: object, value = 2500) => {
+      const periods = [{ startedAt: "2026-11-12T08:00:00.000Z", stoppedAt: "2026-11-12T09:00:00.000Z" }];
+      const targets = [{ kind: "equipment", id: equipmentId, meter: { value } }];
+      const plan = await (await app.request(`${base()}/interventions`, { method: "POST", headers: worker, body: JSON.stringify({ procedure: "equipment_maintenance", periods, targets }) })).json();
+      return app.request(`${base()}/interventions/${plan.id}/complete`, { method: "POST", headers: worker, body: JSON.stringify({ periods, targets, maintenance }) });
+    };
+    const noProblem = await repair({ operations: [] });
+    expect(noProblem.status).toBe(422);
+    expect((await noProblem.json()).detail).toContain("description du problème");
+    const low = await repair({ operations: [], problem: "Fuite vérin relevage AV" }, 100);
+    expect(low.status).toBe(409);
+    const ok = await repair({ operations: [], problem: "Fuite vérin relevage AV" });
+    expect(ok.status).toBe(200);
+    const i = await (await app.request(`${base()}/interventions/${(await ok.json()).intervention.id}`, { headers: worker })).json();
+    expect(i.maintenance).toMatchObject({ nature: "corrective", problem: "Fuite vérin relevage AV", operations: [] });
+  });
 });

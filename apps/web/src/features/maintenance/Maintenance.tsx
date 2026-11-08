@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router";
 import { Alert, Badge, Button, Group, Modal, NumberInput, Paper, SegmentedControl, Select, Stack, Switch, Table, Text, TextInput, Textarea, Title, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -70,6 +71,10 @@ function useRefresh() {
 
 type Filter = "todo" | "all" | "off";
 
+/** Saisie d'entretien pré-remplie depuis des échéances (FR-MAT-55). */
+export const newMaintenance = (farmId: string, equipmentId: string, operations: string[], status: "done" | "planned") =>
+  `/f/${farmId}/interventions/new?${new URLSearchParams({ procedure: "equipment_maintenance", equipment: equipmentId, operations: operations.join(","), status })}`;
+
 /**
  * Onglet Entretien de la fiche matériel (FR-MAT-20 à 26) : échéances triées
  * par urgence, à la date de la frise ; « dernière fois connue » pour amorcer
@@ -127,6 +132,9 @@ export function MaintenanceTab({ equipmentId, hasMeter }: { equipmentId: string;
               { value: "off", label: `Non applicables (${count("not_applicable")})` },
             ]}
           />
+          <Button size="xs" variant="default" component={Link} to={`/f/${farm.id}/interventions/new?${new URLSearchParams({ procedure: "equipment_maintenance", equipment: equipmentId, nature: "corrective" })}`}>
+            Réparation
+          </Button>
           {owner && (
             <Button size="xs" variant="light" leftSection={<Plus size={14} />} onClick={() => setEditing("new")}>
               Opération
@@ -193,6 +201,16 @@ export function MaintenanceTab({ equipmentId, hasMeter }: { equipmentId: string;
                   </Table.Td>
                   <Table.Td>
                     <Group gap={4} wrap="nowrap">
+                      {o.due.status !== "not_applicable" && (
+                        <>
+                          <Button size="compact-xs" variant="light" component={Link} to={newMaintenance(farm.id, equipmentId, [o.id], "done")} aria-label={`Réaliser : ${o.label}`}>
+                            Réaliser
+                          </Button>
+                          <Button size="compact-xs" variant="subtle" component={Link} to={newMaintenance(farm.id, equipmentId, [o.id], "planned")} aria-label={`Planifier : ${o.label}`}>
+                            Planifier
+                          </Button>
+                        </>
+                      )}
                       {o.due.status !== "not_applicable" && o.due.status !== "on_demand" && (
                         <Button size="compact-xs" variant="subtle" leftSection={<CalendarCheck size={12} />} onClick={() => setBaseline(o)} aria-label={`Dernière fois : ${o.label}`}>
                           Dernière fois

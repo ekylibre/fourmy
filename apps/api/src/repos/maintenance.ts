@@ -104,8 +104,19 @@ async function dueInputs(tx: Tx, equipmentIds: string[]) {
   );
   const om = byEq(options);
   const opts = new Map(equipmentIds.map((id) => [id, (om.get(id) ?? []).map((o) => ({ code: o.code, from: iso(o.from)!, to: iso(o.to) }))]));
-  // Les réalisations (interventions d'entretien) arrivent avec le lot K.
-  return { readings: series, options: opts, completions: [] as Completion[] };
+  // Réalisations : opérations cochées dans une intervention réalisée ; heures = relevé de cette intervention.
+  const done = await rows<{ operation_id: string; equipment_id: string; stopped_at: string; reading_id: string | null }>(
+    tx,
+    sql`SELECT io.operation_id, io.equipment_id, i.stopped_at,
+               (SELECT r.id FROM meter_readings r WHERE r.intervention_id = i.id AND r.equipment_id = io.equipment_id LIMIT 1) AS reading_id
+        FROM intervention_operations io JOIN interventions i ON i.id = io.intervention_id
+        WHERE i.status = 'done' AND i.stopped_at IS NOT NULL AND io.equipment_id IN (${ids})`,
+  );
+  const completions: Completion[] = done.map((d) => {
+    const point = d.reading_id ? series.get(d.equipment_id)?.find((p) => p.reading.id === d.reading_id) : undefined;
+    return { operationId: d.operation_id, at: iso(d.stopped_at)!, usage: point && point.status === "valid" ? point.usage : null };
+  });
+  return { readings: series, options: opts, completions };
 }
 
 export async function maintenanceView(db: Database, farmId: string, equipmentId: string, at: string): Promise<EquipmentMaintenance> {

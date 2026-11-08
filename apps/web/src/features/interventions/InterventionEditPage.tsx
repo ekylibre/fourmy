@@ -8,7 +8,26 @@ import { procedureLabel } from "../../app/labels";
 import { useArticles, useIntervention, usePeople, useProcedures, useSnapshot } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
 import { ProcedureIcon } from "../../components/ProcedureIcon";
-import { InterventionForm } from "./InterventionForm";
+import { InterventionForm, type FormInitial } from "./InterventionForm";
+
+/**
+ * Nouvelle intervention pré-remplie par l'adresse (lot K) : depuis une
+ * échéance (`?procedure=equipment_maintenance&equipment=…&operations=a,b&status=planned`)
+ * ou une anomalie (`&nature=corrective&problem=…`).
+ */
+function initialFromParams(p: URLSearchParams): FormInitial | undefined {
+  const procedure = p.get("procedure");
+  if (!procedure) return undefined;
+  const nature = p.get("nature");
+  return {
+    procedure,
+    equipmentId: p.get("equipment") ?? undefined,
+    operationIds: (p.get("operations") ?? "").split(",").filter(Boolean),
+    mode: p.get("status") === "planned" ? "planned" : p.get("status") === "done" ? "done" : undefined,
+    nature: nature === "corrective" || nature === "preventive" ? nature : null,
+    problem: p.get("problem") ?? undefined,
+  };
+}
 import { interventionDay } from "./presenters";
 
 type FormMode = "new" | "complete" | "edit";
@@ -84,6 +103,7 @@ function FormLayout({ mode, intervention: i, back }: { mode: FormMode; intervent
           planned={mode === "complete" ? i : undefined}
           editing={mode === "edit" ? i : undefined}
           defaultDay={day.slice(0, 10)}
+          initial={mode === "new" ? initialFromParams(new URLSearchParams(location.search)) : undefined}
           onDone={(id) => {
             // Après l'enregistrement : la fiche de l'intervention.
             const target = id ?? i?.id;

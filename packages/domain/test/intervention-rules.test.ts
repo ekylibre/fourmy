@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { getProcedure, PROCEDURES, PROCEDURE_LABELS } from "@fourmy/contracts";
-import { validateIntervention, periodBounds, storedUnit, splitUnit } from "../src/index.js";
+import { deriveNature, validateIntervention, periodBounds, storedUnit, splitUnit } from "../src/index.js";
 
 const kinds: Record<string, "phyto" | "fertilizer" | "seed" | "harvest" | "other"> = {
   "00000000-0000-7000-8000-000000000001": "phyto",
@@ -97,5 +97,36 @@ describe("unités", () => {
     expect(storedUnit("liter", "hectare")).toBe("liter_per_hectare");
     expect(splitUnit("kilogram_per_hectare")).toEqual({ unit: "kilogram", per: "hectare" });
     expect(splitUnit("ton")).toEqual({ unit: "ton", per: "total" });
+  });
+});
+
+describe("entretien (lot K)", () => {
+  const maint = getProcedure("equipment_maintenance");
+  const EQ = "0193a000-0000-7000-8000-00000000e001";
+  const OP = "0193a000-0000-7000-8000-00000000c001";
+  const period = [{ startedAt: "2026-11-08T08:00:00.000Z", stoppedAt: "2026-11-08T10:00:00.000Z" }];
+  const base = { periods: period, targets: [{ kind: "equipment" as const, id: EQ, meter: { value: 4330 } }], inputs: [], outputs: [], purposes: [] };
+  const ctx = { articleKind: () => "part" as const };
+
+  it("préventif dès qu'une opération du plan est cochée ; curatif sinon, avec le problème", () => {
+    expect(deriveNature([{ result: "ok" }])).toBe("preventive");
+    expect(deriveNature([])).toBe("corrective");
+    expect(validateIntervention(maint, { ...base, maintenance: { operations: [{ equipmentId: EQ, operationId: OP, result: "done" }] } }, "complete", ctx)).toEqual([]);
+    expect(validateIntervention(maint, { ...base, maintenance: { operations: [] } }, "complete", ctx)).toContain("Une réparation (entretien curatif) demande la description du problème.");
+    expect(validateIntervention(maint, { ...base, maintenance: { operations: [], problem: "Fuite vérin relevage AV" } }, "complete", ctx)).toEqual([]);
+    // Sans bloc entretien (ancien mobile) : accepté comme avant.
+    expect(validateIntervention(maint, base, "complete", ctx)).toEqual([]);
+  });
+
+  it("opérations, pièces et relevés visent les matériels entretenus", () => {
+    const other = "0193a000-0000-7000-8000-00000000e002";
+    expect(validateIntervention(maint, { ...base, maintenance: { operations: [{ equipmentId: other, operationId: OP, result: "done" }] } }, "plan", ctx)).toContain(
+      "Une opération du plan doit viser un matériel entretenu.",
+    );
+    expect(validateIntervention(maint, { ...base, inputs: [{ articleId: OP, quantity: 1, per: "total", equipmentId: other }] }, "plan", ctx)).toContain(
+      "Une pièce ou un fluide est rattaché à un matériel qui n'est pas entretenu.",
+    );
+    const plowing = getProcedure("plowing");
+    expect(validateIntervention(plowing, { ...base, targets: [{ kind: "land_parcel", id: EQ, meter: { value: 1 } }] }, "plan", ctx)).toContain("Un relevé de compteur se saisit sur un matériel.");
   });
 });
