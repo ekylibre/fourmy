@@ -20,7 +20,7 @@ const TOOLS: { value: CartoTool; label: string; icon: typeof Pentagon; help: str
  */
 export function CartoToolbar({ state, tools = TOOLS.map((t) => t.value) }: { state: CartoState; tools?: CartoTool[] }) {
   const { editor, tool, selection, measure, error } = state;
-  const current = TOOLS.find((t) => t.value === tool)!;
+  const current = TOOLS.find((t) => t.value === tool);
   return (
     <Paper p="sm" withBorder>
       <Stack gap="xs">
@@ -59,7 +59,7 @@ export function CartoToolbar({ state, tools = TOOLS.map((t) => t.value) }: { sta
           </Group>
         </Group>
         <Text size="sm" c="dimmed">
-          {current.help}
+          {current?.help}
         </Text>
         {measure && (
           <Text size="sm" role="status" aria-label="Mesure">

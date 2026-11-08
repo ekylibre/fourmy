@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import {
   ActionIcon,
   Alert,
   Button,
   Divider,
   Group,
+  Loader,
   MultiSelect,
   NumberInput,
   SegmentedControl,
@@ -35,7 +36,12 @@ import { formatHa } from "@fourmy/ui-lyvre";
 import { api, ApiError, farmPath } from "../../app/api";
 import { unitLabel } from "../../app/labels";
 import { invalidateAfterIntervention } from "../../app/queries";
+import { MapBoundary } from "../../components/MapBoundary";
 import { ProcedureIcon } from "../../components/ProcedureIcon";
+import { treatedAreaM2 } from "./zones";
+
+// La carte (MapLibre, terra-draw) n'est chargée qu'en mode « Carte ».
+const ParcelPicker = lazy(() => import("./ParcelPicker").then((m) => ({ default: m.ParcelPicker })));
 
 /** Ligne de quantité ; `keep` garde ce que le formulaire n'affiche pas (lot, lieu de prélèvement). */
 type QuantityRow = {
@@ -120,9 +126,18 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   const [parcels, setParcels] = useState<string[]>(planned?.targets.filter((t) => t.kind === "land_parcel").map((t) => t.id) ?? []);
   const [maintained, setMaintained] = useState<string[]>(planned?.targets.filter((t) => t.kind === "equipment").map((t) => t.id) ?? []);
   // Surface travaillée et zone de travail des cibles : conservées telles quelles.
-  const [targetExtras] = useState(
-    () => new Map((planned?.targets ?? []).map((t) => [t.id, { workedAreaM2: t.workedAreaM2, workingZone: t.workingZone }])),
+  // Surface travaillée et zone de travail des cibles : conservées, ou dessinées sur la carte.
+  const [targetExtras, setTargetExtras] = useState(
+    () =>
+      new Map<string, { workedAreaM2?: number; workingZone?: InterventionTarget["workingZone"] }>(
+        (planned?.targets ?? []).map((t) => [t.id, { workedAreaM2: t.workedAreaM2, workingZone: t.workingZone }]),
+      ),
   );
+  const [parcelMode, setParcelMode] = useState<"liste" | "carte">("liste");
+  const parcelShapes = new Map(
+    snapshot.landParcels.map((p) => [p.id, { id: p.id, name: p.name, shape: p.version.shape as unknown as import("@fourmy/carto").Area, areaM2: p.version.areaM2 }]),
+  );
+  const treatedM2 = treatedAreaM2(parcels, parcelShapes, targetExtras);
   const [inputs, setInputs] = useState<QuantityRow[]>(
     planned?.inputs.map((i) => ({ articleId: i.articleId, quantity: i.quantity, per: i.per, to: null, keep: { lotId: i.lotId, from: i.from } })) ?? [],
   );
@@ -312,6 +327,12 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               <Trash2 size={16} />
             </ActionIcon>
           </Group>
+          {kind === "input" && row.per === "hectare" && a && row.quantity !== "" && treatedM2 > 0 && (
+            <Text size="xs" c="dimmed" className="lv-num">
+              ≈ {(Number(row.quantity) * (treatedM2 / 10_000)).toLocaleString("fr-FR", { maximumFractionDigits: 3 })} {unitLabel(a.unit)} au total sur{" "}
+              {formatHa(treatedM2)}
+            </Text>
+          )}
           {kind === "output" && completing && (
             <Select
               aria-label="Destination"
@@ -429,13 +450,63 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               onChange={setMaintained}
             />
           ) : (
-            <MultiSelect
-              label="Parcelles"
-              searchable
-              data={snapshot.landParcels.map((p) => ({ value: p.id, label: `${p.name} (${formatHa(p.version.areaM2)})` }))}
-              value={parcels}
-              onChange={setParcels}
-            />
+            <Stack gap={6}>
+              <Group justify="space-between" align="flex-end">
+                <Text size="sm" fw={500}>
+                  Parcelles{" "}
+                  {parcels.length > 0 && (
+                    <Text span size="xs" c="dimmed" className="lv-num">
+                      · {parcels.length} parcelle(s), {formatHa(treatedM2)} traités
+                    </Text>
+                  )}
+                </Text>
+                <SegmentedControl
+                  size="xs"
+                  aria-label="Choix des parcelles"
+                  value={parcelMode}
+                  onChange={(v) => setParcelMode(v as "liste" | "carte")}
+                  data={[
+                    { value: "liste", label: "Liste" },
+                    { value: "carte", label: "Carte" },
+                  ]}
+                />
+              </Group>
+              {parcelMode === "liste" ? (
+                <MultiSelect
+                  aria-label="Parcelles"
+                  searchable
+                  data={snapshot.landParcels.map((p) => ({ value: p.id, label: `${p.name} (${formatHa(p.version.areaM2)})` }))}
+                  value={parcels}
+                  onChange={setParcels}
+                />
+              ) : (
+                <MapBoundary>
+                  <Suspense fallback={<Loader size="sm" />}>
+                    <ParcelPicker
+                      parcels={[...parcelShapes.values()]}
+                      selected={parcels}
+                      zones={targetExtras}
+                      onSelect={setParcels}
+                      onZones={(found) => {
+                        setTargetExtras((m) => {
+                          const next = new Map(m);
+                          for (const z of found) next.set(z.parcelId, { workedAreaM2: z.areaM2, workingZone: z.zone as InterventionTarget["workingZone"] });
+                          return next;
+                        });
+                        setParcels((current) => [...new Set([...current, ...found.map((z) => z.parcelId)])]);
+                      }}
+                      onClearZone={(id) =>
+                        setTargetExtras((m) => {
+                          const next = new Map(m);
+                          next.delete(id);
+                          return next;
+                        })
+                      }
+                    />
+                  </Suspense>
+                </MapBoundary>
+              )}
+            </Stack>
           ))}
 
         {inputKinds.length > 0 && (

@@ -20,7 +20,8 @@ import { areaM2, CartoError, measure, mergeAreas, splitArea, validateArea, type 
  * sert qu'au dessin et aux poignées.
  */
 
-export type CartoTool = "select" | "draw" | "cut" | "merge" | "measure-line" | "measure-area";
+/** « none » : aucun outil, la carte reste à l'écran qui l'utilise (clics, sélection propre). */
+export type CartoTool = "none" | "select" | "draw" | "cut" | "merge" | "measure-line" | "measure-area";
 
 export interface CartoEditorEvents {
   /** Les surfaces ont changé (dessin, déplacement, découpe, fusion, suppression, annulation). */
@@ -127,7 +128,7 @@ export class CartoEditor {
   setTool(tool: CartoTool): void {
     this.clearTemporary();
     this.tool = tool;
-    const mode = { select: "select", draw: "polygon", cut: "cut", merge: "static", "measure-line": "measure-line", "measure-area": "measure-area" }[tool];
+    const mode = { none: "static", select: "select", draw: "polygon", cut: "cut", merge: "static", "measure-line": "measure-line", "measure-area": "measure-area" }[tool];
     this.draw.setMode(mode);
     // La sélection est gardée pour découper ou fusionner ; ailleurs, on repart de rien.
     if (tool !== "merge" && tool !== "cut") this.setSelection([]);

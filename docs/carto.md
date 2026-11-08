@@ -11,6 +11,7 @@ mesure, fusion et déplacement de sommets, communs à tous les modules qui
 | `packages/carto` | Géométrie **pure**, sans carte : surfaces, longueurs et périmètres géodésiques ; `splitArea`, `mergeAreas`, `clipToParcel`, `validateArea`. Réutilisable par le mobile. |
 | `apps/web/src/carto/editor.ts` | `CartoEditor` : se branche sur n'importe quelle carte MapLibre, édite une collection de polygones ; outils Modifier, Dessiner, Découper, Fusionner, Distance, Surface ; supprimer, annuler. |
 | `apps/web/src/carto/useCartoEditor.ts`, `CartoToolbar.tsx` | État React et barre d'outils (consigne, mesure, erreurs). |
+| `apps/web/src/features/interventions/ParcelPicker.tsx` | Premier écran qui réutilise l'éditeur : choix des parcelles d'une intervention et zone partielle (outil `none` hors dessin, la carte reste à l'écran). |
 | `/f/:ferme/carte/outils` | Atelier d'essai sur les parcelles à la date de la frise (lien « Outils de dessin » de la carte). Rien n'est enregistré. |
 
 ## Bibliothèques (validées le 2026-11-08)

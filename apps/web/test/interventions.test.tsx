@@ -71,6 +71,22 @@ describe("interventions", () => {
     expect(complete.body.periods).toHaveLength(1);
   });
 
+  it("la surface choisie donne le total de la dose ; la carte se choisit sans casser le formulaire", async () => {
+    const user = userEvent.setup();
+    const form = await openForm(user);
+    await user.click(within(form).getByRole("combobox", { name: "Parcelles" }));
+    await user.click(await screen.findByRole("option", { name: /Les Rouffiats/ }));
+    await user.click(within(form).getByRole("combobox", { name: "Produit" }));
+    await user.click(await screen.findByRole("option", { name: /Fongicide X/ }));
+    await user.type(within(form).getByRole("textbox", { name: "Quantité" }), "2");
+    expect(within(form).getByText(/1 parcelle\(s\), .* ha traités/)).toBeInTheDocument();
+    expect(within(form).getByText(/≈ .* L au total sur/)).toBeInTheDocument();
+    // Mode carte : sans WebGL (jsdom), un message remplace la carte ; la sélection reste.
+    await user.click(within(form).getByText("Carte"));
+    expect(await within(form).findByText(/Carte indisponible/, {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(within(form).getByText(/1 parcelle\(s\)/)).toBeInTheDocument();
+  });
+
   it("affiche le refus du serveur sans fermer le formulaire", async () => {
     const user = userEvent.setup();
     server.use(

@@ -368,3 +368,21 @@ accents et à la casse ; tous les mots tapés doivent se retrouver
 (« monassut semis »). La requête est dans l'adresse (`?q=`), donc partageable.
 Filtrage côté client (`search.ts`) : 2 000 interventions indexées et filtrées
 en moins de 200 ms (test).
+
+## 14. Saisie sur carte (2026-11-08)
+
+Exigence INT-UI-6. Dans le formulaire, « Parcelles » bascule entre **Liste**
+et **Carte** ; la sélection est commune aux deux.
+
+- **Carte** (photo IGN, parcelles de la date de l'intervention) : clic pour
+  ajouter ou retirer une parcelle, **Maj + glisser** pour toutes celles d'un
+  rectangle, « Voir sur la carte » pour centrer une parcelle choisie.
+- **Zone partielle** : dessinée avec l'éditeur carto commun (`docs/carto.md`),
+  découpée sur chaque parcelle touchée (`zones.ts`, `clipToParcel`) ; chaque
+  morceau devient la `workingZone` de sa parcelle et sa surface (géodésique,
+  identique à PostGIS) le `workedAreaM2`. Une parcelle touchée est ajoutée à
+  la sélection ; la zone se retire pour revenir à la parcelle entière.
+- **Surface traitée** affichée (zones comprises) ; chaque dose par hectare
+  montre son total estimé. Le serveur recalcule à l'enregistrement.
+- Carte chargée à la demande (en mode Carte seulement) ; sans WebGL, un
+  message la remplace, la liste reste utilisable.
