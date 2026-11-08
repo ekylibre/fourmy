@@ -40,6 +40,23 @@ export function TreatmentCheckView({
           {LEVELS[check.level].label}
         </Badge>
       </Group>
+      {check.usages.length === 1 && (
+        <Text size="sm" aria-label={`Usage de ${check.articleName}`}>
+          <Text span size="xs" c="dimmed">
+            Usage :{" "}
+          </Text>
+          {check.usages[0]!.label}
+          {check.usages[0]!.doseLabel ? ` · dose max ${check.usages[0]!.doseLabel}` : ""}
+        </Text>
+      )}
+      {!onUsage && check.usages.length > 1 && check.usageId && (
+        <Text size="sm" aria-label={`Usage de ${check.articleName}`}>
+          <Text span size="xs" c="dimmed">
+            Usage :{" "}
+          </Text>
+          {check.usages.find((u) => u.id === check.usageId)?.label ?? check.usageId}
+        </Text>
+      )}
       {onUsage && check.usages.length > 1 && (
         <Select
           size="xs"

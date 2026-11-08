@@ -52,25 +52,26 @@ function fakeServer(phytoVersion: string) {
       CREATE TABLE registered_phytosanitary_cropsets (name character varying, label jsonb, crop_names text[]);
       CREATE TABLE registered_phytosanitary_products (id integer, name character varying, other_names text[], natures text[],
         active_compounds text[], france_maaid character varying, in_field_reentry_delay interval, state character varying,
-        started_on date, stopped_on date, firm_name character varying, product_type character varying, is_derogation boolean);
+        started_on date, stopped_on date, firm_name character varying, product_type character varying, is_derogation boolean,
+        mix_category_codes integer[], allowed_mentions jsonb, restricted_mentions character varying, operator_protection_mentions text);
       CREATE TABLE registered_phytosanitary_usages (id character varying, product_id integer, ephy_usage_phrase character varying,
         crop_label_fra character varying, species text[], target_name_label_fra character varying, treatment jsonb,
         dose_quantity numeric, dose_unit character varying, dose_unit_name character varying, pre_harvest_delay interval,
         applications_count integer, applications_frequency interval, untreated_buffer_aquatic integer,
         untreated_buffer_arthropod integer, untreated_buffer_plants integer, usage_conditions character varying,
         decision_date date, state character varying, is_derogation boolean, derogation_started_on date, derogation_stopped_on date);
-      CREATE TABLE registered_phytosanitary_target_name_to_pfi_targets (ephy_name character varying, pfi_id integer, pfi_name character varying);
+      CREATE TABLE registered_phytosanitary_target_name_to_pfi_targets (ephy_name character varying, pfi_id integer, pfi_name character varying, default_pfi_treatment_type_id character varying);
       CREATE TABLE registered_phytosanitary_risks (product_id integer, risk_code character varying, risk_phrase character varying, record_checksum integer);
       CREATE TABLE registered_phytosanitary_symbols (id character varying, symbol_name character varying);`,
     [`phytosanitary/${phytoVersion}/data/p_0.csv.gz`]: csv([
-      `9999001,GLISTER TEST,"{""BARBARIAN TEST""}",{Herbicide},"{""Glyphosate 360 g/L""}",9999001,PT6H,authorized,2015-08-12,,FIRME,PPP,f`,
+      `9999001,GLISTER TEST,"{""BARBARIAN TEST""}",{Herbicide},"{""Glyphosate 360 g/L""}",9999001,PT6H,authorized,2015-08-12,,FIRME,PPP,f,"{1,3}","{""organic_usage"": true}",,Gants en nitrile`,
     ]),
     [`phytosanitary/${phytoVersion}/data/u_0.csv.gz`]: csv([
       `u1,9999001,Maïs*Désherbage,Maïs,{zea_mays},Désherbage,"{""fra"": ""Trt Part.Aer.""}",3.0000,liter_per_hectare,L/ha,P90D,2,P14D,5,,,,2020-01-01,authorized,f,,`,
       `u2,9999001,Céréales*Désherbage,Céréales,{ephy_wheat},Désherbage,,4.0000,liter_per_hectare,L/ha,,,,20,,,,2020-01-01,withdrawn,f,,`,
     ]),
     [`phytosanitary/${phytoVersion}/data/c_0.csv.gz`]: csv([`ephy_wheat,"{""fra"": ""Blés""}","{triticum,triticosecale}"`]),
-    [`phytosanitary/${phytoVersion}/data/t_0.csv.gz`]: csv([`Désherbage,1,Adventices`]),
+    [`phytosanitary/${phytoVersion}/data/t_0.csv.gz`]: csv([`Désherbage,1,Adventices,T21`]),
     [`phytosanitary/${phytoVersion}/data/r_0.csv.gz`]: csv([
       `9999001,H319,Provoque une sévère irritation des yeux,1`,
       `9999001,H410,"Très toxique pour les organismes aquatiques, entraîne des effets néfastes à long terme",2`,
@@ -159,6 +160,9 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", () => {
           { domain: "activity_families", name: "plant_farming", hex: "89504e47" },
           { domain: "varieties", name: "zea", hex: "ffd8ff" },
         ]);
+        const [extra] = await tx`SELECT mix_codes, organic, biocontrol, operator_protection FROM phyto_products`;
+        expect(extra).toEqual({ mix_codes: [1, 3], organic: true, biocontrol: false, operator_protection: "Gants en nitrile" });
+        expect(await tx`SELECT pfi_id, default_treatment_type FROM phyto_target_pfi`).toEqual([{ pfi_id: 1, default_treatment_type: "T21" }]);
         const [p] = await tx`SELECT amm, name, other_names, reentry_delay_hours, natures FROM phyto_products`;
         expect(p).toEqual({ amm: "9999001", name: "GLISTER TEST", other_names: ["BARBARIAN TEST"], reentry_delay_hours: 6, natures: ["Herbicide"] });
         const usages = await tx`SELECT id, species, dose_quantity::float8 AS dose, pre_harvest_delay_days, applications_count,

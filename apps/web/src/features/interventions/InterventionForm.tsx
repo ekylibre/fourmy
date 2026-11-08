@@ -19,7 +19,7 @@ import {
   TextInput,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
 import type {
   Article,
@@ -47,6 +47,7 @@ import { treatedAreaM2 } from "./zones";
 import { durationMinutes, formatDuration, parseDuration, withDuration, withStart } from "./periods";
 import { ComplianceSummary, TreatmentCheckView, useComplianceCheck, type ComplianceDraft } from "./CompliancePanel";
 import type { Activity, InterventionWeather } from "@fourmy/contracts";
+import type { FeatureCollection, Geometry } from "geojson";
 import { SprayingConditions, WeatherFields, type WeatherRequestDraft } from "../weather/Weather";
 
 // La carte (MapLibre, terra-draw) n'est chargée qu'en mode « Carte ».
@@ -449,6 +450,26 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
     return midnight.getTime() < today.getTime() ? { from: midnight.toISOString(), days: 1 } : { from: midnight.toISOString(), days: 3 };
   })();
 
+  // Carte de saisie : eau autour de la ferme et bande de ZNT des parcelles choisies.
+  const mapOpen = parcelMode === "map" && !!procedure && shape !== "maintenance";
+  const farmWater = useQuery({
+    queryKey: ["phyto-water", farmId],
+    enabled: mapOpen,
+    queryFn: () => api.get<FeatureCollection>(farmPath(farmId, "/phyto/water")),
+    staleTime: 30 * 60_000,
+  });
+  const zntM = Math.max(0, ...(compliance?.checks ?? []).map((c) => c.zntM ?? 0));
+  const bufferRequest =
+    mapOpen && zntM > 0 && draft ? JSON.stringify({ targets: draft.targets, at: draft.plannedAt ?? draft.periods[0]?.startedAt, zntM }) : null;
+  const zntBuffer = useQuery({
+    queryKey: ["phyto-buffer", farmId, bufferRequest],
+    enabled: !!bufferRequest,
+    queryFn: () => api.post<{ buffer: Geometry | null }>(farmPath(farmId, "/phyto/water/buffer"), JSON.parse(bufferRequest!)),
+    placeholderData: (prev) => prev,
+  });
+  const bufferLayer: FeatureCollection | undefined =
+    bufferRequest && zntBuffer.data?.buffer ? { type: "FeatureCollection", features: [{ type: "Feature", geometry: zntBuffer.data.buffer, properties: {} }] } : undefined;
+
   const aside = (
     <Stack gap="md" style={{ position: "sticky", top: 16 }}>
       {shape === "treatment" && sprayWindow && <SprayingConditions farmId={farmId} from={sprayWindow.from} days={sprayWindow.days} />}
@@ -469,6 +490,8 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
                   });
                   setParcels((current) => [...new Set([...current, ...found.map((z) => z.parcelId)])]);
                 }}
+                water={farmWater.data}
+                buffer={bufferLayer}
                 onClearZone={(id) =>
                   setTargetExtras((m) => {
                     const next = new Map(m);

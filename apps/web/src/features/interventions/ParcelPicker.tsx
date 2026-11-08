@@ -21,6 +21,10 @@ export interface ParcelPickerProps {
   onSelect: (ids: string[]) => void;
   onZones: (zones: WorkingZone[]) => void;
   onClearZone: (parcelId: string) => void;
+  /** Cours d'eau et plans d'eau autour de la ferme (fossés en pointillés). */
+  water?: FeatureCollection;
+  /** Bande de ZNT autour des parcelles choisies. */
+  buffer?: FeatureCollection;
 }
 
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
@@ -44,7 +48,7 @@ function bounds(geometries: Area[]): LngLatBoundsLike | null {
  * sur les parcelles touchées par les outils carto communs). Les parcelles sont
  * celles de la date de l'intervention.
  */
-export function ParcelPicker({ parcels, selected, zones, onSelect, onZones, onClearZone }: ParcelPickerProps) {
+export function ParcelPicker({ parcels, selected, zones, onSelect, onZones, onClearZone, water = EMPTY, buffer = EMPTY }: ParcelPickerProps) {
   const container = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MlMap | null>(null);
   const [drawing, setDrawing] = useState(false);
@@ -56,6 +60,13 @@ export function ParcelPicker({ parcels, selected, zones, onSelect, onZones, onCl
   // Rappels à jour pour les gestionnaires de la carte (créés une fois).
   const latest = useRef({ selected, onSelect, onZones, parcels, drawing });
   latest.current = { selected, onSelect, onZones, parcels, drawing };
+
+  // Eau et bande de ZNT : mises à jour quand elles arrivent ou changent.
+  useEffect(() => {
+    if (!map) return;
+    (map.getSource("water") as GeoJSONSource | undefined)?.setData(water);
+    (map.getSource("buffer") as GeoJSONSource | undefined)?.setData(buffer);
+  }, [map, water, buffer]);
 
   useEffect(() => {
     if (!container.current) return;
@@ -71,9 +82,13 @@ export function ParcelPicker({ parcels, selected, zones, onSelect, onZones, onCl
           ortho: { type: "raster", tiles: [WMTS("ORTHOIMAGERY.ORTHOPHOTOS", "image/jpeg")], tileSize: 256, attribution: "© IGN — Géoplateforme", maxzoom: 19 },
           parcels: { type: "geojson", data: EMPTY },
           zones: { type: "geojson", data: EMPTY },
+          water: { type: "geojson", data: EMPTY },
+          buffer: { type: "geojson", data: EMPTY },
         },
         layers: [
           { id: "ortho", type: "raster", source: "ortho" },
+          { id: "buffer-fill", type: "fill", source: "buffer", paint: { "fill-color": "#C0392B", "fill-opacity": 0.2 } },
+          { id: "buffer-line", type: "line", source: "buffer", paint: { "line-color": "#C0392B", "line-width": 1.5, "line-dasharray": [3, 2] } },
           {
             id: "parcels-fill",
             type: "fill",
@@ -85,6 +100,15 @@ export function ParcelPicker({ parcels, selected, zones, onSelect, onZones, onCl
             type: "line",
             source: "parcels",
             paint: { "line-color": ["case", ["get", "selected"], "#E8B500", "#FFF8E7"], "line-width": ["case", ["get", "selected"], 3, 1.5] },
+          },
+          { id: "water-fill", type: "fill", source: "water", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#2B7BB9", "fill-opacity": 0.55 } },
+          {
+            id: "water-line", type: "line", source: "water", filter: ["all", ["!=", ["geometry-type"], "Polygon"], ["!=", ["get", "ditch"], true]],
+            paint: { "line-color": "#4FA3E0", "line-width": ["case", ["==", ["get", "permanent"], false], 1.5, 2.5] },
+          },
+          {
+            id: "water-ditch", type: "line", source: "water", filter: ["all", ["!=", ["geometry-type"], "Polygon"], ["==", ["get", "ditch"], true]],
+            paint: { "line-color": "#4FA3E0", "line-width": 1, "line-dasharray": [2, 2] },
           },
           { id: "zones-fill", type: "fill", source: "zones", paint: { "fill-color": "#E85D04", "fill-opacity": 0.45 } },
           { id: "zones-line", type: "line", source: "zones", paint: { "line-color": "#E85D04", "line-width": 2 } },

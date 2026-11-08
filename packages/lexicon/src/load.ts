@@ -15,10 +15,10 @@ import { fetchIndex, fetchManifest, fetchStructure, packageUrl, parseStructure, 
 
 /** Colonnes indispensables, par table Lexicon : sinon, structure inattendue → refus. */
 const REQUIRED: Record<string, string[]> = {
-  registered_phytosanitary_products: ["id", "name", "other_names", "natures", "active_compounds", "france_maaid", "in_field_reentry_delay", "state", "started_on", "stopped_on", "firm_name", "product_type", "is_derogation"],
+  registered_phytosanitary_products: ["id", "name", "other_names", "natures", "active_compounds", "france_maaid", "in_field_reentry_delay", "state", "started_on", "stopped_on", "firm_name", "product_type", "is_derogation", "mix_category_codes", "allowed_mentions", "restricted_mentions", "operator_protection_mentions"],
   registered_phytosanitary_usages: ["id", "product_id", "ephy_usage_phrase", "crop_label_fra", "species", "target_name_label_fra", "treatment", "dose_quantity", "dose_unit", "dose_unit_name", "pre_harvest_delay", "applications_count", "applications_frequency", "untreated_buffer_aquatic", "untreated_buffer_arthropod", "untreated_buffer_plants", "usage_conditions", "decision_date", "state", "is_derogation", "derogation_started_on", "derogation_stopped_on"],
   registered_phytosanitary_cropsets: ["name", "label", "crop_names"],
-  registered_phytosanitary_target_name_to_pfi_targets: ["ephy_name", "pfi_id", "pfi_name"],
+  registered_phytosanitary_target_name_to_pfi_targets: ["ephy_name", "pfi_id", "pfi_name", "default_pfi_treatment_type_id"],
   registered_phytosanitary_risks: ["product_id", "risk_code", "risk_phrase"],
   registered_phytosanitary_symbols: ["id", "symbol_name"],
   master_taxonomy: ["reference_name", "parent", "taxonomic_rank", "translation_id"],
@@ -41,11 +41,16 @@ const TRANSFORMS: Record<string, string[]> = {
   phytosanitary: [
     `TRUNCATE phyto_products, phyto_usages, phyto_cropsets, phyto_target_pfi, phyto_risks, phyto_hazard_symbols`,
     `INSERT INTO phyto_products (id, amm, name, other_names, natures, active_compounds, reentry_delay_hours,
-                                 state, started_on, stopped_on, firm, product_type, is_derogation)
+                                 state, started_on, stopped_on, firm, product_type, is_derogation,
+                                 mix_codes, organic, biocontrol, operator_protection, restricted_mentions)
      SELECT id::int, france_maaid, name,
             coalesce(other_names::text[], '{}'), coalesce(natures::text[], '{}'), coalesce(active_compounds::text[], '{}'),
             round(extract(epoch FROM in_field_reentry_delay::interval) / 3600)::int,
-            state, started_on::date, stopped_on::date, firm_name, product_type, coalesce(is_derogation::boolean, false)
+            state, started_on::date, stopped_on::date, firm_name, product_type, coalesce(is_derogation::boolean, false),
+            coalesce(nullif(mix_category_codes, '')::int[], '{}'),
+            coalesce((nullif(allowed_mentions, '')::jsonb ->> 'organic_usage')::boolean, false),
+            coalesce((nullif(allowed_mentions, '')::jsonb ->> 'biocontrol_usage')::boolean, false),
+            nullif(btrim(operator_protection_mentions), ''), nullif(btrim(restricted_mentions), '')
      FROM lx_registered_phytosanitary_products`,
     `INSERT INTO phyto_usages (id, product_id, phrase, crop_label, species, target_label, treatment_label,
                                dose_quantity, dose_unit, dose_unit_label, pre_harvest_delay_days, applications_count,
@@ -63,8 +68,8 @@ const TRANSFORMS: Record<string, string[]> = {
      FROM lx_registered_phytosanitary_usages`,
     `INSERT INTO phyto_cropsets (name, label, crop_names)
      SELECT name, label::jsonb ->> 'fra', coalesce(crop_names::text[], '{}') FROM lx_registered_phytosanitary_cropsets`,
-    `INSERT INTO phyto_target_pfi (ephy_name, pfi_id, pfi_name)
-     SELECT ephy_name, pfi_id::int, pfi_name FROM lx_registered_phytosanitary_target_name_to_pfi_targets`,
+    `INSERT INTO phyto_target_pfi (ephy_name, pfi_id, pfi_name, default_treatment_type)
+     SELECT ephy_name, pfi_id::int, pfi_name, nullif(default_pfi_treatment_type_id, '') FROM lx_registered_phytosanitary_target_name_to_pfi_targets`,
     // Mentions de danger actuelles (H, EUH) ; les anciennes phrases R ne sont pas reprises.
     `INSERT INTO phyto_risks (product_id, code, phrase)
      SELECT product_id::int, risk_code, risk_phrase FROM lx_registered_phytosanitary_risks

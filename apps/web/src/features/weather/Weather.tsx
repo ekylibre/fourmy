@@ -166,63 +166,63 @@ export function WeatherSummary({ weather }: { weather: InterventionWeather }) {
     );
   }
   const hours = weather.hours ?? [];
+  const values = [
+    { icon: Thermometer, label: "Température", v: `${fmt(weather.temperatureC)} °C` },
+    { icon: Droplets, label: "Hygrométrie", v: `${fmt(weather.humidityPct, 0)} %` },
+    { icon: Wind, label: "Vent", v: `${fmt(weather.windKmh)} km/h${weather.windMaxKmh ? ` (max ${fmt(weather.windMaxKmh)})` : ""}` },
+    { icon: CloudRain, label: "Pluie", v: `${fmt(weather.precipitationMm)} mm` },
+  ];
   return (
-    <Stack gap="sm">
-      <Group gap="lg" align="center" wrap="wrap">
-        {weather.icon && (
-          <Group gap={8} wrap="nowrap">
-            <WeatherIcon code={weather.icon} size={44} />
-            <Stack gap={0}>
-              <Text size="xl" fw={700} className="lv-num">
-                {fmt(weather.temperatureC)} °C
-              </Text>
-              <Text size="xs" c="dimmed">
+    <Stack gap="xs">
+      <SimpleGrid cols={{ base: 1, sm: hours.length > 1 ? 2 : 1 }} spacing="lg">
+        {/* Gauche : temps dominant, puis les valeurs, deux en haut et deux en bas. */}
+        <Stack gap="xs">
+          {weather.icon && (
+            <Group gap={8} wrap="nowrap">
+              <WeatherIcon code={weather.icon} size={36} />
+              <Text size="sm" fw={600}>
                 {weatherLabel(weather.icon)}
               </Text>
-            </Stack>
-          </Group>
-        )}
-        <SimpleGrid cols={weather.icon ? 3 : 4} spacing="lg" style={{ flex: 1, minWidth: 260 }}>
-          {[
-            ...(weather.icon ? [] : [{ icon: Thermometer, label: "Température", v: `${fmt(weather.temperatureC)} °C` }]),
-            { icon: Droplets, label: "Hygrométrie", v: `${fmt(weather.humidityPct, 0)} %` },
-            { icon: Wind, label: "Vent", v: `${fmt(weather.windKmh)} km/h${weather.windMaxKmh ? ` (max ${fmt(weather.windMaxKmh)})` : ""}` },
-            { icon: CloudRain, label: "Pluie", v: `${fmt(weather.precipitationMm)} mm` },
-          ].map(({ icon: Icon, label, v }) => (
-            <Group key={label} gap={6} wrap="nowrap" align="flex-start">
-              <Icon size={16} aria-hidden style={{ marginTop: 2, flex: "none" }} color="var(--mantine-color-dimmed)" />
-              <Stack gap={0}>
-                <Text size="xs" c="dimmed">
-                  {label}
-                </Text>
-                <Text size="sm" fw={600} className="lv-num">
-                  {v}
-                </Text>
-              </Stack>
             </Group>
-          ))}
-        </SimpleGrid>
-      </Group>
-      {hours.length > 1 && (
-        <ScrollArea type="auto">
-          <Group gap={0} wrap="nowrap" aria-label="Météo heure par heure">
-            {hours.map((h) => (
-              <Stack key={h.at} gap={2} align="center" miw={44} py={4} style={{ borderLeft: "1px solid var(--mantine-color-default-border)" }}>
-                <Text size="xs" c="dimmed" className="lv-num">
-                  {new Date(h.at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                </Text>
-                <WeatherIcon code={h.icon} size={20} />
-                <Text size="xs" fw={600} className="lv-num">
-                  {fmt(h.temperatureC, 0)}°
-                </Text>
-                <Text size="xs" c={h.precipitationMm ? "blue" : "dimmed"} className="lv-num">
-                  {h.precipitationMm ? `${fmt(h.precipitationMm)} mm` : "—"}
-                </Text>
-              </Stack>
+          )}
+          <SimpleGrid cols={2} spacing="sm" verticalSpacing="sm">
+            {values.map(({ icon: Icon, label, v }) => (
+              <Group key={label} gap={6} wrap="nowrap" align="flex-start">
+                <Icon size={16} aria-hidden style={{ marginTop: 2, flex: "none" }} color="var(--mantine-color-dimmed)" />
+                <Stack gap={0}>
+                  <Text size="xs" c="dimmed">
+                    {label}
+                  </Text>
+                  <Text size="sm" fw={600} className="lv-num">
+                    {v}
+                  </Text>
+                </Stack>
+              </Group>
             ))}
-          </Group>
-        </ScrollArea>
-      )}
+          </SimpleGrid>
+        </Stack>
+        {/* Droite : l'évolution heure par heure. */}
+        {hours.length > 1 && (
+          <ScrollArea type="auto">
+            <Group gap={0} wrap="nowrap" aria-label="Météo heure par heure">
+              {hours.map((h) => (
+                <Stack key={h.at} gap={2} align="center" miw={46} py={4} style={{ borderLeft: "1px solid var(--mantine-color-default-border)" }}>
+                  <Text size="xs" c="dimmed" className="lv-num">
+                    {new Date(h.at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                  </Text>
+                  <WeatherIcon code={h.icon} size={20} />
+                  <Text size="xs" fw={600} className="lv-num">
+                    {fmt(h.temperatureC, 0)}°
+                  </Text>
+                  <Text size="xs" c={h.precipitationMm ? "blue" : "dimmed"} className="lv-num">
+                    {h.precipitationMm ? `${fmt(h.precipitationMm)} mm` : "—"}
+                  </Text>
+                </Stack>
+              ))}
+            </Group>
+          </ScrollArea>
+        )}
+      </SimpleGrid>
       <Text size="xs" c="dimmed">
         {weatherSourceLabel(weather)}
       </Text>

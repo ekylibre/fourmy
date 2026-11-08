@@ -24,6 +24,13 @@ productions : une production = une parcelle × une campagne.
   d'Ekylibre crée les activités de la ferme d'origine (même famille,
   référence, variété) et retire les activités déduites devenues vides.
 
+## Couleur par défaut
+
+Nomenclature d'Ekylibre `db/nomenclatures/colors.yml` (193 variétés,
+migration 0014 `variety_colors`) : la couleur de la variété cultivée ou de
+son ancêtre le plus proche (`fourmy_variety_color`), sinon celle de la
+production de référence ; une couleur choisie l'emporte.
+
 ## Ce que l'activité décide
 
 - **Culture contrôlée** (usages E-Phy) : variété de l'activité, sinon celle

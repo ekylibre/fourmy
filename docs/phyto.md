@@ -59,6 +59,22 @@ pastilles **ZNT**, **DRE** (délai de ré-entrée) et **DAR** (délai avant
 récolte). `GET /phyto/articles` donne pictogrammes, mentions et délai de
 ré-entrée.
 
+## IFT : cible et type de traitement (retours du 08/11, 15 h 32)
+
+Comme Ekylibre (`pfi_client_api.rb`) : l'usage retenu de chaque produit
+(choisi, ou le seul possible) donne sa **cible PFI** (`cibleIdMetier`, table
+`phyto_target_pfi`) et le **type de traitement** de cette cible
+(`default_treatment_type`) ; sans usage connu, le type se déduit de la
+nature du produit. Sans cible, l'API appliquait la dose de référence de la
+culture (avertissement AV1).
+
+## Saisie : usage et carte
+
+- L'usage retenu s'affiche toujours sous le produit (libellé, dose
+  maximale) ; la liste n'apparaît que s'il y a plusieurs usages possibles.
+- La carte du formulaire montre les cours d'eau de la ferme et la bande de
+  ZNT autour des parcelles choisies (`POST /phyto/water/buffer`).
+
 ## Activités
 
 La culture contrôlée vient de l'**activité** de la parcelle (docs/activites.md) :

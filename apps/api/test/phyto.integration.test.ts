@@ -148,6 +148,10 @@ describe.skipIf(!url)("réglementation phyto (intégration)", () => {
     expect(map.buffer.type).toBe("Polygon");
     expect(map.water.features.map((f: { properties: { id: string } }) => f.properties.id).sort()).toEqual(["TEST-FOSSE", "TEST-RUISSEAU"]);
     expect((await app.request(`${base}/interventions/${crypto.randomUUID()}/water`, { headers })).status).toBe(404);
+    // Saisie en cours : bande de ZNT autour des cibles du formulaire.
+    const draft = await (await post("/phyto/water/buffer", { targets: [{ kind: "land_parcel", id: parcelId }], at: "2025-05-10T06:00:00Z", zntM: 20 })).json();
+    expect(draft.buffer.type).toBe("Polygon");
+    expect((await post("/phyto/water/buffer", { targets: [], at: "2025-05-10T06:00:00Z", zntM: 20 })).status).toBe(200);
   });
 
   it("rattacher un article à son n° AMM ; un n° inconnu est refusé", async () => {

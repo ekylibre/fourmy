@@ -77,6 +77,17 @@ describe("contrôle réglementaire dans le formulaire", () => {
     await vi.waitFor(() => expect(bodies.at(-1)).toMatchObject({ procedure: "spraying", inputs: [{ articleId: FONGICIDE, quantity: 4, per: "hectare" }] }), { timeout: 3000 });
   });
 
+  it("un seul usage possible : affiché d'office avec sa dose maximale", async () => {
+    const user = userEvent.setup();
+    const single = result("ok", [{ code: "authorization", level: "ok", message: "GUILD autorisé sur Vigne." }]);
+    single.checks[0]!.usages = [{ id: "u1", label: "Vigne — Mildiou", doseLabel: "2 L/ha" }];
+    single.checks[0]!.usageId = "u1";
+    server.use(http.post("*/phyto/check", () => HttpResponse.json(single)));
+    const form = await treatmentForm(user);
+    expect(await within(form).findByLabelText("Usage de Fongicide X", {}, { timeout: 3000 })).toHaveTextContent("Usage : Vigne — Mildiou · dose max 2 L/ha");
+    expect(within(form).queryByRole("combobox", { name: "Cible de Fongicide X" })).not.toBeInTheDocument();
+  });
+
   it("un feu rouge demande un motif ; le motif part avec l'intervention", async () => {
     const user = userEvent.setup();
     server.use(

@@ -5,7 +5,7 @@ import { withFarm } from "@fourmy/db";
 import { interventionPlanWrite, phytoArticleCreate, phytoArticleLink } from "@fourmy/contracts";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
-import { checkComplianceFor, farmWater, interventionWater, parcelDelays, phytoArticles, phytoStatus, searchProducts, syncFarmWater } from "../repos/phyto.js";
+import { bufferAround, checkComplianceFor, farmWater, interventionWater, parcelDelays, phytoArticles, phytoStatus, searchProducts, syncFarmWater } from "../repos/phyto.js";
 import { readIntervention } from "../repos/interventions.js";
 import { computeInterventionIft, iftBalance } from "../repos/ift.js";
 import { interventionWeather, sprayingForecast } from "../repos/weather.js";
@@ -13,6 +13,11 @@ import { workPeriod, interventionTarget } from "@fourmy/contracts";
 import { BadRequest, NotFound, problem, uuidParam } from "./helpers.js";
 
 const checkWrite = interventionPlanWrite.extend({ interventionId: z.string().uuid().optional() });
+const bufferWrite = z.object({
+  targets: z.array(interventionTarget).max(500),
+  at: z.string().datetime({ offset: true }),
+  zntM: z.number().positive().max(500),
+});
 const weatherWrite = z.object({
   periods: z.array(workPeriod).default([]),
   plannedAt: z.string().datetime({ offset: true }).optional(),
@@ -103,6 +108,12 @@ export const phytoRoutes = new Hono<Env>()
   .get("/phyto/status", async (c) => c.json(await phytoStatus(db(), c.get("farmId"))))
   .get("/phyto/products", async (c) => c.json({ items: await searchProducts(db(), c.get("farmId"), c.req.query("q") ?? "") }))
   .get("/phyto/water", async (c) => c.json(await farmWater(db(), c.get("farmId"))))
+  // Bande de ZNT autour des cibles d'une saisie en cours (carte du formulaire).
+  .post("/phyto/water/buffer", async (c) => {
+    const parsed = bufferWrite.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.message);
+    return c.json({ buffer: await bufferAround(db(), c.get("farmId"), parsed.data.targets, parsed.data.at, parsed.data.zntM) });
+  })
   .post("/phyto/water/sync", requireOwner, async (c) => {
     const r = await syncFarmWater(db(), c.get("farmId"));
     if (r.error) return problem(c, 502, "Données d'eau indisponibles", r.error);

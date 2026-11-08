@@ -432,6 +432,29 @@ export async function interventionWater(
   });
 }
 
+/**
+ * Bande de ZNT autour des cibles d'une saisie en cours (carte du
+ * formulaire) : zones de travail, sinon parcelles à la date.
+ */
+export async function bufferAround(db: Database, farmId: string, targets: InterventionTarget[], at: string, zntM: number): Promise<unknown> {
+  const parcels = targets.filter((t) => t.kind === "land_parcel");
+  if (parcels.length === 0 || !(zntM > 0)) return null;
+  return withFarm(db, farmId, async (tx) => {
+    const zones = parcels.map((t) =>
+      t.workingZone
+        ? sql`ST_SetSRID(ST_GeomFromGeoJSON(${JSON.stringify(t.workingZone)}), 4326)`
+        : sql`(SELECT v.shape FROM land_parcel_versions v WHERE v.land_parcel_id = ${t.id} AND v.valid @> ${at}::timestamptz LIMIT 1)`,
+    );
+    const [r] = await rows<{ buffer: unknown }>(
+      tx,
+      sql`WITH t AS (SELECT unnest(ARRAY[${sql.join(zones, sql`, `)}]::geometry[]) AS g),
+               u AS (SELECT ST_Union(g) AS g FROM t WHERE g IS NOT NULL)
+          SELECT ST_AsGeoJSON(ST_Buffer(u.g::geography, ${zntM}::float8)::geometry)::json AS buffer FROM u WHERE u.g IS NOT NULL`,
+    );
+    return r?.buffer ?? null;
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Articles phyto de la ferme et délais en cours d'une parcelle
 // ---------------------------------------------------------------------------

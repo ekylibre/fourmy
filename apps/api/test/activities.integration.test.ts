@@ -46,9 +46,10 @@ describe.skipIf(!url)("activités (intégration)", () => {
     await sql`INSERT INTO lexicon_pictures (domain, name, extension, picture) VALUES ('varieties', 'fourmy_test', 'png', '\\x89504e47')`;
     await sql`INSERT INTO phyto_products (id, amm, name, natures, state, started_on) VALUES (${PRODUCT}, ${AMM}, 'ACTI TEST', '{Herbicide}', 'authorized', '2015-01-01')`;
     await sql`INSERT INTO phyto_usages (id, product_id, phrase, crop_label, species, target_label, dose_quantity, dose_unit_label, state) VALUES
-      ('acti-u1', ${PRODUCT}, 'Maïs*Désherbage', 'Maïs', '{zea_mays}', 'Désherbage', 3, 'L/ha', 'authorized'),
+      ('acti-u1', ${PRODUCT}, 'Maïs*Désherbage', 'Maïs', '{zea_mays}', 'Désherbage fourmy test', 3, 'L/ha', 'authorized'),
       ('acti-u2', ${PRODUCT}, 'Jachères*Désherbage', 'Jachères et cultures intermédiaires', '{plant}', 'Désherbage', 2, 'L/ha', 'authorized'),
       ('acti-u3', ${PRODUCT}, 'Jevi*Désherbage', 'Jevi', '{plant}', 'Désherbage', 5, 'L/ha', 'authorized')`;
+    await sql`INSERT INTO phyto_target_pfi (ephy_name, pfi_id, pfi_name, default_treatment_type) VALUES ('Désherbage fourmy test', 999, 'Adventices', 'T21')`;
     await sql`INSERT INTO land_parcels (id, farm_id, name) VALUES (${parcelId}, ${farmId}, 'Le Champ')`;
     await sql`INSERT INTO land_parcel_versions (id, land_parcel_id, shape, area_m2, valid)
       VALUES (${crypto.randomUUID()}, ${parcelId},
@@ -59,6 +60,7 @@ describe.skipIf(!url)("activités (intégration)", () => {
     await teardown(sql, farmId, users);
     await sql`DELETE FROM phyto_usages WHERE product_id = ${PRODUCT}`;
     await sql`DELETE FROM phyto_products WHERE id = ${PRODUCT}`;
+    await sql`DELETE FROM phyto_target_pfi WHERE ephy_name = 'Désherbage fourmy test'`;
     await sql`DELETE FROM lexicon_production_ift WHERE production = ${CORN}`;
     await sql`DELETE FROM lexicon_productions WHERE reference_name IN (${CORN}, ${FALLOW})`;
     await sql`DELETE FROM lexicon_pictures WHERE name = 'fourmy_test'`;
@@ -84,7 +86,7 @@ describe.skipIf(!url)("activités (intégration)", () => {
     const created = await send("POST", "/activities?year=2025", { name: "Maïs", family: "plant_farming", reference: CORN });
     expect(created.status).toBe(201);
     const corn = await created.json();
-    expect(corn).toMatchObject({ name: "Maïs", referenceLabel: "Maïs d'essai", cultivation: "zea_mays", cultivationLabel: "Maïs", color: "#F5D33D", parcelIds: [] });
+    expect(corn).toMatchObject({ name: "Maïs", referenceLabel: "Maïs d'essai", cultivation: "zea_mays", cultivationLabel: "Maïs", color: "#FFFF00", parcelIds: [] }); // zea_mays : Yellow (colors.yml d'Ekylibre)
     expect((await send("POST", "/activities", { name: "Maïs", family: "plant_farming" })).status).toBe(409);
 
     const withParcels = await (await send("PUT", `/activities/${corn.id}/parcels`, { year: 2025, parcelIds: [parcelId] })).json();
@@ -114,7 +116,11 @@ describe.skipIf(!url)("activités (intégration)", () => {
     }) as typeof fetch;
     const ift = await computeInterventionIft(createDb(url), farmId, id, fakeIft);
     expect(ift).toMatchObject({ status: "ok", lines: [expect.objectContaining({ ift: 0.3333 })] });
-    expect(new URL(calls.find((c) => c.includes("/ift/traitement"))!).searchParams.get("cultureIdMetier")).toBe("1112");
+    const call = new URL(calls.find((c) => c.includes("/ift/traitement"))!).searchParams;
+    expect(call.get("cultureIdMetier")).toBe("1112");
+    // Cible PFI de l'usage retenu et type de traitement de cette cible (comme Ekylibre).
+    expect(call.get("cibleIdMetier")).toBe("999");
+    expect(call.get("typeTraitementIdMetier")).toBe("T21");
 
     // La parcelle passe en jachère : usages des jachères (et traitements généraux), pas les Jevi.
     const fallow = await (await send("POST", "/activities?year=2025", { name: "Jachère", family: "plant_farming", reference: FALLOW })).json();

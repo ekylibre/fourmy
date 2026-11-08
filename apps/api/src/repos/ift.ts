@@ -2,6 +2,8 @@ import { sql, type SQL } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
 import { articleUnitBase } from "@fourmy/domain";
 import type { IftResult } from "@fourmy/contracts";
+import { readIntervention } from "./interventions.js";
+import { checkCompliance } from "./phyto.js";
 
 /**
  * IFT des traitements (exigence IFT-1) : API IFT v5 du ministère de
@@ -89,7 +91,41 @@ export async function computeInterventionIft(db: Database, farmId: string, inter
             ORDER BY (a.id IS NULL), 1 NULLS LAST LIMIT 1) prod ON true
           WHERE t.intervention_id = ${interventionId} AND t.role = 'target' AND t.ref_type = 'land_parcel'`,
     );
-    return { stoppedAt: i.stopped_at, inputs, parcels };
+    // Usage retenu de chaque produit (choisi à la saisie, ou le seul possible) :
+    // sa cible PFI et le type de traitement de cette cible, comme Ekylibre
+    // (`pfi_client_api.rb`). Contrôle enregistré, sinon recalculé à la date.
+    const detail = await readIntervention(tx, interventionId);
+    const checks =
+      detail.compliance?.checks ??
+      (
+        await checkCompliance(
+          tx,
+          {
+            procedure: detail.procedure,
+            periods: detail.periods,
+            targets: detail.targets,
+            inputs: detail.inputs,
+            compliance: { usages: {} },
+          },
+          interventionId,
+        )
+      ).checks;
+    const usageIds = checks.map((c) => c.usageId).filter((u): u is string => !!u);
+    const targets = usageIds.length
+      ? await rows<{ id: string; pfi_id: number | null; treatment_type: string | null }>(
+          tx,
+          sql`SELECT u.id, t.pfi_id, t.default_treatment_type AS treatment_type
+              FROM phyto_usages u LEFT JOIN phyto_target_pfi t ON t.ephy_name = u.target_label
+              WHERE u.id = ANY(${`{${usageIds.map((u) => `"${u.replace(/"/g, "")}"`).join(",")}}`}::text[])`,
+        )
+      : [];
+    const pfiByArticle = new Map(
+      checks.flatMap((c) => {
+        const t = targets.find((x) => x.id === c.usageId);
+        return t ? [[c.articleId, { target: t.pfi_id, type: t.treatment_type }] as const] : [];
+      }),
+    );
+    return { stoppedAt: i.stopped_at, inputs, parcels, pfiByArticle };
   });
   if (!context) return { status: "unavailable", total: null, lines: [], computedAt: null, error: "Intervention non réalisée.", retryAt: null };
 
@@ -129,13 +165,15 @@ export async function computeInterventionIft(db: Database, farmId: string, inter
           line.warning = "Surface traitée inconnue.";
           continue;
         }
+        const pfi = context.pfiByArticle.get(input.article_id);
         const params = new URLSearchParams({
           campagneIdMetier: String(campaign),
           numeroAmmIdMetier: input.amm,
           cultureIdMetier: culture,
-          typeTraitementIdMetier: treatmentType(input.natures ?? []),
+          typeTraitementIdMetier: pfi?.type ?? treatmentType(input.natures ?? []),
           uniteIdMetier: base.base === "L" ? "U3" : "U1",
           dose: String(Math.round(perHa * 10_000) / 10_000),
+          ...(pfi?.target ? { cibleIdMetier: String(pfi.target) } : {}),
         });
         try {
           const res = await fetchImpl(`${IFT_API}/ift/traitement?${params}`, { signal: AbortSignal.timeout(30_000) });
