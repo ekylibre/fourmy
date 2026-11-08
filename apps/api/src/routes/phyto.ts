@@ -5,7 +5,7 @@ import { withFarm } from "@fourmy/db";
 import { interventionPlanWrite, phytoArticleCreate, phytoArticleLink } from "@fourmy/contracts";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
-import { checkComplianceFor, farmWater, parcelDelays, phytoArticles, phytoStatus, searchProducts, syncFarmWater } from "../repos/phyto.js";
+import { checkComplianceFor, farmWater, interventionWater, parcelDelays, phytoArticles, phytoStatus, searchProducts, syncFarmWater } from "../repos/phyto.js";
 import { readIntervention } from "../repos/interventions.js";
 import { computeInterventionIft, iftBalance } from "../repos/ift.js";
 import { interventionWeather, sprayingForecast } from "../repos/weather.js";
@@ -20,6 +20,29 @@ const weatherWrite = z.object({
 });
 
 /**
+ * Contrôle d'une intervention enregistrée, recalculé à sa date avec les
+ * usages choisis à la saisie (le motif d'un feu rouge est gardé).
+ */
+async function storedOrLiveCompliance(farmId: string, id: string) {
+  const i = await withFarm(db(), farmId, (tx) => readIntervention(tx, id));
+  const stored = i.compliance ?? null;
+  const live = await checkComplianceFor(
+    db(),
+    farmId,
+    {
+      procedure: i.procedure,
+      periods: i.periods,
+      targets: i.targets,
+      inputs: i.inputs,
+      plannedAt: i.startedAt ?? undefined,
+      compliance: { usages: Object.fromEntries((stored?.checks ?? []).filter((k) => k.usageId).map((k) => [k.articleId, k.usageId!])) },
+    },
+    id,
+  );
+  return { ...live, reason: stored?.reason ?? null };
+}
+
+/**
  * Réglementation phytosanitaire (lot 2) : contrôle à la demande (formulaire),
  * état du référentiel et de l'eau, recherche de produits E-Phy, articles
  * créés ou rattachés depuis le référentiel.
@@ -32,25 +55,15 @@ export const phytoRoutes = new Hono<Env>()
     return c.json(await checkComplianceFor(db(), c.get("farmId"), body, interventionId ?? null));
   })
   // Contrôle d'une intervention enregistrée, à sa date (reprises d'Ekylibre comprises).
-  .get("/interventions/:id/compliance", async (c) => {
-    const id = uuidParam(c, "id");
+  .get("/interventions/:id/compliance", async (c) => c.json(await storedOrLiveCompliance(c.get("farmId"), uuidParam(c, "id"))))
+  // Eau autour de l'intervention (carte de la fiche) : bande de ZNT, cours d'eau proches.
+  .get("/interventions/:id/water", async (c) => {
     const farmId = c.get("farmId");
-    const i = await withFarm(db(), farmId, (tx) => readIntervention(tx, id));
-    const stored = i.compliance ?? null;
-    const live = await checkComplianceFor(
-      db(),
-      farmId,
-      {
-        procedure: i.procedure,
-        periods: i.periods,
-        targets: i.targets,
-        inputs: i.inputs,
-        plannedAt: i.startedAt ?? undefined,
-        compliance: { usages: Object.fromEntries((stored?.checks ?? []).filter((k) => k.usageId).map((k) => [k.articleId, k.usageId!])) },
-      },
-      id,
-    );
-    return c.json({ ...live, reason: stored?.reason ?? null });
+    const id = uuidParam(c, "id");
+    const compliance = await storedOrLiveCompliance(farmId, id);
+    const r = await interventionWater(db(), farmId, id, compliance.checks);
+    if (!r) throw new NotFound("Intervention introuvable");
+    return c.json(r);
   })
   // IFT d'une intervention réalisée, calculé maintenant (sinon le worker s'en charge).
   .post("/interventions/:id/ift", async (c) => c.json(await computeInterventionIft(db(), c.get("farmId"), uuidParam(c, "id"))))

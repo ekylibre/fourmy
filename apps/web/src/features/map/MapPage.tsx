@@ -90,7 +90,7 @@ export function MapPage() {
       <Group justify="space-between">
         <Title order={1}>Carte au {formatDate(at)}</Title>
         <Group>
-        <Button component={Link} to={`/f/${farm.id}/carte/outils${location.search}`} variant="default" leftSection={<PencilRuler size={16} />}>
+        <Button component={Link} to={`/f/${farm.id}/map/tools${location.search}`} variant="default" leftSection={<PencilRuler size={16} />}>
           Outils de dessin (essai)
         </Button>
         <SegmentedControl

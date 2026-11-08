@@ -39,7 +39,7 @@ test("calendrier, kanban et liste sur la semaine de la frise", async ({ page }) 
   expect(multi, "intervention sur plusieurs jours dans la ferme pilote").toBeTruthy();
   const days = [...new Set(multi.periods.map((p) => localDay(p.startedAt)))];
 
-  await page.goto(`/f/${FARM}/interventions?at=${days[0]}&vue=calendrier`);
+  await page.goto(`/f/${FARM}/interventions?at=${days[0]}&view=calendar`);
   for (const day of days) {
     const label = new Date(`${day}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "short" });
     const column = page.getByRole("region", { name: new RegExp(`^${label}$`, "i") });
@@ -50,7 +50,7 @@ test("calendrier, kanban et liste sur la semaine de la frise", async ({ page }) 
   await page.getByText("Kanban", { exact: true }).click();
   await expect(page.getByRole("region", { name: "Réalisée" }).getByRole("article").first()).toBeVisible();
   await page.getByRole("button", { name: "Semaine précédente" }).click();
-  await expect(page).toHaveURL(/vue=kanban/);
+  await expect(page).toHaveURL(/view=kanban/);
   await expect(page.getByRole("region", { name: "Planifiée" })).toBeVisible();
 
   // Liste : un clic ouvre la fiche.

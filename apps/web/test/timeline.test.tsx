@@ -17,7 +17,7 @@ describe("frise temporelle", () => {
     expect(router.state.location.search).toBe("?at=2020-06-15");
 
     await user.click(screen.getByRole("link", { name: "Cuverie" }));
-    expect(router.state.location.pathname).toBe(`/f/${FARM}/cuverie`);
+    expect(router.state.location.pathname).toBe(`/f/${FARM}/cellar`);
     expect(router.state.location.search).toBe("?at=2020-06-15");
   });
 

@@ -34,6 +34,8 @@ export const treatmentCheck = z.object({
   usageId: z.string().nullable(),
   harvestAllowedFrom: isoDateTime.nullable(),
   reentryAllowedFrom: isoDateTime.nullable(),
+  /** Largeur de ZNT eau retenue (m) ; absente des contrôles enregistrés avant le 08/11/2026. */
+  zntM: z.number().nullable().optional(),
 });
 export type TreatmentCheckDto = z.infer<typeof treatmentCheck>;
 
@@ -48,6 +50,13 @@ export const complianceResult = z.object({
   reason: z.string().nullable(),
 });
 export type ComplianceResult = z.infer<typeof complianceResult>;
+
+/** Eau autour d'une intervention (carte de la fiche) : bande de ZNT (GeoJSON) et cours d'eau proches. */
+export interface InterventionWaterMap {
+  zntM: number | null;
+  buffer: unknown;
+  water: { type: "FeatureCollection"; features: unknown[] };
+}
 
 /** IFT d'une intervention (API IFT du ministère). */
 export const iftLine = z.object({

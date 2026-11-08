@@ -5,14 +5,14 @@ import { FARM, renderApp } from "./render";
 
 describe("connexion et choix de la ferme", () => {
   it("redirige vers la connexion sans session", async () => {
-    const { router } = renderApp("/fermes", { signedIn: false });
+    const { router } = renderApp("/farms", { signedIn: false });
     expect(await screen.findByRole("heading", { name: "Connexion" })).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/connexion");
+    expect(router.state.location.pathname).toBe("/login");
   });
 
   it("refuse un mauvais mot de passe, puis connecte et liste les fermes", async () => {
     const user = userEvent.setup();
-    renderApp("/connexion", { signedIn: false });
+    renderApp("/login", { signedIn: false });
     const email = await screen.findByRole("textbox", { name: "E-mail" });
     await user.clear(email);
     await user.type(email, "demo@fourmy.local");
@@ -33,7 +33,7 @@ describe("connexion et choix de la ferme", () => {
     const { router } = renderApp(`/f/${FARM}?at=2026-06-30`);
     await user.click(await screen.findByRole("button", { name: "Se déconnecter" }));
     expect(await screen.findByRole("heading", { name: "Connexion" })).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/connexion");
+    expect(router.state.location.pathname).toBe("/login");
   });
 
   it("une ferme dont on n'est pas membre affiche un message, sans planter", async () => {
@@ -54,7 +54,7 @@ describe("équipe (responsable)", () => {
         return HttpResponse.json({ items: [], nextCursor: null }, { status: 201 });
       }),
     );
-    renderApp(`/f/${FARM}/equipe?at=2026-06-30`);
+    renderApp(`/f/${FARM}/team?at=2026-06-30`);
     expect(await screen.findByRole("heading", { name: "Membres" })).toBeInTheDocument();
     expect(await screen.findByText("Camille")).toBeInTheDocument();
     await user.type(screen.getByRole("textbox", { name: "E-mail du compte" }), "salarie@ferme.fr");

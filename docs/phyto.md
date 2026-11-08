@@ -22,7 +22,7 @@ PHY-4, GEO-1, IFT-1). Réalisé le 2026-11-08.
   de ré-entrée ni les dates de retrait ; les paquets les contiennent.
 - Eau : emprise de toutes les parcelles de la ferme + 200 m, rechargée tous
   les 30 jours par le worker, ou à la demande (page Produits phyto).
-- IFT : `https://ecoagri.api.agriculture.gouv.fr/ift/v5/api` (sans compte).
+- IFT : préproduction `https://ecoagri-pprd.api.agriculture.gouv.fr/ift/v5/api` par défaut (local, dev), production `https://ecoagri.api.agriculture.gouv.fr/ift/v5/api` à régler par `FOURMY_IFT_API_URL` sur la seule production (sans compte dans les deux cas).
 
 ## Contrôle d'un traitement (`@fourmy/domain`, `checkTreatment`)
 

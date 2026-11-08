@@ -21,7 +21,7 @@ test("connexion, cuverie dans le temps, carte, intervention jusqu'au registre", 
   // La frise ramène à fin 2021 : 6 cuves, Cuve 1 à 30 hL de Cabernet-Sauvignon.
   await page.getByLabel("Date de la frise").fill("2021-12-31");
   await page.getByRole("link", { name: "Cuverie" }).click();
-  await expect(page).toHaveURL(/cuverie\?at=2021-12-31/);
+  await expect(page).toHaveURL(/cellar\?at=2021-12-31/);
   await expect(page.getByRole("meter")).toHaveCount(6);
   await page.getByRole("button", { name: "Contenu de Cuve 1" }).click();
   const drawer = page.getByRole("dialog");

@@ -43,7 +43,7 @@ l'API partagent la même origine : cookies de session sans CORS.
 | `SITE_IMAGE` | non | image du site, `ghcr.io/ekylibre/fourmy-site:main` par défaut (prod : une étiquette `sha-…` précise) |
 | `FOURMY_LEXICON_PACKAGES_URL` | non | serveur des paquets Lexicon (référentiel phyto), `https://lexicon-packages.osfarm.org` par défaut ; `off` pour ne pas synchroniser (`docs/phyto.md`) |
 | — | — | Météo : Open-Meteo sans clé par défaut ; les clés OpenWeather et meteoblue se saisissent par ferme dans **Intégrations** (`docs/meteo.md`), pas en variable du serveur |
-| `FOURMY_IFT_API_URL` | non | API IFT du ministère, `https://ecoagri.api.agriculture.gouv.fr/ift/v5/api` par défaut (ouverte, sans compte) |
+| `FOURMY_IFT_API_URL` | **en production** | API IFT du ministère (ouverte, sans compte). Par défaut la **préproduction** `https://ecoagri-pprd.api.agriculture.gouv.fr/ift/v5/api` (local, dev.fourmy.org) ; la production règle `https://ecoagri.api.agriculture.gouv.fr/ift/v5/api` |
 | `EKYLIBRE_SOURCES_URL` | non | serveur des bases Ekylibre restaurées pour les imports depuis l'interface |
 
 Aucun secret dans le dépôt : ils sont générés directement dans Dokploy.

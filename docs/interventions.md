@@ -305,7 +305,7 @@ Exigences : `claudedocs/exigences_interventions.md` (INT-UI-2, INT-UI-3).
     parcelles et zones travaillées, trace GPS des matériels pendant les
     périodes, historique (action, auteur, motif, avant → après). Une
     intervention reprise d'Ekylibre sans modification le dit.
-  - **Modification** `…/:id/modifier` : le formulaire de saisie prérempli ;
+  - **Modification** `…/:id/edit` : le formulaire de saisie prérempli ;
     réalisée → « Correction tracée », motif facultatif ; planifiée → date
     prévue. Ce que le formulaire n'affiche pas est conservé tel quel :
     surface travaillée et zone de travail des cibles, lot et lieu de
@@ -344,7 +344,7 @@ Exigence INT-UI-4.
   précédente / suivante (la suivante peut dépasser aujourd'hui : on planifie),
   « Cette semaine ». Les données viennent de `GET /interventions?campaign=`
   (et de la campagne voisine quand la semaine enjambe le 1er janvier).
-- **Vue** choisie gardée dans l'adresse (`?vue=liste|kanban|calendrier`) et,
+- **Vue** choisie gardée dans l'adresse (`?view=list|kanban|calendar`) et,
   à défaut, dans le navigateur.
 - **Liste** : semaine par défaut, interrupteur « Toute la campagne » ; tri par
   date, intervention, statut ; clic sur une ligne → fiche ; menu d'actions

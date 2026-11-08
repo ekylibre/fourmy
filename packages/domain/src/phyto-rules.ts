@@ -93,6 +93,8 @@ export interface TreatmentCheck {
   /** Fin du délai avant récolte et de ré-entrée (ISO), si connus. */
   harvestAllowedFrom: string | null;
   reentryAllowedFrom: string | null;
+  /** Largeur de la ZNT eau retenue (m), si l'usage en fixe une. */
+  zntM: number | null;
 }
 
 const RANK: Record<ComplianceLevel, number> = { ok: 0, info: 1, warning: 2, danger: 3 };
@@ -176,6 +178,7 @@ export function checkTreatment(input: TreatmentCheckInput): TreatmentCheck {
     usages: [],
     harvestAllowedFrom: null,
     reentryAllowedFrom: null,
+    zntM: null,
     ...extra,
   });
 
@@ -261,8 +264,10 @@ export function checkTreatment(input: TreatmentCheckInput): TreatmentCheck {
 
   // ZNT eau : distance réelle entre la zone traitée et l'eau.
   const buffers = applicable.map((u) => u.untreatedBufferAquatic).filter((n): n is number => n !== null && n > 0);
+  let zntM: number | null = null;
   if (applicable.length && buffers.length) {
     const znt = chosen ? buffers[0]! : Math.max(...buffers);
+    zntM = znt;
     const missing = parcels.filter((p) => !p.waterLoaded);
     const near = parcels.filter((p) => p.waterLoaded && p.waterDistanceM !== null && p.waterDistanceM < znt);
     if (near.length) {
@@ -317,5 +322,6 @@ export function checkTreatment(input: TreatmentCheckInput): TreatmentCheck {
     usages: common.map((u) => ({ id: u.id, label: usageLabel(u) || u.id, doseLabel: u.doseQuantity !== null ? `${fmt(u.doseQuantity)} ${u.doseUnitLabel ?? ""}`.trim() : null })),
     harvestAllowedFrom,
     reentryAllowedFrom,
+    zntM,
   });
 }

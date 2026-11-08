@@ -37,7 +37,7 @@ export function LoginPage() {
               setPending(false);
               if (failure) return setError(failure);
               await queryClient.invalidateQueries({ queryKey: ["session"] });
-              navigate("/fermes");
+              navigate("/farms");
             }}
           >
             <Stack>

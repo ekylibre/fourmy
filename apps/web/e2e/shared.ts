@@ -7,7 +7,7 @@ export const E2E_PASSWORD = "parcours-e2e-fourmy";
 
 /** Connexion par le vrai formulaire (better-auth). */
 export async function login(page: import("@playwright/test").Page) {
-  await page.goto("/connexion");
+  await page.goto("/login");
   await page.getByRole("textbox", { name: "E-mail" }).fill(E2E_EMAIL);
   await page.getByLabel(/^Mot de passe/).fill(E2E_PASSWORD);
   await page.getByRole("button", { name: "Se connecter" }).click();

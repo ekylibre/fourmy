@@ -12,7 +12,11 @@ import type { IftResult } from "@fourmy/contracts";
  * indisponible laisse l'IFT « en attente », recalculé plus tard.
  */
 
-export const IFT_API = process.env.FOURMY_IFT_API_URL ?? "https://ecoagri.api.agriculture.gouv.fr/ift/v5/api";
+/** API de préproduction (recette), par défaut : locale, tests, dev.fourmy.org. */
+export const IFT_API_PREPROD = "https://ecoagri-pprd.api.agriculture.gouv.fr/ift/v5/api";
+/** API de production : à régler explicitement (`FOURMY_IFT_API_URL`) sur la seule production. */
+export const IFT_API_PRODUCTION = "https://ecoagri.api.agriculture.gouv.fr/ift/v5/api";
+export const IFT_API = process.env.FOURMY_IFT_API_URL || IFT_API_PREPROD;
 const rows = async <T>(tx: Tx, q: SQL) => (await tx.execute(q)) as unknown as T[];
 
 const normalize = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();

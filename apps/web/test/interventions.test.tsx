@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { server } from "./setup";
@@ -69,6 +69,22 @@ describe("interventions", () => {
       purposes: [],
     });
     expect(complete.body.periods).toHaveLength(1);
+  });
+
+  it("la durée calcule la fin ; déplacer le début garde la durée", async () => {
+    const user = userEvent.setup();
+    const form = await openForm(user);
+    const start = within(form).getByLabelText("Début") as HTMLInputElement;
+    const end = within(form).getByLabelText("Fin") as HTMLInputElement;
+    const duration = within(form).getByRole("textbox", { name: "Durée" });
+    const day = start.value.slice(0, 10);
+    fireEvent.change(start, { target: { value: `${day}T08:00` } });
+    await user.clear(duration);
+    await user.type(duration, "2h30{Enter}");
+    expect(end.value).toBe(`${day}T10:30`);
+    expect(duration).toHaveValue("2 h 30");
+    fireEvent.change(start, { target: { value: `${day}T14:00` } });
+    expect(end.value).toBe(`${day}T16:30`);
   });
 
   it("la surface choisie donne le total de la dose ; la carte se choisit sans casser le formulaire", async () => {

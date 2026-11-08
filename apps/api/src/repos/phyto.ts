@@ -6,6 +6,7 @@ import {
   type ComplianceResult,
   type ComplianceWrite,
   type InterventionTarget,
+  type InterventionWaterMap,
   type PhytoProduct,
   type PhytoStatus,
   type TreatmentCheckDto,
@@ -348,6 +349,57 @@ export async function farmWater(db: Database, farmId: string) {
     return {
       type: "FeatureCollection" as const,
       features: list.map((w) => ({ type: "Feature" as const, geometry: w.geometry, properties: { id: w.id, name: w.name, kind: w.kind, permanent: w.permanent, ditch: w.ditch } })),
+    };
+  });
+}
+
+/**
+ * Eau autour d'une intervention, pour la carte de sa fiche : la bande de ZNT
+ * (zones traitées élargies de la ZNT la plus exigeante des produits, d'après
+ * le contrôle enregistré) et les cours d'eau, plans d'eau et fossés à moins
+ * de 200 m au-delà de la bande.
+ */
+export async function interventionWater(
+  db: Database,
+  farmId: string,
+  interventionId: string,
+  checks: Pick<TreatmentCheckDto, "zntM" | "indicators">[],
+): Promise<InterventionWaterMap | null> {
+  return withFarm(db, farmId, async (tx) => {
+    const [i] = await rows<{ at: string }>(
+      tx,
+      sql`SELECT coalesce(started_at, stopped_at, created_at)::text AS at FROM interventions WHERE id = ${interventionId}`,
+    );
+    if (!i) return null;
+    // ZNT retenue par produit ; les contrôles enregistrés avant son ajout la donnent dans leur message.
+    const widths = checks.map((c) => {
+      if (typeof c.zntM === "number") return c.zntM;
+      const m = /ZNT de (\d+(?:[.,]\d+)?) m/.exec(c.indicators.find((x) => x.code === "znt")?.message ?? "");
+      return m ? Number(m[1]!.replace(",", ".")) : null;
+    });
+    const known = widths.filter((w): w is number => w !== null && w > 0);
+    const zntM = known.length ? Math.max(...known) : null;
+    const [r] = await rows<{ buffer: unknown; water: { id: string; name: string | null; kind: string; permanent: boolean | null; ditch: boolean; geometry: unknown }[] | null }>(
+      tx,
+      sql`WITH t AS (
+            SELECT coalesce(p.working_zone,
+                            (SELECT v.shape FROM land_parcel_versions v WHERE v.land_parcel_id = p.ref_id AND v.valid @> ${i.at}::timestamptz LIMIT 1)) AS g
+            FROM intervention_parameters p WHERE p.intervention_id = ${interventionId} AND p.role = 'target'),
+          u AS (SELECT ST_Union(g) AS g FROM t WHERE g IS NOT NULL),
+          b AS (SELECT CASE WHEN ${zntM}::float8 IS NULL THEN NULL ELSE ST_Buffer(u.g::geography, ${zntM}::float8)::geometry END AS g FROM u)
+        SELECT (SELECT ST_AsGeoJSON(b.g)::json FROM b) AS buffer,
+               (SELECT json_agg(json_build_object('id', w.id, 'name', w.name, 'kind', w.kind, 'permanent', w.permanent, 'ditch', w.ditch,
+                                                  'geometry', ST_AsGeoJSON(w.geom)::json))
+                FROM water_items w, u
+                WHERE u.g IS NOT NULL AND ST_DWithin(w.geom::geography, u.g::geography, coalesce(${zntM}::float8, 0) + 200)) AS water`,
+    );
+    return {
+      zntM,
+      buffer: r?.buffer ?? null,
+      water: {
+        type: "FeatureCollection" as const,
+        features: (r?.water ?? []).map(({ geometry, ...properties }) => ({ type: "Feature" as const, geometry, properties })),
+      },
     };
   });
 }

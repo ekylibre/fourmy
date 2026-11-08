@@ -48,10 +48,12 @@ export function WeatherFields({
   value: InterventionWeather | null;
   onChange: (w: InterventionWeather | null) => void;
 }) {
-  const [debounced] = useDebouncedValue(request, 600);
+  // Debounce sur le contenu : la demande est recréée à chaque rendu du formulaire.
+  const [debouncedText] = useDebouncedValue(request ? JSON.stringify(request) : null, 600);
+  const debounced = debouncedText ? (JSON.parse(debouncedText) as WeatherRequestDraft) : null;
   const manual = value?.kind === "manual";
   const q = useQuery({
-    queryKey: ["weather-intervention", farmId, JSON.stringify(debounced)],
+    queryKey: ["weather-intervention", farmId, debouncedText],
     enabled: !!debounced && (debounced.periods.length > 0 || !!debounced.plannedAt),
     queryFn: () => api.post<{ weather: InterventionWeather | null }>(farmPath(farmId, "/weather/intervention"), debounced),
     staleTime: 10 * 60_000,

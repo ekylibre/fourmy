@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import { Badge, Button, Drawer, Grid, Group, Paper, Stack, Table, Text, Timeline, Title } from "@mantine/core";
-import { useQueries } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Pencil } from "lucide-react";
 import type { FeatureCollection, Geometry } from "geojson";
-import type { InterventionDetail, Snapshot, TrackReplay } from "@fourmy/contracts";
+import type { InterventionDetail, InterventionWaterMap, Snapshot, TrackReplay } from "@fourmy/contracts";
 import { TREATMENT_PURPOSE_LABELS } from "@fourmy/contracts";
 import { displayStatus } from "@fourmy/domain";
 import { formatHa } from "@fourmy/ui-lyvre";
@@ -85,6 +85,22 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
   const trackSamples = tracks.flatMap((q) => q.data?.samples ?? []);
 
   const layers = useMemo(() => mapLayers(i, snap.data), [i, snap.data]);
+  // Traitement : cours d'eau proches et bande de ZNT sur la carte.
+  const treatment = (i.compliance?.checks.length ?? 0) > 0 || i.inputs.some((q) => names.article.get(q.articleId)?.amm);
+  const water = useQuery({
+    queryKey: ["intervention-water", farm.id, i.id, i.updatedAt],
+    queryFn: () => api.get<InterventionWaterMap>(farmPath(farm.id, `/interventions/${i.id}/water`)),
+    enabled: treatment,
+    staleTime: 10 * 60_000,
+  });
+  const waterLayer = (water.data?.water as FeatureCollection | undefined) ?? EMPTY_FC;
+  const bufferLayer = useMemo<FeatureCollection>(
+    () =>
+      water.data?.buffer
+        ? { type: "FeatureCollection", features: [{ type: "Feature", geometry: water.data.buffer as Geometry, properties: {} }] }
+        : EMPTY_FC,
+    [water.data],
+  );
   const trackLayer = useMemo<FeatureCollection>(
     () => ({
       type: "FeatureCollection",
@@ -123,7 +139,7 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
                 Réaliser
               </Button>
             )}
-            <Button component={Link} to={`modifier${location.search}`} leftSection={<Pencil size={16} />}>
+            <Button component={Link} to={`edit${location.search}`} leftSection={<Pencil size={16} />}>
               Modifier
             </Button>
             <Button variant="subtle" color="brique" onClick={() => setCancelling(true)}>
@@ -254,11 +270,26 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
         <Grid.Col span={{ base: 12, md: 5 }}>
           <Stack>
             {layers && (
-              <Paper withBorder style={{ height: 320, overflow: "hidden" }}>
+              <Paper withBorder style={{ height: 360, overflow: "hidden" }}>
                 <MapBoundary>
-                  <ParcelMap parcels={layers.parcels} places={EMPTY_FC} zones={layers.zones} track={trackLayer} basemap="ortho" />
+                  <ParcelMap
+                    parcels={layers.parcels}
+                    places={EMPTY_FC}
+                    zones={layers.zones}
+                    water={waterLayer}
+                    buffer={bufferLayer}
+                    track={trackLayer}
+                    minHeight={0}
+                    basemap="ortho"
+                  />
                 </MapBoundary>
               </Paper>
+            )}
+            {treatment && water.data && (
+              <Text size="xs" c="dimmed">
+                En bleu, les cours d'eau et plans d'eau (fossés en pointillés) ;
+                {water.data.zntM ? ` en rouge, la ZNT de ${water.data.zntM} m autour de la zone traitée.` : " aucune ZNT fixée par les usages."}
+              </Text>
             )}
             {trackSamples.length > 0 && (
               <Text size="xs" c="dimmed">

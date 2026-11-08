@@ -66,12 +66,15 @@ describe("contrôle réglementaire dans le formulaire", () => {
       }),
     );
     const form = await treatmentForm(user);
-    const panel = await within(form).findByLabelText("Contrôle réglementaire", {}, { timeout: 3000 });
-    expect(await within(panel).findByText(/au-dessus du maximum autorisé/)).toBeInTheDocument();
-    expect(within(panel).getByText("Non conforme")).toBeInTheDocument();
-    expect(within(panel).getByRole("combobox", { name: "Cible de Fongicide X" })).toBeInTheDocument();
-    const last = bodies.at(-1)!;
-    expect(last).toMatchObject({ procedure: "spraying", inputs: [{ articleId: FONGICIDE, quantity: 4, per: "hectare" }] });
+    // Détail sous l'intrant, synthèse de l'intervention à part.
+    const detail = await within(form).findByRole("list", { name: "Contrôle de Fongicide X" }, { timeout: 3000 });
+    expect(within(detail).getByText(/au-dessus du maximum autorisé/)).toBeInTheDocument();
+    expect(within(form).getByRole("combobox", { name: "Cible de Fongicide X" })).toBeInTheDocument();
+    const summary = within(form).getByLabelText("Contrôle réglementaire");
+    expect(within(summary).getByText("Non conforme")).toBeInTheDocument();
+    expect(within(summary).getByText(/1 point\(s\) non conforme\(s\)/)).toBeInTheDocument();
+    // La dernière demande porte la dose saisie (les précédentes, la saisie en cours).
+    await vi.waitFor(() => expect(bodies.at(-1)).toMatchObject({ procedure: "spraying", inputs: [{ articleId: FONGICIDE, quantity: 4, per: "hectare" }] }), { timeout: 3000 });
   });
 
   it("un feu rouge demande un motif ; le motif part avec l'intervention", async () => {

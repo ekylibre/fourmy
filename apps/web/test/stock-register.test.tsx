@@ -19,7 +19,7 @@ describe("stocks et registre phyto", () => {
     URL.revokeObjectURL = vi.fn();
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
 
-    renderApp(`/f/${FARM}/registre?at=2026-06-30`);
+    renderApp(`/f/${FARM}/register?at=2026-06-30`);
     expect(await screen.findByText("1 application(s) en 2026.")).toBeInTheDocument();
     expect(screen.getByText("2100001")).toBeInTheDocument();
     expect(screen.getByText("2 L/ha")).toBeInTheDocument();

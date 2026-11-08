@@ -97,7 +97,7 @@ export function CartoLabPage() {
     <Stack>
       <Group justify="space-between">
         <Title order={1}>Outils de carte</Title>
-        <Button component={Link} to={`/f/${farm.id}/carte${location.search}`} variant="default">
+        <Button component={Link} to={`/f/${farm.id}/map${location.search}`} variant="default">
           Retour à la carte
         </Button>
       </Group>

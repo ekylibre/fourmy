@@ -15,9 +15,9 @@ import { makeMatcher, searchText } from "./search";
 import { CalendarView, KanbanView, ListView, type ViewActions } from "./views";
 import { addDays, inWeek, weekLabel, weekOf } from "./week";
 
-type View = "liste" | "kanban" | "calendrier";
-const VIEWS: View[] = ["liste", "kanban", "calendrier"];
-const STORE_KEY = "fourmy.interventions.vue";
+type View = "list" | "kanban" | "calendar";
+const VIEWS: View[] = ["list", "kanban", "calendar"];
+const STORE_KEY = "fourmy.interventions.view";
 
 const stored = (): View | null => {
   try {
@@ -32,7 +32,7 @@ const stored = (): View | null => {
  * Interventions (exigence INT-UI-4) : la semaine de la frise (lundi →
  * dimanche) en liste, kanban par statut ou calendrier ; la liste peut aussi
  * montrer toute la campagne. La vue choisie est gardée dans l'adresse
- * (`?vue=`) et, à défaut, dans le navigateur.
+ * (`?view=`) et, à défaut, dans le navigateur.
  */
 export function InterventionsPage() {
   const farm = useFarm();
@@ -40,7 +40,9 @@ export function InterventionsPage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const view: View = VIEWS.includes(params.get("vue") as View) ? (params.get("vue") as View) : (stored() ?? "liste");
+  // `?vue=` : ancienne adresse en français, encore acceptée.
+  const asked = params.get("view") ?? ({ liste: "list", kanban: "kanban", calendrier: "calendar" } as Record<string, string>)[params.get("vue") ?? ""] ?? null;
+  const view: View = VIEWS.includes(asked as View) ? (asked as View) : (stored() ?? "list");
   const [wholeCampaign, setWholeCampaign] = useState(false);
   const query = params.get("q") ?? "";
   const [showCancelled, setShowCancelled] = useState(false);
@@ -79,7 +81,7 @@ export function InterventionsPage() {
     setParams(
       (p) => {
         const n = new URLSearchParams(p);
-        n.set("vue", v);
+        n.set("view", v);
         return n;
       },
       { replace: true },
@@ -99,8 +101,8 @@ export function InterventionsPage() {
   const campaign = list.data!.items;
   const pool = edgeYear ? [...campaign, ...(edge.data?.items ?? []).filter((i) => !campaign.some((c) => c.id === i.id))] : campaign;
   // Recherche (vue Liste) : toujours sur toute la campagne.
-  const matcher = view === "liste" ? makeMatcher(query) : null;
-  const listWhole = view === "liste" && (wholeCampaign || matcher !== null);
+  const matcher = view === "list" ? makeMatcher(query) : null;
+  const listWhole = view === "list" && (wholeCampaign || matcher !== null);
   const scoped = matcher ? campaign.filter((i) => matcher(searchText(i, names))) : listWhole ? campaign : pool.filter((i) => inWeek(i, week));
   const visible = showCancelled || view === "kanban" ? scoped : scoped.filter((i) => i.status !== "cancelled");
   const cancelledCount = scoped.filter((i) => i.status === "cancelled").length;
@@ -144,9 +146,9 @@ export function InterventionsPage() {
           value={view}
           onChange={(v) => setView(v as View)}
           data={[
-            { value: "liste", label: <Group gap={6} wrap="nowrap"><List size={16} aria-hidden /><span>Liste</span></Group> },
+            { value: "list", label: <Group gap={6} wrap="nowrap"><List size={16} aria-hidden /><span>Liste</span></Group> },
             { value: "kanban", label: <Group gap={6} wrap="nowrap"><Columns3 size={16} aria-hidden /><span>Kanban</span></Group> },
-            { value: "calendrier", label: <Group gap={6} wrap="nowrap"><CalendarDays size={16} aria-hidden /><span>Calendrier</span></Group> },
+            { value: "calendar", label: <Group gap={6} wrap="nowrap"><CalendarDays size={16} aria-hidden /><span>Calendrier</span></Group> },
           ]}
         />
       </Group>
@@ -158,7 +160,7 @@ export function InterventionsPage() {
             : `${visible.length} intervention(s) ${listWhole ? `sur la campagne ${year}` : "cette semaine"}.`}
         </Text>
         <Group gap="md">
-          {view === "liste" && (
+          {view === "list" && (
             <Switch
               size="xs"
               label={`Toute la campagne ${year}`}
@@ -173,7 +175,7 @@ export function InterventionsPage() {
         </Group>
       </Group>
 
-      {view === "liste" && (
+      {view === "list" && (
         <>
           <TextInput
             aria-label="Rechercher dans la campagne"
@@ -189,7 +191,7 @@ export function InterventionsPage() {
       {view === "kanban" && (
         <KanbanView items={visible} names={names} actions={actions} now={now} onRefused={(message) => notifications.show({ color: "paille", message })} />
       )}
-      {view === "calendrier" && <CalendarView items={visible} week={week} names={names} actions={actions} now={now} />}
+      {view === "calendar" && <CalendarView items={visible} week={week} names={names} actions={actions} now={now} />}
 
       <Drawer
         opened={completing !== null}

@@ -4,7 +4,7 @@ import { FARM, renderApp } from "./render";
 
 describe("cuverie", () => {
   it("affiche une jauge par cuve, groupées par bâtiment", async () => {
-    renderApp(`/f/${FARM}/cuverie`);
+    renderApp(`/f/${FARM}/cellar`);
     expect(await screen.findByRole("heading", { name: "Chai" })).toBeInTheDocument();
     const gauges = screen.getAllByRole("meter");
     expect(gauges).toHaveLength(2);
@@ -14,7 +14,7 @@ describe("cuverie", () => {
 
   it("ouvre le contenu d'une cuve : lot, millésime, cépage, mouvements", async () => {
     const user = userEvent.setup();
-    renderApp(`/f/${FARM}/cuverie`);
+    renderApp(`/f/${FARM}/cellar`);
     await user.click(await screen.findByRole("button", { name: "Contenu de Cuve 1" }));
     const drawer = await screen.findByRole("dialog");
     expect(await within(drawer).findByText("MERLOT-2025")).toBeInTheDocument();

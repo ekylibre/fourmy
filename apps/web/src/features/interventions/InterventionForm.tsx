@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import {
   ActionIcon,
   Alert,
@@ -9,6 +9,7 @@ import {
   Modal,
   MultiSelect,
   NumberInput,
+  Paper,
   SegmentedControl,
   Select,
   Stack,
@@ -40,8 +41,9 @@ import { invalidateAfterIntervention } from "../../app/queries";
 import { MapBoundary } from "../../components/MapBoundary";
 import { ProcedureIcon } from "../../components/ProcedureIcon";
 import { treatedAreaM2 } from "./zones";
-import { CompliancePanel, type ComplianceDraft } from "./CompliancePanel";
-import type { ComplianceResult, InterventionWeather } from "@fourmy/contracts";
+import { durationMinutes, formatDuration, parseDuration, withDuration, withStart } from "./periods";
+import { ComplianceSummary, TreatmentCheckView, useComplianceCheck, type ComplianceDraft } from "./CompliancePanel";
+import type { InterventionWeather } from "@fourmy/contracts";
 import { SprayingConditions, WeatherFields, type WeatherRequestDraft } from "../weather/Weather";
 
 // La carte (MapLibre, terra-draw) n'est chargée qu'en mode « Carte ».
@@ -119,7 +121,6 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   const [usageChoices, setUsageChoices] = useState<Record<string, string>>(() =>
     Object.fromEntries(((toComplete ?? editing)?.compliance?.checks ?? []).filter((c) => c.usageId).map((c) => [c.articleId, c.usageId!])),
   );
-  const [compliance, setCompliance] = useState<ComplianceResult | null>(null);
   const [overrideReason, setOverrideReason] = useState((toComplete ?? editing)?.compliance?.reason ?? "");
   const [askOverride, setAskOverride] = useState(false);
   // Météo pendant l'intervention : pré-remplie (fournisseur), modifiable.
@@ -146,7 +147,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         (planned?.targets ?? []).map((t) => [t.id, { workedAreaM2: t.workedAreaM2, workingZone: t.workingZone }]),
       ),
   );
-  const [parcelMode, setParcelMode] = useState<"liste" | "carte">("liste");
+  const [parcelMode, setParcelMode] = useState<"list" | "map">("list");
   const parcelShapes = new Map(
     snapshot.landParcels.map((p) => [p.id, { id: p.id, name: p.name, shape: p.version.shape as unknown as import("@fourmy/carto").Area, areaM2: p.version.areaM2 }]),
   );
@@ -281,6 +282,15 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       weatherRequest = null; // date en cours de saisie
     }
   }
+  const complianceCheck = useComplianceCheck(farmId, draft, editing?.id ?? toComplete?.id);
+  const compliance = complianceCheck.result;
+  const chooseUsage = (articleId: string, usageId: string | null) =>
+    setUsageChoices((m) => {
+      const next = { ...m };
+      if (usageId) next[articleId] = usageId;
+      else delete next[articleId];
+      return next;
+    });
   const dangers = (compliance?.checks ?? []).flatMap((c) => c.indicators.filter((i) => i.level === "danger").map((i) => i.message));
 
   const submit = useMutation({
@@ -379,6 +389,11 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               {formatHa(treatedM2)}
             </Text>
           )}
+          {kind === "input" && row.articleId && compliance?.checks.find((c) => c.articleId === row.articleId) && (
+            <Paper withBorder p="xs" bg="var(--mantine-color-body)">
+              <TreatmentCheckView check={compliance.checks.find((c) => c.articleId === row.articleId)!} onUsage={chooseUsage} withName={false} />
+            </Paper>
+          )}
           {kind === "output" && completing && (
             <Select
               aria-label="Destination"
@@ -448,8 +463,16 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
                   label={i === 0 ? "Début" : undefined}
                   aria-label="Début"
                   value={p.startedAt}
-                  onChange={(e) => setPeriods(periods.map((x, j) => (j === i ? { ...x, startedAt: e.currentTarget.value } : x)))}
+                  onChange={(e) => {
+                    const v = e.currentTarget.value;
+                    setPeriods(periods.map((x, j) => (j === i ? withStart(x, v) : x)));
+                  }}
                   required
+                />
+                <DurationInput
+                  label={i === 0 ? "Durée" : undefined}
+                  minutes={durationMinutes(p)}
+                  onChange={(m) => setPeriods(periods.map((x, j) => (j === i ? withDuration(x, m) : x)))}
                 />
                 <TextInput
                   type="datetime-local"
@@ -512,14 +535,14 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
                   size="xs"
                   aria-label="Choix des parcelles"
                   value={parcelMode}
-                  onChange={(v) => setParcelMode(v as "liste" | "carte")}
+                  onChange={(v) => setParcelMode(v as "list" | "map")}
                   data={[
-                    { value: "liste", label: "Liste" },
-                    { value: "carte", label: "Carte" },
+                    { value: "list", label: "Liste" },
+                    { value: "map", label: "Carte" },
                   ]}
                 />
               </Group>
-              {parcelMode === "liste" ? (
+              {parcelMode === "list" ? (
                 <MultiSelect
                   aria-label="Parcelles"
                   searchable
@@ -586,22 +609,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
           />
         )}
 
-        {draft && (
-          <CompliancePanel
-            farmId={farmId}
-            draft={draft}
-            interventionId={editing?.id ?? toComplete?.id}
-            onResult={setCompliance}
-            onUsage={(articleId, usageId) =>
-              setUsageChoices((m) => {
-                const next = { ...m };
-                if (usageId) next[articleId] = usageId;
-                else delete next[articleId];
-                return next;
-              })
-            }
-          />
-        )}
+        <ComplianceSummary check={complianceCheck} />
 
         {/* Prévisions : utiles pour un traitement à faire, pas pour un traitement passé. */}
         {shape === "treatment" && (!completing || (periods[0]?.startedAt ?? "") >= new Date().toISOString().slice(0, 10)) && (
@@ -700,5 +708,37 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         </Stack>
       </Modal>
     </form>
+  );
+}
+
+/**
+ * Durée d'une période (« 2 h 30 », « 2,5 », « 45 min ») : la fin se calcule
+ * en quittant le champ (ou avec Entrée).
+ */
+function DurationInput({ label, minutes, onChange }: { label?: string; minutes: number | null; onChange: (minutes: number) => void }) {
+  const shown = minutes === null ? "" : formatDuration(minutes);
+  const [text, setText] = useState(shown);
+  useEffect(() => setText(shown), [shown]);
+  const commit = () => {
+    const m = parseDuration(text);
+    if (m === null) setText(shown);
+    else if (m !== minutes) onChange(m);
+  };
+  return (
+    <TextInput
+      label={label}
+      aria-label="Durée"
+      placeholder="2 h 30"
+      value={text}
+      onChange={(e) => setText(e.currentTarget.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          commit();
+        }
+      }}
+      style={{ flex: "0 0 7rem" }}
+    />
   );
 }

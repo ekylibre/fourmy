@@ -28,7 +28,7 @@ describe("fiche d'une intervention", () => {
     expect(within(quantities).getByText(/2 L\/ha/)).toBeInTheDocument();
     expect(screen.getByText("Intervenants :").parentElement).toHaveTextContent("Intervenants : Camille");
     expect(screen.getByText("Réalisée", { selector: ".mantine-Timeline-itemTitle" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Modifier" })).toHaveAttribute("href", expect.stringContaining(`/interventions/${DEMO.id}/modifier`));
+    expect(screen.getByRole("link", { name: "Modifier" })).toHaveAttribute("href", expect.stringContaining(`/interventions/${DEMO.id}/edit`));
     // Sans WebGL (jsdom), la mini-carte est remplacée par un message ; la fiche reste lisible.
     expect(screen.getByText(/Carte indisponible/)).toBeInTheDocument();
   });
@@ -87,7 +87,7 @@ describe("modification d'une intervention", () => {
         return HttpResponse.json({ intervention: DEMO, warnings: ["Campagne 2026 close : la modification change un historique déjà clos."] });
       }),
     );
-    renderApp(`/f/${FARM}/interventions/${DEMO.id}/modifier?at=2026-06-30`);
+    renderApp(`/f/${FARM}/interventions/${DEMO.id}/edit?at=2026-06-30`);
     expect(await screen.findByText("Correction tracée")).toBeInTheDocument();
     const quantity = screen.getByRole("textbox", { name: "Quantité" });
     await user.clear(quantity);
@@ -121,7 +121,7 @@ describe("modification d'une intervention", () => {
         return HttpResponse.json({ intervention: DEMO, warnings: [] });
       }),
     );
-    renderApp(`/f/${FARM}/interventions/${DEMO.id}/modifier?at=2026-06-30`);
+    renderApp(`/f/${FARM}/interventions/${DEMO.id}/edit?at=2026-06-30`);
     expect(await screen.findByRole("heading", { name: /Modifier : Pulvérisation/ })).toBeInTheDocument();
     expect(screen.queryByText("Correction tracée")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Enregistrer les modifications" }));

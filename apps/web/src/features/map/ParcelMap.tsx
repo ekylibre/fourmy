@@ -24,11 +24,17 @@ export interface ParcelMapProps {
   track: FeatureCollection;
   /** Zones de travail (interventions), en orange au-dessus des parcelles. */
   zones?: FeatureCollection;
+  /** Cours d'eau et plans d'eau (BD TOPO) ; les fossés en pointillés. */
+  water?: FeatureCollection;
+  /** Bande de ZNT autour de la zone traitée, hachurée de rouge, incluse dans le cadrage. */
+  buffer?: FeatureCollection;
+  /** Hauteur minimale (480 px par défaut ; 0 pour suivre son cadre). */
+  minHeight?: number;
   basemap: Basemap;
   onSelect?: (properties: Record<string, unknown> | null) => void;
 }
 
-function bbox(fc: FeatureCollection): LngLatBoundsLike | null {
+function bbox(...fcs: FeatureCollection[]): [[number, number], [number, number]] | null {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   const visit = (c: unknown): void => {
     if (Array.isArray(c) && typeof c[0] === "number") {
@@ -36,16 +42,19 @@ function bbox(fc: FeatureCollection): LngLatBoundsLike | null {
       minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
     } else if (Array.isArray(c)) c.forEach(visit);
   };
-  for (const f of fc.features) if (f.geometry && "coordinates" in f.geometry) visit(f.geometry.coordinates);
+  for (const fc of fcs) for (const f of fc.features) if (f.geometry && "coordinates" in f.geometry) visit(f.geometry.coordinates);
   return Number.isFinite(minX) ? [[minX, minY], [maxX, maxY]] : null;
 }
 
 /** Carte de travail (MapLibre) : parcellaire à la date, bâtiments, trace GPS. */
-export function ParcelMap({ parcels, places, track, zones = EMPTY, basemap, onSelect }: ParcelMapProps) {
+export function ParcelMap({ parcels, places, track, zones = EMPTY, water = EMPTY, buffer = EMPTY, minHeight = 480, basemap, onSelect }: ParcelMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MlMap | null>(null);
   const [ready, setReady] = useState(false);
   const fitted = useRef(false);
+  // Dernier cadrage automatique, rejoué quand le cadre change de taille (tant que l'utilisateur n'a pas bougé la carte).
+  const bounds = useRef<LngLatBoundsLike | null>(null);
+  const moved = useRef(false);
 
   useEffect(() => {
     if (!container.current) return;
@@ -63,6 +72,8 @@ export function ParcelMap({ parcels, places, track, zones = EMPTY, basemap, onSe
           places: { type: "geojson", data: EMPTY },
           track: { type: "geojson", data: EMPTY },
           zones: { type: "geojson", data: EMPTY },
+          water: { type: "geojson", data: EMPTY },
+          buffer: { type: "geojson", data: EMPTY },
         },
         layers: [
           { id: "plan", type: "raster", source: "plan" },
@@ -70,6 +81,17 @@ export function ParcelMap({ parcels, places, track, zones = EMPTY, basemap, onSe
           { id: "parcels-fill", type: "fill", source: "parcels", paint: { "fill-color": ["get", "color"], "fill-opacity": 0.4 } },
           { id: "parcels-casing", type: "line", source: "parcels", paint: { "line-color": "#1E2421", "line-width": 3.5, "line-opacity": 0.6 } },
           { id: "parcels-line", type: "line", source: "parcels", paint: { "line-color": ["get", "color"], "line-width": 2 } },
+          { id: "buffer-fill", type: "fill", source: "buffer", paint: { "fill-color": "#C0392B", "fill-opacity": 0.18 } },
+          { id: "buffer-line", type: "line", source: "buffer", paint: { "line-color": "#C0392B", "line-width": 1.5, "line-dasharray": [3, 2] } },
+          { id: "water-fill", type: "fill", source: "water", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#2B7BB9", "fill-opacity": 0.5 } },
+          {
+            id: "water-line", type: "line", source: "water", filter: ["all", ["!=", ["geometry-type"], "Polygon"], ["!=", ["get", "ditch"], true]],
+            paint: { "line-color": "#2B7BB9", "line-width": ["case", ["==", ["get", "permanent"], false], 1.5, 2.5] },
+          },
+          {
+            id: "water-ditch", type: "line", source: "water", filter: ["all", ["!=", ["geometry-type"], "Polygon"], ["==", ["get", "ditch"], true]],
+            paint: { "line-color": "#2B7BB9", "line-width": 1, "line-dasharray": [2, 2] },
+          },
           { id: "places-fill", type: "fill", source: "places", paint: { "fill-color": "#3B5A78", "fill-opacity": 0.7 } },
           { id: "zones-fill", type: "fill", source: "zones", paint: { "fill-color": "#E85D04", "fill-opacity": 0.3 } },
           { id: "zones-line", type: "line", source: "zones", paint: { "line-color": "#E85D04", "line-width": 1.5 } },
@@ -87,6 +109,18 @@ export function ParcelMap({ parcels, places, track, zones = EMPTY, basemap, onSe
     m.addControl(new NavigationControl({ showCompass: false }), "top-right");
     m.addControl(new ScaleControl({ unit: "metric" }), "bottom-left");
     m.on("load", () => setReady(true));
+    // Un geste de l'utilisateur (pas un fitBounds) : on ne recadre plus de soi-même.
+    m.on("movestart", (e) => {
+      if ((e as { originalEvent?: unknown }).originalEvent) moved.current = true;
+    });
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(() => {
+            m.resize();
+            if (bounds.current && !moved.current) m.fitBounds(bounds.current, { padding: 40, duration: 0 });
+          });
+    observer?.observe(container.current);
     m.on("click", "parcels-fill", (e) => {
       const f = e.features?.[0];
       onSelect?.(f ? (f.properties as Record<string, unknown>) : null);
@@ -95,6 +129,7 @@ export function ParcelMap({ parcels, places, track, zones = EMPTY, basemap, onSe
     m.on("mouseleave", "parcels-fill", () => (m.getCanvas().style.cursor = ""));
     map.current = m;
     return () => {
+      observer?.disconnect();
       m.remove();
       map.current = null;
     };
@@ -107,21 +142,28 @@ export function ParcelMap({ parcels, places, track, zones = EMPTY, basemap, onSe
     (m.getSource("parcels") as GeoJSONSource).setData(parcels);
     (m.getSource("places") as GeoJSONSource).setData(places);
     (m.getSource("zones") as GeoJSONSource).setData(zones);
-    if (!fitted.current) {
-      const b = bbox(parcels);
-      if (b) {
-        m.fitBounds(b, { padding: 40, duration: 0 });
-        fitted.current = true;
-      }
+    (m.getSource("water") as GeoJSONSource).setData(water);
+    (m.getSource("buffer") as GeoJSONSource).setData(buffer);
+    // Cadrage sur les parcelles et la bande de ZNT ; refait quand la bande arrive.
+    const b = bbox(parcels, buffer);
+    if (b && (!fitted.current || (buffer.features.length > 0 && !moved.current))) {
+      bounds.current = b;
+      m.fitBounds(b, { padding: 40, duration: 0 });
+      fitted.current = true;
     }
-  }, [parcels, places, zones, ready]);
+  }, [parcels, places, zones, water, buffer, ready]);
 
   useEffect(() => {
     const m = map.current;
     if (!m || !ready) return;
     (m.getSource("track") as GeoJSONSource).setData(track);
-    const b = track.features.length ? bbox(track) : null;
-    if (b) m.fitBounds(b, { padding: 60, duration: 600 });
+    // La trace et les parcelles : toutes restent visibles.
+    const b = track.features.length ? bbox(track, parcels, buffer) : null;
+    if (b) {
+      bounds.current = b;
+      m.fitBounds(b, { padding: 40, duration: 600 });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [track, ready]);
 
   useEffect(() => {
@@ -131,5 +173,5 @@ export function ParcelMap({ parcels, places, track, zones = EMPTY, basemap, onSe
     m.setLayoutProperty("ortho", "visibility", basemap === "ortho" ? "visible" : "none");
   }, [basemap, ready]);
 
-  return <div ref={container} style={{ width: "100%", height: "100%", minHeight: 480, borderRadius: 14, overflow: "hidden" }} />;
+  return <div ref={container} style={{ width: "100%", height: "100%", minHeight, borderRadius: 14, overflow: "hidden" }} />;
 }

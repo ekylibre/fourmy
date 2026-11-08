@@ -58,17 +58,17 @@ describe("vues des interventions", () => {
     const user = userEvent.setup();
     const { router } = renderApp(`/f/${FARM}/interventions?at=2026-06-10`);
     await user.click(await screen.findByText("Kanban"));
-    expect(router.state.location.search).toContain("vue=kanban");
+    expect(router.state.location.search).toContain("view=kanban");
     await user.click(screen.getByRole("button", { name: "Semaine suivante" }));
     expect(await screen.findByText("Semaine du 15 au 21 juin 2026")).toBeInTheDocument();
-    expect(router.state.location.search).toContain("vue=kanban");
+    expect(router.state.location.search).toContain("view=kanban");
     expect(screen.getByRole("region", { name: "Réalisée" })).toBeInTheDocument();
   });
 
   it("kanban : colonnes par statut, « en cours » calculé", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date("2026-06-12T09:00:00Z") });
     try {
-      renderApp(`/f/${FARM}/interventions?at=2026-06-10&vue=kanban`);
+      renderApp(`/f/${FARM}/interventions?at=2026-06-10&view=kanban`);
       const inProgress = await screen.findByRole("region", { name: "En cours" });
       // Le labour prévu le 12 à 7 h : commencé à 9 h, il est « en cours ».
       expect(await within(inProgress).findByRole("article", { name: "Labour" })).toBeInTheDocument();
@@ -80,7 +80,7 @@ describe("vues des interventions", () => {
   });
 
   it("kanban : glisser une intervention planifiée vers « Réalisée » ouvre la réalisation ; un retour en arrière est refusé", async () => {
-    renderApp(`/f/${FARM}/interventions?at=2026-06-10&vue=kanban`);
+    renderApp(`/f/${FARM}/interventions?at=2026-06-10&view=kanban`);
     const card = await screen.findByRole("article", { name: "Labour" });
     const drag = (target: HTMLElement) => {
       const data = new Map<string, string>();
@@ -94,7 +94,7 @@ describe("vues des interventions", () => {
   });
 
   it("kanban : une carte réalisée ramenée vers « Planifiée » est refusée avec une explication", async () => {
-    renderApp(`/f/${FARM}/interventions?at=2026-06-10&vue=kanban`);
+    renderApp(`/f/${FARM}/interventions?at=2026-06-10&view=kanban`);
     const card = await screen.findByRole("article", { name: "Taille" });
     const data = new Map<string, string>();
     const dataTransfer = { setData: (k: string, v: string) => data.set(k, v), getData: (k: string) => data.get(k) ?? "", effectAllowed: "" };
@@ -106,14 +106,14 @@ describe("vues des interventions", () => {
 
   it("kanban au clavier : le menu d'une carte offre « Réaliser… »", async () => {
     const user = userEvent.setup();
-    renderApp(`/f/${FARM}/interventions?at=2026-06-10&vue=kanban`);
+    renderApp(`/f/${FARM}/interventions?at=2026-06-10&view=kanban`);
     await user.click(await screen.findByRole("button", { name: "Actions : Labour" }));
     await user.click(await screen.findByRole("menuitem", { name: "Réaliser…" }));
     expect(await screen.findByRole("dialog", { name: "Réaliser l'intervention" })).toBeInTheDocument();
   });
 
   it("calendrier : une taille sur deux demi-journées apparaît chaque jour, avec ses heures", async () => {
-    renderApp(`/f/${FARM}/interventions?at=2026-06-10&vue=calendrier`);
+    renderApp(`/f/${FARM}/interventions?at=2026-06-10&view=calendar`);
     const monday = await screen.findByRole("region", { name: /lundi 8 juin/i });
     const tuesday = screen.getByRole("region", { name: /mardi 9 juin/i });
     expect(within(monday).getByRole("article", { name: "Taille" })).toBeInTheDocument();

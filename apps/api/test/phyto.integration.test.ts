@@ -135,6 +135,20 @@ describe.skipIf(!url)("réglementation phyto (intégration)", () => {
     expect(indicators(second).applications).toMatchObject({ level: "danger", message: expect.stringMatching(/Plus de 1 application\(s\).*\(2e\)/) });
   });
 
+  it("carte de la fiche : bande de ZNT retenue (20 m, cible choisie) et eau proche, fossé compris", async () => {
+    const id = crypto.randomUUID();
+    await post("/interventions", { id, procedure: "spraying" });
+    // 2e application de la campagne (feu rouge, test précédent) : motif.
+    const done = await post(`/interventions/${id}/complete`, spraying(2, { compliance: { usages: { [herbicideId]: "test-u1" }, reason: "Essai de la carte" } }));
+    expect(done.status).toBe(200);
+    expect((await done.json()).intervention.compliance.checks[0].zntM).toBe(20);
+    const map = await (await app.request(`${base}/interventions/${id}/water`, { headers })).json();
+    expect(map.zntM).toBe(20);
+    expect(map.buffer.type).toBe("Polygon");
+    expect(map.water.features.map((f: { properties: { id: string } }) => f.properties.id).sort()).toEqual(["TEST-FOSSE", "TEST-RUISSEAU"]);
+    expect((await app.request(`${base}/interventions/${crypto.randomUUID()}/water`, { headers })).status).toBe(404);
+  });
+
   it("rattacher un article à son n° AMM ; un n° inconnu est refusé", async () => {
     const bad = await app.request(`${base}/articles/${noAmmId}/amm`, { method: "PATCH", headers, body: JSON.stringify({ amm: "0000000" }) });
     expect(bad.status).toBe(400);

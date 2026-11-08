@@ -9,12 +9,12 @@ import { Timeline } from "./Timeline";
 
 const SECTIONS = [
   { path: "", label: "Tableau de bord", icon: LayoutDashboard },
-  { path: "/carte", label: "Carte", icon: Map },
-  { path: "/plan-3d", label: "Plan 3D", icon: Box },
+  { path: "/map", label: "Carte", icon: Map },
+  { path: "/3d-plan", label: "Plan 3D", icon: Box },
   { path: "/interventions", label: "Interventions", icon: ClipboardList },
   { path: "/stocks", label: "Stocks", icon: Boxes },
-  { path: "/cuverie", label: "Cuverie", icon: Wine },
-  { path: "/registre", label: "Registre phyto", icon: FileText },
+  { path: "/cellar", label: "Cuverie", icon: Wine },
+  { path: "/register", label: "Registre phyto", icon: FileText },
   { path: "/phyto", label: "Produits phyto", icon: FlaskConical },
 ] as const;
 
@@ -36,7 +36,7 @@ export function Layout() {
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
           <Group gap="md" wrap="nowrap">
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label="Menu" />
-            <Link to="/fermes" style={{ textDecoration: "none" }}>
+            <Link to="/farms" style={{ textDecoration: "none" }}>
               <Wordmark />
             </Link>
             <Text fw={600} truncate maw={260}>
@@ -55,7 +55,7 @@ export function Layout() {
               size="xs"
               onClick={async () => {
                 await signOut();
-                navigate("/connexion");
+                navigate("/login");
               }}
             >
               Se déconnecter
@@ -80,10 +80,10 @@ export function Layout() {
           {farm.role === "owner" && (
             <NavLink
               component={Link}
-              to={linkTo("/equipe")}
+              to={linkTo("/team")}
               label="Équipe"
               leftSection={<Users size={18} />}
-              active={current.startsWith("/equipe")}
+              active={current.startsWith("/team")}
               onClick={close}
             />
           )}
