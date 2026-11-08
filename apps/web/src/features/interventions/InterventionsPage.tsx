@@ -11,6 +11,7 @@ import { useFarm } from "../../app/farm";
 import { formatDate, formatNumber, procedureLabel, unitLabel } from "../../app/labels";
 import { useArticles, useInterventions, usePeople, useProcedures, useSnapshot } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
+import { ProcedureIcon } from "../../components/ProcedureIcon";
 import { InterventionForm } from "./InterventionForm";
 
 const STATUS: Record<Intervention["status"], { label: string; color: string }> = {
@@ -71,7 +72,16 @@ export function InterventionsPage() {
         rowStyle={(i) => (i.status === "cancelled" ? { opacity: 0.55 } : undefined)}
         columns={[
           { accessor: "date", title: "Date", render: (i) => <span className="lv-num">{formatDate(i.stoppedAt ?? i.startedAt ?? i.createdAt)}</span> },
-          { accessor: "procedure", title: "Intervention", render: (i) => procedureLabel(i.procedure) },
+          {
+            accessor: "procedure",
+            title: "Intervention",
+            render: (i) => (
+              <Group gap={8} wrap="nowrap">
+                <ProcedureIcon procedure={i.procedure} />
+                <span>{procedureLabel(i.procedure)}</span>
+              </Group>
+            ),
+          },
           {
             accessor: "targets",
             title: "Cibles",

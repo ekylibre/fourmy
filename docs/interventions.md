@@ -298,3 +298,23 @@ Exigences : `claudedocs/exigences_interventions.md` (INT-UI-2, INT-UI-3).
 - **Statut affiché** : `displayStatus` (domaine) calcule « en cours »
   (planifiée dont le début est passé) ; rien n'est stocké.
 
+## 11. Icônes des procédures (2026-11-08)
+
+Exigence INT-UI-1. Icônes du jeu **Agric** d'Ekylibre
+(github.com/ekylibre/agric, licence MIT).
+
+- **Correspondance** : `packages/contracts/src/procedure-icons.ts`
+  (`PROCEDURE_ICONS`, repli `SHAPE_ICONS` par forme) ; chaque procédure du
+  catalogue porte son `icon`. Ekylibre n'associe pas d'icône aux procédures :
+  la correspondance est propre à Fourmy. L'icône `vine` d'Agric est le logo
+  du réseau social Vine : non utilisée.
+- **Dessins** : seuls ceux utilisés sont intégrés, dans
+  `apps/web/src/icons/agric.ts` (généré, commit Agric et licence en tête).
+  Agric n'est pas publié sur npm. Après un changement de correspondance :
+  `node apps/web/scripts/agric-icons.mjs <clone d'agric>` (refuse une icône
+  importée sous une licence autre que MIT, ISC, CC0, Apache-2.0, OFL).
+- **Composant** : `ProcedureIcon` (couleur du texte, décorative sauf avec
+  `title`). Affiché dans la liste des interventions et le choix de la
+  procédure du formulaire ; fiche, kanban et calendrier le reprendront.
+- **Test** : toute icône du catalogue a son dessin ; les 37 procédures des
+  pilotes ont une icône propre.

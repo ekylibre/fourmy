@@ -31,6 +31,7 @@ import type {
 import { formatHa } from "@fourmy/ui-lyvre";
 import { api, ApiError, farmPath } from "../../app/api";
 import { unitLabel } from "../../app/labels";
+import { ProcedureIcon } from "../../components/ProcedureIcon";
 
 type QuantityRow = { articleId: string | null; quantity: number | ""; per: QuantityPer; to: string | null };
 type PeriodRow = { startedAt: string; stoppedAt: string };
@@ -289,6 +290,13 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
           data={procedureOptions}
           value={code}
           onChange={chooseProcedure}
+          renderOption={({ option }) => (
+            <Group gap={8} wrap="nowrap">
+              <ProcedureIcon procedure={option.value} />
+              <span>{option.label}</span>
+            </Group>
+          )}
+          leftSection={code ? <ProcedureIcon procedure={code} /> : undefined}
           searchable
           required
           disabled={Boolean(planned)}

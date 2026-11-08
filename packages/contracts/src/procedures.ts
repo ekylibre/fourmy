@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PROCEDURE_LABELS } from "./procedure-labels.js";
+import { procedureIcon } from "./procedure-icons.js";
 
 /**
  * Catalogue des procédures (docs/interventions.md §3). Une procédure est une
@@ -28,6 +29,8 @@ export const procedureDefinition = z.object({
   outputKinds: z.array(articleKind),
   /** Procédure hors catalogue (reprise d'Ekylibre) : forme « travail » par défaut. */
   legacy: z.boolean().default(false),
+  /** Icône Agric (procedure-icons.ts) ; à défaut, celle de la forme. */
+  icon: z.string(),
 });
 export type ProcedureDefinition = z.infer<typeof procedureDefinition>;
 
@@ -147,6 +150,7 @@ export const PROCEDURES: ProcedureDefinition[] = DEFINITIONS.map(([code, shape, 
   inputKinds,
   outputKinds,
   legacy: false,
+  icon: procedureIcon(code, shape),
 }));
 
 const BY_CODE = new Map(PROCEDURES.map((p) => [p.code, p]));
@@ -166,6 +170,7 @@ export function getProcedure(code: string): ProcedureDefinition {
       inputKinds: ["phyto", "fertilizer", "seed", "other"],
       outputKinds: [],
       legacy: true,
+      icon: procedureIcon(code, "work"),
     }
   );
 }
