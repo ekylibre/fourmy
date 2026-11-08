@@ -3,7 +3,8 @@ import { formatHa, formatLiters } from "@fourmy/ui-lyvre";
 import { useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
 import { formatDate, NATURE_LABELS, procedureLabel } from "../../app/labels";
-import { useInterventions, useSnapshot } from "../../app/queries";
+import { useFarmDues, useInterventions, useSnapshot } from "../../app/queries";
+import { Link, useLocation } from "react-router";
 import { ErrorAlert, Loading } from "../../components/states";
 import { SprayingConditions } from "../weather/Weather";
 
@@ -32,6 +33,8 @@ export function DashboardPage() {
   const snap = useSnapshot(farm.id, at);
   const from = new Date(Date.parse(at) - 30 * 86_400_000).toISOString();
   const recent = useInterventions(farm.id, from, at);
+  const dues = useFarmDues(farm.id, at);
+  const location = useLocation();
 
   if (snap.isLoading) return <Loading />;
   if (snap.error) return <ErrorAlert error={snap.error} />;
@@ -58,7 +61,13 @@ export function DashboardPage() {
           value={s.containers.length ? formatLiters(volume) : "—"}
           hint={s.containers.length ? `${s.containers.length} cuves · capacité ${formatLiters(capacity)}` : "aucune cuve"}
         />
-        <Kpi label="Matériels" value={String(s.equipments.length)} />
+        <Link to={`/f/${farm.id}/maintenance${location.search}`} style={{ textDecoration: "none", color: "inherit" }} aria-label="Entretien des matériels">
+          <Kpi
+            label="Entretien"
+            value={dues.data ? String(dues.data.items.filter((i) => i.due.status === "overdue").length) : "—"}
+            hint={dues.data ? `en retard · ${dues.data.items.filter((i) => i.due.status === "soon").length} bientôt · ${s.equipments.length} matériels` : `${s.equipments.length} matériels`}
+          />
+        </Link>
       </SimpleGrid>
 
       {/* Prévisions : seulement quand la frise est sur aujourd'hui. */}

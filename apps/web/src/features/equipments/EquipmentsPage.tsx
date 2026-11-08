@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { Badge, Button, Group, Paper, SegmentedControl, Select, Stack, Table, Text, TextInput, Title } from "@mantine/core";
-import { Gauge, Plus, Radio, Search } from "lucide-react";
+import { Gauge, Plus, Radio, Search, Wrench } from "lucide-react";
 import { equipmentKindLabel, equipmentStateLabel, type EquipmentSummary } from "@fourmy/contracts";
 import { useFarm } from "../../app/farm";
 import { formatDate } from "../../app/labels";
@@ -44,11 +44,16 @@ export function EquipmentsPage() {
     <Stack>
       <Group justify="space-between">
         <Title order={1}>Matériels</Title>
-        {farm.role === "owner" && (
-          <Button leftSection={<Plus size={16} />} onClick={() => setCreating(true)}>
-            Nouveau matériel
+        <Group>
+          <Button component={Link} to={`/f/${farm.id}/maintenance${location.search}`} variant="light" leftSection={<Wrench size={16} />}>
+            Entretien
           </Button>
-        )}
+          {farm.role === "owner" && (
+            <Button leftSection={<Plus size={16} />} onClick={() => setCreating(true)}>
+              Nouveau matériel
+            </Button>
+          )}
+        </Group>
       </Group>
       <Group>
         <SegmentedControl
@@ -87,6 +92,16 @@ export function EquipmentsPage() {
                         {!inService(e) && (
                           <Badge size="xs" color="gray" variant="light">
                             {equipmentStateLabel(e.state)}
+                          </Badge>
+                        )}
+                        {e.due && e.due.overdue > 0 && (
+                          <Badge size="xs" color="brique">
+                            {e.due.overdue} en retard
+                          </Badge>
+                        )}
+                        {e.due && e.due.soon > 0 && (
+                          <Badge size="xs" color="paille">
+                            {e.due.soon} bientôt
                           </Badge>
                         )}
                         {e.tracked && (

@@ -21,3 +21,4 @@ export * from "./activities.js";
 export * from "./certifications.js";
 export * from "./parcels.js";
 export * from "./equipments.js";
+export * from "./maintenance.js";

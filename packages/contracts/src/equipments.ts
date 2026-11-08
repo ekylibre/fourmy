@@ -100,6 +100,8 @@ export const equipmentSummary = z.object({
   logoSource: z.enum(["equipment", "brand"]).nullable(),
   lastReading: lastReading.nullable(),
   tracked: z.boolean(),
+  /** Échéances du plan d'entretien (null : pas de plan). */
+  due: z.object({ overdue: z.number(), soon: z.number(), unknown: z.number() }).nullable().optional(),
 });
 export type EquipmentSummary = z.infer<typeof equipmentSummary>;
 

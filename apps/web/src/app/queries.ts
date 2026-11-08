@@ -5,8 +5,10 @@ import type {
   ParcelCertification,
   Article,
   ContainerContents,
+  EquipmentMaintenance,
   EquipmentSheet,
   EquipmentSummary,
+  FarmDueItem,
   FarmBrand,
   FarmMember,
   Intervention,
@@ -185,5 +187,25 @@ export function useBrands(farmId: string) {
     queryKey: ["brands", farmId],
     queryFn: () => api.get<{ items: FarmBrand[] }>(farmPath(farmId, "/brands")),
     staleTime: 5 * 60_000,
+  });
+}
+
+/** Entretien d'un matériel à une date : plan, échéances, fluides, pièces. */
+export function useMaintenance(farmId: string, equipmentId: string, at: string) {
+  return useQuery({
+    queryKey: ["maintenance", farmId, equipmentId, at],
+    queryFn: () => api.get<EquipmentMaintenance>(farmPath(farmId, `/equipments/${equipmentId}/maintenance?at=${encodeURIComponent(at)}`)),
+  });
+}
+
+/** Échéances en retard et à venir de toute la ferme (tableau de bord de l'entretien). */
+export function useFarmDues(farmId: string, at: string) {
+  return useQuery({
+    queryKey: ["maintenance-due", farmId, at],
+    queryFn: () =>
+      api.get<{ items: FarmDueItem[]; byEquipment: Record<string, { overdue: number; soon: number; unknown: number }> }>(
+        farmPath(farmId, `/maintenance/due?at=${encodeURIComponent(at)}`),
+      ),
+    staleTime: 60_000,
   });
 }

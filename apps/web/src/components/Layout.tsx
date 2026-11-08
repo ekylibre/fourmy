@@ -103,7 +103,7 @@ export function Layout() {
             <NavLink
               component={Link}
               to={linkTo("/imports")}
-              label="Imports Ekylibre"
+              label="Imports"
               leftSection={<Database size={18} />}
               active={current.startsWith("/imports")}
               onClick={close}

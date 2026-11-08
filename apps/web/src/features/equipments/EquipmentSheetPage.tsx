@@ -13,8 +13,9 @@ import { ErrorAlert, Loading } from "../../components/states";
 import { ProcedureIcon } from "../../components/ProcedureIcon";
 import { EquipmentLogo, uploadLogo } from "./EquipmentLogo";
 import { EquipmentFormModal, formatHours, ReadingModal } from "./EquipmentForms";
+import { MaintenanceTab, PartsTab } from "../maintenance/Maintenance";
 
-const TABS = ["general", "technical", "readings", "history"] as const;
+const TABS = ["general", "maintenance", "parts", "technical", "readings", "history"] as const;
 type Tab = (typeof TABS)[number];
 
 /**
@@ -101,12 +102,23 @@ function Sheet({ sheet: s }: { sheet: EquipmentSheet }) {
       >
         <Tabs.List>
           <Tabs.Tab value="general">Général</Tabs.Tab>
+          <Tabs.Tab value="maintenance">
+            Entretien
+            {s.due && s.due.overdue + s.due.soon > 0 ? ` (${s.due.overdue + s.due.soon})` : ""}
+          </Tabs.Tab>
+          <Tabs.Tab value="parts">Pièces</Tabs.Tab>
           <Tabs.Tab value="technical">Technique</Tabs.Tab>
           <Tabs.Tab value="readings">Relevés ({s.readings.length})</Tabs.Tab>
           <Tabs.Tab value="history">Historique ({s.history.length})</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="general" pt="md">
           <General sheet={s} />
+        </Tabs.Panel>
+        <Tabs.Panel value="maintenance" pt="md">
+          <MaintenanceTab equipmentId={s.id} hasMeter={!!s.meterUnit} />
+        </Tabs.Panel>
+        <Tabs.Panel value="parts" pt="md">
+          <PartsTab equipmentId={s.id} />
         </Tabs.Panel>
         <Tabs.Panel value="technical" pt="md">
           <Technical technical={s.technical} />

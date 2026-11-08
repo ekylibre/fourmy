@@ -3,6 +3,7 @@ import { Alert, Badge, Button, Group, List, Paper, Stack, Table, Text, TextInput
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
+import { EquipmentBundleImport } from "./EquipmentBundleImport";
 
 type Run = {
   id: string;
@@ -159,6 +160,7 @@ export function ImportsPage() {
           )}
         </Paper>
       )}
+      <EquipmentBundleImport />
     </Stack>
   );
 }

@@ -91,3 +91,90 @@ L'onglet est dans l'adresse (`?tab=technical|readings|history`).
 | `GET /equipments` · `GET /equipments/:id/sheet` · `GET /equipments/:id/readings` · `GET /brands` · `GET /assets/:id` | membre |
 | `POST /equipments/:id/readings` (`origin: reference` : responsable) | membre |
 | `POST /equipments` · `PUT /equipments/:id` · `POST /equipments/:id/options` · `DELETE /equipment-options/:id` · `DELETE /meter-readings/:id` · `PUT/DELETE /equipments/:id/logo` · `PUT /brands/:id` · `PUT/DELETE /brands/:id/logo` | responsable |
+
+## Plan d'entretien et échéances (lot J)
+
+### Import de la base matériel (Imports › Base matériel)
+
+- **Choix du dossier** : on choisit le dossier d'un matériel au format de
+  la base Arion. Le navigateur n'en lit que les fichiers utiles :
+  `machine.json`, `sources.json`, `fiche_technique.json`,
+  `entretien/plan_entretien.json`, `entretien/fluides.csv`,
+  `pieces/pieces_entretien.csv`. Les notices PDF et les images restent sur
+  le poste.
+- **Rattachement** : au matériel choisi, sinon à celui qui a le même n° de
+  série, sinon à un nouveau matériel.
+- **Ce qui est créé ou mis à jour** :
+  - le **modèle** (plan par défaut, fluides, pièces), propre à la ferme : il
+    n'est jamais partagé, faute de droits clairs sur les documents du
+    constructeur ;
+  - la fiche du matériel (identité, agrégats, fiche technique) et ses
+    options montées ;
+  - le plan copié sur le matériel ;
+  - les fluides ;
+  - les pièces, sous forme d'articles `part` de la ferme, dédoublonnés par
+    référence et par marque.
+- **Visites initiales** : chacune devient une opération ponctuelle
+  (« Visite des 100 premières heures »). Sur un tracteur déjà plus âgé que
+  la visite, elle est « non applicable ».
+- **Options absentes d'usine** : une opération qui mentionne une option
+  absente d'usine (prise de force avant, relevage avant, freinage
+  pneumatique de remorque) arrive retirée du plan, avec le motif « Option
+  absente d'usine ».
+- **Réimport** : rejouable sans doublon. Les opérations déjà sur le
+  matériel sont **conservées** telles que la ferme les a ajustées, seules
+  les nouvelles sont ajoutées.
+- **Pilote** :
+
+  | Matériel | Opérations | Non applicables | Fluides | Pièces |
+  |---|---|---|---|---|
+  | ARION 430 | 59 | 3 | 11 | 54 |
+  | ARION 630 C | 62 | 5 | 9 | 43 |
+
+  Les deux tracteurs ont 27 références en commun.
+
+### Onglet Entretien de la fiche
+
+- **Calcul** : les échéances sont calculées à la date de la frise, jamais
+  stockées. On peut donc rejouer la ferme dans le temps.
+- **Tri** : en retard, bientôt, à renseigner, à jour.
+- **Prochaine échéance** : dernière réalisation + périodicité, en heures
+  et/ou en mois, au premier terme atteint.
+- **Dernière réalisation** : la plus récente des réalisations (interventions
+  d'entretien, lot K), sinon la « dernière fois connue », sinon la mise en
+  service.
+- **Sans rien de connu**, l'opération est « à renseigner » :
+  - **Dernière fois** (tout membre) : date et heures de la dernière
+    réalisation, pour une opération ;
+  - **Amorcer le plan** : la même date pour toutes les opérations à
+    renseigner (révision complète à l'achat, par exemple).
+- **Réalisation sans relevé d'heures** : les heures sont interpolées entre
+  deux relevés. Sinon, l'échéance ne suit que les mois.
+- **Plan ajustable par le responsable** : libellé, type, périodicité,
+  exécutant (exploitant ou atelier agréé), retrait du plan. Une opération
+  copiée du modèle ne modifie que ce matériel.
+- **Fluides préconisés** : organe, produit, norme, capacité, source.
+- **Seuil « bientôt »** : 50 h ou 1 mois par défaut, réglable sur la page
+  Entretien par le responsable.
+
+### Onglet Pièces
+
+Le référentiel des pièces d'entretien du matériel : famille, référence
+constructeur, désignation, quantité, position dans le catalogue, opérations
+qui les utilisent.
+
+### Tableau de bord de l'entretien (`/f/:ferme/maintenance`)
+
+- On y accède par le bouton « Entretien » de la liste des matériels, ou par
+  la carte « Entretien » du tableau de bord de la ferme.
+- La page liste, pour tous les matériels, les opérations en retard et à
+  venir, par urgence, ainsi que les matériels qui ont des échéances à
+  renseigner.
+
+### API (lot J)
+
+| Route | Droits |
+|---|---|
+| `GET /equipments/:id/maintenance?at=` · `GET /maintenance/due?at=` · `GET /equipment-models` · `GET /settings/maintenance` | membre |
+| `PUT /plan-operations/:id/baseline` · `POST /equipments/:id/plan/baseline` | membre |
+| `POST /equipments/:id/plan` · `PUT /plan-operations/:id` · `POST /equipments/:id/plan/apply-model` · `POST /imports/equipment-bundle` · `PUT /settings/maintenance` | responsable |

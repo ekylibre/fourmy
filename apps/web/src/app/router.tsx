@@ -13,6 +13,7 @@ import { PhytoProductsPage } from "../features/phyto/PhytoProductsPage";
 import { ActivitiesPage } from "../features/activities/ActivitiesPage";
 import { EquipmentsPage } from "../features/equipments/EquipmentsPage";
 import { EquipmentSheetPage } from "../features/equipments/EquipmentSheetPage";
+import { MaintenancePage } from "../features/maintenance/MaintenancePage";
 import { ParcelCreatePage } from "../features/parcels/ParcelCreatePage";
 import { ParcelSheetPage } from "../features/parcels/ParcelSheetPage";
 import { LoginPage } from "../features/login/LoginPage";
@@ -129,6 +130,7 @@ export const routes = [
       { path: "activities", element: <ActivitiesPage /> },
       { path: "equipments", element: <EquipmentsPage /> },
       { path: "equipments/:equipmentId", element: <EquipmentSheetPage /> },
+      { path: "maintenance", element: <MaintenancePage /> },
       { path: "land-parcels/new", element: <Suspense fallback={<Loading />}><ParcelCreatePage /></Suspense> },
       { path: "land-parcels/:parcelId", element: <Suspense fallback={<Loading />}><ParcelSheetPage /></Suspense> },
       { path: "imports", element: <ImportsPage /> },

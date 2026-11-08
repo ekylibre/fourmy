@@ -1,0 +1,146 @@
+import { useState } from "react";
+import { Link, useLocation } from "react-router";
+import { Button, Group, NumberInput, Paper, Stack, Table, Text, Title } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft } from "lucide-react";
+import { dueLabel } from "@fourmy/domain";
+import { OPERATION_KIND_LABELS, PERFORMER_LABELS, type MaintenanceSettings } from "@fourmy/contracts";
+import { api, ApiError, farmPath } from "../../app/api";
+import { useAt } from "../../app/at";
+import { useFarm } from "../../app/farm";
+import { formatDate } from "../../app/labels";
+import { useEquipments, useFarmDues } from "../../app/queries";
+import { ErrorAlert, Loading } from "../../components/states";
+import { EquipmentLogo } from "../equipments/EquipmentLogo";
+import { DueBadge } from "./Maintenance";
+
+/**
+ * Tableau de bord de l'entretien (FR-MAT-24) : opérations en retard ou à
+ * venir de tous les matériels, triées par urgence, à la date de la frise.
+ */
+export function MaintenancePage() {
+  const farm = useFarm();
+  const location = useLocation();
+  const { at, isToday } = useAt();
+  const q = useFarmDues(farm.id, at);
+  const equipments = useEquipments(farm.id);
+  if (q.isLoading) return <Loading />;
+  if (q.error) return <ErrorAlert error={q.error} />;
+  const { items, byEquipment } = q.data!;
+  const toFill = Object.entries(byEquipment).filter(([, c]) => c.unknown > 0);
+  const logo = (id: string) => equipments.data?.items.find((e) => e.id === id);
+  const link = (id: string) => {
+    const p = new URLSearchParams(location.search);
+    p.set("tab", "maintenance");
+    return `/f/${farm.id}/equipments/${id}?${p}`;
+  };
+
+  return (
+    <Stack>
+      <Button component={Link} to={`/f/${farm.id}/equipments${location.search}`} variant="subtle" size="compact-sm" leftSection={<ArrowLeft size={14} />} w="fit-content">
+        Matériels
+      </Button>
+      <Title order={1}>Entretien{isToday ? "" : ` au ${formatDate(at)}`}</Title>
+      <Paper withBorder>
+        <Table aria-label="Échéances d'entretien" verticalSpacing="xs" highlightOnHover>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>État</Table.Th>
+              <Table.Th>Matériel</Table.Th>
+              <Table.Th>Opération</Table.Th>
+              <Table.Th>Échéance</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {items.map((i) => {
+              const e = logo(i.equipmentId);
+              return (
+                <Table.Tr key={i.operationId}>
+                  <Table.Td>
+                    <DueBadge status={i.due.status} />
+                  </Table.Td>
+                  <Table.Td>
+                    <Group gap="xs" wrap="nowrap">
+                      <EquipmentLogo farmId={farm.id} assetId={e?.logoAssetId ?? null} kind={i.equipmentKind} size={24} />
+                      <Link to={link(i.equipmentId)}>{i.equipmentName}</Link>
+                    </Group>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">{i.label}</Text>
+                    <Text size="xs" c="dimmed">
+                      {OPERATION_KIND_LABELS[i.kind]}
+                      {i.performer === "workshop" ? ` · ${PERFORMER_LABELS.workshop}` : ""}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm" c={i.due.status === "overdue" ? "brique" : undefined}>
+                      {dueLabel(i.due)}
+                    </Text>
+                  </Table.Td>
+                </Table.Tr>
+              );
+            })}
+            {items.length === 0 && (
+              <Table.Tr>
+                <Table.Td colSpan={4}>
+                  <Text size="sm" c="dimmed" ta="center" py="md">
+                    Aucune opération en retard ni à venir.
+                  </Text>
+                </Table.Td>
+              </Table.Tr>
+            )}
+          </Table.Tbody>
+        </Table>
+      </Paper>
+      {toFill.length > 0 && (
+        <Paper withBorder p="md">
+          <Title order={4} mb={4}>
+            Échéances à renseigner
+          </Title>
+          <Text size="sm" c="dimmed" mb="xs">
+            Sans dernière réalisation connue, Fourmy ne peut pas calculer ces échéances. Indiquez « Dernière fois » dans l'onglet Entretien du matériel.
+          </Text>
+          {toFill.map(([id, c]) => (
+            <Text key={id} size="sm">
+              <Link to={link(id)}>{logo(id)?.name ?? "Matériel"}</Link> : {c.unknown} opération(s)
+            </Text>
+          ))}
+        </Paper>
+      )}
+      {farm.role === "owner" && <SettingsPanel farmId={farm.id} />}
+    </Stack>
+  );
+}
+
+function SettingsPanel({ farmId }: { farmId: string }) {
+  const queryClient = useQueryClient();
+  const q = useQuery({ queryKey: ["maintenance-settings", farmId], queryFn: () => api.get<MaintenanceSettings>(farmPath(farmId, "/settings/maintenance")) });
+  const [hours, setHours] = useState<number | string | null>(null);
+  const [months, setMonths] = useState<number | string | null>(null);
+  const save = useMutation({
+    mutationFn: () => api.put(farmPath(farmId, "/settings/maintenance"), { soonHours: Number(hours ?? q.data?.soonHours), soonMonths: Number(months ?? q.data?.soonMonths) }),
+    onSuccess: () => {
+      notifications.show({ color: "lichen", message: "Seuils enregistrés." });
+      void queryClient.invalidateQueries({ queryKey: ["maintenance-settings"] });
+      void queryClient.invalidateQueries({ queryKey: ["maintenance-due"] });
+      void queryClient.invalidateQueries({ queryKey: ["maintenance"] });
+    },
+    onError: (e) => notifications.show({ color: "brique", message: e instanceof ApiError ? e.message : String(e) }),
+  });
+  if (!q.data) return null;
+  return (
+    <Paper withBorder p="md">
+      <Title order={4} mb="xs">
+        Seuil « bientôt »
+      </Title>
+      <Group align="flex-end">
+        <NumberInput label="Heures avant l'échéance" value={hours ?? q.data.soonHours} onChange={setHours} min={0} suffix=" h" w={180} />
+        <NumberInput label="ou mois avant" value={months ?? q.data.soonMonths} onChange={setMonths} min={0} max={12} w={140} />
+        <Button variant="default" onClick={() => save.mutate()} loading={save.isPending} disabled={hours === null && months === null}>
+          Enregistrer
+        </Button>
+      </Group>
+    </Paper>
+  );
+}

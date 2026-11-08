@@ -18,6 +18,7 @@ import {
   updateEquipment,
   type LogoUpload,
 } from "../repos/equipments.js";
+import { farmDues } from "../repos/maintenance.js";
 import { BadRequest, domainCtx, problem, uuidParam } from "./helpers.js";
 
 /** Logo envoyé en multipart : `file` (PNG, JPEG ou SVG) et, pour un SVG, `raster` (PNG). */
@@ -34,7 +35,10 @@ async function logoUpload(c: Context<Env>): Promise<LogoUpload> {
  * options, marques et logos pour le responsable (NFR-MAT-4).
  */
 export const equipmentRoutes = new Hono<Env>()
-  .get("/equipments", async (c) => c.json({ items: await listEquipments(db(), c.get("farmId")) }))
+  .get("/equipments", async (c) => {
+    const [items, dues] = await Promise.all([listEquipments(db(), c.get("farmId")), farmDues(db(), c.get("farmId"), new Date().toISOString())]);
+    return c.json({ items: items.map((e) => ({ ...e, due: dues.byEquipment[e.id] ?? null })) });
+  })
   .post("/equipments", requireOwner, async (c) => {
     const parsed = equipmentWrite.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.message);
