@@ -23,6 +23,24 @@ MET-3). Réalisé le 2026-11-08.
 - Point météo : centre des parcelles de l'intervention (à sa date), sinon
   centre de la ferme.
 
+## Icônes (lot D, retours du 08/11/2026)
+
+Référence commune : les **codes d'icône d'OpenWeather** (`01d`…`50n`,
+https://openweathermap.org/weather-conditions#Icon-list), quel que soit le
+fournisseur : Open-Meteo (codes WMO + jour/nuit) et meteoblue (pictocodes)
+y sont ramenés (`iconFromWmo`, `iconFromMeteoblue`). Le temps **dominant**
+d'une période est le plus marquant (orage > neige > pluie > averses >
+brouillard > couvert > nuageux > peu nuageux > soleil). Dessin local (icônes
+lucide colorées), sans image chargée chez un tiers.
+
+- Fiche : temps dominant, température, hygrométrie, vent, pluie, puis la
+  **frise heure par heure** de la période (icône, température, pluie),
+  enregistrée avec la météo (`hours`, 48 pas au plus).
+- Conditions de pulvérisation : par jour, icône du temps de la journée,
+  températures mini / maxi et pluie, puis les créneaux colorés.
+- Les météos enregistrées avant les icônes (hors saisie à la main) sont
+  complétées par le worker.
+
 ## Météo d'une intervention (MET-2)
 
 - Le formulaire **pré-remplit** température, hygrométrie, vent moyen et pluie

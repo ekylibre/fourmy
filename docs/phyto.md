@@ -49,6 +49,16 @@ est jugé sur la réglementation de 2016) :
 - **Unités** des articles repris (« Litre », « Kg », « Sac de 12 kg »)
   ramenées au litre ou au kilo.
 
+## Pictogrammes réglementaires (lot D)
+
+Sur la fiche (intrants) et dans le formulaire (sous le produit) : les
+**pictogrammes de danger SGH** (CLP), déduits des mentions H du produit
+(`phyto_risks`, paquet Lexicon `phytosanitary`) par la correspondance CLP
+complète (`hazardPictograms`, préséances : SGH06 exclut SGH07…), plus des
+pastilles **ZNT**, **DRE** (délai de ré-entrée) et **DAR** (délai avant
+récolte). `GET /phyto/articles` donne pictogrammes, mentions et délai de
+ré-entrée.
+
 ## Activités
 
 La culture contrôlée vient de l'**activité** de la parcelle (docs/activites.md) :

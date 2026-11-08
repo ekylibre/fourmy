@@ -33,6 +33,18 @@ describe("fiche d'une intervention", () => {
     expect(screen.getByText(/Carte indisponible/)).toBeInTheDocument();
   });
 
+  it("périodes avec durée et intervenants ; pictogrammes réglementaires des intrants phyto", async () => {
+    renderApp(`/f/${FARM}/interventions/${DEMO.id}?at=2026-06-30`);
+    const period = (await screen.findAllByLabelText("Période de travail"))[0]!;
+    expect(within(period).getByText(/\d+ h|\d+ min/)).toBeInTheDocument();
+    expect(await within(period).findByText("Camille")).toBeInTheDocument();
+    const quantities = await screen.findByRole("table", { name: "Intrants et sorties" });
+    const pictos = await within(quantities).findByLabelText("Pictogrammes réglementaires");
+    expect(within(pictos).getByRole("img", { name: /SGH09 : Dangereux pour l'environnement aquatique/ })).toBeInTheDocument();
+    expect(within(pictos).getByRole("img", { name: /SGH07/ })).toBeInTheDocument();
+    expect(within(pictos).getByText("DRE 6 h")).toBeInTheDocument();
+  });
+
   it("l'historique montre une correction : motif, avant → après", async () => {
     server.use(
       detail({}, [

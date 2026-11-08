@@ -1,11 +1,12 @@
 import { sql, type SQL } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
-import { checkTreatment, worstLevel, type ParcelContext, type PhytoProductRef, type PhytoUsageRef } from "@fourmy/domain";
+import { checkTreatment, hazardPictograms, worstLevel, type ParcelContext, type PhytoProductRef, type PhytoUsageRef } from "@fourmy/domain";
 import {
   PROCEDURES,
   type ComplianceResult,
   type ComplianceWrite,
   type InterventionTarget,
+  type FarmPhytoArticle,
   type InterventionWaterMap,
   type PhytoProduct,
   type PhytoStatus,
@@ -438,21 +439,41 @@ export async function interventionWater(
 /** Articles phyto avec leur produit E-Phy (rattachement par n° AMM). */
 export async function phytoArticles(db: Database, farmId: string) {
   return withFarm(db, farmId, async (tx) => {
-    const list = await rows<{ id: string; name: string; unit: string; amm: string | null; product_name: string | null; state: string | null; stopped_on: string | null }>(
+    const list = await rows<{
+      id: string;
+      name: string;
+      unit: string;
+      amm: string | null;
+      product_name: string | null;
+      state: string | null;
+      stopped_on: string | null;
+      reentry: number | null;
+      risks: { code: string; phrase: string }[] | null;
+      symbols: string[] | null;
+    }>(
       tx,
-      sql`SELECT a.id, a.name, a.unit, nullif(btrim(a.amm), '') AS amm, p.name AS product_name, p.state, p.stopped_on::text
+      sql`SELECT a.id, a.name, a.unit, nullif(btrim(a.amm), '') AS amm, p.name AS product_name, p.state, p.stopped_on::text,
+                 p.reentry_delay_hours AS reentry,
+                 (SELECT json_agg(json_build_object('code', r.code, 'phrase', r.phrase) ORDER BY r.code) FROM phyto_risks r WHERE r.product_id = p.id) AS risks,
+                 (SELECT array_agg(DISTINCT s.symbol) FROM phyto_risks r
+                    JOIN phyto_hazard_symbols s ON s.code = substring(r.code from '^H[0-9]{3}') WHERE r.product_id = p.id) AS symbols
           FROM articles a
-          LEFT JOIN LATERAL (SELECT name, state, stopped_on FROM phyto_products WHERE amm = btrim(a.amm)
+          LEFT JOIN LATERAL (SELECT id, name, state, stopped_on, reentry_delay_hours FROM phyto_products WHERE amm = btrim(a.amm)
                              ORDER BY (state = 'authorized') DESC LIMIT 1) p ON true
           WHERE a.kind = 'phyto' ORDER BY a.name`,
     );
-    return list.map((a) => ({
-      id: a.id,
-      name: a.name,
-      unit: a.unit,
-      amm: a.amm,
-      product: a.product_name ? { name: a.product_name, state: a.state!, stoppedOn: a.stopped_on } : null,
-    }));
+    return list.map(
+      (a): FarmPhytoArticle => ({
+        id: a.id,
+        name: a.name,
+        unit: a.unit,
+        amm: a.amm,
+        product: a.product_name ? { name: a.product_name, state: a.state!, stoppedOn: a.stopped_on } : null,
+        hazards: hazardPictograms((a.risks ?? []).map((r) => r.code), a.symbols ?? []),
+        risks: a.risks ?? [],
+        reentryDelayHours: a.reentry,
+      }),
+    );
   });
 }
 

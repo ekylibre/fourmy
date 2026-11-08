@@ -121,7 +121,8 @@ export const handlers = [
     }),
   ),
   http.get(`*${base}/phyto/articles`, () =>
-    HttpResponse.json({ items: [{ id: demoArticles[0]!.id, name: demoArticles[0]!.name, unit: "liter", amm: "2100001", product: { name: "GUILD", state: "authorized", stoppedOn: null } }] }),
+    HttpResponse.json({ items: [{ id: demoArticles[0]!.id, name: demoArticles[0]!.name, unit: "liter", amm: "2100001", product: { name: "GUILD", state: "authorized", stoppedOn: null },
+      hazards: ["SGH07", "SGH09"], risks: [{ code: "H319", phrase: "Provoque une sévère irritation des yeux" }, { code: "H410", phrase: "Très toxique pour les organismes aquatiques, entraîne des effets néfastes à long terme" }], reentryDelayHours: 6 }] }),
   ),
   http.get(`*${base}/procedures`, () => HttpResponse.json(demoProcedures)),
   http.get(`*${base}/people`, () => page(demoPeople)),

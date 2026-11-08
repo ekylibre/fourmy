@@ -3,7 +3,7 @@ import postgres from "postgres";
 import { createDb } from "@fourmy/db";
 import { createApp } from "../src/app.js";
 import { encryptSecret } from "../src/secrets.js";
-import { fillInterventionWeather, interventionWeather, sprayingForecast } from "../src/repos/weather.js";
+import { fillInterventionWeather, interventionWeather, pendingWeather, sprayingForecast } from "../src/repos/weather.js";
 import { setupFarm, teardown } from "./helpers.js";
 
 /**
@@ -136,5 +136,15 @@ describe.skipIf(!url)("météo des interventions (intégration)", () => {
     expect(row!.weather).toMatchObject({ source: "open_meteo", temperatureC: 15 });
     const [kept] = await sql`SELECT weather FROM interventions WHERE id = ${id}`;
     expect(kept!.weather).toMatchObject({ source: "manual", temperatureC: 11 });
+
+    // Météo d'avant les icônes : complétée (temps dominant, frise) ; la saisie à la main jamais.
+    await sql`UPDATE interventions SET weather = weather - 'icon' - 'hours' WHERE id = ${other}`;
+    const pending = (await pendingWeather(db, 1000)).map((p) => p.id);
+    expect(pending).toContain(other);
+    expect(pending).not.toContain(id);
+    await fillInterventionWeather(db, farmId, other, fakeWeather().fetchImpl);
+    const [refilled] = await sql`SELECT weather FROM interventions WHERE id = ${other}`;
+    expect(refilled!.weather).toHaveProperty("icon");
+    expect(refilled!.weather.hours.length).toBeGreaterThan(0);
   });
 });

@@ -2,7 +2,8 @@ import { useEffect, useRef } from "react";
 import { Badge, Box, Button, Group, NumberInput, Paper, ScrollArea, SimpleGrid, Stack, Text, Tooltip } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
-import { CloudSun, RefreshCw } from "lucide-react";
+import { CloudRain, CloudSun, Droplets, RefreshCw, Thermometer, Wind } from "lucide-react";
+import { WeatherIcon, weatherLabel } from "./WeatherIcon";
 import type { InterventionWeather, SprayingForecast } from "@fourmy/contracts";
 import { api, farmPath } from "../../app/api";
 
@@ -81,6 +82,8 @@ export function WeatherFields({
       windMaxKmh: value?.windMaxKmh ?? null,
       precipitationMm: value?.precipitationMm ?? null,
       fetchedAt: null,
+      icon: value?.icon ?? null,
+      ...(value?.hours ? { hours: value.hours } : {}),
       ...patch,
     });
   const field = (label: string, key: "temperatureC" | "humidityPct" | "windKmh" | "precipitationMm", suffix: string, min = 0) => (
@@ -100,10 +103,15 @@ export function WeatherFields({
     <Stack gap={6} aria-label="Météo">
       <Group justify="space-between" gap="xs">
         <Group gap={6}>
-          <CloudSun size={16} aria-hidden />
+          {value?.icon ? <WeatherIcon code={value.icon} size={18} /> : <CloudSun size={16} aria-hidden />}
           <Text size="sm" fw={600}>
             Météo
           </Text>
+          {value?.icon && (
+            <Text size="xs" c="dimmed">
+              {weatherLabel(value.icon)}
+            </Text>
+          )}
           {value && (
             <Text size="xs" c="dimmed">
               {weatherSourceLabel(value)}
@@ -145,7 +153,10 @@ export function WeatherFields({
   );
 }
 
-/** Météo enregistrée (fiche). */
+/**
+ * Météo enregistrée (fiche), façon meteoblue : temps dominant, température,
+ * hygrométrie, vent et pluie, puis la frise horaire de la période.
+ */
 export function WeatherSummary({ weather }: { weather: InterventionWeather }) {
   if (weather.temperatureC === null && weather.humidityPct === null && weather.windKmh === null && weather.precipitationMm === null) {
     return (
@@ -154,30 +165,77 @@ export function WeatherSummary({ weather }: { weather: InterventionWeather }) {
       </Text>
     );
   }
+  const hours = weather.hours ?? [];
   return (
-    <Stack gap={4}>
-      <SimpleGrid cols={4} spacing="xs">
-        {[
-          ["Température", `${fmt(weather.temperatureC)} °C`],
-          ["Hygrométrie", `${fmt(weather.humidityPct, 0)} %`],
-          ["Vent", `${fmt(weather.windKmh)} km/h${weather.windMaxKmh ? ` (max ${fmt(weather.windMaxKmh)})` : ""}`],
-          ["Pluie", `${fmt(weather.precipitationMm)} mm`],
-        ].map(([label, v]) => (
-          <Stack key={label} gap={0}>
-            <Text size="xs" c="dimmed">
-              {label}
-            </Text>
-            <Text size="sm" fw={600} className="lv-num">
-              {v}
-            </Text>
-          </Stack>
-        ))}
-      </SimpleGrid>
+    <Stack gap="sm">
+      <Group gap="lg" align="center" wrap="wrap">
+        {weather.icon && (
+          <Group gap={8} wrap="nowrap">
+            <WeatherIcon code={weather.icon} size={44} />
+            <Stack gap={0}>
+              <Text size="xl" fw={700} className="lv-num">
+                {fmt(weather.temperatureC)} °C
+              </Text>
+              <Text size="xs" c="dimmed">
+                {weatherLabel(weather.icon)}
+              </Text>
+            </Stack>
+          </Group>
+        )}
+        <SimpleGrid cols={weather.icon ? 3 : 4} spacing="lg" style={{ flex: 1, minWidth: 260 }}>
+          {[
+            ...(weather.icon ? [] : [{ icon: Thermometer, label: "Température", v: `${fmt(weather.temperatureC)} °C` }]),
+            { icon: Droplets, label: "Hygrométrie", v: `${fmt(weather.humidityPct, 0)} %` },
+            { icon: Wind, label: "Vent", v: `${fmt(weather.windKmh)} km/h${weather.windMaxKmh ? ` (max ${fmt(weather.windMaxKmh)})` : ""}` },
+            { icon: CloudRain, label: "Pluie", v: `${fmt(weather.precipitationMm)} mm` },
+          ].map(({ icon: Icon, label, v }) => (
+            <Group key={label} gap={6} wrap="nowrap" align="flex-start">
+              <Icon size={16} aria-hidden style={{ marginTop: 2, flex: "none" }} color="var(--mantine-color-dimmed)" />
+              <Stack gap={0}>
+                <Text size="xs" c="dimmed">
+                  {label}
+                </Text>
+                <Text size="sm" fw={600} className="lv-num">
+                  {v}
+                </Text>
+              </Stack>
+            </Group>
+          ))}
+        </SimpleGrid>
+      </Group>
+      {hours.length > 1 && (
+        <ScrollArea type="auto">
+          <Group gap={0} wrap="nowrap" aria-label="Météo heure par heure">
+            {hours.map((h) => (
+              <Stack key={h.at} gap={2} align="center" miw={44} py={4} style={{ borderLeft: "1px solid var(--mantine-color-default-border)" }}>
+                <Text size="xs" c="dimmed" className="lv-num">
+                  {new Date(h.at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                </Text>
+                <WeatherIcon code={h.icon} size={20} />
+                <Text size="xs" fw={600} className="lv-num">
+                  {fmt(h.temperatureC, 0)}°
+                </Text>
+                <Text size="xs" c={h.precipitationMm ? "blue" : "dimmed"} className="lv-num">
+                  {h.precipitationMm ? `${fmt(h.precipitationMm)} mm` : "—"}
+                </Text>
+              </Stack>
+            ))}
+          </Group>
+        </ScrollArea>
+      )}
       <Text size="xs" c="dimmed">
         {weatherSourceLabel(weather)}
       </Text>
     </Stack>
   );
+}
+
+/** Temps dominant de quelques heures (même règle que le serveur : le plus marquant). */
+const SEVERITY = ["01", "02", "03", "04", "50", "09", "10", "13", "11"];
+function dominantIcon(icons: (string | null | undefined)[]): string | null {
+  const known = icons.filter((i): i is string => !!i && /^\d\d[dn]$/.test(i));
+  if (known.length === 0) return null;
+  return known.reduce((w, i) => (SEVERITY.indexOf(i.slice(0, 2)) > SEVERITY.indexOf(w.slice(0, 2)) ? i : w));
 }
 
 const SLOT_COLORS = { go: "lichen", caution: "paille", stop: "brique" } as const;
@@ -231,31 +289,46 @@ export function SprayingConditions({ farmId, days = 3, from }: { farmId: string;
       </Text>
       <ScrollArea type="auto">
         <Stack gap={6}>
-          {[...byDay].map(([label, slots]) => (
-            <Group key={label} gap={6} wrap="nowrap" align="center">
-              <Text size="xs" w={120} tt="capitalize">
-                {label}
-              </Text>
-              <Group gap={2} wrap="nowrap">
-                {slots.map((s) => (
-                  <Tooltip
-                    key={s.at}
-                    withArrow
-                    label={`${new Date(s.at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} — ${SLOT_LABELS[s.level]}${s.reasons.length ? ` : ${s.reasons.join(", ")}` : ""}`}
-                  >
-                    <Box
-                      role="img"
-                      aria-label={`${new Date(s.at).toLocaleString("fr-FR", { weekday: "short", hour: "2-digit", minute: "2-digit" })} ${SLOT_LABELS[s.level]}${s.reasons.length ? ` : ${s.reasons.join(", ")}` : ""}`}
-                      w={s.stepHours * 8}
-                      h={18}
-                      bg={`var(--mantine-color-${SLOT_COLORS[s.level]}-${s.level === "go" ? 5 : 4})`}
-                      style={{ borderRadius: 2 }}
-                    />
-                  </Tooltip>
-                ))}
+          {[...byDay].map(([label, slots]) => {
+            const temps = slots.map((x) => x.temperatureC).filter((t): t is number => t !== null);
+            const rain = slots.reduce((n, x) => n + (x.precipitationMm ?? 0), 0);
+            // Temps du jour : dominant des heures de jour (8 h – 20 h).
+            const icon = dominantIcon(slots.filter((x) => (x.icon ?? "").endsWith("d")).map((x) => x.icon));
+            return (
+              <Group key={label} gap={6} wrap="nowrap" align="center">
+                <Group gap={6} w={210} wrap="nowrap" style={{ flex: "none" }}>
+                  <WeatherIcon code={icon} size={22} />
+                  <Stack gap={0}>
+                    <Text size="xs" fw={600} tt="capitalize">
+                      {label}
+                    </Text>
+                    <Text size="xs" c="dimmed" className="lv-num">
+                      {temps.length ? `${Math.round(Math.min(...temps))}° / ${Math.round(Math.max(...temps))}°` : ""}
+                      {rain > 0 ? ` · ${fmt(rain)} mm` : ""}
+                    </Text>
+                  </Stack>
+                </Group>
+                <Group gap={2} wrap="nowrap">
+                  {slots.map((s) => (
+                    <Tooltip
+                      key={s.at}
+                      withArrow
+                      label={`${new Date(s.at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} — ${SLOT_LABELS[s.level]}${s.reasons.length ? ` : ${s.reasons.join(", ")}` : ""}`}
+                    >
+                      <Box
+                        role="img"
+                        aria-label={`${new Date(s.at).toLocaleString("fr-FR", { weekday: "short", hour: "2-digit", minute: "2-digit" })} ${SLOT_LABELS[s.level]}${s.reasons.length ? ` : ${s.reasons.join(", ")}` : ""}`}
+                        w={s.stepHours * 8}
+                        h={18}
+                        bg={`var(--mantine-color-${SLOT_COLORS[s.level]}-${s.level === "go" ? 5 : 4})`}
+                        style={{ borderRadius: 2 }}
+                      />
+                    </Tooltip>
+                  ))}
+                </Group>
               </Group>
-            </Group>
-          ))}
+            );
+          })}
         </Stack>
       </ScrollArea>
       <Group gap="xs" mt="xs">

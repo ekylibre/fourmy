@@ -22,6 +22,17 @@ export interface WeatherHour {
   precipitationMm: number | null;
   /** Durée du pas (h) : 1, ou 3 pour OpenWeather. */
   stepHours: number;
+  /** Code d'icône au format OpenWeather (`01d`…`50n`), quel que soit le fournisseur. */
+  icon?: string | null;
+}
+
+/** Heure résumée gardée avec la météo d'une intervention (frise horaire de la fiche). */
+export interface WeatherHourBrief {
+  at: string;
+  icon: string | null;
+  temperatureC: number | null;
+  precipitationMm: number | null;
+  windKmh: number | null;
 }
 
 export type WeatherProviderName = "open_meteo" | "openweather" | "meteoblue";
@@ -34,6 +45,10 @@ export interface WeatherSummary {
   windKmh: number | null;
   windMaxKmh: number | null;
   precipitationMm: number | null;
+  /** Temps dominant de la période (code OpenWeather). */
+  icon: string | null;
+  /** Heures de la période (frise de la fiche). */
+  hours: WeatherHourBrief[];
 }
 
 const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
@@ -57,6 +72,52 @@ async function getJson(url: string, fetchImpl: typeof fetch, label: string): Pro
   });
 }
 
+// --- Icônes ---------------------------------------------------------------------
+//
+// Référence commune : les codes d'icône d'OpenWeather
+// (https://openweathermap.org/weather-conditions#Icon-list), `d` le jour,
+// `n` la nuit. Open-Meteo (codes WMO) et meteoblue (pictocodes) y sont ramenés.
+
+/** Code WMO (Open-Meteo) → code d'icône OpenWeather. */
+export function iconFromWmo(code: number | null, isDay: boolean): string | null {
+  if (code === null) return null;
+  const s = isDay ? "d" : "n";
+  if (code === 0) return `01${s}`;
+  if (code === 1) return `02${s}`;
+  if (code === 2) return `03${s}`;
+  if (code === 3) return `04${s}`;
+  if (code === 45 || code === 48) return `50${s}`;
+  if ((code >= 51 && code <= 57) || (code >= 80 && code <= 82)) return `09${s}`;
+  if (code >= 61 && code <= 67) return `10${s}`;
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return `13${s}`;
+  if (code >= 95) return `11${s}`;
+  return null;
+}
+
+/** Pictocode horaire meteoblue (1 à 35) → code d'icône OpenWeather. */
+export function iconFromMeteoblue(code: number | null, isDay: boolean): string | null {
+  if (code === null) return null;
+  const s = isDay ? "d" : "n";
+  const base: Record<number, string> = {
+    1: "01", 2: "01", 3: "01", 4: "02", 5: "02", 6: "02", 7: "03", 8: "03", 9: "03",
+    10: "11", 11: "11", 12: "11", 13: "50", 14: "50", 15: "50", 16: "50", 17: "50", 18: "50",
+    19: "04", 20: "04", 21: "04", 22: "04", 23: "10", 24: "13", 25: "10", 26: "13", 27: "11",
+    28: "09", 29: "13", 30: "13", 31: "09", 32: "13", 33: "09", 34: "13", 35: "13",
+  };
+  return base[code] ? `${base[code]}${s}` : null;
+}
+
+/** Gravité d'un temps (le temps dominant d'une période est le plus marquant). */
+const SEVERITY = ["01", "02", "03", "04", "50", "09", "10", "13", "11"];
+
+/** Temps dominant de quelques heures : le plus marquant ; jour si une heure l'est. */
+export function dominantIcon(icons: (string | null | undefined)[]): string | null {
+  const known = icons.filter((i): i is string => !!i && /^\d\d[dn]$/.test(i));
+  if (known.length === 0) return null;
+  const worst = known.reduce((w, i) => (SEVERITY.indexOf(i.slice(0, 2)) > SEVERITY.indexOf(w.slice(0, 2)) ? i : w));
+  return `${worst.slice(0, 2)}${known.some((i) => i.endsWith("d")) ? "d" : "n"}`;
+}
+
 // --- Open-Meteo ---------------------------------------------------------------
 
 /**
@@ -69,7 +130,7 @@ export async function openMeteoHours(lat: number, lon: number, from: Date, to: D
   const params = new URLSearchParams({
     latitude: lat.toFixed(5),
     longitude: lon.toFixed(5),
-    hourly: "temperature_2m,relative_humidity_2m,wind_speed_10m,wind_gusts_10m,precipitation",
+    hourly: "temperature_2m,relative_humidity_2m,wind_speed_10m,wind_gusts_10m,precipitation,weather_code,is_day",
     start_date: day(from),
     end_date: day(to),
     timezone: "UTC",
@@ -88,6 +149,7 @@ export async function openMeteoHours(lat: number, lon: number, from: Date, to: D
     gustKmh: num(h.wind_gusts_10m?.[i]),
     precipitationMm: num(h.precipitation?.[i]),
     stepHours: 1,
+    icon: iconFromWmo(num(h.weather_code?.[i]), h.is_day?.[i] !== 0),
   }));
 }
 
@@ -104,7 +166,13 @@ export async function openWeatherTest(apiKey: string, lat: number, lon: number, 
 export async function openWeatherForecast(apiKey: string, lat: number, lon: number, fetchImpl: typeof fetch = fetch): Promise<WeatherHour[]> {
   const p = new URLSearchParams({ lat: String(lat), lon: String(lon), units: "metric", appid: apiKey });
   const body = (await getJson(`${OPENWEATHER}/forecast?${p}`, fetchImpl, "OpenWeather")) as {
-    list?: { dt: number; main?: { temp?: number; humidity?: number }; wind?: { speed?: number; gust?: number }; rain?: Record<string, number> }[];
+    list?: {
+      dt: number;
+      main?: { temp?: number; humidity?: number };
+      wind?: { speed?: number; gust?: number };
+      rain?: Record<string, number>;
+      weather?: { icon?: string }[];
+    }[];
   };
   return (body.list ?? []).map((e) => ({
     at: new Date(e.dt * 1000).toISOString(),
@@ -114,6 +182,7 @@ export async function openWeatherForecast(apiKey: string, lat: number, lon: numb
     gustKmh: num(e.wind?.gust) === null ? null : e.wind!.gust! * 3.6,
     precipitationMm: e.rain?.["3h"] ?? 0,
     stepHours: 3,
+    icon: /^\d\d[dn]$/.test(e.weather?.[0]?.icon ?? "") ? e.weather![0]!.icon! : null,
   }));
 }
 
@@ -133,6 +202,7 @@ export async function meteoblueForecast(apiKey: string, lat: number, lon: number
     gustKmh: num(d.gust?.[i]) ?? num(d.windgusts?.[i]),
     precipitationMm: num(d.precipitation?.[i]),
     stepHours: 1,
+    icon: iconFromMeteoblue(num(d.pictocode?.[i]), d.isdaylight?.[i] !== 0),
   }));
 }
 
@@ -177,6 +247,15 @@ export function summarize(
     windKmh: mean(vals("windKmh")),
     windMaxKmh: vals("windKmh").length ? Math.round(Math.max(...vals("windKmh")) * 10) / 10 : winds.length ? Math.round(Math.max(...winds) * 10) / 10 : null,
     precipitationMm: rain.length ? Math.round(rain.reduce((a, b) => a + b, 0) * 10) / 10 : null,
+    icon: dominantIcon(inside.map((h) => h.icon)),
+    // Frise : au plus 48 pas, pour garder la météo enregistrée légère.
+    hours: inside.slice(0, 48).map((h) => ({
+      at: h.at,
+      icon: h.icon ?? null,
+      temperatureC: h.temperatureC,
+      precipitationMm: h.precipitationMm,
+      windKmh: h.windKmh,
+    })),
   };
 }
 

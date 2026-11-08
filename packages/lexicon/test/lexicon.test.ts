@@ -44,6 +44,8 @@ function fakeServer(phytoVersion: string) {
         { name: "registered_phytosanitary_usages", rows: 2, files: [{ path: "data/u_0.csv.gz" }] },
         { name: "registered_phytosanitary_cropsets", rows: 1, files: [{ path: "data/c_0.csv.gz" }] },
         { name: "registered_phytosanitary_target_name_to_pfi_targets", rows: 1, files: [{ path: "data/t_0.csv.gz" }] },
+        { name: "registered_phytosanitary_risks", rows: 3, files: [{ path: "data/r_0.csv.gz" }] },
+        { name: "registered_phytosanitary_symbols", rows: 2, files: [{ path: "data/s_0.csv.gz" }] },
       ],
     }),
     [`phytosanitary/${phytoVersion}/structure.sql`]: `
@@ -57,7 +59,9 @@ function fakeServer(phytoVersion: string) {
         applications_count integer, applications_frequency interval, untreated_buffer_aquatic integer,
         untreated_buffer_arthropod integer, untreated_buffer_plants integer, usage_conditions character varying,
         decision_date date, state character varying, is_derogation boolean, derogation_started_on date, derogation_stopped_on date);
-      CREATE TABLE registered_phytosanitary_target_name_to_pfi_targets (ephy_name character varying, pfi_id integer, pfi_name character varying);`,
+      CREATE TABLE registered_phytosanitary_target_name_to_pfi_targets (ephy_name character varying, pfi_id integer, pfi_name character varying);
+      CREATE TABLE registered_phytosanitary_risks (product_id integer, risk_code character varying, risk_phrase character varying, record_checksum integer);
+      CREATE TABLE registered_phytosanitary_symbols (id character varying, symbol_name character varying);`,
     [`phytosanitary/${phytoVersion}/data/p_0.csv.gz`]: csv([
       `9999001,GLISTER TEST,"{""BARBARIAN TEST""}",{Herbicide},"{""Glyphosate 360 g/L""}",9999001,PT6H,authorized,2015-08-12,,FIRME,PPP,f`,
     ]),
@@ -67,6 +71,12 @@ function fakeServer(phytoVersion: string) {
     ]),
     [`phytosanitary/${phytoVersion}/data/c_0.csv.gz`]: csv([`ephy_wheat,"{""fra"": ""Blés""}","{triticum,triticosecale}"`]),
     [`phytosanitary/${phytoVersion}/data/t_0.csv.gz`]: csv([`Désherbage,1,Adventices`]),
+    [`phytosanitary/${phytoVersion}/data/r_0.csv.gz`]: csv([
+      `9999001,H319,Provoque une sévère irritation des yeux,1`,
+      `9999001,H410,"Très toxique pour les organismes aquatiques, entraîne des effets néfastes à long terme",2`,
+      `9999001,R50,Très toxique pour les organismes aquatiques,3`,
+    ]),
+    [`phytosanitary/${phytoVersion}/data/s_0.csv.gz`]: csv([`H319,SGH07`, `H410,SGH09`]),
     "taxonomy/t1/manifest.json": JSON.stringify({
       name: "taxonomy",
       version: "t1",
@@ -134,7 +144,7 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", () => {
         const server = fakeServer("v1");
         const first = await syncLexiconIn(tx, { base: "http://lexicon.test", fetchImpl: server.fetchImpl, force: true });
         expect(first).toEqual([
-          { name: "phytosanitary", version: "v1", status: "loaded", rows: 5 },
+          { name: "phytosanitary", version: "v1", status: "loaded", rows: 10 },
           { name: "taxonomy", version: "t1", status: "loaded", rows: 4 },
           { name: "productions", version: "pr1", status: "loaded", rows: 5 },
           { name: "agricultural_pictures", version: "pi1", status: "loaded", rows: 2 },
@@ -155,6 +165,9 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", () => {
                                        applications_frequency_days, untreated_buffer_aquatic, treatment_label, state FROM phyto_usages ORDER BY id`;
         expect(usages[0]).toEqual({ id: "u1", species: ["zea_mays"], dose: 3, pre_harvest_delay_days: 90, applications_count: 2, applications_frequency_days: 14, untreated_buffer_aquatic: 5, treatment_label: "Trt Part.Aer.", state: "authorized" });
         expect(usages[1]).toMatchObject({ id: "u2", species: ["ephy_wheat"], pre_harvest_delay_days: null, state: "withdrawn" });
+        // Mentions de danger actuelles seulement (pas les phrases R) et leur pictogramme.
+        expect(await tx`SELECT code FROM phyto_risks ORDER BY code`).toEqual([{ code: "H319" }, { code: "H410" }]);
+        expect(await tx`SELECT code, symbol FROM phyto_hazard_symbols ORDER BY code`).toEqual([{ code: "H319", symbol: "SGH07" }, { code: "H410", symbol: "SGH09" }]);
         expect(await tx`SELECT crop_names, label FROM phyto_cropsets`).toEqual([{ crop_names: ["triticum", "triticosecale"], label: "Blés" }]);
         expect(await tx`SELECT reference_name, parent, label FROM taxonomy ORDER BY 1`).toEqual([
           { reference_name: "zea", parent: "poaceae", label: "Maïs (genre)" },

@@ -146,6 +146,7 @@ export async function sprayingForecast(
         humidityPct: h.humidityPct,
         windKmh: h.windKmh,
         precipitationMm: h.precipitationMm,
+        icon: h.icon ?? null,
       };
     });
   return {
@@ -183,9 +184,12 @@ export async function fillInterventionWeather(db: Database, farmId: string, inte
     weather = null;
   }
   // Aucune donnée (pas de période, hors couverture) : marqué pour ne pas réessayer sans fin.
-  const stored = weather ?? { source: "open_meteo", kind: "observed", temperatureC: null, humidityPct: null, windKmh: null, precipitationMm: null, fetchedAt: new Date().toISOString() };
+  const stored = weather ?? { source: "open_meteo", kind: "observed", temperatureC: null, humidityPct: null, windKmh: null, precipitationMm: null, icon: null, fetchedAt: new Date().toISOString() };
+  // Sans météo, ou d'avant les icônes (jamais une saisie à la main).
   await withFarm(db, farmId, (tx) =>
-    tx.execute(sql`UPDATE interventions SET weather = ${JSON.stringify(stored)}::jsonb WHERE id = ${interventionId} AND weather IS NULL`),
+    tx.execute(sql`UPDATE interventions SET weather = ${JSON.stringify(stored)}::jsonb
+                   WHERE id = ${interventionId}
+                     AND (weather IS NULL OR (NOT (weather ? 'icon') AND weather->>'source' <> 'manual' AND weather->>'kind' <> 'manual'))`),
   );
   return weather;
 }

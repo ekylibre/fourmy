@@ -51,6 +51,21 @@ export const complianceResult = z.object({
 });
 export type ComplianceResult = z.infer<typeof complianceResult>;
 
+/** Article phyto de la ferme et son produit E-Phy (GET /phyto/articles). */
+export interface FarmPhytoArticle {
+  id: string;
+  name: string;
+  unit: string;
+  amm: string | null;
+  product: { name: string; state: string; stoppedOn: string | null } | null;
+  /** Pictogrammes de danger (SGH01…SGH09), d'après les mentions H. */
+  hazards: string[];
+  /** Mentions de danger (H…, EUH…). */
+  risks: { code: string; phrase: string }[];
+  /** Délai de ré-entrée dans la parcelle (h). */
+  reentryDelayHours: number | null;
+}
+
 /** Eau autour d'une intervention (carte de la fiche) : bande de ZNT (GeoJSON) et cours d'eau proches. */
 export interface InterventionWaterMap {
   zntM: number | null;
@@ -122,6 +137,21 @@ export const interventionWeather = z.object({
   windMaxKmh: z.number().min(0).max(300).nullable().optional(),
   precipitationMm: z.number().min(0).max(1000).nullable(),
   fetchedAt: isoDateTime.nullable().optional(),
+  /** Temps dominant (code d'icône OpenWeather `01d`…`50n`), quel que soit le fournisseur. */
+  icon: z.string().regex(/^\d\d[dn]$/).nullable().optional(),
+  /** Heures de la période (frise de la fiche), 48 au plus. */
+  hours: z
+    .array(
+      z.object({
+        at: isoDateTime,
+        icon: z.string().regex(/^\d\d[dn]$/).nullable(),
+        temperatureC: z.number().nullable(),
+        precipitationMm: z.number().nullable(),
+        windKmh: z.number().nullable(),
+      }),
+    )
+    .max(48)
+    .optional(),
 });
 export type InterventionWeather = z.infer<typeof interventionWeather>;
 
@@ -135,6 +165,7 @@ export const sprayingSlot = z.object({
   humidityPct: z.number().nullable(),
   windKmh: z.number().nullable(),
   precipitationMm: z.number().nullable(),
+  icon: z.string().nullable().optional(),
 });
 export const sprayingForecast = z.object({
   source: weatherSource,

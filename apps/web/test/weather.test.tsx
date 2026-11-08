@@ -86,12 +86,34 @@ describe("fiche et tableau de bord", () => {
   it("la fiche montre la météo enregistrée et sa source", async () => {
     server.use(
       http.get("*/interventions/:id", () =>
-        HttpResponse.json({ ...DEMO, history: [], weather: { source: "openweather", kind: "forecast", temperatureC: 18, humidityPct: 70, windKmh: 9, windMaxKmh: 14, precipitationMm: 0.6 } }),
+        HttpResponse.json({
+          ...DEMO,
+          history: [],
+          weather: {
+            source: "openweather",
+            kind: "forecast",
+            temperatureC: 18,
+            humidityPct: 70,
+            windKmh: 9,
+            windMaxKmh: 14,
+            precipitationMm: 0.6,
+            icon: "10d",
+            hours: [
+              { at: "2026-06-10T06:00:00.000Z", icon: "02d", temperatureC: 16, precipitationMm: 0, windKmh: 8 },
+              { at: "2026-06-10T07:00:00.000Z", icon: "10d", temperatureC: 18, precipitationMm: 0.6, windKmh: 10 },
+            ],
+          },
+        }),
       ),
     );
     renderApp(`/f/${FARM}/interventions/${DEMO.id}?at=2026-06-10`);
     const meteo = await screen.findByLabelText("Météo de l'intervention");
     expect(within(meteo).getByText("18 °C")).toBeInTheDocument();
+    // Temps dominant (icône au format OpenWeather) et frise horaire.
+    expect(within(meteo).getAllByRole("img", { name: "Pluie" }).length).toBeGreaterThan(0);
+    const hourly = within(meteo).getByLabelText("Météo heure par heure");
+    expect(within(hourly).getByRole("img", { name: "Peu nuageux" })).toBeInTheDocument();
+    expect(within(hourly).getByText("0,6 mm")).toBeInTheDocument();
     expect(within(meteo).getByText("9 km/h (max 14)")).toBeInTheDocument();
     expect(within(meteo).getByText("OpenWeather, prévision")).toBeInTheDocument();
   });

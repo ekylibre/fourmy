@@ -196,3 +196,18 @@ describe("contrôle d'un traitement", () => {
     expect(maize.usages.map((u) => u.id)).toEqual(["general"]);
   });
 });
+
+describe("pictogrammes de danger (CLP)", () => {
+  it("déduits des mentions H, préséances comprises", async () => {
+    const { hazardPictograms } = await import("../src/index.js");
+    // Callisto : H319, H361d, H400, H410.
+    expect(hazardPictograms(["H319", "H361d", "H400", "H410"])).toEqual(["SGH07", "SGH08", "SGH09"]);
+    // Toxicité aiguë : pas de point d'exclamation en plus.
+    expect(hazardPictograms(["H301", "H319"])).toEqual(["SGH06"]);
+    // Corrosif : l'irritation des yeux ne donne pas SGH07, une autre mention si.
+    expect(hazardPictograms(["H314", "H319"])).toEqual(["SGH05"]);
+    expect(hazardPictograms(["H314", "H302"])).toEqual(["SGH05", "SGH07"]);
+    // Sans pictogramme (H412, EUH401) ; table Lexicon en complément.
+    expect(hazardPictograms(["H412", "EUH401"], ["SGH09"])).toEqual(["SGH09"]);
+  });
+});

@@ -1,17 +1,19 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
-import { Badge, Button, Grid, Group, Paper, Stack, Table, Text, Timeline, Title } from "@mantine/core";
+import { Badge, Box, Button, Grid, Group, Paper, Stack, Table, Text, Timeline, Title } from "@mantine/core";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, CalendarClock, Pencil, Timer, User, Users } from "lucide-react";
+import { formatDuration } from "./periods";
 import type { FeatureCollection, Geometry } from "geojson";
-import type { InterventionDetail, InterventionWaterMap, Snapshot, TrackReplay } from "@fourmy/contracts";
+import type { ComplianceResult, InterventionDetail, InterventionWaterMap, Snapshot, TrackReplay } from "@fourmy/contracts";
 import { TREATMENT_PURPOSE_LABELS } from "@fourmy/contracts";
 import { displayStatus } from "@fourmy/domain";
 import { formatHa } from "@fourmy/ui-lyvre";
 import { api, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { formatDateTime, formatNumber, formatPeriod, procedureLabel, unitLabel } from "../../app/labels";
-import { useActivities, useArticles, useIntervention, useParcelNames, usePeople, useSnapshot } from "../../app/queries";
+import { useActivities, useArticles, useIntervention, useParcelNames, usePeople, usePhytoArticles, useSnapshot } from "../../app/queries";
+import { RegulatoryPictos } from "../phyto/Hazards";
 import { ActivityBadge, activityOfParcel } from "../activities/ActivityBadge";
 import { ErrorAlert, Loading } from "../../components/states";
 import { MapBoundary } from "../../components/MapBoundary";
@@ -49,6 +51,20 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
   const people = usePeople(farm.id);
   const parcelNames = useParcelNames(farm.id);
   const activities = useActivities(farm.id, Number(day.slice(0, 4)));
+  // Pictogrammes réglementaires des intrants phyto : produit (mentions H, ré-entrée) et contrôle (ZNT, DAR).
+  const phytoArticles = usePhytoArticles(farm.id);
+  const liveCompliance = useQuery({
+    queryKey: ["intervention-compliance", farm.id, i.id, i.updatedAt],
+    enabled: i.inputs.length > 0 && !i.compliance,
+    queryFn: () => api.get<ComplianceResult>(farmPath(farm.id, `/interventions/${i.id}/compliance`)),
+  });
+  const compliance = i.compliance ?? liveCompliance.data ?? null;
+  const pictosOf = (articleId: string) => {
+    const article = phytoArticles.data?.items.find((a) => a.id === articleId);
+    const check = compliance?.checks.find((c) => c.articleId === articleId);
+    const dar = /Délai avant récolte[^:]*: (\d+) j/.exec(check?.indicators.find((x) => x.code === "dar")?.message ?? "");
+    return { article, zntM: check?.zntM ?? null, harvestDays: dar ? Number(dar[1]) : null };
+  };
   const [cancelling, setCancelling] = useState(false);
   const status = displayStatus(i, new Date().toISOString());
   const list = `/f/${farm.id}/interventions${location.search}`;
@@ -59,6 +75,7 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
     article: new Map(articles.data?.items.map((a) => [a.id, { name: a.name, unit: a.unit, amm: a.amm }])),
     person: new Map(people.data?.items.map((p) => [p.id, p.name])),
   };
+  const doerNames = i.doers.map((d) => names.person.get(d.personId) ?? "?");
 
   // Surfaces à la date de l'intervention : saisie (partielle), sinon parcelle.
   const parcelAt = new Map(snap.data?.landParcels.map((p) => [p.id, p]));
@@ -156,15 +173,43 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
                 {i.status === "planned" && i.periods.length === 0 ? "Date prévue" : "Périodes de travail"}
               </Title>
               {i.periods.length ? (
-                <Stack gap={2}>
-                  {i.periods.map((p) => (
-                    <Text key={p.startedAt} className="lv-num" size="sm">
-                      {formatPeriod(p.startedAt, p.stoppedAt)}
+                <Stack gap={6}>
+                  {i.periods.map((p) => {
+                    const minutes = Math.round((new Date(p.stoppedAt).getTime() - new Date(p.startedAt).getTime()) / 60_000);
+                    return (
+                      <Group key={p.startedAt} gap="lg" wrap="wrap" aria-label="Période de travail">
+                        <Group gap={6} wrap="nowrap">
+                          <CalendarClock size={16} aria-hidden color="var(--mantine-color-dimmed)" />
+                          <Text className="lv-num" size="sm">
+                            {formatPeriod(p.startedAt, p.stoppedAt)}
+                          </Text>
+                        </Group>
+                        <Group gap={6} wrap="nowrap">
+                          <Timer size={16} aria-hidden color="var(--mantine-color-dimmed)" />
+                          <Text className="lv-num" size="sm" fw={600}>
+                            {formatDuration(minutes)}
+                          </Text>
+                        </Group>
+                        {doerNames.length > 0 && (
+                          <Group gap={6} wrap="nowrap">
+                            {doerNames.length > 1 ? <Users size={16} aria-hidden color="var(--mantine-color-dimmed)" /> : <User size={16} aria-hidden color="var(--mantine-color-dimmed)" />}
+                            <Text size="sm">{doerNames.join(", ")}</Text>
+                          </Group>
+                        )}
+                      </Group>
+                    );
+                  })}
+                  {i.periods.length > 1 && (
+                    <Text size="xs" c="dimmed" className="lv-num">
+                      Total : {formatDuration(i.periods.reduce((n, p) => n + Math.round((new Date(p.stoppedAt).getTime() - new Date(p.startedAt).getTime()) / 60_000), 0))}
                     </Text>
-                  ))}
+                  )}
                 </Stack>
               ) : (
-                <Text size="sm">{formatDateTime(i.startedAt)}</Text>
+                <Group gap={6}>
+                  <CalendarClock size={16} aria-hidden color="var(--mantine-color-dimmed)" />
+                  <Text size="sm">{formatDateTime(i.startedAt)}</Text>
+                </Group>
               )}
             </Paper>
 
@@ -217,6 +262,11 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
                             <Text span size="xs" c="dimmed">
                               {q.role}
                             </Text>
+                            {q.role === "Intrant" && (
+                              <Box mt={4}>
+                                <RegulatoryPictos {...pictosOf(q.articleId)} size={24} />
+                              </Box>
+                            )}
                           </Table.Td>
                           <Table.Td ta="right" className="lv-num" fw={q.per === "hectare" ? 600 : undefined}>
                             {perHa === null ? "—" : `${formatNumber(perHa, 3)} ${unit}/ha`}

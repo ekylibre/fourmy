@@ -19,6 +19,8 @@ const REQUIRED: Record<string, string[]> = {
   registered_phytosanitary_usages: ["id", "product_id", "ephy_usage_phrase", "crop_label_fra", "species", "target_name_label_fra", "treatment", "dose_quantity", "dose_unit", "dose_unit_name", "pre_harvest_delay", "applications_count", "applications_frequency", "untreated_buffer_aquatic", "untreated_buffer_arthropod", "untreated_buffer_plants", "usage_conditions", "decision_date", "state", "is_derogation", "derogation_started_on", "derogation_stopped_on"],
   registered_phytosanitary_cropsets: ["name", "label", "crop_names"],
   registered_phytosanitary_target_name_to_pfi_targets: ["ephy_name", "pfi_id", "pfi_name"],
+  registered_phytosanitary_risks: ["product_id", "risk_code", "risk_phrase"],
+  registered_phytosanitary_symbols: ["id", "symbol_name"],
   master_taxonomy: ["reference_name", "parent", "taxonomic_rank", "translation_id"],
   taxonomy__translations: ["id", "fra"],
   master_productions: ["reference_name", "activity_family", "specie", "usage", "life_duration", "support_unit", "color", "translation_id"],
@@ -28,7 +30,7 @@ const REQUIRED: Record<string, string[]> = {
 };
 
 const PACKAGES: { name: string; tables: string[] }[] = [
-  { name: "phytosanitary", tables: ["registered_phytosanitary_products", "registered_phytosanitary_usages", "registered_phytosanitary_cropsets", "registered_phytosanitary_target_name_to_pfi_targets"] },
+  { name: "phytosanitary", tables: ["registered_phytosanitary_products", "registered_phytosanitary_usages", "registered_phytosanitary_cropsets", "registered_phytosanitary_target_name_to_pfi_targets", "registered_phytosanitary_risks", "registered_phytosanitary_symbols"] },
   { name: "taxonomy", tables: ["master_taxonomy", "taxonomy__translations"] },
   { name: "productions", tables: ["master_productions", "productions__translations", "master_crop_production_tfi_codes"] },
   { name: "agricultural_pictures", tables: ["master_agricultural_pictures"] },
@@ -37,7 +39,7 @@ const PACKAGES: { name: string; tables: string[] }[] = [
 /** Passage des tables temporaires (texte) aux tables de Fourmy, typées. */
 const TRANSFORMS: Record<string, string[]> = {
   phytosanitary: [
-    `TRUNCATE phyto_products, phyto_usages, phyto_cropsets, phyto_target_pfi`,
+    `TRUNCATE phyto_products, phyto_usages, phyto_cropsets, phyto_target_pfi, phyto_risks, phyto_hazard_symbols`,
     `INSERT INTO phyto_products (id, amm, name, other_names, natures, active_compounds, reentry_delay_hours,
                                  state, started_on, stopped_on, firm, product_type, is_derogation)
      SELECT id::int, france_maaid, name,
@@ -63,6 +65,12 @@ const TRANSFORMS: Record<string, string[]> = {
      SELECT name, label::jsonb ->> 'fra', coalesce(crop_names::text[], '{}') FROM lx_registered_phytosanitary_cropsets`,
     `INSERT INTO phyto_target_pfi (ephy_name, pfi_id, pfi_name)
      SELECT ephy_name, pfi_id::int, pfi_name FROM lx_registered_phytosanitary_target_name_to_pfi_targets`,
+    // Mentions de danger actuelles (H, EUH) ; les anciennes phrases R ne sont pas reprises.
+    `INSERT INTO phyto_risks (product_id, code, phrase)
+     SELECT product_id::int, risk_code, risk_phrase FROM lx_registered_phytosanitary_risks
+     WHERE risk_code ~ '^(H|EUH)' ON CONFLICT DO NOTHING`,
+    `INSERT INTO phyto_hazard_symbols (code, symbol)
+     SELECT id, symbol_name FROM lx_registered_phytosanitary_symbols WHERE coalesce(symbol_name, '') <> '' ON CONFLICT DO NOTHING`,
   ],
   taxonomy: [
     `TRUNCATE taxonomy`,

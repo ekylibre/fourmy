@@ -305,6 +305,10 @@ Exigences : `claudedocs/exigences_interventions.md` (INT-UI-2, INT-UI-3).
     parcelles et zones travaillées, trace GPS des matériels pendant les
     périodes, historique (action, auteur, motif, avant → après). Une
     intervention reprise d'Ekylibre sans modification le dit.
+  - **Fiche** (lot D) : chaque période avec sa durée et ses intervenants
+    (icônes), l'activité et son image pour chaque parcelle, les
+    pictogrammes réglementaires des intrants phyto, la météo façon
+    meteoblue (temps dominant, frise horaire).
   - **Saisie en pleine page** (retours du 08/11/2026), même mise en page
     partout : **nouvelle** `…/interventions/new`, **réalisation** d'une
     planifiée `…/:id/complete`, **modification** `…/:id/edit`. À gauche le

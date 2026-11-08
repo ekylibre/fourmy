@@ -1,6 +1,7 @@
 import { useQuery, type QueryClient } from "@tanstack/react-query";
 import type {
   Activity,
+  FarmPhytoArticle,
   Article,
   ContainerContents,
   FarmMember,
@@ -136,5 +137,14 @@ export function useActivities(farmId: string, year: number) {
     queryKey: ["activities", farmId, year],
     queryFn: () => api.get<{ items: Activity[] }>(farmPath(farmId, `/activities?year=${year}`)),
     staleTime: 5 * 60_000,
+  });
+}
+
+/** Articles phyto de la ferme : produit E-Phy, pictogrammes, mentions de danger, ré-entrée. */
+export function usePhytoArticles(farmId: string) {
+  return useQuery({
+    queryKey: ["phyto-articles", farmId],
+    queryFn: () => api.get<{ items: FarmPhytoArticle[] }>(farmPath(farmId, "/phyto/articles")),
+    staleTime: 10 * 60_000,
   });
 }

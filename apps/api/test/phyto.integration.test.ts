@@ -69,6 +69,7 @@ describe.skipIf(!url)("réglementation phyto (intégration)", () => {
   afterAll(async () => {
     await teardown(sql, farmId, [userId]);
     await sql`DELETE FROM phyto_usages WHERE product_id = ${PRODUCT}`;
+    await sql`DELETE FROM phyto_risks WHERE product_id = ${PRODUCT}`;
     await sql`DELETE FROM phyto_products WHERE id = ${PRODUCT}`;
     if (insertedPackage) await sql`DELETE FROM lexicon_packages WHERE version = 'test-fourmy'`;
     await sql.end();
@@ -159,6 +160,16 @@ describe.skipIf(!url)("réglementation phyto (intégration)", () => {
     expect(status.water.items).toBe(2);
     const found = await (await app.request(`${base}/phyto/products?q=herbi%20bis`, { headers })).json();
     expect(found.items.map((p: { amm: string }) => p.amm)).toContain(AMM);
+  });
+
+  it("pictogrammes réglementaires d'un article : mentions H, pictogrammes SGH, délai de ré-entrée", async () => {
+    await sql`INSERT INTO phyto_risks (product_id, code, phrase) VALUES
+      (${PRODUCT}, 'H319', 'Provoque une sévère irritation des yeux'), (${PRODUCT}, 'H361d', 'Susceptible de nuire au foetus'),
+      (${PRODUCT}, 'EUH401', 'Respectez les instructions d''utilisation')`;
+    const list = await (await app.request(`${base}/phyto/articles`, { headers })).json();
+    const herbi = list.items.find((a: { id: string }) => a.id === herbicideId);
+    expect(herbi).toMatchObject({ hazards: ["SGH07", "SGH08"], reentryDelayHours: 6 });
+    expect(herbi.risks.map((r: { code: string }) => r.code)).toEqual(["EUH401", "H319", "H361d"]);
   });
 
   it("IFT : appel à l'API du ministère (simulée), corrigé de la part traitée ; API indisponible → en attente", async () => {

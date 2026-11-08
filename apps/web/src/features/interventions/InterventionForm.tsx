@@ -38,7 +38,8 @@ import type {
 import { formatHa } from "@fourmy/ui-lyvre";
 import { api, ApiError, farmPath } from "../../app/api";
 import { unitLabel } from "../../app/labels";
-import { invalidateAfterIntervention, useActivities } from "../../app/queries";
+import { invalidateAfterIntervention, useActivities, usePhytoArticles } from "../../app/queries";
+import { RegulatoryPictos } from "../phyto/Hazards";
 import { ActivityBadge, activityOfParcel } from "../activities/ActivityBadge";
 import { MapBoundary } from "../../components/MapBoundary";
 import { ProcedureIcon } from "../../components/ProcedureIcon";
@@ -163,6 +164,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   const treatedM2 = treatedAreaM2(parcels, parcelShapes, targetExtras);
   // Activité des parcelles choisies (production de la campagne) : désigne la culture contrôlée.
   const activities = useActivities(farmId, Number(snapshot.at.slice(0, 4)));
+  const phytoArticles = usePhytoArticles(farmId);
   const parcelActivities = [
     ...parcels
       .map((id) => activityOfParcel(id, snapshot.productions, activities.data?.items))
@@ -408,6 +410,13 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               ≈ {(Number(row.quantity) * (treatedM2 / 10_000)).toLocaleString("fr-FR", { maximumFractionDigits: 3 })} {unitLabel(a.unit)} au total sur{" "}
               {formatHa(treatedM2)}
             </Text>
+          )}
+          {kind === "input" && row.articleId && a?.kind === "phyto" && (
+            <RegulatoryPictos
+              article={phytoArticles.data?.items.find((x) => x.id === row.articleId)}
+              zntM={compliance?.checks.find((c) => c.articleId === row.articleId)?.zntM ?? null}
+              size={22}
+            />
           )}
           {kind === "input" && row.articleId && compliance?.checks.find((c) => c.articleId === row.articleId) && (
             <Paper withBorder p="xs" bg="var(--mantine-color-body)">
