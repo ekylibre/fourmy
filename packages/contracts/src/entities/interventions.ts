@@ -12,6 +12,13 @@ import { treatmentPurpose } from "../procedures.js";
 export const interventionStatus = z.enum(["planned", "done", "cancelled"]);
 export type InterventionStatus = z.infer<typeof interventionStatus>;
 
+/**
+ * Statut affiché (kanban) : « en cours » n'est pas stocké, il est calculé —
+ * intervention planifiée dont la première période a commencé.
+ */
+export const interventionDisplayStatus = z.enum(["planned", "in_progress", "done", "cancelled"]);
+export type InterventionDisplayStatus = z.infer<typeof interventionDisplayStatus>;
+
 export const interventionOrigin = z.enum(["web", "mobile", "migration", "plugin"]);
 
 /** Rôle d'une ligne de paramètre en base (stockage) ; l'API expose la forme structurée. */
@@ -93,6 +100,20 @@ export const interventionCompleteWrite = interventionBody.omit({ procedure: true
 });
 export type InterventionCompleteWrite = z.infer<typeof interventionCompleteWrite>;
 
+/**
+ * Modification (PUT /interventions/:id). Planifiée : mise à jour directe.
+ * Réalisée : correction tracée — mouvements contre-passés puis repassés,
+ * historique conservé. Annulée : refusée. `correctionId` (UUID client) rend
+ * la modification idempotente ; le motif est facultatif.
+ */
+export const interventionUpdateWrite = interventionBody.extend({
+  correctionId: uuid.optional(),
+  reason: z.string().trim().max(500).optional(),
+  /** Date prévue (planifiée sans période). */
+  plannedAt: isoDateTime.optional(),
+});
+export type InterventionUpdateWrite = z.infer<typeof interventionUpdateWrite>;
+
 /** Intervention telle que lue (quantités accompagnées de l'unité de l'article). */
 export const intervention = z
   .object({
@@ -115,6 +136,31 @@ export const intervention = z
   })
   .merge(auditFields);
 export type Intervention = z.infer<typeof intervention>;
+
+/** Entrée de l'historique d'une intervention (journal d'audit). */
+export const interventionHistoryEntry = z.object({
+  id: uuid,
+  at: isoDateTime,
+  action: z.string(), // planned | completed | updated | corrected | cancelled
+  actor: z.string(),
+  actorName: z.string().nullable(),
+  origin: z.string(),
+  reason: z.string().nullable(),
+  /** Champ modifié → valeur avant / après (modifications et corrections). */
+  changes: z.record(z.object({ before: z.unknown(), after: z.unknown() })).nullable(),
+});
+export type InterventionHistoryEntry = z.infer<typeof interventionHistoryEntry>;
+
+/** Fiche (GET /interventions/:id) : l'intervention et son historique. */
+export const interventionDetail = intervention.extend({ history: z.array(interventionHistoryEntry) });
+export type InterventionDetail = z.infer<typeof interventionDetail>;
+
+/** Résultat d'une modification : alertes non bloquantes (campagne close, stock négatif…). */
+export const interventionUpdateResult = z.object({
+  intervention,
+  warnings: z.array(z.string()),
+});
+export type InterventionUpdateResult = z.infer<typeof interventionUpdateResult>;
 
 /** Ligne du registre phytosanitaire — calculée, jamais saisie (§4.4). */
 export const phytoRegisterEntry = z.object({

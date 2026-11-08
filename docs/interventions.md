@@ -168,6 +168,9 @@ fin de la dernière.
 - Les périodes sont ordonnées et ne se chevauchent pas.
 - **Annuler** une intervention réalisée = contre-passer ses mouvements
   (`cancelled`) ; une intervention planifiée peut être supprimée.
+- **Modifier** une intervention planifiée = mise à jour directe ; une
+  intervention réalisée = **correction tracée** (§10) ; une annulée ne se
+  modifie plus.
 
 Ces règles sont **les mêmes** sur le serveur, le web et le mobile : le
 mobile valide hors ligne exactement ce que le serveur acceptera.
@@ -267,3 +270,31 @@ quand seule une partie de la parcelle est traitée.
 - **Web** : formulaire unique piloté par la forme (périodes multiples,
   quantités par hectare ou totales, sortie + destination, motifs, notes,
   habitudes en premier), annulation avec motif, annulées masquables.
+
+## 10. Fiche et correction tracée (2026-11-08)
+
+Exigences : `claudedocs/exigences_interventions.md` (INT-UI-2, INT-UI-3).
+
+- **API** : `GET /interventions/:id` (intervention + historique tiré du
+  journal d'audit : action, auteur, motif, champs modifiés avant/après) ;
+  `PUT /interventions/:id` (corps de saisie complet, `reason` et
+  `correctionId` facultatifs ; réponse `{ intervention, warnings }`) ;
+  `GET /interventions?campaign=2026` (toute la campagne, bornes de la table
+  `campaigns`, sinon l'année civile).
+- **Planifiée** : mise à jour directe, audit `updated`, événement
+  `intervention.updated`.
+- **Réalisée** : le **solde net** des mouvements de l'intervention est
+  contre-passé (`effectiveMovements` : une intervention déjà corrigée n'est
+  jamais contre-passée deux fois, annulation comprise), puis la nouvelle
+  version est réalisée comme à la première fois (lots, lieux, alertes de
+  stock négatif). Audit `corrected` avec l'avant et l'après ; événements
+  `intervention.corrected` et `stock.moved`. Le registre phyto suit (vue sur
+  les paramètres).
+- **Idempotence** : `correctionId` devient l'identifiant de l'entrée d'audit ;
+  rejouée, la correction n'est pas réappliquée.
+- **Campagne close** (`stops_on` dépassée) : correction possible, avec une
+  alerte dans `warnings`. Motif facultatif.
+- **Rôles** : owner et worker, comme la réalisation et l'annulation.
+- **Statut affiché** : `displayStatus` (domaine) calcule « en cours »
+  (planifiée dont le début est passé) ; rien n'est stocké.
+

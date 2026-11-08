@@ -10,6 +10,7 @@ export const eventType = z.enum([
   "land_parcel.versioned",
   "intervention.planned",
   "intervention.completed",
+  "intervention.updated",
   "intervention.corrected",
   "stock.moved",
   "container.placed",

@@ -11,6 +11,9 @@ import {
   storedUnit,
   splitUnit,
   DomainError,
+  diffIntervention,
+  effectiveMovements,
+  assertEditable,
   type DomainCtx,
   type ResolvedStockLine,
 } from "@fourmy/domain";
@@ -19,6 +22,9 @@ import {
   type ArticleKind,
   type Intervention,
   type InterventionCompleteWrite,
+  type InterventionDetail,
+  type InterventionHistoryEntry,
+  type InterventionUpdateWrite,
   type InterventionPlanWrite,
   type StockMovement,
   type TargetKind,
@@ -155,6 +161,22 @@ export async function listInterventions(
   );
 }
 
+/**
+ * Bornes d'une campagne de la ferme (année) : celles de la table `campaigns`,
+ * sinon l'année civile.
+ */
+export async function campaignWindow(db: Database, farmId: string, year: number): Promise<{ from: string; to: string }> {
+  return withFarm(db, farmId, async (tx) => {
+    const [c] = await rows<{ from: string; to: string }>(
+      tx,
+      sql`SELECT starts_on::text AS from, (stops_on + 1)::text AS to FROM campaigns WHERE year = ${year} ORDER BY starts_on LIMIT 1`,
+    );
+    const from = c?.from ?? `${year}-01-01`;
+    const to = c?.to ?? `${year + 1}-01-01`;
+    return { from: new Date(`${from}T00:00:00Z`).toISOString(), to: new Date(`${to}T00:00:00Z`).toISOString() };
+  });
+}
+
 export async function readIntervention(tx: Tx, id: string): Promise<Intervention> {
   const [one] = await readInterventions(tx, sql`i.id = ${id}`, 1);
   if (!one) throw new NotFound(`Intervention ${id} introuvable.`);
@@ -248,10 +270,7 @@ async function outbox(tx: Tx, farmId: string, event: ReturnType<typeof buildEven
 }
 
 async function audit(tx: Tx, farmId: string, ctx: DomainCtx, entityId: string, action: string, diff: object) {
-  await tx.execute(sql`
-    INSERT INTO audit_log (id, farm_id, actor, origin, entity, entity_id, action, diff, at)
-    VALUES (${ctx.newId()}, ${farmId}, ${ctx.actor}, ${ctx.origin}, 'intervention', ${entityId}, ${action},
-            ${JSON.stringify(diff)}::jsonb, ${ctx.now}::timestamptz)`);
+  await auditAs(tx, farmId, ctx, ctx.newId(), entityId, action, diff);
 }
 
 // ---------------------------------------------------------------------------
@@ -386,10 +405,34 @@ export async function completeInTx(
     sql`SELECT status, procedure FROM interventions WHERE id = ${interventionId} FOR UPDATE`,
   );
   if (!current) throw new NotFound(`Intervention ${interventionId} introuvable.`);
-  if (current.status === "done") throw new Conflict("Intervention déjà réalisée : l'annuler puis la ressaisir, plutôt que la réaliser à nouveau.");
+  if (current.status === "done") throw new Conflict("Intervention déjà réalisée : la modifier (correction tracée) plutôt que la réaliser à nouveau.");
   if (current.status === "cancelled") throw new Conflict("Intervention annulée.");
 
-  const articles = await validate(tx, current.procedure, input, "complete");
+  const { plan, areaHa, warnings } = await applyCompletion(tx, farmId, ctx, interventionId, current.procedure, input);
+  await tx.execute(sql`
+    INSERT INTO audit_log (id, farm_id, actor, origin, entity, entity_id, action, diff, at)
+    VALUES (${plan.audit.id}, ${farmId}, ${plan.audit.actor}, ${plan.audit.origin}, ${plan.audit.entity},
+            ${plan.audit.entityId}, ${plan.audit.action},
+            ${JSON.stringify({ ...plan.audit.diff, areaHa, warnings })}::jsonb, ${plan.audit.at}::timestamptz)`);
+  await outbox(tx, farmId, plan.event);
+  await stockEvents(tx, farmId, ctx, plan.movements);
+  return { intervention: await readIntervention(tx, interventionId), movements: plan.movements, warnings };
+}
+
+/**
+ * Écrit le corps d'une intervention réalisée et passe ses mouvements de stock
+ * (réalisation, ou nouvelle version d'une correction). L'appelant écrit
+ * l'audit et l'événement propres à son action.
+ */
+async function applyCompletion(
+  tx: Tx,
+  farmId: string,
+  ctx: DomainCtx,
+  interventionId: string,
+  procedure: string,
+  input: InterventionCompleteWrite,
+) {
+  const articles = await validate(tx, procedure, input, "complete");
   const { startedAt, stoppedAt } = periodBounds(input.periods);
   await writeBody(tx, interventionId, input, articles);
   const areaHa = await treatedAreaHa(tx, input, stoppedAt!);
@@ -428,27 +471,167 @@ export async function completeInTx(
   }
 
   const plan = planInterventionCompletion(ctx, { farmId, interventionId, startedAt: startedAt!, stoppedAt: stoppedAt!, lines });
-  for (const m of plan.movements) {
+  await insertMovements(tx, farmId, interventionId, plan.movements);
+  await tx.execute(sql`
+    UPDATE interventions SET status = 'done', procedure = ${procedure},
+      started_at = ${startedAt}::timestamptz, stopped_at = ${stoppedAt}::timestamptz,
+      purposes = ${sql`ARRAY[${sql.join(input.purposes.map((p) => sql`${p}`), sql`, `)}]::text[]`},
+      notes = ${input.notes ?? null}, updated_at = now()
+    WHERE id = ${interventionId}`);
+  return { plan, areaHa, warnings };
+}
+
+async function insertMovements(tx: Tx, farmId: string, interventionId: string, movements: StockMovement[]) {
+  for (const m of movements) {
     await tx.execute(sql`
       INSERT INTO stock_movements (id, farm_id, lot_id, place_id, container_id, quantity, unit, occurred_at, cause, intervention_id)
       VALUES (${m.id}, ${farmId}, ${m.lotId}, ${m.placeId}, ${m.containerId}, ${m.quantity}, ${m.unit},
               ${m.occurredAt}::timestamptz, ${m.cause}, ${interventionId})`);
   }
-  await tx.execute(sql`
-    UPDATE interventions SET status = 'done', started_at = ${startedAt}::timestamptz, stopped_at = ${stoppedAt}::timestamptz,
-      purposes = ${sql`ARRAY[${sql.join(input.purposes.map((p) => sql`${p}`), sql`, `)}]::text[]`},
-      notes = ${input.notes ?? null}, updated_at = now()
-    WHERE id = ${interventionId}`);
-  await tx.execute(sql`
-    INSERT INTO audit_log (id, farm_id, actor, origin, entity, entity_id, action, diff, at)
-    VALUES (${plan.audit.id}, ${farmId}, ${plan.audit.actor}, ${plan.audit.origin}, ${plan.audit.entity},
-            ${plan.audit.entityId}, ${plan.audit.action},
-            ${JSON.stringify({ ...plan.audit.diff, areaHa, warnings })}::jsonb, ${plan.audit.at}::timestamptz)`);
-  await outbox(tx, farmId, plan.event);
-  for (const m of plan.movements) {
+}
+
+async function stockEvents(tx: Tx, farmId: string, ctx: DomainCtx, movements: StockMovement[]) {
+  for (const m of movements) {
     await outbox(tx, farmId, buildEvent(ctx, farmId, "stock.moved", { movementId: m.id, lotId: m.lotId, quantity: m.quantity, unit: m.unit }));
   }
-  return { intervention: await readIntervention(tx, interventionId), movements: plan.movements, warnings };
+}
+
+/**
+ * Contre-passe les mouvements encore en vigueur d'une intervention (solde net :
+ * une intervention déjà corrigée n'est pas contre-passée deux fois).
+ */
+async function reverseMovements(tx: Tx, farmId: string, ctx: DomainCtx, interventionId: string) {
+  const all = (
+    await rows<StockMovement & { occurredAt: string; createdAt: string }>(
+      tx,
+      sql`SELECT id, farm_id AS "farmId", lot_id AS "lotId", place_id AS "placeId", container_id AS "containerId",
+                 quantity::float8 AS quantity, unit, occurred_at AS "occurredAt", cause,
+                 intervention_id AS "interventionId", created_at AS "createdAt"
+          FROM stock_movements WHERE intervention_id = ${interventionId}`,
+    )
+  ).map((m) => ({ ...m, occurredAt: iso(m.occurredAt)!, createdAt: iso(m.createdAt)! }));
+  const plan = planCorrection(ctx, farmId, interventionId, effectiveMovements(all));
+  await insertMovements(tx, farmId, interventionId, plan.movements);
+  return plan;
+}
+
+// ---------------------------------------------------------------------------
+// Modification et correction tracée
+// ---------------------------------------------------------------------------
+
+/** Alerte si l'intervention tombe dans une campagne close (non bloquant). */
+async function closedCampaignWarning(tx: Tx, ctx: DomainCtx, dates: (string | null)[]): Promise<string[]> {
+  const days = [...new Set(dates.filter((d): d is string => !!d).map((d) => d.slice(0, 10)))];
+  if (days.length === 0) return [];
+  const closed = await rows<{ year: number }>(
+    tx,
+    sql`SELECT DISTINCT year FROM campaigns
+        WHERE stops_on < ${ctx.now.slice(0, 10)}::date
+          AND (${sql.join(days.map((d) => sql`${d}::date BETWEEN starts_on AND stops_on`), sql` OR `)})
+        ORDER BY year`,
+  );
+  return closed.map((c) => `Campagne ${c.year} close : la modification change un historique déjà clos.`);
+}
+
+/**
+ * Modifie une intervention. Planifiée : mise à jour directe. Réalisée :
+ * correction tracée — le solde de ses mouvements est contre-passé, la
+ * nouvelle version est passée, l'historique garde l'avant et l'après.
+ * Annulée : refusée. Idempotent sur `correctionId`.
+ */
+export async function updateIntervention(
+  db: Database,
+  farmId: string,
+  ctx: DomainCtx,
+  interventionId: string,
+  input: InterventionUpdateWrite,
+): Promise<{ intervention: Intervention; warnings: string[] }> {
+  return withFarm(db, farmId, async (tx) => {
+    const [current] = await rows<{ status: Intervention["status"] }>(
+      tx,
+      sql`SELECT status FROM interventions WHERE id = ${interventionId} FOR UPDATE`,
+    );
+    if (!current) throw new NotFound(`Intervention ${interventionId} introuvable.`);
+    if (input.correctionId) {
+      const replay = await rows(tx, sql`SELECT 1 FROM audit_log WHERE id = ${input.correctionId} AND entity_id = ${interventionId}`);
+      if (replay.length) return { intervention: await readIntervention(tx, interventionId), warnings: [] };
+    }
+    if (current.status === "cancelled") throw new Conflict("Intervention annulée : elle ne se modifie plus.");
+    assertEditable(current.status);
+
+    const before = await readIntervention(tx, interventionId);
+    const changes = diffIntervention(before, { ...input, notes: input.notes ?? null });
+    const warnings = await closedCampaignWarning(tx, ctx, [before.startedAt, before.stoppedAt, ...input.periods.map((p) => p.stoppedAt)]);
+    const auditId = input.correctionId ?? ctx.newId();
+    const reason = input.reason || null;
+
+    if (current.status === "planned") {
+      const articles = await validate(tx, input.procedure, input, "plan");
+      const bounds = periodBounds(input.periods);
+      await writeBody(tx, interventionId, input, articles);
+      await tx.execute(sql`
+        UPDATE interventions SET procedure = ${input.procedure},
+          started_at = ${bounds.startedAt ?? input.plannedAt ?? before.startedAt}, stopped_at = ${bounds.stoppedAt},
+          purposes = ${sql`ARRAY[${sql.join(input.purposes.map((p) => sql`${p}`), sql`, `)}]::text[]`},
+          notes = ${input.notes ?? null}, updated_at = now()
+        WHERE id = ${interventionId}`);
+      await auditAs(tx, farmId, ctx, auditId, interventionId, "updated", { changes, reason, warnings });
+      await outbox(tx, farmId, buildEvent(ctx, farmId, "intervention.updated", { interventionId }));
+      return { intervention: await readIntervention(tx, interventionId), warnings };
+    }
+
+    // Réalisée : correction tracée.
+    if (input.periods.length === 0) throw new DomainError("Au moins une période de travail.");
+    const reversal = await reverseMovements(tx, farmId, ctx, interventionId);
+    const { plan, areaHa, warnings: stockWarnings } = await applyCompletion(tx, farmId, ctx, interventionId, input.procedure, input);
+    warnings.push(...stockWarnings);
+    await auditAs(tx, farmId, ctx, auditId, interventionId, "corrected", {
+      changes,
+      reason,
+      warnings,
+      areaHa,
+      reversed: reversal.movements.length,
+      movements: plan.movements.length,
+    });
+    await outbox(tx, farmId, reversal.event);
+    await stockEvents(tx, farmId, ctx, [...reversal.movements, ...plan.movements]);
+    return { intervention: await readIntervention(tx, interventionId), warnings };
+  });
+}
+
+async function auditAs(tx: Tx, farmId: string, ctx: DomainCtx, id: string, entityId: string, action: string, diff: object) {
+  await tx.execute(sql`
+    INSERT INTO audit_log (id, farm_id, actor, origin, entity, entity_id, action, diff, at)
+    VALUES (${id}, ${farmId}, ${ctx.actor}, ${ctx.origin}, 'intervention', ${entityId}, ${action},
+            ${JSON.stringify(diff)}::jsonb, ${ctx.now}::timestamptz)`);
+}
+
+// ---------------------------------------------------------------------------
+// Fiche : intervention + historique
+// ---------------------------------------------------------------------------
+
+export async function readInterventionDetail(db: Database, farmId: string, id: string): Promise<InterventionDetail> {
+  return withFarm(db, farmId, async (tx) => {
+    const intervention = await readIntervention(tx, id);
+    const log = await rows<{ id: string; at: string; action: string; actor: string; actor_name: string | null; origin: string; diff: Record<string, unknown> }>(
+      tx,
+      sql`SELECT a.id, a.at, a.action, a.actor, u.name AS actor_name, a.origin, a.diff
+          FROM audit_log a LEFT JOIN users u ON u.id::text = a.actor
+          WHERE a.entity = 'intervention' AND a.entity_id = ${id}
+          ORDER BY a.at, a.id`,
+    );
+    const history: InterventionHistoryEntry[] = log.map((r) => ({
+      id: r.id,
+      at: iso(r.at)!,
+      action: r.action,
+      actor: r.actor,
+      actorName: r.actor_name,
+      origin: r.origin,
+      reason: typeof r.diff?.reason === "string" ? r.diff.reason : null,
+      changes: (r.diff?.changes as InterventionHistoryEntry["changes"]) ?? null,
+    }));
+    return { ...intervention, history };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -471,23 +654,9 @@ export async function cancelIntervention(
     if (!current) throw new NotFound(`Intervention ${interventionId} introuvable.`);
     if (current.status === "cancelled") throw new Conflict("Intervention déjà annulée.");
     if (current.status === "done") {
-      const original = (
-        await rows<StockMovement & { occurredAt: string; createdAt: string }>(
-          tx,
-          sql`SELECT id, farm_id AS "farmId", lot_id AS "lotId", place_id AS "placeId", container_id AS "containerId",
-                     quantity::float8 AS quantity, unit, occurred_at AS "occurredAt", cause,
-                     intervention_id AS "interventionId", created_at AS "createdAt"
-              FROM stock_movements WHERE intervention_id = ${interventionId} AND cause = 'intervention'`,
-        )
-      ).map((m) => ({ ...m, occurredAt: iso(m.occurredAt)!, createdAt: iso(m.createdAt)! }));
-      const plan = planCorrection(ctx, farmId, interventionId, original);
-      for (const m of plan.movements) {
-        await tx.execute(sql`
-          INSERT INTO stock_movements (id, farm_id, lot_id, place_id, container_id, quantity, unit, occurred_at, cause, intervention_id)
-          VALUES (${m.id}, ${farmId}, ${m.lotId}, ${m.placeId}, ${m.containerId}, ${m.quantity}, ${m.unit},
-                  ${m.occurredAt}::timestamptz, ${m.cause}, ${interventionId})`);
-      }
+      const plan = await reverseMovements(tx, farmId, ctx, interventionId);
       await outbox(tx, farmId, plan.event);
+      await stockEvents(tx, farmId, ctx, plan.movements);
     }
     await tx.execute(sql`UPDATE interventions SET status = 'cancelled', updated_at = now() WHERE id = ${interventionId}`);
     await audit(tx, farmId, ctx, interventionId, "cancelled", { reason, previousStatus: current.status });

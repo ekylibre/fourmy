@@ -1,23 +1,41 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { interventionPlanWrite, interventionCompleteWrite } from "@fourmy/contracts";
+import { interventionPlanWrite, interventionCompleteWrite, interventionUpdateWrite } from "@fourmy/contracts";
 import type { Env } from "../context.js";
 import { db } from "../db.js";
-import { listInterventions, planIntervention, completeIntervention, cancelIntervention } from "../repos/interventions.js";
+import {
+  listInterventions,
+  planIntervention,
+  completeIntervention,
+  cancelIntervention,
+  updateIntervention,
+  readInterventionDetail,
+  campaignWindow,
+} from "../repos/interventions.js";
 import { BadRequest, domainCtx, problem, uuidParam, window } from "./helpers.js";
 
 const cancelWrite = z.object({ reason: z.string().trim().min(3, "Motif d'annulation requis.") });
 
 /**
  * Interventions (docs/interventions.md). Ouvertes aux rôles owner et worker :
- * le salarié de terrain planifie, réalise et annule ses saisies.
+ * le salarié de terrain planifie, réalise, corrige et annule ses saisies.
  */
 export const interventionRoutes = new Hono<Env>()
   .get("/interventions", async (c) => {
     const status = c.req.query("status");
     if (status && !["planned", "done", "cancelled"].includes(status)) throw new BadRequest("status : planned, done ou cancelled");
+    // ?campaign=2026 : toute la campagne (vues de la semaine, kanban, recherche) ; sinon ?from&to.
+    const campaign = c.req.query("campaign");
+    let range: { from: string; to: string };
+    if (campaign !== undefined) {
+      const year = Number(campaign);
+      if (!Number.isInteger(year) || year < 1900 || year > 2200) throw new BadRequest("campaign : année de campagne attendue (ex. 2026)");
+      range = await campaignWindow(db(), c.get("farmId"), year);
+    } else {
+      range = window(c, 366);
+    }
     const items = await listInterventions(db(), c.get("farmId"), {
-      ...window(c, 366),
+      ...range,
       status: status as "planned" | "done" | "cancelled" | undefined,
     });
     return c.json({ items, nextCursor: null });
@@ -27,6 +45,12 @@ export const interventionRoutes = new Hono<Env>()
     if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.message);
     const { intervention, created } = await planIntervention(db(), c.get("farmId"), domainCtx(c), parsed.data);
     return c.json(intervention, created ? 201 : 200);
+  })
+  .get("/interventions/:id", async (c) => c.json(await readInterventionDetail(db(), c.get("farmId"), uuidParam(c, "id"))))
+  .put("/interventions/:id", async (c) => {
+    const parsed = interventionUpdateWrite.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.message);
+    return c.json(await updateIntervention(db(), c.get("farmId"), domainCtx(c), uuidParam(c, "id"), parsed.data));
   })
   .post("/interventions/:id/complete", async (c) => {
     const parsed = interventionCompleteWrite.safeParse(await c.req.json().catch(() => null));
