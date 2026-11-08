@@ -88,6 +88,23 @@ describe("contrôle réglementaire dans le formulaire", () => {
     expect(within(form).queryByRole("combobox", { name: "Cible de Fongicide X" })).not.toBeInTheDocument();
   });
 
+  it("précautions d'emploi à droite ; un mélange interdit est un feu rouge à motif", async () => {
+    const user = userEvent.setup();
+    const r = result("ok", [{ code: "authorization", level: "ok", message: "GUILD autorisé sur Vigne." }]);
+    r.level = "danger";
+    r.mixture = { level: "danger", issues: [{ articleIds: [FONGICIDE], message: "Mélange interdit : GUILD et AUTRE sont tous de catégorie 3." }] };
+    server.use(http.post("*/phyto/check", () => HttpResponse.json(r)));
+    const form = await treatmentForm(user);
+    const precautions = await within(form).findByLabelText("Précautions : Fongicide X", {}, { timeout: 3000 });
+    expect(within(precautions).getByText("Protection de l'opérateur (EPI)")).toBeInTheDocument();
+    expect(within(precautions).getByText(/gants en nitrile/)).toBeInTheDocument();
+    const summary = within(form).getByLabelText("Contrôle réglementaire");
+    await vi.waitFor(() => expect(within(summary).getByText(/1 point\(s\) non conforme\(s\)/)).toBeInTheDocument());
+    await user.click(within(form).getByRole("button", { name: "Enregistrer" }));
+    const modal = await screen.findByRole("dialog", { name: "Feu rouge réglementaire" });
+    expect(within(modal).getByText(/Mélange interdit/)).toBeInTheDocument();
+  });
+
   it("un feu rouge demande un motif ; le motif part avec l'intervention", async () => {
     const user = userEvent.setup();
     server.use(

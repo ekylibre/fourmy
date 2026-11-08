@@ -135,7 +135,7 @@ export function useComplianceCheck(farmId: string, draft: ComplianceDraft | null
 export function ComplianceSummary({ check }: { check: ReturnType<typeof useComplianceCheck> }) {
   const { query, result, hasInputs } = check;
   if (!hasInputs) return null;
-  const dangers = (result?.checks ?? []).reduce((n, c) => n + c.indicators.filter((i) => i.level === "danger").length, 0);
+  const dangers = (result?.checks ?? []).reduce((n, c) => n + c.indicators.filter((i) => i.level === "danger").length, 0) + (result?.mixture?.issues.length ?? 0);
   const warnings = (result?.checks ?? []).reduce((n, c) => n + c.indicators.filter((i) => i.level === "warning").length, 0);
   return (
     <Paper withBorder p="sm" aria-label="Contrôle réglementaire">

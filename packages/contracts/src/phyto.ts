@@ -36,6 +36,8 @@ export const treatmentCheck = z.object({
   reentryAllowedFrom: isoDateTime.nullable(),
   /** Largeur de ZNT eau retenue (m) ; absente des contrôles enregistrés avant le 08/11/2026. */
   zntM: z.number().nullable().optional(),
+  /** Conditions d'emploi de l'usage retenu (E-Phy). */
+  usageConditions: z.string().nullable().optional(),
 });
 export type TreatmentCheckDto = z.infer<typeof treatmentCheck>;
 
@@ -46,6 +48,11 @@ export const complianceResult = z.object({
   /** Version du référentiel Lexicon utilisée ; null s'il n'est pas chargé. */
   referential: z.string().nullable(),
   checks: z.array(treatmentCheck),
+  /** Mélange des produits (arrêté du 7 avril 2010 modifié) ; absent avant le 08/11/2026. */
+  mixture: z
+    .object({ level: z.enum(["ok", "danger"]), issues: z.array(z.object({ articleIds: z.array(uuid), message: z.string() })) })
+    .nullable()
+    .optional(),
   /** Motif saisi pour passer outre un feu rouge. */
   reason: z.string().nullable(),
 });
@@ -64,6 +71,13 @@ export interface FarmPhytoArticle {
   risks: { code: string; phrase: string }[];
   /** Délai de ré-entrée dans la parcelle (h). */
   reentryDelayHours: number | null;
+  /** Précautions d'emploi (E-Phy) : protection de l'opérateur, mentions restrictives. */
+  operatorProtection: string | null;
+  restrictedMentions: string | null;
+  /** Catégories de mélange (arrêté de 2015) ; utilisable en agriculture biologique ; biocontrôle. */
+  mixCodes: number[];
+  organic: boolean;
+  biocontrol: boolean;
 }
 
 /** Eau autour d'une intervention (carte de la fiche) : bande de ZNT (GeoJSON) et cours d'eau proches. */

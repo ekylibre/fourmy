@@ -40,6 +40,8 @@ import { api, ApiError, farmPath } from "../../app/api";
 import { unitLabel } from "../../app/labels";
 import { invalidateAfterIntervention, useActivities, usePhytoArticles } from "../../app/queries";
 import { RegulatoryPictos } from "../phyto/Hazards";
+import { PrecautionsPanel } from "../phyto/Precautions";
+import { dangerMessages } from "@fourmy/domain";
 import { ActivityBadge, activityOfParcel } from "../activities/ActivityBadge";
 import { MapBoundary } from "../../components/MapBoundary";
 import { ProcedureIcon } from "../../components/ProcedureIcon";
@@ -312,7 +314,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       else delete next[articleId];
       return next;
     });
-  const dangers = (compliance?.checks ?? []).flatMap((c) => c.indicators.filter((i) => i.level === "danger").map((i) => i.message));
+  const dangers = compliance ? dangerMessages(compliance) : [];
 
   const submit = useMutation({
     mutationFn: async () => {
@@ -504,6 +506,12 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
           </MapBoundary>
         </Paper>
       )}
+      <PrecautionsPanel
+        articles={[...new Set(inputs.map((r) => r.articleId))]
+          .map((id) => phytoArticles.data?.items.find((a) => a.id === id))
+          .filter((a): a is NonNullable<typeof a> => !!a)}
+        compliance={compliance}
+      />
       <ComplianceSummary check={complianceCheck} />
     </Stack>
   );

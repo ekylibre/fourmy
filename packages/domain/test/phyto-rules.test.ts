@@ -211,3 +211,18 @@ describe("pictogrammes de danger (CLP)", () => {
     expect(hazardPictograms(["H412", "EUH401"], ["SGH09"])).toEqual(["SGH09"]);
   });
 });
+
+describe("mélanges (arrêté de 2015, règle d'Ekylibre)", () => {
+  it("catégorie 5 seule ; deux produits d'une même catégorie 2, 3 ou 4 interdits", async () => {
+    const { checkMixture, dangerMessages } = await import("../src/index.js");
+    const a = { articleId: "a", name: "Callisto", mixCodes: [1, 3] };
+    const b = { articleId: "b", name: "Dimba", mixCodes: [1] };
+    const c = { articleId: "c", name: "Lotryne", mixCodes: [1, 3] };
+    const d = { articleId: "d", name: "Seul", mixCodes: [5] };
+    expect(checkMixture([a, b])).toEqual({ level: "ok", issues: [] });
+    expect(checkMixture([a, c]).issues.map((i) => i.message)).toEqual(["Mélange interdit : Callisto et Lotryne sont tous de catégorie 3."]);
+    expect(checkMixture([b, d]).issues.map((i) => i.message)).toEqual(["Seul ne se mélange avec aucun autre produit (catégorie 5)."]);
+    expect(checkMixture([d])).toEqual({ level: "ok", issues: [] });
+    expect(dangerMessages({ checks: [{ indicators: [{ level: "danger", message: "Dose" }] }], mixture: checkMixture([a, c]) })).toHaveLength(2);
+  });
+});

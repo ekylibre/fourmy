@@ -75,6 +75,19 @@ culture (avertissement AV1).
 - La carte du formulaire montre les cours d'eau de la ferme et la bande de
   ZNT autour des parcelles choisies (`POST /phyto/water/buffer`).
 
+## Précautions d'emploi et mélanges (lot F)
+
+Colonne de droite du formulaire, par produit : pictogrammes, mentions
+« utilisable en AB » et « biocontrôle », conditions d'emploi de l'usage
+retenu, mentions restrictives et protection de l'opérateur (EPI), d'après
+E-Phy (migration 0013, `GET /phyto/articles`).
+
+**Mélange** (arrêté du 7 avril 2010 modifié par celui du 12 juin 2015,
+règle d'Ekylibre `mix_category_code_validator.rb`, `checkMixture`) : un
+produit de catégorie 5 ne se mélange avec aucun autre ; deux produits d'une
+même catégorie 2, 3 ou 4 ne se mélangent pas. Un mélange interdit est un
+feu rouge (`compliance.mixture`) : motif obligatoire pour enregistrer.
+
 ## Activités
 
 La culture contrôlée vient de l'**activité** de la parcelle (docs/activites.md) :

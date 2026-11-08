@@ -16,6 +16,7 @@ import {
   assertEditable,
   type DomainCtx,
   type ResolvedStockLine,
+  dangerMessages,
 } from "@fourmy/domain";
 import {
   getProcedure,
@@ -292,7 +293,7 @@ async function recordCompliance(tx: Tx, ctx: DomainCtx, interventionId: string, 
   if (body.weather) await tx.execute(sql`UPDATE interventions SET weather = ${JSON.stringify(body.weather)}::jsonb WHERE id = ${interventionId}`);
   const result = await checkCompliance(tx, body, interventionId);
   if (mode === "done" && result.level === "danger" && ctx.origin === "web" && !body.compliance?.reason?.trim()) {
-    const dangers = result.checks.flatMap((c) => c.indicators.filter((i) => i.level === "danger").map((i) => i.message));
+    const dangers = dangerMessages(result);
     throw new DomainError(`Feu rouge réglementaire : ${dangers.join(" ")} Pour enregistrer quand même, indiquez un motif.`);
   }
   await tx.execute(sql`UPDATE interventions SET compliance = ${JSON.stringify(result)}::jsonb WHERE id = ${interventionId}`);

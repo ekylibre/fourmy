@@ -28,6 +28,15 @@ export function ComplianceSection({ farmId, intervention: i }: { farmId: string;
       </Group>
       {!result && <Text size="sm" c="dimmed">Contrôle en cours…</Text>}
       {result && <ComplianceChecks result={result} />}
+      {result?.mixture && result.mixture.issues.length > 0 && (
+        <Alert color="brique" variant="light" mt="sm" title="Mélange interdit">
+          {result.mixture.issues.map((i) => (
+            <Text key={i.message} size="sm">
+              {i.message}
+            </Text>
+          ))}
+        </Alert>
+      )}
       {result?.reason && (
         <Alert color="brique" variant="light" mt="sm" title="Enregistrée malgré un feu rouge">
           Motif : « {result.reason} »

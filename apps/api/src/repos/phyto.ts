@@ -1,6 +1,6 @@
 import { sql, type SQL } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
-import { checkTreatment, hazardPictograms, worstLevel, type ParcelContext, type PhytoProductRef, type PhytoUsageRef } from "@fourmy/domain";
+import { checkMixture, checkTreatment, hazardPictograms, worstLevel, type MixtureProduct, type ParcelContext, type PhytoProductRef, type PhytoUsageRef } from "@fourmy/domain";
 import {
   PROCEDURES,
   type ComplianceResult,
@@ -67,7 +67,7 @@ async function lineage(tx: Tx, cultivation: string): Promise<{ names: string[]; 
   return { names: list.map((r) => r.reference_name), label: list[0]!.label };
 }
 
-async function productByAmm(tx: Tx, amm: string): Promise<{ id: number; ref: PhytoProductRef } | null> {
+async function productByAmm(tx: Tx, amm: string): Promise<{ id: number; ref: PhytoProductRef; mixCodes: number[] } | null> {
   const [p] = await rows<{
     id: number;
     amm: string;
@@ -77,9 +77,10 @@ async function productByAmm(tx: Tx, amm: string): Promise<{ id: number; ref: Phy
     stopped_on: string | null;
     reentry_delay_hours: number | null;
     natures: string[];
+    mix_codes: number[];
   }>(
     tx,
-    sql`SELECT id, amm, name, state, started_on::text, stopped_on::text, reentry_delay_hours, natures
+    sql`SELECT id, amm, name, state, started_on::text, stopped_on::text, reentry_delay_hours, natures, mix_codes
         FROM phyto_products WHERE amm = ${amm}
         ORDER BY (state = 'authorized') DESC, stopped_on DESC NULLS FIRST LIMIT 1`,
   );
@@ -87,6 +88,7 @@ async function productByAmm(tx: Tx, amm: string): Promise<{ id: number; ref: Phy
   return {
     id: p.id,
     ref: { amm: p.amm, name: p.name, state: p.state, startedOn: p.started_on, stoppedOn: p.stopped_on, reentryDelayHours: p.reentry_delay_hours, natures: p.natures },
+    mixCodes: p.mix_codes ?? [],
   };
 }
 
@@ -95,7 +97,7 @@ async function usagesOf(tx: Tx, productId: number): Promise<PhytoUsageRef[]> {
     tx,
     sql`SELECT id, crop_label, species, target_label, dose_quantity::float8 AS dose_quantity, dose_unit_label,
                pre_harvest_delay_days, applications_count, untreated_buffer_aquatic, state, decision_date::text,
-               is_derogation, derogation_started_on::text, derogation_stopped_on::text
+               is_derogation, derogation_started_on::text, derogation_stopped_on::text, usage_conditions
         FROM phyto_usages WHERE product_id = ${productId} ORDER BY crop_label, target_label, dose_quantity`,
   );
   return list.map((u) => ({
@@ -113,6 +115,7 @@ async function usagesOf(tx: Tx, productId: number): Promise<PhytoUsageRef[]> {
     isDerogation: Boolean(u.is_derogation),
     derogationStartedOn: (u.derogation_started_on as string | null) ?? null,
     derogationStoppedOn: (u.derogation_stopped_on as string | null) ?? null,
+    usageConditions: (u.usage_conditions as string | null) || null,
   }));
 }
 
@@ -237,6 +240,7 @@ export async function checkCompliance(tx: Tx, body: CheckableBody, selfId: strin
   const sets = await cropsets(tx, version);
 
   const checks: TreatmentCheckDto[] = [];
+  const mixable: MixtureProduct[] = [];
   for (const input of phytoInputs) {
     const article = articles.find((a) => a.id === input.articleId)!;
     const amm = article.amm?.trim() || null;
@@ -260,8 +264,18 @@ export async function checkCompliance(tx: Tx, body: CheckableBody, selfId: strin
       result.level = worstLevel(result.indicators.map((i) => i.level));
     }
     checks.push({ articleId: input.articleId, ...result });
+    if (product && !mixable.some((m) => m.articleId === input.articleId)) mixable.push({ articleId: input.articleId, name: product.ref.name, mixCodes: product.mixCodes });
   }
-  return { level: worstLevel(checks.map((c) => c.level)), checkedAt, referential: version, checks, reason: body.compliance?.reason ?? null };
+  // Mélange des produits de la bouillie (arrêté de 2015) : un feu rouge de plus.
+  const mixture = checkMixture(mixable);
+  return {
+    level: worstLevel([...checks.map((c) => c.level), mixture.level]),
+    checkedAt,
+    referential: version,
+    checks,
+    mixture,
+    reason: body.compliance?.reason ?? null,
+  };
 }
 
 /** Contrôle à la demande (formulaire), dans le contexte de la ferme. */
@@ -473,15 +487,21 @@ export async function phytoArticles(db: Database, farmId: string) {
       reentry: number | null;
       risks: { code: string; phrase: string }[] | null;
       symbols: string[] | null;
+      operator_protection: string | null;
+      restricted_mentions: string | null;
+      mix_codes: number[] | null;
+      organic: boolean | null;
+      biocontrol: boolean | null;
     }>(
       tx,
       sql`SELECT a.id, a.name, a.unit, nullif(btrim(a.amm), '') AS amm, p.name AS product_name, p.state, p.stopped_on::text,
-                 p.reentry_delay_hours AS reentry,
+                 p.reentry_delay_hours AS reentry, p.operator_protection, p.restricted_mentions, p.mix_codes, p.organic, p.biocontrol,
                  (SELECT json_agg(json_build_object('code', r.code, 'phrase', r.phrase) ORDER BY r.code) FROM phyto_risks r WHERE r.product_id = p.id) AS risks,
                  (SELECT array_agg(DISTINCT s.symbol) FROM phyto_risks r
                     JOIN phyto_hazard_symbols s ON s.code = substring(r.code from '^H[0-9]{3}') WHERE r.product_id = p.id) AS symbols
           FROM articles a
-          LEFT JOIN LATERAL (SELECT id, name, state, stopped_on, reentry_delay_hours FROM phyto_products WHERE amm = btrim(a.amm)
+          LEFT JOIN LATERAL (SELECT id, name, state, stopped_on, reentry_delay_hours, operator_protection, restricted_mentions,
+                                    mix_codes, organic, biocontrol FROM phyto_products WHERE amm = btrim(a.amm)
                              ORDER BY (state = 'authorized') DESC LIMIT 1) p ON true
           WHERE a.kind = 'phyto' ORDER BY a.name`,
     );
@@ -495,6 +515,11 @@ export async function phytoArticles(db: Database, farmId: string) {
         hazards: hazardPictograms((a.risks ?? []).map((r) => r.code), a.symbols ?? []),
         risks: a.risks ?? [],
         reentryDelayHours: a.reentry,
+        operatorProtection: a.operator_protection,
+        restrictedMentions: a.restricted_mentions,
+        mixCodes: a.mix_codes ?? [],
+        organic: a.organic ?? false,
+        biocontrol: a.biocontrol ?? false,
       }),
     );
   });

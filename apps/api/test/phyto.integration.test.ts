@@ -176,6 +176,20 @@ describe.skipIf(!url)("réglementation phyto (intégration)", () => {
     expect(herbi.risks.map((r: { code: string }) => r.code)).toEqual(["EUH401", "H319", "H361d"]);
   });
 
+  it("mélange : deux produits de catégorie 3 ensemble → feu rouge ; précautions d'emploi des articles", async () => {
+    const other = crypto.randomUUID();
+    await sql`UPDATE phyto_products SET mix_codes = '{1,3}', operator_protection = 'Gants en nitrile' WHERE id = ${PRODUCT}`;
+    await sql`INSERT INTO phyto_products (id, amm, name, natures, state, started_on, mix_codes) VALUES (${PRODUCT + 1}, '9900002', 'AUTRE TEST', '{Herbicide}', 'authorized', '2015-01-01', '{1,3}')`;
+    await sql`INSERT INTO articles (id, farm_id, name, kind, unit, amm) VALUES (${other}, ${farmId}, 'Autre', 'phyto', 'Litre', '9900002')`;
+    const r = await (await post("/phyto/check", spraying(1, { inputs: [{ articleId: herbicideId, quantity: 1, per: "hectare" }, { articleId: other, quantity: 1, per: "hectare" }] }))).json();
+    expect(r.mixture).toMatchObject({ level: "danger", issues: [{ message: "Mélange interdit : HERBI TEST et AUTRE TEST sont tous de catégorie 3." }] });
+    expect(r.level).toBe("danger");
+    const list = await (await app.request(`${base}/phyto/articles`, { headers })).json();
+    expect(list.items.find((x: { id: string }) => x.id === herbicideId)).toMatchObject({ operatorProtection: "Gants en nitrile", mixCodes: [1, 3], organic: false });
+    await sql`DELETE FROM articles WHERE id = ${other}`;
+    await sql`DELETE FROM phyto_products WHERE id = ${PRODUCT + 1}`;
+  });
+
   it("IFT : appel à l'API du ministère (simulée), corrigé de la part traitée ; API indisponible → en attente", async () => {
     const id = crypto.randomUUID();
     await post("/interventions", { id, procedure: "spraying" });

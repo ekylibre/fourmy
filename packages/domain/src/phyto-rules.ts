@@ -47,6 +47,8 @@ export interface PhytoUsageRef {
   isDerogation: boolean;
   derogationStartedOn: string | null;
   derogationStoppedOn: string | null;
+  /** Conditions d'emploi de l'usage (E-Phy), texte libre. */
+  usageConditions?: string | null;
 }
 
 export interface ParcelContext {
@@ -103,6 +105,8 @@ export interface TreatmentCheck {
   zntM: number | null;
   /** Usage retenu : celui choisi, ou le seul possible. */
   usageId: string | null;
+  /** Conditions d'emploi de l'usage retenu. */
+  usageConditions: string | null;
 }
 
 const RANK: Record<ComplianceLevel, number> = { ok: 0, info: 1, warning: 2, danger: 3 };
@@ -201,6 +205,7 @@ export function checkTreatment(input: TreatmentCheckInput): TreatmentCheck {
     reentryAllowedFrom: null,
     zntM: null,
     usageId: null,
+    usageConditions: null,
     ...extra,
   });
 
@@ -347,5 +352,6 @@ export function checkTreatment(input: TreatmentCheckInput): TreatmentCheck {
     reentryAllowedFrom,
     zntM,
     usageId: chosen?.id ?? null,
+    usageConditions: chosen?.usageConditions ?? null,
   });
 }
