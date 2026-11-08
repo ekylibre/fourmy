@@ -14,6 +14,7 @@
     "e2e": "playwright test"
   },
   "dependencies": {
+    "@fourmy/carto": "workspace:*",
     "@fourmy/contracts": "workspace:*",
     "@fourmy/domain": "workspace:*",
     "@fourmy/ui-lyvre": "workspace:*",
@@ -30,7 +31,9 @@
     "maplibre-gl": "6.16.0",
     "react": "19.2.9",
     "react-dom": "19.2.9",
-    "react-router": "8.5.0"
+    "react-router": "8.5.0",
+    "terra-draw": "1.38.0",
+    "terra-draw-maplibre-gl-adapter": "1.5.0"
   },
   "devDependencies": {
     "@fourmy/db": "workspace:*",

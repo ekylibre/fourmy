@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { Link, useLocation } from "react-router";
+import { PencilRuler } from "lucide-react";
 import { Badge, Button, Grid, Group, Paper, SegmentedControl, Select, Stack, Table, Text, Title } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import type { FeatureCollection, Geometry } from "geojson";
@@ -15,6 +17,7 @@ import { ParcelMap, type Basemap } from "./ParcelMap";
 /** Carte 2D : parcellaire à la date de la frise, bâtiments, trace GPS du jour (US-1). */
 export function MapPage() {
   const farm = useFarm();
+  const location = useLocation();
   const { at, day } = useAt();
   const snap = useSnapshot(farm.id, at);
   const [basemap, setBasemap] = useState<Basemap>("ortho");
@@ -84,6 +87,10 @@ export function MapPage() {
     <Stack>
       <Group justify="space-between">
         <Title order={1}>Carte au {formatDate(at)}</Title>
+        <Group>
+        <Button component={Link} to={`/f/${farm.id}/carte/outils${location.search}`} variant="default" leftSection={<PencilRuler size={16} />}>
+          Outils de dessin (essai)
+        </Button>
         <SegmentedControl
           value={basemap}
           onChange={(v) => setBasemap(v as Basemap)}
@@ -92,6 +99,7 @@ export function MapPage() {
             { value: "plan", label: "Plan IGN" },
           ]}
         />
+        </Group>
       </Group>
       <Grid>
         <Grid.Col span={{ base: 12, md: 8 }} style={{ height: "68vh" }}>

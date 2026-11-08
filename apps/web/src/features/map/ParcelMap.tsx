@@ -13,7 +13,7 @@ setWorkerUrl(maplibreWorkerUrl);
 export type Basemap = "plan" | "ortho";
 
 /** Fonds IGN Géoplateforme (WMTS, sans clé) — souverains, à jour. */
-const WMTS = (layer: string, format: string) =>
+export const WMTS = (layer: string, format: string) =>
   `https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=${layer}&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=${format}`;
 
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };

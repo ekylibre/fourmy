@@ -1,0 +1,27 @@
+{
+  "name": "@fourmy/carto",
+  "version": "0.0.0",
+  "description": "Opérations géométriques pures (surfaces géodésiques, découpe, fusion) partagées par les outils carto",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@turf/boolean-intersects": "7.4.0",
+    "@turf/boolean-valid": "7.4.0",
+    "@turf/difference": "7.4.0",
+    "@turf/helpers": "7.4.0",
+    "@turf/intersect": "7.4.0",
+    "@turf/kinks": "7.4.0",
+    "@turf/union": "7.4.0",
+    "geographiclib-geodesic": "2.2.0"
+  },
+  "devDependencies": { "@types/geojson": "7946.0.16", "vitest": "2.1.8" }
+}
