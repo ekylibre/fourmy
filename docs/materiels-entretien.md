@@ -157,7 +157,118 @@ obligatoire), **S** (v1 souhaitée), **L** (plus tard).
 - **FR-MAT-43 (L)** Références équivalentes (autres marques) et lien vers le
   catalogue constructeur.
 
-### 3.6 Hors périmètre
+### 3.6 Adaptation des interventions (brainstorm du 2026-11-08)
+
+**État actuel** (relevé le 2026-11-08) :
+- La forme `maintenance` existe, avec deux procédures :
+  `equipment_maintenance` et `installation_maintenance`.
+- La saisie se limite aux matériels entretenus (liste), aux périodes, aux
+  intrants et aux intervenants. Le panneau de droite est celui du phyto.
+- Un matériel n'a que nom, nature et état. Il n'a ni fiche ni écran à lui.
+- Les articles n'ont pas de nature « pièce » ni « fluide ». Les
+  interventions n'ont pas de photos.
+- Pierre a **62 entretiens migrés d'Ekylibre** :
+  - aucun n'a de note ni de relevé d'heures ;
+  - certains n'ont pas de matériel cible ;
+  - quelques-uns ont des pièces (socs de charrue Grégoire Besson).
+
+Ce que l'intervention doit apprendre pour couvrir FR-MAT-30 à 35 :
+
+- **FR-MAT-50 (M) Relevé par matériel ciblé.** Chaque matériel ciblé
+  **équipé d'un compteur** porte son relevé (heures) à la date de
+  l'intervention.
+  - Le relevé est facultatif mais demandé.
+  - Sans relevé, l'échéance repart de la **date seule**, ce qui est signalé.
+  - Le relevé créé a l'origine `intervention`.
+  - Il est contrôlé comme un relevé saisi : il doit rester entre le relevé
+    précédent et le relevé suivant, même saisi après coup (FR-MAT-12).
+- **FR-MAT-51 (M) Opérations du plan réalisées.** Pour chaque matériel
+  ciblé, on coche les opérations du plan.
+  - Pour un **contrôle**, on note un résultat : RAS ou anomalie, avec un
+    texte.
+  - Une anomalie peut ouvrir une réparation **planifiée** (FR-MAT-55).
+- **FR-MAT-52 (M) Nature de l'entretien.** L'intervention est **préventive**
+  (au moins une opération du plan) ou **curative** (panne, réparation).
+  - Une intervention curative demande une **description du problème**.
+  - La nature est déduite des opérations cochées, et reste modifiable.
+- **FR-MAT-53 (M) Pièces et fluides en intrants.** Il faut deux nouvelles
+  natures d'articles : **pièce** et **fluide** (huiles, graisses, AdBlue,
+  liquide de refroidissement).
+  - Unités : pièce, litre, kg.
+  - Pré-remplissage depuis les opérations cochées : pièces liées
+    (FR-MAT-41) et quantité de fluide préconisée (FR-MAT-26).
+  - Un intrant est rattaché au matériel ciblé, quand l'intervention en vise
+    plusieurs.
+- **FR-MAT-54 (M) Intervenants.** Membres de la ferme et/ou **atelier
+  externe** : un nom en texte libre, avec un n° de bon ou de facture
+  facultatif pour le rapprochement dans Lyvre.
+  - Les « outils » (matériels utilisés) sont masqués pour cette forme.
+- **FR-MAT-55 (M) Planifier depuis une échéance.** Depuis une échéance, deux
+  actions :
+  - « Réaliser » ouvre la saisie **pré-remplie** (FR-MAT-32) ;
+  - « Planifier » crée une intervention `planned`, pré-remplie de la même
+    façon.
+  - Seule une intervention `done` remet l'échéance à zéro.
+  - Annuler, supprimer ou modifier une intervention `done` **recalcule**
+    les échéances : elles sont calculées, jamais stockées (NFR-MAT-5).
+- **FR-MAT-56 (M) Panneau de droite propre à l'entretien.** À la place des
+  conditions de traitement et de la conformité phyto, il affiche pour le
+  matériel choisi :
+  - dernier relevé ;
+  - échéances en retard et à venir, que l'on peut ajouter en un clic ;
+  - pièces prévues avec leur stock ;
+  - fluides préconisés.
+- **FR-MAT-57 (M) Fiche d'intervention d'entretien.** La fiche affiche :
+  - matériel(s) et relevé ;
+  - opérations réalisées, avec leur source (notice, page) ;
+  - résultat des contrôles ;
+  - pièces et fluides ;
+  - atelier ;
+  - **prochaine échéance** de chaque opération après cette intervention.
+- **FR-MAT-58 (S) Photos.** On joint des photos à l'intervention (panne,
+  pièce usée, compteur). Elles sont consultables sur mobile.
+  - D'abord pour l'entretien, puis pour toutes les formes.
+- **FR-MAT-59 (S) Historique migré.** Les entretiens venus d'Ekylibre
+  restent des interventions **curatives sans opération**.
+  - L'exploitant peut ensuite les rattacher à des opérations du plan, pour
+    amorcer les échéances.
+  - Ceux qui n'ont pas de matériel sont signalés « matériel à préciser ».
+- **FR-MAT-60 (S) Relevé en fin de chantier.** Toute intervention de champ
+  qui utilise un matériel à compteur (outil `tools[]`, ex. le tracteur d'un
+  labour) peut porter un relevé de fin de chantier, facultatif. C'est
+  l'occasion la plus naturelle de relever les heures.
+- **FR-MAT-61 (L) Heures estimées depuis les chantiers.** Sans Traccar, la
+  durée des interventions de champ d'un matériel peut donner un relevé
+  **estimé**, recalé sur le dernier relevé réel, comme pour Traccar.
+- **FR-MAT-62 (S) Bâtiments et installations.** `installation_maintenance`
+  vise un lieu (bâtiment) ou un contenant (cuve).
+  - Mêmes champs, sans compteur.
+  - Plan d'entretien possible plus tard (contrôle électrique, nettoyage des
+    cuves).
+
+### 3.7 Écrans matériels (prérequis)
+
+- **FR-MAT-70 (M) Liste des matériels** : nature, état, dernier relevé et
+  **badge d'échéances** (en retard, bientôt). Filtres par nature et par
+  état.
+- **FR-MAT-71 (M) Fiche matériel en onglets**, sur le modèle de la fiche
+  parcelle :
+  - Général (identité, agrégats, options) ;
+  - Technique ;
+  - Entretien (plan et échéances) ;
+  - Relevés ;
+  - Historique (interventions d'entretien et de champ) ;
+  - Pièces ;
+  - Documents.
+- **FR-MAT-72 (M) Compteur par matériel** : présence et unité (heures en
+  v1).
+  - Par défaut, tracteurs et automoteurs ont un compteur, les outils
+    traînés n'en ont pas.
+  - Modifiable sur la fiche.
+- **FR-MAT-73 (M) Accès** depuis le menu principal (« Matériels ») et depuis
+  le tableau de bord de la ferme (FR-MAT-24).
+
+### 3.8 Hors périmètre
 - Réservation de matériel, planning partagé entre exploitations,
   répartition des heures entre adhérents, facturation de travaux.
 - Valorisation, prix et coûts des pièces (Lyvre).
@@ -225,6 +336,30 @@ prochaines heures.
 - Les opérations non applicables (option absente d'usine) sont marquées
   comme telles.
 
+**US-MAT-7 — Panne au champ.** Le relevage avant de l'ARION 630 C fuit.
+- Je saisis une intervention d'entretien **curative**, avec la description
+  « fuite vérin relevage AV », le nom de l'atelier et les heures du
+  compteur.
+- Aucune opération du plan n'est cochée, donc aucune échéance ne bouge.
+- Le relevé d'heures est bien enregistré.
+
+**US-MAT-8 — Contrôle avec anomalie.** Pendant la révision des 500 h, le
+contrôle des freins révèle une usure.
+- Je coche le contrôle avec le résultat « anomalie » et un texte.
+- Fourmy propose de **planifier** une réparation, pré-remplie avec le
+  matériel et la description.
+
+**US-MAT-9 — Corriger après coup.** Je supprime une vidange saisie par
+erreur.
+- L'échéance « vidange moteur » revient à la réalisation précédente.
+- Le relevé d'origine `intervention` créé par cette vidange disparaît avec
+  elle.
+
+**US-MAT-10 — Heures en fin de labour.** Je saisis un labour avec l'ARION 630
+C et j'indique 4 352 h en fin de chantier.
+- Le relevé est créé et les échéances avancent.
+- Le labour n'est pas modifié pour autant.
+
 ## 6. Arbitrages (2026-11-07)
 1. **Traccar** : les boîtiers du pilote **ne remontent pas encore** de
    compteur d'heures.
@@ -255,3 +390,23 @@ prochaines heures.
      matériel seraient à construire.
    - Il faut choisir le support : un fichier dans le dépôt ou un catalogue
      dans la base.
+
+## 8. Arbitrages du 2026-11-08
+1. **Procédures** : une seule procédure, `equipment_maintenance`. Sa
+   **nature** (préventif ou curatif) est déduite des opérations cochées et
+   reste modifiable (FR-MAT-52).
+2. **Heures estimées depuis les chantiers** (FR-MAT-61) : plus tard. En v1,
+   les relevés viennent :
+   - de la saisie manuelle ;
+   - de la fin de chantier (FR-MAT-60, qui reste en **S**) ;
+   - de Traccar.
+3. **Photos** (FR-MAT-58) : plus tard, avec les documents des matériels
+   (FR-MAT-7).
+4. **Découpage** en quatre lots, dans l'ordre I → J → K → L :
+   - **I** : écrans matériels, compteur et relevés (FR-MAT-4, 10 à 12, 70
+     à 73) ;
+   - **J** : plan, échéances et import de la base Arion (FR-MAT-8, 20 à 24,
+     40 et 41) ;
+   - **K** : intervention d'entretien adaptée (FR-MAT-30 à 33 et 50 à 57) ;
+   - **L** : Traccar (FR-MAT-13 et 14), pièces à commander (FR-MAT-42) et
+     notifications (FR-MAT-25).
