@@ -43,6 +43,16 @@ const selectVersion = (alias = "v") => sql`
   lower(${sql.raw(alias)}.valid) AS lower,
   upper(${sql.raw(alias)}.valid) AS upper`;
 
+/**
+ * Noms de toutes les parcelles de la ferme, quelle que soit la date : pour
+ * afficher les cibles d'interventions d'autres dates que celle de la frise.
+ */
+export async function listParcelNames(db: Database, farmId: string): Promise<{ id: string; name: string }[]> {
+  return withFarm(db, farmId, async (tx) =>
+    (await tx.execute(sql`SELECT id, name FROM land_parcels ORDER BY name`)) as unknown as { id: string; name: string }[],
+  );
+}
+
 /** Parcellaire à une date : chaque parcelle, son nom et sa version valide à `at`. */
 export async function listParcelsAt(db: Database, farmId: string, at: string): Promise<LandParcelAt[]> {
   return withFarm(db, farmId, async (tx) => {

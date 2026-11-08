@@ -64,6 +64,18 @@ describe.skipIf(!url)("parcellaire (intégration)", () => {
     expect(rows.filter((r) => r.upper === null)).toHaveLength(1);
   });
 
+  it("liste les noms de toutes les parcelles, même sans version à la date du jour", async () => {
+    // Parcelle close l'an dernier : absente du parcellaire du jour, présente dans les noms.
+    const oldId = crypto.randomUUID();
+    await sql`INSERT INTO land_parcels (id, farm_id, name) VALUES (${oldId}, ${farmId}, 'Ancienne vigne')`;
+    await sql`INSERT INTO land_parcel_versions (id, land_parcel_id, shape, area_m2, valid)
+      VALUES (${crypto.randomUUID()}, ${oldId}, ST_Multi(ST_GeomFromText('POLYGON((1 45,1.001 45,1.001 45.001,1 45.001,1 45))', 4326)), 8000, tstzrange('2020-01-01', '2021-01-01'))`;
+    const today = await (await app.request(`${base}/land-parcels`, { headers })).json();
+    expect(today.items.map((p: { name: string }) => p.name)).not.toContain("Ancienne vigne");
+    const names = await (await app.request(`${base}/land-parcels/names`, { headers })).json();
+    expect(names.items).toEqual(expect.arrayContaining([{ id: oldId, name: "Ancienne vigne" }, expect.objectContaining({ name: "Les Rouffiats" })]));
+  });
+
   it("une ferme dont on n'est pas membre est refusée (403)", async () => {
     const otherFarm = `/api/v1/farms/${crypto.randomUUID()}`;
     const res = await app.request(`${otherFarm}/land-parcels`, { headers });

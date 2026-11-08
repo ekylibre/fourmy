@@ -10,6 +10,7 @@ import {
   demoMyFarms,
   demoArticles,
   demoInterventions,
+  demoInterventionHistory,
   demoPeople,
   demoProcedures,
   demoStock,
@@ -63,6 +64,7 @@ export const handlers = [
   http.get("*/health", () => HttpResponse.json({ status: "ok", service: "mock" })),
   http.get("*/api/v1/me/farms", () => HttpResponse.json({ userId: "mock", items: demoMyFarms })),
   http.get(`*${base}/snapshot`, () => HttpResponse.json(demoSnapshot)),
+  http.get(`*${base}/land-parcels/names`, () => HttpResponse.json({ items: demoLandParcelsAt.map((p) => ({ id: p.id, name: p.name })) })),
   http.get(`*${base}/land-parcels`, () => page(demoLandParcelsAt)),
   http.get(`*${base}/places`, () => page(demoPlacesAt)),
   http.get(`*${base}/containers`, () => page(demoContainersAt)),
@@ -75,6 +77,10 @@ export const handlers = [
     const body = (await request.json()) as { id: string; procedure: string };
     return HttpResponse.json({ ...demoInterventions[0], id: body.id, procedure: body.procedure, status: "planned" }, { status: 201 });
   }),
+  http.get(`*${base}/interventions/:id`, ({ params }) =>
+    HttpResponse.json({ ...demoInterventions.find((i) => i.id === params.id) ?? demoInterventions[0], history: demoInterventionHistory }),
+  ),
+  http.put(`*${base}/interventions/:id`, () => HttpResponse.json({ intervention: demoInterventions[0], warnings: [] })),
   http.post(`*${base}/interventions/:id/complete`, () =>
     HttpResponse.json({ intervention: { ...demoInterventions[0] }, movements: [], warnings: [] }),
   ),

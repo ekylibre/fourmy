@@ -21,6 +21,9 @@ import type {
   Article,
   Intervention,
   InterventionCompleteWrite,
+  InterventionInput,
+  InterventionTarget,
+  InterventionUpdateResult,
   Person,
   ProcedureCatalogue,
   ProcedureCatalogueItem,
@@ -31,9 +34,17 @@ import type {
 import { formatHa } from "@fourmy/ui-lyvre";
 import { api, ApiError, farmPath } from "../../app/api";
 import { unitLabel } from "../../app/labels";
+import { invalidateAfterIntervention } from "../../app/queries";
 import { ProcedureIcon } from "../../components/ProcedureIcon";
 
-type QuantityRow = { articleId: string | null; quantity: number | ""; per: QuantityPer; to: string | null };
+/** Ligne de quantité ; `keep` garde ce que le formulaire n'affiche pas (lot, lieu de prélèvement). */
+type QuantityRow = {
+  articleId: string | null;
+  quantity: number | "";
+  per: QuantityPer;
+  to: string | null;
+  keep?: { lotId?: string; from?: InterventionInput["from"] };
+};
 type PeriodRow = { startedAt: string; stoppedAt: string };
 
 export interface InterventionFormProps {
@@ -44,6 +55,11 @@ export interface InterventionFormProps {
   catalogue: ProcedureCatalogue;
   /** Intervention planifiée à réaliser (formulaire prérempli). */
   planned?: Intervention;
+  /**
+   * Intervention à modifier : planifiée → mise à jour ; réalisée → correction
+   * tracée (stock et registre suivent, l'historique garde l'avant).
+   */
+  editing?: Intervention;
   defaultDay: string;
   onDone: () => void;
 }
@@ -82,13 +98,18 @@ function withSuggestions<T extends { value: string }>(options: T[], suggested: s
  * personnes habituels de la ferme sont proposés en premier. Planifier, ou
  * réaliser directement (une ou plusieurs périodes de travail).
  */
-export function InterventionForm({ farmId, snapshot, articles, people, catalogue, planned, defaultDay, onDone }: InterventionFormProps) {
+export function InterventionForm({ farmId, snapshot, articles, people, catalogue, planned: toComplete, editing, defaultDay, onDone }: InterventionFormProps) {
   const queryClient = useQueryClient();
+  // Formulaire prérempli : intervention à réaliser ou à modifier.
+  const planned = toComplete ?? editing;
+  const correcting = editing?.status === "done";
+  const [correctionId] = useState(() => crypto.randomUUID());
+  const [reason, setReason] = useState("");
   const [code, setCode] = useState<string | null>(planned?.procedure ?? null);
   const procedure: ProcedureCatalogueItem | undefined = catalogue.items.find((p) => p.code === code);
   const shape = procedure?.shape;
   const [mode, setMode] = useState<"done" | "planned">("done");
-  const completing = Boolean(planned) || mode === "done";
+  const completing = editing ? correcting : Boolean(planned) || mode === "done";
 
   const start = planned?.startedAt ? local(planned.startedAt) : `${defaultDay}T08:00`;
   const [periods, setPeriods] = useState<PeriodRow[]>(
@@ -98,8 +119,12 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   );
   const [parcels, setParcels] = useState<string[]>(planned?.targets.filter((t) => t.kind === "land_parcel").map((t) => t.id) ?? []);
   const [maintained, setMaintained] = useState<string[]>(planned?.targets.filter((t) => t.kind === "equipment").map((t) => t.id) ?? []);
+  // Surface travaillée et zone de travail des cibles : conservées telles quelles.
+  const [targetExtras] = useState(
+    () => new Map((planned?.targets ?? []).map((t) => [t.id, { workedAreaM2: t.workedAreaM2, workingZone: t.workingZone }])),
+  );
   const [inputs, setInputs] = useState<QuantityRow[]>(
-    planned?.inputs.map((i) => ({ articleId: i.articleId, quantity: i.quantity, per: i.per, to: null })) ?? [],
+    planned?.inputs.map((i) => ({ articleId: i.articleId, quantity: i.quantity, per: i.per, to: null, keep: { lotId: i.lotId, from: i.from } })) ?? [],
   );
   const [outputs, setOutputs] = useState<QuantityRow[]>(
     planned?.outputs.map((o) => ({
@@ -107,6 +132,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       quantity: o.quantity,
       per: o.per,
       to: o.to?.containerId ? `container:${o.to.containerId}` : o.to?.placeId ? `place:${o.to.placeId}` : null,
+      keep: { lotId: o.lotId },
     })) ?? [],
   );
   const [tools, setTools] = useState<string[]>(planned?.tools.map((t) => t.equipmentId) ?? []);
@@ -166,12 +192,27 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       targets:
         shape === "maintenance"
           ? maintained.map((id) => ({ kind: "equipment" as const, id }))
-          : parcels.map((id) => ({ kind: "land_parcel" as const, id })),
-      inputs: quantity(inputs).map((r) => ({ articleId: r.articleId!, quantity: Number(r.quantity), per: r.per })),
+          : parcels.map((id): InterventionTarget => {
+              const extra = targetExtras.get(id);
+              return {
+                kind: "land_parcel",
+                id,
+                ...(extra?.workedAreaM2 ? { workedAreaM2: extra.workedAreaM2 } : {}),
+                ...(extra?.workingZone ? { workingZone: extra.workingZone } : {}),
+              };
+            }),
+      inputs: quantity(inputs).map((r) => ({
+        articleId: r.articleId!,
+        quantity: Number(r.quantity),
+        per: r.per,
+        ...(r.keep?.lotId ? { lotId: r.keep.lotId } : {}),
+        ...(r.keep?.from ? { from: r.keep.from } : {}),
+      })),
       outputs: quantity(outputs).map((r) => ({
         articleId: r.articleId!,
         quantity: Number(r.quantity),
         per: r.per,
+        ...(r.keep?.lotId ? { lotId: r.keep.lotId } : {}),
         ...(r.to ? { to: location(r.to) } : {}),
       })),
       tools: tools.map((equipmentId) => ({ equipmentId })),
@@ -184,6 +225,16 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   const submit = useMutation({
     mutationFn: async () => {
       const full = body();
+      if (editing) {
+        const write = {
+          procedure: code,
+          ...full,
+          ...(correcting ? {} : { periods: [], plannedAt: full.periods[0]?.startedAt }),
+          correctionId,
+          ...(reason.trim() ? { reason: reason.trim() } : {}),
+        };
+        return api.put<InterventionUpdateResult>(farmPath(farmId, `/interventions/${editing.id}`), write);
+      }
       const id = planned?.id ?? crypto.randomUUID();
       if (!planned) {
         // Réalisée d'emblée : on crée l'intervention puis on la réalise avec tout son contenu.
@@ -201,10 +252,11 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
     },
     onSuccess: (r) => {
       for (const w of r.warnings) notifications.show({ color: "paille", title: "À vérifier", message: w, autoClose: 10_000 });
-      notifications.show({ color: "lichen", message: completing ? "Intervention enregistrée." : "Intervention planifiée." });
-      for (const key of ["interventions", "stock", "register", "snapshot", "contents", "procedures"]) {
-        void queryClient.invalidateQueries({ queryKey: [key] });
-      }
+      notifications.show({
+        color: "lichen",
+        message: editing ? (correcting ? "Intervention corrigée." : "Intervention modifiée.") : completing ? "Intervention enregistrée." : "Intervention planifiée.",
+      });
+      invalidateAfterIntervention(queryClient);
       onDone();
     },
     onError: (e) => setError(e instanceof ApiError ? e.message : String(e)),
@@ -299,8 +351,14 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
           leftSection={code ? <ProcedureIcon procedure={code} /> : undefined}
           searchable
           required
-          disabled={Boolean(planned)}
+          disabled={Boolean(toComplete)}
         />
+        {correcting && (
+          <Alert color="ardoise" variant="light" title="Correction tracée">
+            Les mouvements de stock de cette intervention sont repris puis repassés avec les nouvelles valeurs ; le registre phyto suit.
+            L'historique garde la version d'avant.
+          </Alert>
+        )}
         {!planned && (
           <SegmentedControl
             value={mode}
@@ -444,8 +502,16 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
             Une quantité par hectare est multipliée par la surface traitée à la date de l'intervention ; le stock et le registre phyto se mettent à jour.
           </Text>
         )}
+        {editing && (
+          <TextInput
+            label={correcting ? "Motif de la correction (facultatif)" : "Motif de la modification (facultatif)"}
+            maxLength={500}
+            value={reason}
+            onChange={(e) => setReason(e.currentTarget.value)}
+          />
+        )}
         <Button type="submit" loading={submit.isPending}>
-          {planned ? "Enregistrer la réalisation" : mode === "planned" ? "Planifier" : "Enregistrer"}
+          {editing ? (correcting ? "Enregistrer la correction" : "Enregistrer les modifications") : planned ? "Enregistrer la réalisation" : mode === "planned" ? "Planifier" : "Enregistrer"}
         </Button>
       </Stack>
     </form>

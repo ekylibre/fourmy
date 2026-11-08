@@ -9,6 +9,9 @@ export default defineConfig({
   testDir: "./e2e",
   timeout: 60_000,
   fullyParallel: false,
+  // Un seul navigateur : les parcours partagent la ferme pilote en base, et le
+  // rendu WebGL logiciel (cartes, plan 3D) cale quand plusieurs tournent ensemble.
+  workers: 1,
   reporter: [["list"]],
   globalSetup: "./e2e/global-setup.ts",
   globalTeardown: "./e2e/global-teardown.ts",

@@ -1,5 +1,6 @@
 import type {
   Snapshot,
+  InterventionHistoryEntry,
   LandParcelVersion,
   LandParcelAt,
   PlaceVersion,
@@ -218,6 +219,20 @@ export const demoInterventions: Intervention[] = [
     clientId: "00000000-0000-7000-8000-000000000401",
     createdAt: now,
     updatedAt: now,
+  },
+];
+
+/** Historique de l'intervention de démo : saisie puis réalisée sur mobile. */
+export const demoInterventionHistory: InterventionHistoryEntry[] = [
+  {
+    id: "00000000-0000-7000-8000-000000000701",
+    at: "2026-06-10T09:05:00.000Z",
+    action: "completed",
+    actor: DEMO_USER_ID,
+    actorName: "Camille",
+    origin: "mobile",
+    reason: null,
+    changes: null,
   },
 ];
 

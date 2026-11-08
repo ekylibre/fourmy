@@ -1,9 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type QueryClient } from "@tanstack/react-query";
 import type {
   Article,
   ContainerContents,
   FarmMember,
   Intervention,
+  InterventionDetail,
   Person,
   PhytoRegisterEntry,
   ProcedureCatalogue,
@@ -47,6 +48,31 @@ export function useInterventions(farmId: string, from: string, to: string) {
         farmPath(farmId, `/interventions?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
       ),
   });
+}
+
+/** Fiche d'une intervention : l'intervention et son historique. */
+export function useIntervention(farmId: string, id: string) {
+  return useQuery({
+    queryKey: ["intervention", farmId, id],
+    queryFn: () => api.get<InterventionDetail>(farmPath(farmId, `/interventions/${id}`)),
+  });
+}
+
+/** Noms de toutes les parcelles, quelle que soit la date (cibles d'autres dates que la frise). */
+export function useParcelNames(farmId: string) {
+  return useQuery({
+    queryKey: ["parcel-names", farmId],
+    queryFn: () => api.get<{ items: { id: string; name: string }[] }>(farmPath(farmId, "/land-parcels/names")),
+    staleTime: 5 * 60_000,
+    select: (r) => new Map(r.items.map((p) => [p.id, p.name])),
+  });
+}
+
+/** Après une écriture sur les interventions : tout ce qui en dépend est relu. */
+export function invalidateAfterIntervention(queryClient: QueryClient) {
+  for (const key of ["interventions", "intervention", "stock", "register", "snapshot", "contents", "procedures"]) {
+    void queryClient.invalidateQueries({ queryKey: [key] });
+  }
 }
 
 export function useContainerContents(farmId: string, containerId: string | null, at: string) {

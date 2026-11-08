@@ -71,3 +71,17 @@ export function formatDate(iso: string | null | undefined): string {
 export function formatNumber(n: number, digits = 2): string {
   return n.toLocaleString("fr-FR", { maximumFractionDigits: digits });
 }
+
+export function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+/** Période de travail : « 10/06/2026 08:00 → 10:00 », ou sur deux jours. */
+export function formatPeriod(startedAt: string, stoppedAt: string): string {
+  const sameDay = new Date(startedAt).toDateString() === new Date(stoppedAt).toDateString();
+  const end = sameDay
+    ? new Date(stoppedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+    : formatDateTime(stoppedAt);
+  return `${formatDateTime(startedAt)} → ${end}`;
+}

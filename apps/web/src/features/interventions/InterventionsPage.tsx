@@ -1,26 +1,19 @@
 import { useState } from "react";
-import { Alert, Badge, Button, Drawer, Group, Modal, Stack, Switch, Text, TextInput, Title } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation, useNavigate } from "react-router";
+import { Badge, Button, Drawer, Group, Stack, Switch, Text, Title } from "@mantine/core";
 import { Plus } from "lucide-react";
 import { DataTable } from "mantine-datatable";
 import type { Intervention } from "@fourmy/contracts";
-import { api, ApiError, farmPath } from "../../app/api";
+import { displayStatus } from "@fourmy/domain";
 import { useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
-import { formatDate, formatNumber, procedureLabel, unitLabel } from "../../app/labels";
-import { useArticles, useInterventions, usePeople, useProcedures, useSnapshot } from "../../app/queries";
+import { formatDate, procedureLabel } from "../../app/labels";
+import { useArticles, useInterventions, useParcelNames, usePeople, useProcedures, useSnapshot } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
 import { ProcedureIcon } from "../../components/ProcedureIcon";
+import { CancelModal } from "./CancelModal";
 import { InterventionForm } from "./InterventionForm";
-
-const STATUS: Record<Intervention["status"], { label: string; color: string }> = {
-  done: { label: "Réalisée", color: "lichen" },
-  planned: { label: "Planifiée", color: "paille" },
-  cancelled: { label: "Annulée", color: "gray" },
-};
-
-const short = (names: string[]) => (names.length > 3 ? `${names.slice(0, 3).join(", ")} +${names.length - 3}` : names.join(", "));
+import { quantityText, short, STATUS, targetName, type Names } from "./presenters";
 
 /** Interventions de la campagne de la frise ; saisie, réalisation, annulation. */
 export function InterventionsPage() {
@@ -32,16 +25,24 @@ export function InterventionsPage() {
   const articles = useArticles(farm.id);
   const people = usePeople(farm.id);
   const catalogue = useProcedures(farm.id);
+  const parcelNames = useParcelNames(farm.id);
+  const navigate = useNavigate();
+  const location = useLocation();
   const [editing, setEditing] = useState<Intervention | "new" | null>(null);
   const [cancelling, setCancelling] = useState<Intervention | null>(null);
   const [showCancelled, setShowCancelled] = useState(false);
 
   if (list.isLoading || snap.isLoading) return <Loading />;
   if (list.error) return <ErrorAlert error={list.error} />;
-  const parcelName = new Map(snap.data?.landParcels.map((p) => [p.id, p.name]));
-  const equipmentName = new Map(snap.data?.equipments.map((e) => [e.id, e.name]));
-  const articleName = new Map(articles.data?.items.map((a) => [a.id, a.name]));
-  const personName = new Map(people.data?.items.map((p) => [p.id, p.name]));
+  // Noms des parcelles de toutes dates : une intervention de mars cible des parcelles de mars.
+  const names: Names = {
+    parcel: parcelNames.data ?? new Map(),
+    equipment: new Map(snap.data?.equipments.map((e) => [e.id, e.name])),
+    article: new Map(articles.data?.items.map((a) => [a.id, { name: a.name, unit: a.unit }])),
+    person: new Map(people.data?.items.map((p) => [p.id, p.name])),
+  };
+  const now = new Date().toISOString();
+  const open = (i: Intervention) => navigate(`${i.id}${location.search}`);
   const all = [...list.data!.items].reverse();
   const rows = showCancelled ? all : all.filter((i) => i.status !== "cancelled");
   const cancelledCount = all.length - all.filter((i) => i.status !== "cancelled").length;
@@ -69,7 +70,8 @@ export function InterventionsPage() {
         minHeight={150}
         noRecordsText="Aucune intervention sur cette campagne"
         records={rows}
-        rowStyle={(i) => (i.status === "cancelled" ? { opacity: 0.55 } : undefined)}
+        rowStyle={(i) => (i.status === "cancelled" ? { opacity: 0.55, cursor: "pointer" } : { cursor: "pointer" })}
+        onRowClick={({ record }) => open(record)}
         columns={[
           { accessor: "date", title: "Date", render: (i) => <span className="lv-num">{formatDate(i.stoppedAt ?? i.startedAt ?? i.createdAt)}</span> },
           {
@@ -85,27 +87,15 @@ export function InterventionsPage() {
           {
             accessor: "targets",
             title: "Cibles",
-            render: (i) =>
-              short(
-                i.targets.map((t) =>
-                  t.kind === "land_parcel"
-                    ? (parcelName.get(t.id) ?? "parcelle d'une autre date")
-                    : t.kind === "equipment"
-                      ? (equipmentName.get(t.id) ?? "matériel")
-                      : "lieu",
-                ),
-              ),
+            render: (i) => short(i.targets.map((t) => targetName(names, t))),
           },
           {
             accessor: "inputs",
             title: "Intrants et sorties",
             ellipsis: false,
-            render: (i) =>
-              [...i.inputs, ...i.outputs]
-                .map((q) => `${articleName.get(q.articleId) ?? "?"} ${formatNumber(q.quantity, 3)} ${unitLabel(q.unit)}${q.per === "hectare" ? "/ha" : ""}`)
-                .join(" · "),
+            render: (i) => [...i.inputs, ...i.outputs].map((q) => quantityText(names, q)).join(" · "),
           },
-          { accessor: "doers", title: "Intervenants", render: (i) => short(i.doers.map((d) => personName.get(d.personId) ?? "?")) },
+          { accessor: "doers", title: "Intervenants", render: (i) => short(i.doers.map((d) => names.person.get(d.personId) ?? "?")) },
           {
             accessor: "status",
             title: "Statut",
@@ -113,7 +103,7 @@ export function InterventionsPage() {
             width: 210,
             render: (i) => (
               <Group gap={4} wrap="nowrap">
-                <Badge color={STATUS[i.status].color}>{STATUS[i.status].label}</Badge>
+                <Badge color={STATUS[displayStatus(i, now)].color}>{STATUS[displayStatus(i, now)].label}</Badge>
                 {i.origin === "mobile" && <Badge color="ardoise">Mobile</Badge>}
                 {i.origin === "migration" && <Badge color="gray">Ekylibre</Badge>}
               </Group>
@@ -126,7 +116,7 @@ export function InterventionsPage() {
             noWrap: true,
             render: (i) =>
               i.status === "cancelled" ? null : (
-                <Group gap={4} justify="flex-end" wrap="nowrap">
+                <Group gap={4} justify="flex-end" wrap="nowrap" onClick={(e) => e.stopPropagation()}>
                   {i.status === "planned" && (
                     <Button size="xs" variant="light" onClick={() => setEditing(i)}>
                       Réaliser
@@ -162,58 +152,5 @@ export function InterventionsPage() {
       </Drawer>
       <CancelModal farmId={farm.id} intervention={cancelling} onClose={() => setCancelling(null)} />
     </Stack>
-  );
-}
-
-/** Annulation avec motif : une intervention réalisée voit ses mouvements de stock contre-passés. */
-function CancelModal({ farmId, intervention, onClose }: { farmId: string; intervention: Intervention | null; onClose: () => void }) {
-  const queryClient = useQueryClient();
-  const [reason, setReason] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const close = () => {
-    setReason("");
-    setError(null);
-    onClose();
-  };
-  const cancel = useMutation({
-    mutationFn: () => api.post<Intervention>(farmPath(farmId, `/interventions/${intervention!.id}/cancel`), { reason }),
-    onSuccess: () => {
-      notifications.show({ color: "lichen", message: "Intervention annulée." });
-      for (const key of ["interventions", "stock", "register", "snapshot", "contents", "procedures"]) {
-        void queryClient.invalidateQueries({ queryKey: [key] });
-      }
-      close();
-    },
-    onError: (e) => setError(e instanceof ApiError ? e.message : String(e)),
-  });
-  return (
-    <Modal opened={intervention !== null} onClose={close} title="Annuler l'intervention">
-      {intervention && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            cancel.mutate();
-          }}
-        >
-          <Stack>
-            <Text size="sm">
-              {procedureLabel(intervention.procedure)} du {formatDate(intervention.stoppedAt ?? intervention.startedAt)}.
-              {intervention.status === "done" &&
-                " Ses mouvements de stock seront contre-passés et elle sortira du registre phyto ; l'historique garde la trace de l'annulation."}
-            </Text>
-            <TextInput label="Motif" required minLength={3} value={reason} onChange={(e) => setReason(e.currentTarget.value)} data-autofocus />
-            {error && <Alert color="brique">{error}</Alert>}
-            <Group justify="flex-end">
-              <Button variant="default" onClick={close}>
-                Garder
-              </Button>
-              <Button type="submit" color="brique" loading={cancel.isPending} disabled={reason.trim().length < 3}>
-                Annuler l'intervention
-              </Button>
-            </Group>
-          </Stack>
-        </form>
-      )}
-    </Modal>
   );
 }

@@ -297,6 +297,23 @@ Exigences : `claudedocs/exigences_interventions.md` (INT-UI-2, INT-UI-3).
 - **Rôles** : owner et worker, comme la réalisation et l'annulation.
 - **Statut affiché** : `displayStatus` (domaine) calcule « en cours »
   (planifiée dont le début est passé) ; rien n'est stocké.
+- **Écrans** :
+  - **Fiche** `/f/:ferme/interventions/:id` (clic sur une ligne de la liste) :
+    périodes, parcelles et surfaces **à la date de l'intervention** (pas de la
+    frise), intrants et sorties par hectare et au total (la valeur saisie en
+    gras, l'autre calculée sur la surface traitée), moyens, mini-carte des
+    parcelles et zones travaillées, trace GPS des matériels pendant les
+    périodes, historique (action, auteur, motif, avant → après). Une
+    intervention reprise d'Ekylibre sans modification le dit.
+  - **Modification** `…/:id/modifier` : le formulaire de saisie prérempli ;
+    réalisée → « Correction tracée », motif facultatif ; planifiée → date
+    prévue. Ce que le formulaire n'affiche pas est conservé tel quel :
+    surface travaillée et zone de travail des cibles, lot et lieu de
+    prélèvement des intrants, lot des sorties.
+  - **Liste** : noms des parcelles de toutes dates (`GET /land-parcels/names`),
+    plus de « parcelle d'une autre date ».
+  - Sans WebGL, les cartes sont remplacées par un message (`MapBoundary`) :
+    la fiche et la page Carte restent utilisables.
 
 ## 11. Icônes des procédures (2026-11-08)
 

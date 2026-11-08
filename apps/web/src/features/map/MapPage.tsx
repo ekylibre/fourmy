@@ -12,6 +12,7 @@ import { useFarm } from "../../app/farm";
 import { formatDate, NATURE_COLORS, NATURE_LABELS } from "../../app/labels";
 import { useSnapshot } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
+import { MapBoundary } from "../../components/MapBoundary";
 import { ParcelMap, type Basemap } from "./ParcelMap";
 
 /** Carte 2D : parcellaire à la date de la frise, bâtiments, trace GPS du jour (US-1). */
@@ -104,7 +105,9 @@ export function MapPage() {
       <Grid>
         <Grid.Col span={{ base: 12, md: 8 }} style={{ height: "68vh" }}>
           {layers && (
-            <ParcelMap parcels={layers.parcels} places={layers.places} track={trackLayer} basemap={basemap} onSelect={setSelected} />
+            <MapBoundary>
+              <ParcelMap parcels={layers.parcels} places={layers.places} track={trackLayer} basemap={basemap} onSelect={setSelected} />
+            </MapBoundary>
           )}
         </Grid.Col>
         <Grid.Col span={{ base: 12, md: 4 }}>

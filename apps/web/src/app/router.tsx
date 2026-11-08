@@ -8,6 +8,7 @@ import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { FarmsPage } from "../features/farms/FarmsPage";
 import { ImportsPage } from "../features/imports/ImportsPage";
 import { InterventionsPage } from "../features/interventions/InterventionsPage";
+import { InterventionEditPage } from "../features/interventions/InterventionEditPage";
 import { LoginPage } from "../features/login/LoginPage";
 import { RegisterPage } from "../features/register/RegisterPage";
 import { StockPage } from "../features/stock/StockPage";
@@ -19,6 +20,7 @@ import { UNAUTHORIZED_EVENT, useSession } from "./session";
 // MapLibre est lourd : la carte est chargée à la demande, pas avec l'application.
 const MapPage = lazy(() => import("../features/map/MapPage").then((m) => ({ default: m.MapPage })));
 // Cesium (plusieurs Mo) : le plan 3D n'est chargé que s'il est ouvert.
+const InterventionPage = lazy(() => import("../features/interventions/InterventionPage").then((m) => ({ default: m.InterventionPage })));
 const CartoLabPage = lazy(() => import("../carto/CartoLabPage").then((m) => ({ default: m.CartoLabPage })));
 const Plan3DPage = lazy(() => import("../3d/Plan3DPage").then((m) => ({ default: m.Plan3DPage })));
 
@@ -72,6 +74,8 @@ export const routes = [
       { path: "carte/outils", element: <Suspense fallback={<Loading />}><CartoLabPage /></Suspense> },
       { path: "plan-3d", element: <Suspense fallback={<Loading />}><Plan3DPage /></Suspense> },
       { path: "interventions", element: <InterventionsPage /> },
+      { path: "interventions/:interventionId", element: <Suspense fallback={<Loading />}><InterventionPage /></Suspense> },
+      { path: "interventions/:interventionId/modifier", element: <InterventionEditPage /> },
       { path: "stocks", element: <StockPage /> },
       { path: "cuverie", element: <CellarPage /> },
       { path: "registre", element: <RegisterPage /> },
