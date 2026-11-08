@@ -39,7 +39,12 @@ const otherWeek: Intervention = { ...base, id: id(4), procedure: "harvesting", i
 
 beforeEach(() => {
   localStorage.clear();
-  server.use(http.get("*/interventions", () => HttpResponse.json({ items: [done, planned, vine, otherWeek], nextCursor: null })));
+  const all = [done, planned, vine, otherWeek];
+  server.use(
+    http.get("*/interventions", () => HttpResponse.json({ items: all, nextCursor: null })),
+    // Fiche (page « Réaliser ») : l'intervention de cette semaine d'essai.
+    http.get("*/interventions/:id", ({ params }) => HttpResponse.json({ ...(all.find((i) => i.id === params.id) ?? done), history: [] })),
+  );
 });
 
 describe("vues des interventions", () => {
@@ -90,7 +95,7 @@ describe("vues des interventions", () => {
       fireEvent(target, Object.assign(createEvent.drop(target), { dataTransfer }));
     };
     drag(screen.getByRole("region", { name: "Réalisée" }));
-    expect(await screen.findByRole("dialog", { name: "Réaliser l'intervention" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /^Réaliser : / })).toBeInTheDocument();
   });
 
   it("kanban : une carte réalisée ramenée vers « Planifiée » est refusée avec une explication", async () => {
@@ -109,7 +114,8 @@ describe("vues des interventions", () => {
     renderApp(`/f/${FARM}/interventions?at=2026-06-10&view=kanban`);
     await user.click(await screen.findByRole("button", { name: "Actions : Labour" }));
     await user.click(await screen.findByRole("menuitem", { name: "Réaliser…" }));
-    expect(await screen.findByRole("dialog", { name: "Réaliser l'intervention" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Réaliser : Labour" })).toBeInTheDocument();
+    expect(screen.getByRole("form", { name: "Saisie de l'intervention" })).toBeInTheDocument();
   });
 
   it("calendrier : une taille sur deux demi-journées apparaît chaque jour, avec ses heures", async () => {

@@ -90,8 +90,12 @@ export const phytoRoutes = new Hono<Env>()
   })
   .get("/weather/spraying", async (c) => {
     const days = Math.min(Math.max(Number(c.req.query("days") ?? 3) || 3, 1), 5);
+    const from = c.req.query("from") ? new Date(c.req.query("from")!) : undefined;
+    if (from && Number.isNaN(from.getTime())) throw new BadRequest("from : date ISO attendue");
+    // Pas au-delà de l'horizon des prévisions (16 jours chez Open-Meteo).
+    if (from && from.getTime() > Date.now() + 15 * 86_400_000) return c.json(null);
     try {
-      return c.json(await sprayingForecast(db(), c.get("farmId"), days));
+      return c.json(await sprayingForecast(db(), c.get("farmId"), days, fetch, from));
     } catch (e) {
       return problem(c, 502, "Météo indisponible", e instanceof Error ? e.message : String(e));
     }

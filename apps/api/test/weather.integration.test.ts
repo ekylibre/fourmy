@@ -100,6 +100,16 @@ describe.skipIf(!url)("météo des interventions (intégration)", () => {
     expect(f!.slots[0]).toMatchObject({ stepHours: 3, level: "go", reasons: [] });
   });
 
+  it("conditions d'un jour passé (traitement réalisé) : observées, Open-Meteo, heure par heure", async () => {
+    const fake = fakeWeather();
+    const f = await sprayingForecast(db, farmId, 1, fake.fetchImpl, new Date("2025-09-23T00:00:00Z"));
+    expect(f).toMatchObject({ source: "open_meteo", kind: "observed" });
+    expect(f!.slots).toHaveLength(24);
+    // 7 h : vent 9 km/h (> 7) et pluie 0,2 mm → à surveiller.
+    expect(f!.slots.find((s) => s.at.startsWith("2025-09-23T07"))).toMatchObject({ level: "caution" });
+    expect(fake.calls).toEqual(["archive-api.open-meteo.com/v1/archive"]);
+  });
+
   it("la météo saisie part avec l'intervention ; le worker complète celles qui n'en ont pas", async () => {
     const id = crypto.randomUUID();
     const weather = { source: "manual", kind: "manual", temperatureC: 11, humidityPct: 90, windKmh: 3, precipitationMm: 0 };

@@ -1,6 +1,8 @@
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { Button, Group, Paper, Stack, Title } from "@mantine/core";
 import { ArrowLeft } from "lucide-react";
+import type { InterventionDetail } from "@fourmy/contracts";
+import { useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
 import { procedureLabel } from "../../app/labels";
 import { useArticles, useIntervention, usePeople, useProcedures, useSnapshot } from "../../app/queries";
@@ -9,39 +11,68 @@ import { ProcedureIcon } from "../../components/ProcedureIcon";
 import { InterventionForm } from "./InterventionForm";
 import { interventionDay } from "./presenters";
 
+type FormMode = "new" | "complete" | "edit";
+
 /**
- * Modification d'une intervention (exigence INT-UI-3) : le formulaire de
- * saisie, prérempli. Planifiée : mise à jour ; réalisée : correction tracée.
- * Les parcelles proposées sont celles de la date de l'intervention.
+ * Saisie d'une intervention en pleine page (exigences INT-UI-3, retours du
+ * 08/11) : nouvelle, réalisation d'une intervention planifiée, ou
+ * modification (planifiée : mise à jour ; réalisée : correction tracée).
+ * Même mise en page partout : le formulaire à gauche ; à droite les
+ * conditions de pulvérisation, la carte et le contrôle réglementaire.
  */
 export function InterventionEditPage() {
+  return <InterventionFormPage mode="edit" />;
+}
+export function InterventionCompletePage() {
+  return <InterventionFormPage mode="complete" />;
+}
+export function InterventionNewPage() {
+  return <InterventionFormPage mode="new" />;
+}
+
+function InterventionFormPage({ mode }: { mode: FormMode }) {
   const { interventionId } = useParams();
+  const farm = useFarm();
+  if (mode === "new") return <FormLayout mode={mode} back={`/f/${farm.id}/interventions`} />;
+  return <ExistingForm mode={mode} id={interventionId!} />;
+}
+
+function ExistingForm({ mode, id }: { mode: FormMode; id: string }) {
+  const farm = useFarm();
+  const detail = useIntervention(farm.id, id);
+  if (detail.error) return <ErrorAlert error={detail.error} />;
+  if (!detail.data) return <Loading />;
+  const i = detail.data;
+  if (i.status === "cancelled") return <ErrorAlert error={new Error("Intervention annulée : elle ne se modifie plus.")} />;
+  if (mode === "complete" && i.status !== "planned") return <ErrorAlert error={new Error("Intervention déjà réalisée : utilisez « Modifier » pour la corriger.")} />;
+  return <FormLayout mode={mode} intervention={i} back={`/f/${farm.id}/interventions/${i.id}`} />;
+}
+
+function FormLayout({ mode, intervention: i, back }: { mode: FormMode; intervention?: InterventionDetail; back: string }) {
   const farm = useFarm();
   const navigate = useNavigate();
   const location = useLocation();
-  const detail = useIntervention(farm.id, interventionId!);
-  const day = detail.data ? interventionDay(detail.data) : null;
-  const snap = useSnapshot(farm.id, day ?? new Date().toISOString());
+  const { day: timelineDay } = useAt();
+  const day = i ? interventionDay(i) : `${timelineDay}T12:00:00.000Z`;
+  const snap = useSnapshot(farm.id, day);
   const articles = useArticles(farm.id);
   const people = usePeople(farm.id);
   const catalogue = useProcedures(farm.id);
-  const sheet = `/f/${farm.id}/interventions/${interventionId}${location.search}`;
+  const backTo = `${back}${location.search}`;
 
-  if (detail.error) return <ErrorAlert error={detail.error} />;
-  if (!detail.data || !day || snap.isLoading || !snap.data || !articles.data || !catalogue.data) return <Loading />;
-  const i = detail.data;
-  if (i.status === "cancelled") return <ErrorAlert error={new Error("Intervention annulée : elle ne se modifie plus.")} />;
+  if (snap.error) return <ErrorAlert error={snap.error} />;
+  if (snap.isLoading || !snap.data || !articles.data || !catalogue.data) return <Loading />;
+  const title =
+    mode === "new" ? "Nouvelle intervention" : mode === "complete" ? `Réaliser : ${procedureLabel(i!.procedure)}` : `${i!.status === "done" ? "Corriger" : "Modifier"} : ${procedureLabel(i!.procedure)}`;
 
   return (
-    <Stack maw={760}>
-      <Button component={Link} to={sheet} variant="subtle" size="compact-sm" leftSection={<ArrowLeft size={14} />} w="fit-content">
-        Retour à la fiche
+    <Stack>
+      <Button component={Link} to={backTo} variant="subtle" size="compact-sm" leftSection={<ArrowLeft size={14} />} w="fit-content">
+        {mode === "new" ? "Interventions" : "Retour à la fiche"}
       </Button>
       <Group gap="sm">
-        <ProcedureIcon procedure={i.procedure} size={28} />
-        <Title order={1}>
-          {i.status === "done" ? "Corriger" : "Modifier"} : {procedureLabel(i.procedure)}
-        </Title>
+        {i && <ProcedureIcon procedure={i.procedure} size={28} />}
+        <Title order={1}>{title}</Title>
       </Group>
       <Paper p="md" withBorder>
         <InterventionForm
@@ -50,9 +81,14 @@ export function InterventionEditPage() {
           articles={articles.data.items}
           people={people.data?.items ?? []}
           catalogue={catalogue.data}
-          editing={i}
+          planned={mode === "complete" ? i : undefined}
+          editing={mode === "edit" ? i : undefined}
           defaultDay={day.slice(0, 10)}
-          onDone={() => navigate(sheet)}
+          onDone={(id) => {
+            // Après l'enregistrement : la fiche de l'intervention.
+            const target = id ?? i?.id;
+            navigate(target ? `/f/${farm.id}/interventions/${target}${location.search}` : backTo);
+          }}
         />
       </Paper>
     </Stack>

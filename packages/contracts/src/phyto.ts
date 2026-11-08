@@ -138,6 +138,8 @@ export const sprayingSlot = z.object({
 });
 export const sprayingForecast = z.object({
   source: weatherSource,
+  /** Prévision (à venir) ou conditions observées (fenêtre passée). */
+  kind: z.enum(["forecast", "observed"]).default("forecast"),
   latitude: z.number(),
   longitude: z.number(),
   slots: z.array(sprayingSlot),

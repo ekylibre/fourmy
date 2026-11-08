@@ -51,11 +51,16 @@ est jugé sur la réglementation de 2016) :
 
 ## Saisie, fiche, registre
 
-- **Formulaire** : panneau « Contrôle réglementaire » en direct
-  (`POST /phyto/check`), choix de la cible. Une réalisation avec un feu rouge
+- **Formulaire** : contrôle en direct (`POST /phyto/check`) affiché sous
+  chaque intrant, avec le choix de la cible ; synthèse de l'intervention
+  (feu global) dans la colonne de droite. Une réalisation avec un feu rouge
   demande un **motif** (« alerte + motif ») ; le serveur refuse une
   réalisation web rouge sans motif. Depuis le mobile (qui ne connaît pas
   encore les feux), la réalisation est enregistrée, feu rouge visible.
+- **Carte de la fiche** d'un traitement : cours d'eau et plans d'eau à moins
+  de 200 m au-delà de la ZNT (fossés en pointillés) et bande de ZNT la plus
+  exigeante des produits autour de la zone traitée
+  (`GET /interventions/:id/water`, largeur `zntM` du contrôle).
 - **Fiche** : contrôle enregistré à la saisie (`interventions.compliance`,
   avec le motif), sinon calculé à la date (`GET /interventions/:id/compliance`,
   reprises d'Ekylibre comprises) ; IFT par produit et parcelle.

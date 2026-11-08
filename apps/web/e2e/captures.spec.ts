@@ -63,7 +63,7 @@ test("formulaire d'intervention piloté par la forme (vendange)", async ({ page 
   await page.getByLabel("Date de la frise").fill("2023-09-20");
   await page.getByRole("link", { name: "Interventions" }).click();
   await page.getByRole("button", { name: "Nouvelle intervention" }).click();
-  const form = page.getByRole("dialog");
+  const form = page.getByRole("form", { name: "Saisie de l'intervention" });
   await form.getByRole("combobox", { name: "Intervention" }).fill("Vendange manuelle");
   await page.getByRole("option", { name: "Vendange manuelle" }).click();
   await expect(form.getByPlaceholder(/Rangée où/).first()).toBeVisible();
@@ -92,7 +92,7 @@ test("parcelles choisies sur la carte, zone partielle", async ({ page }) => {
   await page.getByLabel("Date de la frise").fill("2023-06-15");
   await page.getByRole("link", { name: "Interventions" }).click();
   await page.getByRole("button", { name: "Nouvelle intervention" }).click();
-  const form = page.getByRole("dialog");
+  const form = page.getByRole("form", { name: "Saisie de l'intervention" });
   await form.getByRole("combobox", { name: "Intervention" }).fill("sans fertilisation");
   await page.getByRole("option", { name: "Pulvérisation (sans fertilisation)" }).click();
   await form.getByText("Carte", { exact: true }).click();
@@ -121,7 +121,7 @@ test("contrôle réglementaire d'un traitement (référentiel E-Phy chargé)", a
   await page.getByLabel("Date de la frise").fill("2023-06-15");
   await page.getByRole("link", { name: "Interventions" }).click();
   await page.getByRole("button", { name: "Nouvelle intervention" }).click();
-  const form = page.getByRole("dialog");
+  const form = page.getByRole("form", { name: "Saisie de l'intervention" });
   await form.getByRole("combobox", { name: "Intervention" }).fill("sans fertilisation");
   await page.getByRole("option", { name: "Pulvérisation (sans fertilisation)" }).click();
   await form.getByRole("combobox", { name: "Parcelles" }).click();
@@ -130,8 +130,8 @@ test("contrôle réglementaire d'un traitement (référentiel E-Phy chargé)", a
   await form.getByRole("combobox", { name: "Produit", exact: true }).click();
   await page.getByRole("option", { name: /AMM/ }).first().click();
   await form.getByRole("textbox", { name: "Quantité" }).fill("3");
-  await expect(form.getByLabel("Contrôle réglementaire").getByRole("listitem").first()).toBeVisible({ timeout: 15_000 });
-  await form.getByLabel("Contrôle réglementaire").scrollIntoViewIfNeeded();
+  await expect(form.getByRole("list", { name: /^Contrôle de / }).getByRole("listitem").first()).toBeVisible({ timeout: 15_000 });
+  await form.getByRole("list", { name: /^Contrôle de / }).scrollIntoViewIfNeeded();
   await snap(page, "controle-phyto");
   await page.keyboard.press("Escape");
 });

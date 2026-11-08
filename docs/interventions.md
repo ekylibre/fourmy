@@ -305,11 +305,21 @@ Exigences : `claudedocs/exigences_interventions.md` (INT-UI-2, INT-UI-3).
     parcelles et zones travaillées, trace GPS des matériels pendant les
     périodes, historique (action, auteur, motif, avant → après). Une
     intervention reprise d'Ekylibre sans modification le dit.
-  - **Modification** `…/:id/edit` : le formulaire de saisie prérempli ;
-    réalisée → « Correction tracée », motif facultatif ; planifiée → date
-    prévue. Ce que le formulaire n'affiche pas est conservé tel quel :
-    surface travaillée et zone de travail des cibles, lot et lieu de
-    prélèvement des intrants, lot des sorties.
+  - **Saisie en pleine page** (retours du 08/11/2026), même mise en page
+    partout : **nouvelle** `…/interventions/new`, **réalisation** d'une
+    planifiée `…/:id/complete`, **modification** `…/:id/edit`. À gauche le
+    formulaire ; à droite les conditions de pulvérisation (traitement), la
+    carte des parcelles (bouton « Carte ») et la synthèse du contrôle
+    réglementaire ; le détail du contrôle est sous chaque intrant. Après
+    l'enregistrement : la fiche de l'intervention.
+  - Nouvelle intervention : **réalisée** si son début est passé, **à
+    planifier** s'il est à venir (le choix reste modifiable). Chaque période
+    a une **durée** qui calcule la fin ; déplacer le début garde la durée.
+  - **Modification** : le formulaire prérempli ; réalisée → « Correction
+    tracée », motif facultatif ; planifiée → date prévue. Ce que le
+    formulaire n'affiche pas est conservé tel quel : surface travaillée et
+    zone de travail des cibles, lot et lieu de prélèvement des intrants, lot
+    des sorties.
   - **Liste** : noms des parcelles de toutes dates (`GET /land-parcels/names`),
     plus de « parcelle d'une autre date ».
   - Sans WebGL, les cartes sont remplacées par un message (`MapBoundary`) :

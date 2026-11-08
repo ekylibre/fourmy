@@ -4,6 +4,7 @@ import {
   Alert,
   Button,
   Divider,
+  Grid,
   Group,
   Loader,
   Modal,
@@ -73,7 +74,8 @@ export interface InterventionFormProps {
    */
   editing?: Intervention;
   defaultDay: string;
-  onDone: () => void;
+  /** Après l'enregistrement, avec l'identifiant de l'intervention. */
+  onDone: (id?: string) => void;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -128,10 +130,16 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   const [code, setCode] = useState<string | null>(planned?.procedure ?? null);
   const procedure: ProcedureCatalogueItem | undefined = catalogue.items.find((p) => p.code === code);
   const shape = procedure?.shape;
-  const [mode, setMode] = useState<"done" | "planned">("done");
+  const start = planned?.startedAt ? local(planned.startedAt) : `${defaultDay}T08:00`;
+  // Nouvelle intervention : réalisée si son début est passé, à planifier sinon (modifiable).
+  const [mode, setMode] = useState<"done" | "planned">(() => (!planned && new Date(start).getTime() > Date.now() ? "planned" : "done"));
+  const followStart = (startedAt: string) => {
+    if (planned) return;
+    const t = new Date(startedAt).getTime();
+    if (!Number.isNaN(t)) setMode(t > Date.now() ? "planned" : "done");
+  };
   const completing = editing ? correcting : Boolean(planned) || mode === "done";
 
-  const start = planned?.startedAt ? local(planned.startedAt) : `${defaultDay}T08:00`;
   const [periods, setPeriods] = useState<PeriodRow[]>(
     planned?.periods.length
       ? planned.periods.map((p) => ({ startedAt: local(p.startedAt), stoppedAt: local(p.stoppedAt) }))
@@ -304,7 +312,8 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
           correctionId,
           ...(reason.trim() ? { reason: reason.trim() } : {}),
         };
-        return api.put<InterventionUpdateResult>(farmPath(farmId, `/interventions/${editing.id}`), write);
+        const r = await api.put<InterventionUpdateResult>(farmPath(farmId, `/interventions/${editing.id}`), write);
+        return { warnings: r.warnings, id: editing.id };
       }
       const id = planned?.id ?? crypto.randomUUID();
       if (!planned) {
@@ -317,9 +326,10 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         );
       }
       if (completing) {
-        return api.post<{ warnings: string[] }>(farmPath(farmId, `/interventions/${id}/complete`), full);
+        const r = await api.post<{ warnings: string[] }>(farmPath(farmId, `/interventions/${id}/complete`), full);
+        return { warnings: r.warnings, id };
       }
-      return { warnings: [] as string[] };
+      return { warnings: [] as string[], id };
     },
     onSuccess: (r) => {
       for (const w of r.warnings) notifications.show({ color: "paille", title: "À vérifier", message: w, autoClose: 10_000 });
@@ -328,7 +338,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         message: editing ? (correcting ? "Intervention corrigée." : "Intervention modifiée.") : completing ? "Intervention enregistrée." : "Intervention planifiée.",
       });
       invalidateAfterIntervention(queryClient);
-      onDone();
+      onDone(r.id);
     },
     onError: (e) => setError(e instanceof ApiError ? e.message : String(e)),
   });
@@ -408,8 +418,57 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       );
     });
 
+  // Conditions de pulvérisation autour du début : le jour même (observées) pour un
+  // traitement passé, les 3 jours à partir du jour prévu pour un traitement à venir.
+  const sprayWindow = (() => {
+    const t = new Date(periods[0]?.startedAt ?? "");
+    if (Number.isNaN(t.getTime())) return null;
+    const midnight = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+    const today = new Date();
+    const sameDay = midnight.getTime() === new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+    if (sameDay) return { from: undefined, days: 3 };
+    return midnight.getTime() < today.getTime() ? { from: midnight.toISOString(), days: 1 } : { from: midnight.toISOString(), days: 3 };
+  })();
+
+  const aside = (
+    <Stack gap="md" style={{ position: "sticky", top: 16 }}>
+      {shape === "treatment" && sprayWindow && <SprayingConditions farmId={farmId} from={sprayWindow.from} days={sprayWindow.days} />}
+      {procedure && shape !== "maintenance" && parcelMode === "map" && (
+        <Paper withBorder p="xs" aria-label="Carte des parcelles">
+          <MapBoundary>
+            <Suspense fallback={<Loader size="sm" />}>
+              <ParcelPicker
+                parcels={[...parcelShapes.values()]}
+                selected={parcels}
+                zones={targetExtras}
+                onSelect={setParcels}
+                onZones={(found) => {
+                  setTargetExtras((m) => {
+                    const next = new Map(m);
+                    for (const z of found) next.set(z.parcelId, { workedAreaM2: z.areaM2, workingZone: z.zone as InterventionTarget["workingZone"] });
+                    return next;
+                  });
+                  setParcels((current) => [...new Set([...current, ...found.map((z) => z.parcelId)])]);
+                }}
+                onClearZone={(id) =>
+                  setTargetExtras((m) => {
+                    const next = new Map(m);
+                    next.delete(id);
+                    return next;
+                  })
+                }
+              />
+            </Suspense>
+          </MapBoundary>
+        </Paper>
+      )}
+      <ComplianceSummary check={complianceCheck} />
+    </Stack>
+  );
+
   return (
     <form
+      aria-label="Saisie de l'intervention"
       onSubmit={(e) => {
         e.preventDefault();
         setError(null);
@@ -420,251 +479,233 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         submit.mutate();
       }}
     >
-      <Stack>
-        <Select
-          label="Intervention"
-          data={procedureOptions}
-          value={code}
-          onChange={chooseProcedure}
-          renderOption={({ option }) => (
-            <Group gap={8} wrap="nowrap">
-              <ProcedureIcon procedure={option.value} />
-              <span>{option.label}</span>
-            </Group>
-          )}
-          leftSection={code ? <ProcedureIcon procedure={code} /> : undefined}
-          searchable
-          required
-          disabled={Boolean(toComplete)}
-        />
-        {correcting && (
-          <Alert color="ardoise" variant="light" title="Correction tracée">
-            Les mouvements de stock de cette intervention sont repris puis repassés avec les nouvelles valeurs ; le registre phyto suit.
-            L'historique garde la version d'avant.
-          </Alert>
-        )}
-        {!planned && (
-          <SegmentedControl
-            value={mode}
-            onChange={(v) => setMode(v as "done" | "planned")}
-            data={[
-              { value: "done", label: "Réalisée" },
-              { value: "planned", label: "À planifier" },
-            ]}
-          />
-        )}
-
-        {completing ? (
-          <>
-            {periods.map((p, i) => (
-              <Group key={i} grow align="flex-end" wrap="nowrap">
-                <TextInput
-                  type="datetime-local"
-                  label={i === 0 ? "Début" : undefined}
-                  aria-label="Début"
-                  value={p.startedAt}
-                  onChange={(e) => {
-                    const v = e.currentTarget.value;
-                    setPeriods(periods.map((x, j) => (j === i ? withStart(x, v) : x)));
-                  }}
-                  required
-                />
-                <DurationInput
-                  label={i === 0 ? "Durée" : undefined}
-                  minutes={durationMinutes(p)}
-                  onChange={(m) => setPeriods(periods.map((x, j) => (j === i ? withDuration(x, m) : x)))}
-                />
-                <TextInput
-                  type="datetime-local"
-                  label={i === 0 ? "Fin" : undefined}
-                  aria-label="Fin"
-                  value={p.stoppedAt}
-                  onChange={(e) => setPeriods(periods.map((x, j) => (j === i ? { ...x, stoppedAt: e.currentTarget.value } : x)))}
-                  required
-                />
-                {periods.length > 1 && (
-                  <ActionIcon variant="subtle" color="brique" aria-label="Retirer la période" style={{ flex: "none" }} onClick={() => setPeriods(periods.filter((_, j) => j !== i))}>
-                    <Trash2 size={16} />
-                  </ActionIcon>
-                )}
-              </Group>
-            ))}
-            <Button
-              variant="subtle"
-              size="xs"
-              leftSection={<Plus size={14} />}
-              onClick={() => {
-                const day = periods.at(-1)!.startedAt.slice(0, 10);
-                setPeriods([...periods, { startedAt: `${day}T14:00`, stoppedAt: `${day}T17:00` }]);
-              }}
-            >
-              Ajouter une période de travail
-            </Button>
-          </>
-        ) : (
-          <TextInput
-            type="datetime-local"
-            label="Date prévue"
-            value={periods[0]!.startedAt}
-            onChange={(e) => setPeriods([{ ...periods[0]!, startedAt: e.currentTarget.value }])}
-            required
-          />
-        )}
-
-        {procedure &&
-          (shape === "maintenance" ? (
-            <MultiSelect
-              label="Matériels entretenus"
+      <Grid>
+        <Grid.Col span={{ base: 12, lg: 7 }}>
+          <Stack>
+            <Select
+              label="Intervention"
+              data={procedureOptions}
+              value={code}
+              onChange={chooseProcedure}
+              renderOption={({ option }) => (
+                <Group gap={8} wrap="nowrap">
+                  <ProcedureIcon procedure={option.value} />
+                  <span>{option.label}</span>
+                </Group>
+              )}
+              leftSection={code ? <ProcedureIcon procedure={code} /> : undefined}
               searchable
-              data={snapshot.equipments.map((e) => ({ value: e.id, label: e.name }))}
-              value={maintained}
-              onChange={setMaintained}
+              required
+              disabled={Boolean(toComplete)}
             />
-          ) : (
-            <Stack gap={6}>
-              <Group justify="space-between" align="flex-end">
-                <Text size="sm" fw={500}>
-                  Parcelles{" "}
-                  {parcels.length > 0 && (
-                    <Text span size="xs" c="dimmed" className="lv-num">
-                      · {parcels.length} parcelle(s), {formatHa(treatedM2)} traités
-                    </Text>
-                  )}
-                </Text>
+            {correcting && (
+              <Alert color="ardoise" variant="light" title="Correction tracée">
+                Les mouvements de stock de cette intervention sont repris puis repassés avec les nouvelles valeurs ; le registre phyto suit.
+                L'historique garde la version d'avant.
+              </Alert>
+            )}
+            {!planned && (
+              <Stack gap={2}>
                 <SegmentedControl
-                  size="xs"
-                  aria-label="Choix des parcelles"
-                  value={parcelMode}
-                  onChange={(v) => setParcelMode(v as "list" | "map")}
+                  aria-label="Type"
+                  value={mode}
+                  onChange={(v) => setMode(v as "done" | "planned")}
                   data={[
-                    { value: "list", label: "Liste" },
-                    { value: "map", label: "Carte" },
+                    { value: "done", label: "Réalisée" },
+                    { value: "planned", label: "À planifier" },
                   ]}
                 />
-              </Group>
-              {parcelMode === "list" ? (
+                <Text size="xs" c="dimmed">
+                  Déduit du début : passé, réalisée ; à venir, à planifier.
+                </Text>
+              </Stack>
+            )}
+
+            {completing ? (
+              <>
+                {periods.map((p, i) => (
+                  <Group key={i} grow align="flex-end" wrap="nowrap">
+                    <TextInput
+                      type="datetime-local"
+                      label={i === 0 ? "Début" : undefined}
+                      aria-label="Début"
+                      value={p.startedAt}
+                      onChange={(e) => {
+                        const v = e.currentTarget.value;
+                        setPeriods(periods.map((x, j) => (j === i ? withStart(x, v) : x)));
+                        if (i === 0) followStart(v);
+                      }}
+                      required
+                    />
+                    <DurationInput
+                      label={i === 0 ? "Durée" : undefined}
+                      minutes={durationMinutes(p)}
+                      onChange={(m) => setPeriods(periods.map((x, j) => (j === i ? withDuration(x, m) : x)))}
+                    />
+                    <TextInput
+                      type="datetime-local"
+                      label={i === 0 ? "Fin" : undefined}
+                      aria-label="Fin"
+                      value={p.stoppedAt}
+                      onChange={(e) => setPeriods(periods.map((x, j) => (j === i ? { ...x, stoppedAt: e.currentTarget.value } : x)))}
+                      required
+                    />
+                    {periods.length > 1 && (
+                      <ActionIcon variant="subtle" color="brique" aria-label="Retirer la période" style={{ flex: "none" }} onClick={() => setPeriods(periods.filter((_, j) => j !== i))}>
+                        <Trash2 size={16} />
+                      </ActionIcon>
+                    )}
+                  </Group>
+                ))}
+                <Button
+                  variant="subtle"
+                  size="xs"
+                  leftSection={<Plus size={14} />}
+                  onClick={() => {
+                    const day = periods.at(-1)!.startedAt.slice(0, 10);
+                    setPeriods([...periods, { startedAt: `${day}T14:00`, stoppedAt: `${day}T17:00` }]);
+                  }}
+                >
+                  Ajouter une période de travail
+                </Button>
+              </>
+            ) : (
+              <TextInput
+                type="datetime-local"
+                label="Date prévue"
+                aria-label="Date prévue"
+                value={periods[0]!.startedAt}
+                onChange={(e) => {
+                  const v = e.currentTarget.value;
+                  setPeriods([withStart(periods[0]!, v)]);
+                  followStart(v);
+                }}
+                required
+              />
+            )}
+
+            {procedure &&
+              (shape === "maintenance" ? (
                 <MultiSelect
-                  aria-label="Parcelles"
+                  label="Matériels entretenus"
                   searchable
-                  data={snapshot.landParcels.map((p) => ({ value: p.id, label: `${p.name} (${formatHa(p.version.areaM2)})` }))}
-                  value={parcels}
-                  onChange={setParcels}
+                  data={snapshot.equipments.map((e) => ({ value: e.id, label: e.name }))}
+                  value={maintained}
+                  onChange={setMaintained}
                 />
               ) : (
-                <MapBoundary>
-                  <Suspense fallback={<Loader size="sm" />}>
-                    <ParcelPicker
-                      parcels={[...parcelShapes.values()]}
-                      selected={parcels}
-                      zones={targetExtras}
-                      onSelect={setParcels}
-                      onZones={(found) => {
-                        setTargetExtras((m) => {
-                          const next = new Map(m);
-                          for (const z of found) next.set(z.parcelId, { workedAreaM2: z.areaM2, workingZone: z.zone as InterventionTarget["workingZone"] });
-                          return next;
-                        });
-                        setParcels((current) => [...new Set([...current, ...found.map((z) => z.parcelId)])]);
-                      }}
-                      onClearZone={(id) =>
-                        setTargetExtras((m) => {
-                          const next = new Map(m);
-                          next.delete(id);
-                          return next;
-                        })
-                      }
+                <Stack gap={6}>
+                  <Group justify="space-between" align="flex-end">
+                    <Text size="sm" fw={500}>
+                      Parcelles{" "}
+                      {parcels.length > 0 && (
+                        <Text span size="xs" c="dimmed" className="lv-num">
+                          · {parcels.length} parcelle(s), {formatHa(treatedM2)} traités
+                        </Text>
+                      )}
+                    </Text>
+                    <SegmentedControl
+                      size="xs"
+                      aria-label="Choix des parcelles"
+                      value={parcelMode}
+                      onChange={(v) => setParcelMode(v as "list" | "map")}
+                      data={[
+                        { value: "list", label: "Liste" },
+                        { value: "map", label: "Carte" },
+                      ]}
                     />
-                  </Suspense>
-                </MapBoundary>
-              )}
-            </Stack>
-          ))}
+                  </Group>
+                  <MultiSelect
+                      aria-label="Parcelles"
+                      searchable
+                      data={snapshot.landParcels.map((p) => ({ value: p.id, label: `${p.name} (${formatHa(p.version.areaM2)})` }))}
+                      value={parcels}
+                      onChange={setParcels}
+                    />
+                </Stack>
+              ))}
 
-        {inputKinds.length > 0 && (
-          <>
-            <Divider label="Intrants" labelPosition="left" />
-            {quantityRows("input", inputs, setInputs, articleOptions(inputKinds, procedure!.suggestions.inputs))}
-            <Button variant="subtle" size="xs" leftSection={<Plus size={14} />} onClick={() => setInputs([...inputs, emptyRow("hectare")])}>
-              Ajouter un intrant
+            {inputKinds.length > 0 && (
+              <>
+                <Divider label="Intrants" labelPosition="left" />
+                {quantityRows("input", inputs, setInputs, articleOptions(inputKinds, procedure!.suggestions.inputs))}
+                <Button variant="subtle" size="xs" leftSection={<Plus size={14} />} onClick={() => setInputs([...inputs, emptyRow("hectare")])}>
+                  Ajouter un intrant
+                </Button>
+              </>
+            )}
+
+            {outputKinds.length > 0 && (
+              <>
+                <Divider label={shape === "harvest" ? "Récolte" : "Sorties"} labelPosition="left" />
+                {quantityRows("output", outputs, setOutputs, articleOptions(outputKinds, []))}
+                <Button variant="subtle" size="xs" leftSection={<Plus size={14} />} onClick={() => setOutputs([...outputs, emptyRow("total")])}>
+                  Ajouter une sortie
+                </Button>
+              </>
+            )}
+
+            {shape === "treatment" && (
+              <MultiSelect
+                label="Motifs (facultatif)"
+                data={Object.entries(catalogue.purposes).map(([value, label]) => ({ value, label }))}
+                value={purposes}
+                onChange={(v) => setPurposes(v as TreatmentPurpose[])}
+              />
+            )}
+
+            {procedure && <WeatherFields farmId={farmId} request={weatherRequest} value={weather} onChange={setWeather} />}
+
+            {procedure && (
+              <>
+                <Divider label="Moyens" labelPosition="left" />
+                <MultiSelect
+                  label="Matériels"
+                  searchable
+                  data={withSuggestions(snapshot.equipments.map((e) => ({ value: e.id, label: e.name })), procedure.suggestions.tools)}
+                  value={tools}
+                  onChange={setTools}
+                />
+                <MultiSelect
+                  label="Intervenants"
+                  searchable
+                  data={withSuggestions(
+                    people.filter((p) => p.active || doers.includes(p.id)).map((p) => ({ value: p.id, label: p.role ? `${p.name} (${p.role})` : p.name })),
+                    procedure.suggestions.doers,
+                  )}
+                  value={doers}
+                  onChange={setDoers}
+                  nothingFoundMessage="Aucune personne — à ajouter dans Équipe"
+                />
+                <Textarea label="Notes" autosize minRows={2} maxLength={2000} value={notes} onChange={(e) => setNotes(e.currentTarget.value)} />
+              </>
+            )}
+
+            {error && (
+              <Alert color="brique" title="Enregistrement refusé">
+                {error}
+              </Alert>
+            )}
+            {inputKinds.length > 0 && (
+              <Text size="xs" c="dimmed">
+                Une quantité par hectare est multipliée par la surface traitée à la date de l'intervention ; le stock et le registre phyto se mettent à jour.
+              </Text>
+            )}
+            {editing && (
+              <TextInput
+                label={correcting ? "Motif de la correction (facultatif)" : "Motif de la modification (facultatif)"}
+                maxLength={500}
+                value={reason}
+                onChange={(e) => setReason(e.currentTarget.value)}
+              />
+            )}
+            <Button type="submit" loading={submit.isPending}>
+              {editing ? (correcting ? "Enregistrer la correction" : "Enregistrer les modifications") : planned ? "Enregistrer la réalisation" : mode === "planned" ? "Planifier" : "Enregistrer"}
             </Button>
-          </>
-        )}
-
-        {outputKinds.length > 0 && (
-          <>
-            <Divider label={shape === "harvest" ? "Récolte" : "Sorties"} labelPosition="left" />
-            {quantityRows("output", outputs, setOutputs, articleOptions(outputKinds, []))}
-            <Button variant="subtle" size="xs" leftSection={<Plus size={14} />} onClick={() => setOutputs([...outputs, emptyRow("total")])}>
-              Ajouter une sortie
-            </Button>
-          </>
-        )}
-
-        {shape === "treatment" && (
-          <MultiSelect
-            label="Motifs (facultatif)"
-            data={Object.entries(catalogue.purposes).map(([value, label]) => ({ value, label }))}
-            value={purposes}
-            onChange={(v) => setPurposes(v as TreatmentPurpose[])}
-          />
-        )}
-
-        <ComplianceSummary check={complianceCheck} />
-
-        {/* Prévisions : utiles pour un traitement à faire, pas pour un traitement passé. */}
-        {shape === "treatment" && (!completing || (periods[0]?.startedAt ?? "") >= new Date().toISOString().slice(0, 10)) && (
-          <SprayingConditions farmId={farmId} />
-        )}
-
-        {procedure && <WeatherFields farmId={farmId} request={weatherRequest} value={weather} onChange={setWeather} />}
-
-        {procedure && (
-          <>
-            <Divider label="Moyens" labelPosition="left" />
-            <MultiSelect
-              label="Matériels"
-              searchable
-              data={withSuggestions(snapshot.equipments.map((e) => ({ value: e.id, label: e.name })), procedure.suggestions.tools)}
-              value={tools}
-              onChange={setTools}
-            />
-            <MultiSelect
-              label="Intervenants"
-              searchable
-              data={withSuggestions(
-                people.filter((p) => p.active || doers.includes(p.id)).map((p) => ({ value: p.id, label: p.role ? `${p.name} (${p.role})` : p.name })),
-                procedure.suggestions.doers,
-              )}
-              value={doers}
-              onChange={setDoers}
-              nothingFoundMessage="Aucune personne — à ajouter dans Équipe"
-            />
-            <Textarea label="Notes" autosize minRows={2} maxLength={2000} value={notes} onChange={(e) => setNotes(e.currentTarget.value)} />
-          </>
-        )}
-
-        {error && (
-          <Alert color="brique" title="Enregistrement refusé">
-            {error}
-          </Alert>
-        )}
-        {inputKinds.length > 0 && (
-          <Text size="xs" c="dimmed">
-            Une quantité par hectare est multipliée par la surface traitée à la date de l'intervention ; le stock et le registre phyto se mettent à jour.
-          </Text>
-        )}
-        {editing && (
-          <TextInput
-            label={correcting ? "Motif de la correction (facultatif)" : "Motif de la modification (facultatif)"}
-            maxLength={500}
-            value={reason}
-            onChange={(e) => setReason(e.currentTarget.value)}
-          />
-        )}
-        <Button type="submit" loading={submit.isPending}>
-          {editing ? (correcting ? "Enregistrer la correction" : "Enregistrer les modifications") : planned ? "Enregistrer la réalisation" : mode === "planned" ? "Planifier" : "Enregistrer"}
-        </Button>
-      </Stack>
+          </Stack>
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, lg: 5 }}>{aside}</Grid.Col>
+      </Grid>
       <Modal opened={askOverride} onClose={() => setAskOverride(false)} title="Feu rouge réglementaire" size="lg">
         <Stack>
           <Alert color="brique" variant="light">

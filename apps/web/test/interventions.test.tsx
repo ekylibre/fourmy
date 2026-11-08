@@ -13,7 +13,7 @@ async function openForm(user: ReturnType<typeof userEvent.setup>) {
   const button = await screen.findByRole("button", { name: "Nouvelle intervention" });
   await vi.waitFor(() => expect(button).toBeEnabled()); // catalogue chargé
   await user.click(button);
-  const form = await screen.findByRole("dialog");
+  const form = await screen.findByRole("form", { name: "Saisie de l'intervention" });
   await user.click(within(form).getByRole("combobox", { name: "Intervention" }));
   await user.click(await screen.findByRole("option", { name: "Pulvérisation" }));
   return form;
@@ -113,7 +113,7 @@ describe("interventions", () => {
     const form = await openForm(user);
     await user.click(within(form).getByRole("button", { name: "Enregistrer" }));
     expect(await within(form).findByText(/au moins un produit phytosanitaire/)).toBeInTheDocument();
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("form", { name: "Saisie de l'intervention" })).toBeInTheDocument();
   });
 
   it("annule une intervention réalisée avec un motif", async () => {

@@ -40,8 +40,12 @@ MET-3). Réalisé le 2026-11-08.
 
 ## Conditions de pulvérisation (MET-3)
 
-Widget sur le **tableau de bord** (frise sur aujourd'hui) et dans le
-**formulaire d'un traitement** à planifier ou du jour : les 3 prochains jours,
+Widget sur le **tableau de bord** (frise sur aujourd'hui) et, toujours, dans
+le **formulaire d'un traitement** (colonne de droite) : pour un traitement
+passé, les conditions **observées** heure par heure ce jour-là
+(`GET /weather/spraying?days=1&from=…`, historique Open-Meteo) ; pour un
+traitement à venir, les 3 jours à partir du jour prévu (16 jours au plus) ;
+sinon les 3 prochains jours,
 un créneau par heure (par 3 h avec OpenWeather), favorable / à surveiller /
 défavorable, la raison au survol, le prochain créneau favorable. Seuils repris
 d'Ekylibre (`weather_spraying_cells_controller.rb`) :

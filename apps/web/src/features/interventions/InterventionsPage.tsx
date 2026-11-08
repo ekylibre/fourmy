@@ -1,15 +1,14 @@
 import { useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
-import { ActionIcon, Button, CloseButton, Drawer, Group, SegmentedControl, Stack, Switch, Text, TextInput, Title, Tooltip } from "@mantine/core";
+import { ActionIcon, Button, CloseButton, Group, SegmentedControl, Stack, Switch, Text, TextInput, Title, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { CalendarDays, ChevronLeft, ChevronRight, Columns3, List, Plus, Search } from "lucide-react";
 import type { Intervention } from "@fourmy/contracts";
 import { todayIso, useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
-import { useArticles, useCampaignInterventions, useParcelNames, usePeople, useProcedures, useSnapshot } from "../../app/queries";
+import { useArticles, useCampaignInterventions, useParcelNames, usePeople, useSnapshot } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
 import { CancelModal } from "./CancelModal";
-import { InterventionForm } from "./InterventionForm";
 import type { Names } from "./presenters";
 import { makeMatcher, searchText } from "./search";
 import { CalendarView, KanbanView, ListView, type ViewActions } from "./views";
@@ -46,7 +45,6 @@ export function InterventionsPage() {
   const [wholeCampaign, setWholeCampaign] = useState(false);
   const query = params.get("q") ?? "";
   const [showCancelled, setShowCancelled] = useState(false);
-  const [completing, setCompleting] = useState<Intervention | "new" | null>(null);
   const [cancelling, setCancelling] = useState<Intervention | null>(null);
 
   const week = weekOf(day);
@@ -58,7 +56,6 @@ export function InterventionsPage() {
   const snap = useSnapshot(farm.id, at);
   const articles = useArticles(farm.id);
   const people = usePeople(farm.id);
-  const catalogue = useProcedures(farm.id);
   const parcelNames = useParcelNames(farm.id);
 
   const setParam = (key: string, value: string) =>
@@ -109,7 +106,7 @@ export function InterventionsPage() {
 
   const actions: ViewActions = {
     open: (i) => navigate(`${i.id}${location.search}`),
-    complete: (i) => setCompleting(i),
+    complete: (i) => navigate(`${i.id}/complete${location.search}`),
     cancel: (i) => setCancelling(i),
   };
 
@@ -117,7 +114,7 @@ export function InterventionsPage() {
     <Stack>
       <Group justify="space-between">
         <Title order={1}>Interventions {year}</Title>
-        <Button leftSection={<Plus size={16} />} onClick={() => setCompleting("new")} disabled={!catalogue.data}>
+        <Button leftSection={<Plus size={16} />} onClick={() => navigate(`new${location.search}`)}>
           Nouvelle intervention
         </Button>
       </Group>
@@ -193,26 +190,6 @@ export function InterventionsPage() {
       )}
       {view === "calendar" && <CalendarView items={visible} week={week} names={names} actions={actions} now={now} />}
 
-      <Drawer
-        opened={completing !== null}
-        onClose={() => setCompleting(null)}
-        position="right"
-        size="lg"
-        title={completing === "new" ? "Nouvelle intervention" : "Réaliser l'intervention"}
-      >
-        {completing !== null && snap.data && articles.data && catalogue.data && (
-          <InterventionForm
-            farmId={farm.id}
-            snapshot={snap.data}
-            articles={articles.data.items}
-            people={people.data?.items ?? []}
-            catalogue={catalogue.data}
-            planned={completing === "new" ? undefined : completing}
-            defaultDay={day}
-            onDone={() => setCompleting(null)}
-          />
-        )}
-      </Drawer>
       <CancelModal farmId={farm.id} intervention={cancelling} onClose={() => setCancelling(null)} />
     </Stack>
   );

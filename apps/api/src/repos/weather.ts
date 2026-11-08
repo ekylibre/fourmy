@@ -116,11 +116,18 @@ export async function interventionWeather(db: Database, farmId: string, req: Wea
 }
 
 /** Créneaux de pulvérisation des prochains jours au centre de la ferme (widget). */
-export async function sprayingForecast(db: Database, farmId: string, days = 3, fetchImpl: typeof fetch = fetch): Promise<SprayingForecast | null> {
+export async function sprayingForecast(
+  db: Database,
+  farmId: string,
+  days = 3,
+  fetchImpl: typeof fetch = fetch,
+  /** Début de la fenêtre (date d'un traitement) ; maintenant par défaut. Passée : conditions observées. */
+  start?: Date,
+): Promise<SprayingForecast | null> {
   const { point, providers } = await withFarm(db, farmId, async (tx) => ({ point: await weatherPoint(tx), providers: await keyedProviders(tx) }));
   if (!point) return null;
   const now = new Date();
-  const from = new Date(Math.floor(now.getTime() / HOUR) * HOUR);
+  const from = new Date(Math.floor((start ?? now).getTime() / HOUR) * HOUR);
   const to = new Date(from.getTime() + days * 24 * HOUR);
   const { source, hours } = await hoursFor(providers, point.lat, point.lon, from, to, fetchImpl);
   const slots = hours
@@ -141,7 +148,13 @@ export async function sprayingForecast(db: Database, farmId: string, days = 3, f
         precipitationMm: h.precipitationMm,
       };
     });
-  return { source, latitude: Math.round(point.lat * 1e4) / 1e4, longitude: Math.round(point.lon * 1e4) / 1e4, slots };
+  return {
+    source,
+    kind: to.getTime() <= now.getTime() ? "observed" : "forecast",
+    latitude: Math.round(point.lat * 1e4) / 1e4,
+    longitude: Math.round(point.lon * 1e4) / 1e4,
+    slots,
+  };
 }
 
 /** Complète la météo d'une intervention réalisée (worker, historique Open-Meteo). */

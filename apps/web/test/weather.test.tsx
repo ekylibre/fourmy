@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { demoInterventions } from "@fourmy/mocks";
@@ -13,7 +13,7 @@ async function openTreatment(user: ReturnType<typeof userEvent.setup>) {
   const button = await screen.findByRole("button", { name: "Nouvelle intervention" });
   await vi.waitFor(() => expect(button).toBeEnabled());
   await user.click(button);
-  const form = await screen.findByRole("dialog");
+  const form = await screen.findByRole("form", { name: "Saisie de l'intervention" });
   await user.click(within(form).getByRole("combobox", { name: "Intervention" }));
   await user.click(await screen.findByRole("option", { name: "Pulvérisation" }));
   await user.click(within(form).getByRole("combobox", { name: "Parcelles" }));
@@ -62,15 +62,23 @@ describe("météo de l'intervention", () => {
     expect(within(meteo).getByRole("textbox", { name: "Température" })).toHaveValue("14,2 °C");
   });
 
-  it("le formulaire d'un traitement à planifier montre les conditions de pulvérisation", async () => {
+  it("conditions de pulvérisation toujours affichées : le jour même pour un traitement passé, les jours suivants à venir", async () => {
     const user = userEvent.setup();
+    const asked: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      if (request.url.includes("/weather/spraying")) asked.push(request.url);
+    });
     const form = await openTreatment(user);
-    // Traitement passé (10/06/2026) : pas de prévisions ; à planifier : oui.
-    expect(within(form).queryByLabelText("Conditions de pulvérisation")).not.toBeInTheDocument();
-    await user.click(within(form).getByText("À planifier"));
-    const widget = await within(form).findByLabelText("Conditions de pulvérisation");
-    expect(within(widget).getByText(/Prochain créneau favorable/)).toBeInTheDocument();
-    expect(within(widget).getByRole("img", { name: /défavorable : vent 22 km\/h/ })).toBeInTheDocument();
+    // Traitement du 10/06/2026 (passé) : conditions observées ce jour-là.
+    expect(await within(form).findByLabelText("Conditions de pulvérisation")).toBeInTheDocument();
+    await vi.waitFor(() => expect(asked.some((u) => /days=1&from=2026-06-/.test(u))).toBe(true));
+    // Début dans le futur : le type passe à « À planifier », 3 jours de prévision.
+    const start = within(form).getByLabelText("Début") as HTMLInputElement;
+    fireEvent.change(start, { target: { value: "2099-06-10T08:00" } });
+    expect(within(form).getByRole("radio", { name: "À planifier" })).toBeChecked();
+    expect(within(form).getByLabelText("Date prévue")).toHaveValue("2099-06-10T08:00");
+    await vi.waitFor(() => expect(asked.some((u) => /days=3&from=2099-06-/.test(u))).toBe(true));
+    server.events.removeAllListeners();
   });
 });
 

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
-import { Badge, Button, Drawer, Grid, Group, Paper, Stack, Table, Text, Timeline, Title } from "@mantine/core";
+import { Badge, Button, Grid, Group, Paper, Stack, Table, Text, Timeline, Title } from "@mantine/core";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Pencil } from "lucide-react";
 import type { FeatureCollection, Geometry } from "geojson";
@@ -11,13 +11,12 @@ import { formatHa } from "@fourmy/ui-lyvre";
 import { api, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { formatDateTime, formatNumber, formatPeriod, procedureLabel, unitLabel } from "../../app/labels";
-import { useArticles, useIntervention, useParcelNames, usePeople, useProcedures, useSnapshot } from "../../app/queries";
+import { useArticles, useIntervention, useParcelNames, usePeople, useSnapshot } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
 import { MapBoundary } from "../../components/MapBoundary";
 import { ProcedureIcon } from "../../components/ProcedureIcon";
 import { ParcelMap } from "../map/ParcelMap";
 import { CancelModal } from "./CancelModal";
-import { InterventionForm } from "./InterventionForm";
 import { actionLabel, changeLines, interventionDay, STATUS, targetName, type Names } from "./presenters";
 import { ComplianceSection, IftSection } from "./RegulatorySections";
 import { WeatherSummary } from "../weather/Weather";
@@ -48,8 +47,6 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
   const articles = useArticles(farm.id);
   const people = usePeople(farm.id);
   const parcelNames = useParcelNames(farm.id);
-  const catalogue = useProcedures(farm.id);
-  const [completing, setCompleting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const status = displayStatus(i, new Date().toISOString());
   const list = `/f/${farm.id}/interventions${location.search}`;
@@ -135,7 +132,7 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
         {i.status !== "cancelled" && (
           <Group gap="xs">
             {i.status === "planned" && (
-              <Button variant="light" onClick={() => setCompleting(true)} disabled={!catalogue.data || !snap.data || !articles.data}>
+              <Button variant="light" component={Link} to={`complete${location.search}`}>
                 Réaliser
               </Button>
             )}
@@ -308,20 +305,6 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
         </Grid.Col>
       </Grid>
 
-      <Drawer opened={completing} onClose={() => setCompleting(false)} position="right" size="lg" title="Réaliser l'intervention">
-        {completing && snap.data && articles.data && catalogue.data && (
-          <InterventionForm
-            farmId={farm.id}
-            snapshot={snap.data}
-            articles={articles.data.items}
-            people={people.data?.items ?? []}
-            catalogue={catalogue.data}
-            planned={i}
-            defaultDay={day.slice(0, 10)}
-            onDone={() => setCompleting(false)}
-          />
-        )}
-      </Drawer>
       <CancelModal farmId={farm.id} intervention={cancelling ? i : null} onClose={() => setCancelling(false)} />
     </Stack>
   );

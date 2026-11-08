@@ -19,7 +19,7 @@ test("choisir les parcelles sur la carte et dessiner une zone partielle", async 
   await page.goto(`/f/${FARM}/interventions?at=2022-05-18`);
 
   await page.getByRole("button", { name: "Nouvelle intervention" }).click();
-  const form = page.getByRole("dialog");
+  const form = page.getByRole("form", { name: "Saisie de l'intervention" });
   await form.getByRole("combobox", { name: "Intervention" }).fill("avec fertilisation");
   await page.getByRole("option", { name: "Pulvérisation (avec fertilisation)" }).click();
   await form.getByText("Carte", { exact: true }).click();
@@ -61,8 +61,7 @@ test("choisir les parcelles sur la carte et dessiner une zone partielle", async 
   await form.getByRole("button", { name: "Enregistrer" }).click();
   await expect(page.getByText("Intervention enregistrée.")).toBeVisible();
 
-  // La fiche montre la surface travaillée de la parcelle 008.
-  await page.getByRole("row").filter({ hasText: "Pulvérisation (avec fertilisation)" }).filter({ hasNotText: "Ekylibre" }).first().click();
+  // Après l'enregistrement, la fiche : surface travaillée de la parcelle 008.
   await expect(page.getByRole("heading", { name: "Historique" })).toBeVisible();
   await expect(page.getByRole("table", { name: "Cibles" }).getByRole("row").filter({ hasText: "Parcelle 008" })).toContainText("surface travaillée");
   expect(crashes).toEqual([]);

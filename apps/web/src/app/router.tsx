@@ -8,7 +8,7 @@ import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { FarmsPage } from "../features/farms/FarmsPage";
 import { ImportsPage } from "../features/imports/ImportsPage";
 import { InterventionsPage } from "../features/interventions/InterventionsPage";
-import { InterventionEditPage } from "../features/interventions/InterventionEditPage";
+import { InterventionCompletePage, InterventionEditPage, InterventionNewPage } from "../features/interventions/InterventionEditPage";
 import { PhytoProductsPage } from "../features/phyto/PhytoProductsPage";
 import { LoginPage } from "../features/login/LoginPage";
 import { RegisterPage } from "../features/register/RegisterPage";
@@ -113,6 +113,8 @@ export const routes = [
       { path: "map/tools", element: <Suspense fallback={<Loading />}><CartoLabPage /></Suspense> },
       { path: "3d-plan", element: <Suspense fallback={<Loading />}><Plan3DPage /></Suspense> },
       { path: "interventions", element: <InterventionsPage /> },
+      { path: "interventions/new", element: <InterventionNewPage /> },
+      { path: "interventions/:interventionId/complete", element: <InterventionCompletePage /> },
       { path: "interventions/:interventionId", element: <Suspense fallback={<Loading />}><InterventionPage /></Suspense> },
       { path: "interventions/:interventionId/edit", element: <InterventionEditPage /> },
       { path: "stocks", element: <StockPage /> },

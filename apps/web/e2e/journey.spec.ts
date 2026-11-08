@@ -41,7 +41,7 @@ test("connexion, cuverie dans le temps, carte, intervention jusqu'au registre", 
 
   await page.getByRole("link", { name: "Interventions" }).click();
   await page.getByRole("button", { name: "Nouvelle intervention" }).click();
-  const form = page.getByRole("dialog");
+  const form = page.getByRole("form", { name: "Saisie de l'intervention" });
   // La forme « traitement » de la procédure guide la saisie (produits phyto, motifs).
   await form.getByRole("combobox", { name: "Intervention" }).fill("sans fertilisation");
   await page.getByRole("option", { name: "Pulvérisation (sans fertilisation)" }).click();

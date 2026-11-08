@@ -187,10 +187,10 @@ const SLOT_LABELS = { go: "favorable", caution: "à surveiller", stop: "défavor
  * Conditions de pulvérisation des prochains jours (MET-3), seuils
  * d'Ekylibre : un créneau par heure (ou par 3 h), sa couleur et sa raison.
  */
-export function SprayingConditions({ farmId, days = 3 }: { farmId: string; days?: number }) {
+export function SprayingConditions({ farmId, days = 3, from }: { farmId: string; days?: number; /** Début de la fenêtre (ISO) ; maintenant par défaut. */ from?: string }) {
   const q = useQuery({
-    queryKey: ["weather-spraying", farmId, days],
-    queryFn: () => api.get<SprayingForecast | null>(farmPath(farmId, `/weather/spraying?days=${days}`)),
+    queryKey: ["weather-spraying", farmId, days, from ?? null],
+    queryFn: () => api.get<SprayingForecast | null>(farmPath(farmId, `/weather/spraying?days=${days}${from ? `&from=${encodeURIComponent(from)}` : ""}`)),
     staleTime: 15 * 60_000,
     retry: false,
   });
@@ -209,17 +209,23 @@ export function SprayingConditions({ farmId, days = 3 }: { farmId: string; days?
     const d = new Date(s.at).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "short" });
     byDay.set(d, [...(byDay.get(d) ?? []), s]);
   }
+  const observed = q.data.kind === "observed";
   const next = q.data.slots.find((s) => s.level === "go");
+  const goHours = q.data.slots.filter((s) => s.level === "go").reduce((n, s) => n + s.stepHours, 0);
   return (
     <Paper p="md" withBorder aria-label="Conditions de pulvérisation">
       <Group justify="space-between" mb="xs">
         <Text fw={700}>Conditions de pulvérisation</Text>
         <Text size="xs" c="dimmed">
-          {SOURCES[q.data.source]}
+          {SOURCES[q.data.source]}, {observed ? "observées" : "prévision"}
         </Text>
       </Group>
       <Text size="sm" mb="xs">
-        {next
+        {observed
+          ? goHours
+            ? `Ce jour-là : ${goHours} h favorable(s) à la pulvérisation.`
+            : "Ce jour-là : aucune heure favorable à la pulvérisation."
+          : next
           ? `Prochain créneau favorable : ${new Date(next.at).toLocaleString("fr-FR", { weekday: "long", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}.`
           : `Aucun créneau favorable dans les ${days} prochains jours.`}
       </Text>
