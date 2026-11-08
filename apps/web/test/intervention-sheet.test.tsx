@@ -17,7 +17,7 @@ const detail = (patch: object = {}, history = demoInterventionHistory) =>
 describe("fiche d'une intervention", () => {
   it("s'ouvre d'un clic dans la liste : parcelles, doses par ha et totales, moyens, historique", async () => {
     const user = userEvent.setup();
-    renderApp(`/f/${FARM}/interventions?at=2026-06-30`);
+    renderApp(`/f/${FARM}/interventions?at=2026-06-10`);
     await user.click(await screen.findByText("Pulvérisation"));
 
     expect(await screen.findByRole("heading", { name: "Pulvérisation", level: 1 })).toBeInTheDocument();

@@ -1,40 +1,81 @@
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router";
-import { Badge, Button, Drawer, Group, Stack, Switch, Text, Title } from "@mantine/core";
-import { Plus } from "lucide-react";
-import { DataTable } from "mantine-datatable";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
+import { ActionIcon, Button, Drawer, Group, SegmentedControl, Stack, Switch, Text, Title, Tooltip } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
+import { CalendarDays, ChevronLeft, ChevronRight, Columns3, List, Plus } from "lucide-react";
 import type { Intervention } from "@fourmy/contracts";
-import { displayStatus } from "@fourmy/domain";
-import { useAt } from "../../app/at";
+import { todayIso, useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
-import { formatDate, procedureLabel } from "../../app/labels";
-import { useArticles, useInterventions, useParcelNames, usePeople, useProcedures, useSnapshot } from "../../app/queries";
+import { useArticles, useCampaignInterventions, useParcelNames, usePeople, useProcedures, useSnapshot } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
-import { ProcedureIcon } from "../../components/ProcedureIcon";
 import { CancelModal } from "./CancelModal";
 import { InterventionForm } from "./InterventionForm";
-import { quantityText, short, STATUS, targetName, type Names } from "./presenters";
+import type { Names } from "./presenters";
+import { CalendarView, KanbanView, ListView, type ViewActions } from "./views";
+import { addDays, inWeek, weekLabel, weekOf } from "./week";
 
-/** Interventions de la campagne de la frise ; saisie, réalisation, annulation. */
+type View = "liste" | "kanban" | "calendrier";
+const VIEWS: View[] = ["liste", "kanban", "calendrier"];
+const STORE_KEY = "fourmy.interventions.vue";
+
+const stored = (): View | null => {
+  try {
+    const v = localStorage.getItem(STORE_KEY);
+    return VIEWS.includes(v as View) ? (v as View) : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Interventions (exigence INT-UI-4) : la semaine de la frise (lundi →
+ * dimanche) en liste, kanban par statut ou calendrier ; la liste peut aussi
+ * montrer toute la campagne. La vue choisie est gardée dans l'adresse
+ * (`?vue=`) et, à défaut, dans le navigateur.
+ */
 export function InterventionsPage() {
   const farm = useFarm();
-  const { at, day } = useAt();
+  const { at, day, setDay } = useAt();
+  const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const view: View = VIEWS.includes(params.get("vue") as View) ? (params.get("vue") as View) : (stored() ?? "liste");
+  const [wholeCampaign, setWholeCampaign] = useState(false);
+  const [showCancelled, setShowCancelled] = useState(false);
+  const [completing, setCompleting] = useState<Intervention | "new" | null>(null);
+  const [cancelling, setCancelling] = useState<Intervention | null>(null);
+
+  const week = weekOf(day);
   const year = Number(day.slice(0, 4));
-  const list = useInterventions(farm.id, new Date(`${year}-01-01T00:00:00`).toISOString(), new Date(`${year + 1}-01-01T00:00:00`).toISOString());
+  const list = useCampaignInterventions(farm.id, year);
+  // L'année précédente ou suivante quand la semaine enjambe le 1er janvier.
+  const edgeYear = Number(week.start.slice(0, 4)) !== year ? Number(week.start.slice(0, 4)) : Number(week.end.slice(0, 4)) !== year ? Number(week.end.slice(0, 4)) : null;
+  const edge = useCampaignInterventions(farm.id, edgeYear ?? year);
   const snap = useSnapshot(farm.id, at);
   const articles = useArticles(farm.id);
   const people = usePeople(farm.id);
   const catalogue = useProcedures(farm.id);
   const parcelNames = useParcelNames(farm.id);
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [editing, setEditing] = useState<Intervention | "new" | null>(null);
-  const [cancelling, setCancelling] = useState<Intervention | null>(null);
-  const [showCancelled, setShowCancelled] = useState(false);
 
-  if (list.isLoading || snap.isLoading) return <Loading />;
+  const setView = (v: View) => {
+    try {
+      localStorage.setItem(STORE_KEY, v);
+    } catch {
+      // Stockage indisponible : la vue reste dans l'adresse.
+    }
+    setParams(
+      (p) => {
+        const n = new URLSearchParams(p);
+        n.set("vue", v);
+        return n;
+      },
+      { replace: true },
+    );
+  };
+
+  if (list.isLoading) return <Loading />;
   if (list.error) return <ErrorAlert error={list.error} />;
-  // Noms des parcelles de toutes dates : une intervention de mars cible des parcelles de mars.
+
   const names: Names = {
     parcel: parcelNames.data ?? new Map(),
     equipment: new Map(snap.data?.equipments.map((e) => [e.id, e.name])),
@@ -42,111 +83,96 @@ export function InterventionsPage() {
     person: new Map(people.data?.items.map((p) => [p.id, p.name])),
   };
   const now = new Date().toISOString();
-  const open = (i: Intervention) => navigate(`${i.id}${location.search}`);
-  const all = [...list.data!.items].reverse();
-  const rows = showCancelled ? all : all.filter((i) => i.status !== "cancelled");
-  const cancelledCount = all.length - all.filter((i) => i.status !== "cancelled").length;
+  const campaign = list.data!.items;
+  const pool = edgeYear ? [...campaign, ...(edge.data?.items ?? []).filter((i) => !campaign.some((c) => c.id === i.id))] : campaign;
+  const listWhole = view === "liste" && wholeCampaign;
+  const scoped = listWhole ? campaign : pool.filter((i) => inWeek(i, week));
+  const visible = showCancelled || view === "kanban" ? scoped : scoped.filter((i) => i.status !== "cancelled");
+  const cancelledCount = scoped.filter((i) => i.status === "cancelled").length;
+
+  const actions: ViewActions = {
+    open: (i) => navigate(`${i.id}${location.search}`),
+    complete: (i) => setCompleting(i),
+    cancel: (i) => setCancelling(i),
+  };
 
   return (
     <Stack>
       <Group justify="space-between">
         <Title order={1}>Interventions {year}</Title>
-        <Button leftSection={<Plus size={16} />} onClick={() => setEditing("new")} disabled={!catalogue.data}>
+        <Button leftSection={<Plus size={16} />} onClick={() => setCompleting("new")} disabled={!catalogue.data}>
           Nouvelle intervention
         </Button>
       </Group>
+
+      <Group justify="space-between" wrap="wrap" gap="sm">
+        <Group gap={4} wrap="nowrap">
+          <Tooltip label="Semaine précédente">
+            <ActionIcon variant="default" aria-label="Semaine précédente" onClick={() => setDay(addDays(week.start, -7))} disabled={listWhole}>
+              <ChevronLeft size={16} />
+            </ActionIcon>
+          </Tooltip>
+          <Text fw={600} miw={220} ta="center" aria-live="polite" c={listWhole ? "dimmed" : undefined}>
+            {listWhole ? `Campagne ${year}` : `Semaine ${weekLabel(week)}`}
+          </Text>
+          <Tooltip label="Semaine suivante (planification)">
+            <ActionIcon variant="default" aria-label="Semaine suivante" onClick={() => setDay(addDays(week.start, 7))} disabled={listWhole}>
+              <ChevronRight size={16} />
+            </ActionIcon>
+          </Tooltip>
+          <Button variant="subtle" size="xs" onClick={() => setDay(todayIso())} disabled={listWhole}>
+            Cette semaine
+          </Button>
+        </Group>
+        <SegmentedControl
+          aria-label="Vue"
+          value={view}
+          onChange={(v) => setView(v as View)}
+          data={[
+            { value: "liste", label: <Group gap={6} wrap="nowrap"><List size={16} aria-hidden /><span>Liste</span></Group> },
+            { value: "kanban", label: <Group gap={6} wrap="nowrap"><Columns3 size={16} aria-hidden /><span>Kanban</span></Group> },
+            { value: "calendrier", label: <Group gap={6} wrap="nowrap"><CalendarDays size={16} aria-hidden /><span>Calendrier</span></Group> },
+          ]}
+        />
+      </Group>
+
       <Group justify="space-between">
         <Text c="dimmed" size="sm">
-          {rows.length} intervention(s) sur la campagne {year}.
+          {visible.length} intervention(s) {listWhole ? `sur la campagne ${year}` : "cette semaine"}.
         </Text>
-        {cancelledCount > 0 && (
-          <Switch size="xs" label={`Afficher les annulées (${cancelledCount})`} checked={showCancelled} onChange={(e) => setShowCancelled(e.currentTarget.checked)} />
-        )}
+        <Group gap="md">
+          {view === "liste" && (
+            <Switch size="xs" label={`Toute la campagne ${year}`} checked={wholeCampaign} onChange={(e) => setWholeCampaign(e.currentTarget.checked)} />
+          )}
+          {view !== "kanban" && cancelledCount > 0 && (
+            <Switch size="xs" label={`Afficher les annulées (${cancelledCount})`} checked={showCancelled} onChange={(e) => setShowCancelled(e.currentTarget.checked)} />
+          )}
+        </Group>
       </Group>
-      <DataTable
-        withTableBorder
-        striped
-        highlightOnHover
-        minHeight={150}
-        noRecordsText="Aucune intervention sur cette campagne"
-        records={rows}
-        rowStyle={(i) => (i.status === "cancelled" ? { opacity: 0.55, cursor: "pointer" } : { cursor: "pointer" })}
-        onRowClick={({ record }) => open(record)}
-        columns={[
-          { accessor: "date", title: "Date", render: (i) => <span className="lv-num">{formatDate(i.stoppedAt ?? i.startedAt ?? i.createdAt)}</span> },
-          {
-            accessor: "procedure",
-            title: "Intervention",
-            render: (i) => (
-              <Group gap={8} wrap="nowrap">
-                <ProcedureIcon procedure={i.procedure} />
-                <span>{procedureLabel(i.procedure)}</span>
-              </Group>
-            ),
-          },
-          {
-            accessor: "targets",
-            title: "Cibles",
-            render: (i) => short(i.targets.map((t) => targetName(names, t))),
-          },
-          {
-            accessor: "inputs",
-            title: "Intrants et sorties",
-            ellipsis: false,
-            render: (i) => [...i.inputs, ...i.outputs].map((q) => quantityText(names, q)).join(" · "),
-          },
-          { accessor: "doers", title: "Intervenants", render: (i) => short(i.doers.map((d) => names.person.get(d.personId) ?? "?")) },
-          {
-            accessor: "status",
-            title: "Statut",
-            noWrap: true,
-            width: 210,
-            render: (i) => (
-              <Group gap={4} wrap="nowrap">
-                <Badge color={STATUS[displayStatus(i, now)].color}>{STATUS[displayStatus(i, now)].label}</Badge>
-                {i.origin === "mobile" && <Badge color="ardoise">Mobile</Badge>}
-                {i.origin === "migration" && <Badge color="gray">Ekylibre</Badge>}
-              </Group>
-            ),
-          },
-          {
-            accessor: "actions",
-            title: "",
-            textAlign: "right",
-            noWrap: true,
-            render: (i) =>
-              i.status === "cancelled" ? null : (
-                <Group gap={4} justify="flex-end" wrap="nowrap" onClick={(e) => e.stopPropagation()}>
-                  {i.status === "planned" && (
-                    <Button size="xs" variant="light" onClick={() => setEditing(i)}>
-                      Réaliser
-                    </Button>
-                  )}
-                  <Button size="xs" variant="subtle" color="brique" onClick={() => setCancelling(i)}>
-                    Annuler
-                  </Button>
-                </Group>
-              ),
-          },
-        ]}
-      />
+
+      {view === "liste" && <ListView items={visible} names={names} actions={actions} now={now} />}
+      {view === "kanban" && (
+        <KanbanView items={visible} names={names} actions={actions} now={now} onRefused={(message) => notifications.show({ color: "paille", message })} />
+      )}
+      {view === "calendrier" && <CalendarView items={visible} week={week} names={names} actions={actions} now={now} />}
+
       <Drawer
-        opened={editing !== null}
-        onClose={() => setEditing(null)}
+        opened={completing !== null}
+        onClose={() => setCompleting(null)}
         position="right"
         size="lg"
-        title={editing === "new" ? "Nouvelle intervention" : "Réaliser l'intervention"}
+        title={completing === "new" ? "Nouvelle intervention" : "Réaliser l'intervention"}
       >
-        {editing !== null && snap.data && articles.data && catalogue.data && (
+        {completing !== null && snap.data && articles.data && catalogue.data && (
           <InterventionForm
             farmId={farm.id}
             snapshot={snap.data}
             articles={articles.data.items}
             people={people.data?.items ?? []}
             catalogue={catalogue.data}
-            planned={editing === "new" ? undefined : editing}
+            planned={completing === "new" ? undefined : completing}
             defaultDay={day}
-            onDone={() => setEditing(null)}
+            onDone={() => setCompleting(null)}
           />
         )}
       </Drawer>

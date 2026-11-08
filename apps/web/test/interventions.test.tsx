@@ -9,7 +9,7 @@ const FONGICIDE = "00000000-0000-7000-8000-000000000301";
 const CAMILLE = "00000000-0000-7000-8000-000000000601";
 
 async function openForm(user: ReturnType<typeof userEvent.setup>) {
-  renderApp(`/f/${FARM}/interventions?at=2026-06-30`);
+  renderApp(`/f/${FARM}/interventions?at=2026-06-10`);
   const button = await screen.findByRole("button", { name: "Nouvelle intervention" });
   await vi.waitFor(() => expect(button).toBeEnabled()); // catalogue chargé
   await user.click(button);
@@ -21,7 +21,7 @@ async function openForm(user: ReturnType<typeof userEvent.setup>) {
 
 describe("interventions", () => {
   it("liste les interventions de la campagne avec libellés, intervenants et origine", async () => {
-    renderApp(`/f/${FARM}/interventions?at=2026-06-30`);
+    renderApp(`/f/${FARM}/interventions?at=2026-06-10`);
     expect(await screen.findByText("Pulvérisation")).toBeInTheDocument();
     expect(screen.getByText("Les Rouffiats")).toBeInTheDocument();
     expect(screen.getByText(/Fongicide X 2 L\/ha/)).toBeInTheDocument();
@@ -93,8 +93,9 @@ describe("interventions", () => {
         return HttpResponse.json({});
       }),
     );
-    renderApp(`/f/${FARM}/interventions?at=2026-06-30`);
-    await user.click(await screen.findByRole("button", { name: "Annuler" }));
+    renderApp(`/f/${FARM}/interventions?at=2026-06-10`);
+    await user.click(await screen.findByRole("button", { name: "Actions : Pulvérisation" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Annuler…" }));
     const modal = await screen.findByRole("dialog");
     expect(within(modal).getByText(/contre-passés/)).toBeInTheDocument();
     const confirm = within(modal).getByRole("button", { name: "Annuler l'intervention" });

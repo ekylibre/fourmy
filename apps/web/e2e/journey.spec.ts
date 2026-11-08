@@ -64,8 +64,9 @@ test("connexion, cuverie dans le temps, carte, intervention jusqu'au registre", 
     .filter({ hasText: "Pulvérisation (sans fertilisation)" })
     .filter({ hasText: "Réalisée" })
     .filter({ hasNotText: "Ekylibre" }) // celle saisie à l'instant, pas une reprise
-    .getByRole("button", { name: "Annuler" })
+    .getByRole("button", { name: /^Actions/ })
     .click();
+  await page.getByRole("menuitem", { name: "Annuler…" }).click();
   const modal = page.getByRole("dialog");
   await modal.getByRole("textbox", { name: "Motif" }).fill("essai de bout en bout");
   await modal.getByRole("button", { name: "Annuler l'intervention" }).click();

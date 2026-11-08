@@ -335,3 +335,26 @@ Exigence INT-UI-1. Icônes du jeu **Agric** d'Ekylibre
   procédure du formulaire ; fiche, kanban et calendrier le reprendront.
 - **Test** : toute icône du catalogue a son dessin ; les 37 procédures des
   pilotes ont une icône propre.
+
+## 12. Vues de la semaine (2026-11-08)
+
+Exigence INT-UI-4.
+
+- **Semaine** : celle du jour de la frise, du lundi au dimanche ; semaine
+  précédente / suivante (la suivante peut dépasser aujourd'hui : on planifie),
+  « Cette semaine ». Les données viennent de `GET /interventions?campaign=`
+  (et de la campagne voisine quand la semaine enjambe le 1er janvier).
+- **Vue** choisie gardée dans l'adresse (`?vue=liste|kanban|calendrier`) et,
+  à défaut, dans le navigateur.
+- **Liste** : semaine par défaut, interrupteur « Toute la campagne » ; tri par
+  date, intervention, statut ; clic sur une ligne → fiche ; menu d'actions
+  (fiche, réaliser, annuler).
+- **Kanban** : Planifiée, En cours (calculée), Réalisée, Annulée. Glisser vers
+  « Réalisée » ouvre la réalisation, vers « Annulée » la confirmation ; un
+  retour en arrière est refusé avec une explication. Le menu de chaque carte
+  offre les mêmes actions au clavier.
+- **Calendrier** : sept colonnes ; chaque période à son jour avec ses heures
+  (une intervention sur plusieurs jours apparaît chaque jour) ; une
+  intervention planifiée sans période à sa date prévue.
+- Code : `apps/web/src/features/interventions/week.ts` (semaine, créneaux),
+  `views.tsx` (trois vues).

@@ -50,6 +50,15 @@ export function useInterventions(farmId: string, from: string, to: string) {
   });
 }
 
+/** Toutes les interventions d'une campagne (semaine, kanban, calendrier, recherche). */
+export function useCampaignInterventions(farmId: string, year: number) {
+  return useQuery({
+    queryKey: ["interventions", farmId, "campaign", year],
+    queryFn: () => api.get<Page<Intervention>>(farmPath(farmId, `/interventions?campaign=${year}`)),
+    placeholderData: (prev) => prev,
+  });
+}
+
 /** Fiche d'une intervention : l'intervention et son historique. */
 export function useIntervention(farmId: string, id: string) {
   return useQuery({
