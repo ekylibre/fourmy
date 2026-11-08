@@ -133,9 +133,9 @@ async function parcelContext(
         SELECT lp.name,
                (SELECT area_m2::float8 FROM v) AS area,
                (SELECT ST_Area(g::geography) FROM z) AS zone_area,
-               (SELECT p.cultivation FROM productions p JOIN campaigns c ON c.id = p.campaign_id
+               (SELECT coalesce(p.cultivation, CASE p.nature WHEN 'vine' THEN 'vitis' END) FROM productions p JOIN campaigns c ON c.id = p.campaign_id
                  WHERE p.land_parcel_id = lp.id AND ${at}::timestamptz::date BETWEEN c.starts_on AND c.stops_on
-                 ORDER BY p.cultivation NULLS LAST LIMIT 1) AS cultivation,
+                 ORDER BY coalesce(p.cultivation, CASE p.nature WHEN 'vine' THEN 'vitis' END) NULLS LAST LIMIT 1) AS cultivation,
                (SELECT name FROM w ORDER BY d LIMIT 1) AS water_name,
                (SELECT d FROM w ORDER BY d LIMIT 1) AS water_m,
                (SELECT min(coalesce(i.started_at, i.stopped_at)) FROM interventions i

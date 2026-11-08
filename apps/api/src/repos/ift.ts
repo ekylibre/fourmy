@@ -69,9 +69,9 @@ export async function computeInterventionIft(db: Database, farmId: string, inter
                  CASE WHEN t.working_zone IS NULL THEN NULL ELSE ST_Area(t.working_zone::geography) END AS zone_area,
                  (WITH RECURSIVE l AS (
                     SELECT reference_name, parent, label, 0 AS depth FROM taxonomy
-                    WHERE reference_name = (SELECT p.cultivation FROM productions p JOIN campaigns c ON c.id = p.campaign_id
+                    WHERE reference_name = (SELECT coalesce(p.cultivation, CASE p.nature WHEN 'vine' THEN 'vitis' END) FROM productions p JOIN campaigns c ON c.id = p.campaign_id
                                             WHERE p.land_parcel_id = t.ref_id AND ${i.stopped_at}::timestamptz::date BETWEEN c.starts_on AND c.stops_on
-                                            ORDER BY p.cultivation NULLS LAST LIMIT 1)
+                                            ORDER BY coalesce(p.cultivation, CASE p.nature WHEN 'vine' THEN 'vitis' END) NULLS LAST LIMIT 1)
                     UNION ALL SELECT x.reference_name, x.parent, x.label, l.depth + 1 FROM taxonomy x JOIN l ON x.reference_name = l.parent WHERE l.depth < 30)
                   SELECT array_agg(label ORDER BY depth) FROM l) AS labels
           FROM intervention_parameters t
