@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MOCK_WRONG_PASSWORD } from "@fourmy/mocks";
 import { FARM, renderApp } from "./render";
@@ -83,8 +83,11 @@ describe("intégrations (responsable)", () => {
     expect(await screen.findByRole("heading", { name: "Traccar — traceurs GPS" })).toBeInTheDocument();
     await user.type(screen.getByRole("textbox", { name: /Adresse du serveur Traccar/ }), "https://traccar.osfarm.org");
     await user.type(screen.getByLabelText(/^Jeton d'accès/), "jeton-secret-4242");
-    await user.click(screen.getByRole("button", { name: "Tester et activer" }));
+    // Trois fournisseurs (Traccar, OpenWeather, meteoblue) : on agit sur la carte Traccar.
+    await user.click(within(screen.getByTestId("integration-traccar")).getByRole("button", { name: "Tester et activer" }));
     expect(await screen.findByText("Intégration enregistrée (connexion vérifiée).")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "OpenWeather — météo" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "meteoblue — météo agricole" })).toBeInTheDocument();
     expect(body).toEqual({ settings: { url: "https://traccar.osfarm.org" }, secret: "jeton-secret-4242" });
     expect(screen.getByText("Tracteur → Tracteur")).toBeInTheDocument();
     expect(screen.getByText(/Quad : aucun matériel de ce nom/)).toBeInTheDocument();

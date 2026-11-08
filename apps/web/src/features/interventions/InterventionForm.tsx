@@ -41,7 +41,8 @@ import { MapBoundary } from "../../components/MapBoundary";
 import { ProcedureIcon } from "../../components/ProcedureIcon";
 import { treatedAreaM2 } from "./zones";
 import { CompliancePanel, type ComplianceDraft } from "./CompliancePanel";
-import type { ComplianceResult } from "@fourmy/contracts";
+import type { ComplianceResult, InterventionWeather } from "@fourmy/contracts";
+import { SprayingConditions, WeatherFields, type WeatherRequestDraft } from "../weather/Weather";
 
 // La carte (MapLibre, terra-draw) n'est chargée qu'en mode « Carte ».
 const ParcelPicker = lazy(() => import("./ParcelPicker").then((m) => ({ default: m.ParcelPicker })));
@@ -121,6 +122,8 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   const [compliance, setCompliance] = useState<ComplianceResult | null>(null);
   const [overrideReason, setOverrideReason] = useState((toComplete ?? editing)?.compliance?.reason ?? "");
   const [askOverride, setAskOverride] = useState(false);
+  // Météo pendant l'intervention : pré-remplie (fournisseur), modifiable.
+  const [weather, setWeather] = useState<InterventionWeather | null>((toComplete ?? editing)?.weather ?? null);
   const [code, setCode] = useState<string | null>(planned?.procedure ?? null);
   const procedure: ProcedureCatalogueItem | undefined = catalogue.items.find((p) => p.code === code);
   const shape = procedure?.shape;
@@ -245,6 +248,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       purposes,
       ...(notes.trim() ? { notes: notes.trim() } : {}),
       compliance: { usages: usageChoices, ...(overrideReason.trim() ? { reason: overrideReason.trim() } : {}) },
+      ...(weather ? { weather } : {}),
     } satisfies InterventionCompleteWrite;
   };
 
@@ -264,6 +268,17 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       };
     } catch {
       draft = null; // date en cours de saisie
+    }
+  }
+  let weatherRequest: WeatherRequestDraft | null = null;
+  if (code) {
+    try {
+      const full = body();
+      weatherRequest = completing
+        ? { periods: full.periods, targets: full.targets }
+        : { periods: [], plannedAt: full.periods[0]?.startedAt, targets: full.targets };
+    } catch {
+      weatherRequest = null; // date en cours de saisie
     }
   }
   const dangers = (compliance?.checks ?? []).flatMap((c) => c.indicators.filter((i) => i.level === "danger").map((i) => i.message));
@@ -587,6 +602,13 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
             }
           />
         )}
+
+        {/* Prévisions : utiles pour un traitement à faire, pas pour un traitement passé. */}
+        {shape === "treatment" && (!completing || (periods[0]?.startedAt ?? "") >= new Date().toISOString().slice(0, 10)) && (
+          <SprayingConditions farmId={farmId} />
+        )}
+
+        {procedure && <WeatherFields farmId={farmId} request={weatherRequest} value={weather} onChange={setWeather} />}
 
         {procedure && (
           <>

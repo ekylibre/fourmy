@@ -20,6 +20,12 @@ la fiche et la carte, motif obligatoire sur un feu rouge, IFT par l'API du
 ministère (ouverte, sans compte) et bilan de campagne, page Produits phyto.
 Détail : `docs/phyto.md`.
 
+**Lot 3 réalisé** (2026-11-08) : intégrations OpenWeather et meteoblue
+(Open-Meteo sans clé par défaut), météo pré-remplie et enregistrée avec
+chaque intervention, complétée par le worker pour l'historique, widget des
+conditions de pulvérisation (tableau de bord, formulaire de traitement).
+Clé OpenWeather de Pierre reprise de son Ekylibre. Détail : `docs/meteo.md`.
+
 Constaté pendant l'essai du lot 1 (traité) :
 
 - **Cible rattachée à la mauvaise parcelle (migration)** : pour une cible

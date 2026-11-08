@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { uuid, farmId, isoDateTime, geoJsonGeometry, auditFields } from "../primitives.js";
 import { treatmentPurpose } from "../procedures.js";
-import { complianceResult, complianceWrite, iftResult } from "../phyto.js";
+import { complianceResult, complianceWrite, iftResult, interventionWeather } from "../phyto.js";
 
 /**
  * Interventions (docs/interventions.md §4). Modèle simplifié par rapport à
@@ -87,6 +87,8 @@ const interventionBody = z.object({
   notes: z.string().trim().max(2000).optional(),
   /** Contrôle réglementaire : cible choisie par produit, motif d'un passage outre un feu rouge. */
   compliance: complianceWrite.optional(),
+  /** Météo pendant l'intervention (pré-remplie depuis le fournisseur, modifiable). */
+  weather: interventionWeather.optional(),
 });
 
 /** Planification (POST /interventions). `id` client → idempotent. */
@@ -140,6 +142,8 @@ export const intervention = z
     compliance: complianceResult.nullable().optional(),
     /** IFT (traitements réalisés). */
     ift: iftResult.nullable().optional(),
+    /** Météo pendant l'intervention. */
+    weather: interventionWeather.nullable().optional(),
   })
   .merge(auditFields);
 export type Intervention = z.infer<typeof intervention>;

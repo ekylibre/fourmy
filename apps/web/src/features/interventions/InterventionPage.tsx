@@ -20,6 +20,7 @@ import { CancelModal } from "./CancelModal";
 import { InterventionForm } from "./InterventionForm";
 import { actionLabel, changeLines, interventionDay, STATUS, targetName, type Names } from "./presenters";
 import { ComplianceSection, IftSection } from "./RegulatorySections";
+import { WeatherSummary } from "../weather/Weather";
 
 const EMPTY_FC: FeatureCollection = { type: "FeatureCollection", features: [] };
 const ORIGINS: Record<string, string> = { web: "Web", mobile: "Mobile", migration: "Reprise d'Ekylibre", plugin: "Extension" };
@@ -212,6 +213,15 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
                 <Text size="xs" c="dimmed" mt={4}>
                   En gras, la valeur saisie ; l'autre est calculée sur la surface traitée.
                 </Text>
+              </Paper>
+            )}
+
+            {i.weather && (
+              <Paper p="md" withBorder aria-label="Météo de l'intervention">
+                <Title order={4} mb="xs">
+                  Météo
+                </Title>
+                <WeatherSummary weather={i.weather} />
               </Paper>
             )}
 

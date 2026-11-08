@@ -8,7 +8,7 @@ import { isoDateTime, uuid } from "./primitives.js";
  * fournisseur. Un champ `secret` est chiffré côté serveur et jamais renvoyé.
  */
 
-export const integrationProvider = z.enum(["traccar"]);
+export const integrationProvider = z.enum(["traccar", "openweather", "meteoblue"]);
 export type IntegrationProvider = z.infer<typeof integrationProvider>;
 
 export interface IntegrationField {
@@ -41,6 +41,36 @@ export const INTEGRATION_PROVIDERS: IntegrationProviderDefinition[] = [
         kind: "secret",
         required: true,
         help: "Créé dans Traccar : Paramètres → Préférences → Jeton. Lecture seule suffit.",
+      },
+    ],
+  },
+  {
+    provider: "openweather",
+    label: "OpenWeather — météo",
+    description:
+      "Prévisions à 5 jours pour la météo des interventions et les conditions de pulvérisation. Sans intégration météo, Open-Meteo (gratuit, sans clé) est utilisé ; l'historique vient toujours d'Open-Meteo.",
+    fields: [
+      {
+        key: "apiKey",
+        label: "Clé d'API",
+        kind: "secret",
+        required: true,
+        help: "Sur openweathermap.org : My API keys. Une clé gratuite suffit.",
+      },
+    ],
+  },
+  {
+    provider: "meteoblue",
+    label: "meteoblue — météo agricole",
+    description:
+      "Prévisions horaires du paquet agro de meteoblue pour la météo des interventions et les conditions de pulvérisation. Prioritaire sur OpenWeather et Open-Meteo quand il est actif.",
+    fields: [
+      {
+        key: "apiKey",
+        label: "Clé d'API",
+        kind: "secret",
+        required: true,
+        help: "Sur my.meteoblue.com : clé donnant accès au paquet basic-1h_agro-1h.",
       },
     ],
   },

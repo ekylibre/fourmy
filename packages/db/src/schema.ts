@@ -198,6 +198,8 @@ export const interventions = pgTable("interventions", {
   compliance: jsonb("compliance"),
   /** IFT des traitements (API IFT du ministère), calculé après réalisation. */
   ift: jsonb("ift"),
+  /** Météo pendant l'intervention (pré-remplie, modifiable). */
+  weather: jsonb("weather"),
   ...audit,
 });
 

@@ -5,6 +5,7 @@ import { useFarm } from "../../app/farm";
 import { formatDate, NATURE_LABELS, procedureLabel } from "../../app/labels";
 import { useInterventions, useSnapshot } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
+import { SprayingConditions } from "../weather/Weather";
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -59,6 +60,9 @@ export function DashboardPage() {
         />
         <Kpi label="Matériels" value={String(s.equipments.length)} />
       </SimpleGrid>
+
+      {/* Prévisions : seulement quand la frise est sur aujourd'hui. */}
+      {isToday && <SprayingConditions farmId={farm.id} />}
 
       <Paper p="md">
         <Title order={3} mb="sm">

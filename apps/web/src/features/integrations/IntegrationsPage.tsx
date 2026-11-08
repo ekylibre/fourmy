@@ -47,6 +47,16 @@ export function IntegrationsPage() {
           integration={items.find((i) => i.provider === definition.provider) ?? null}
         />
       ))}
+      <Paper p="md" data-testid="integration-open-meteo">
+        <Group justify="space-between">
+          <Title order={2}>Open-Meteo — météo</Title>
+          <Badge color="lichen">Actif par défaut</Badge>
+        </Group>
+        <Text size="sm" c="dimmed" mt={4}>
+          Gratuit et sans clé : prévisions et historique depuis 1940 pour la météo des interventions et les conditions de
+          pulvérisation. Utilisé quand ni meteoblue ni OpenWeather ne sont actifs, et toujours pour le passé.
+        </Text>
+      </Paper>
     </Stack>
   );
 }

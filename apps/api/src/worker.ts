@@ -6,6 +6,7 @@ import { db } from "./db.js";
 import { dueIntegrations, syncIntegration } from "./integrations/repo.js";
 import { syncFarmWater } from "./repos/phyto.js";
 import { computeInterventionIft, pendingIft } from "./repos/ift.js";
+import { fillInterventionWeather, pendingWeather } from "./repos/weather.js";
 
 /**
  * Worker : synchronise les intégrations actives de toutes les fermes
@@ -59,8 +60,19 @@ async function iftTick(): Promise<void> {
   }
 }
 
+/** Météo des interventions réalisées sans météo (historique Open-Meteo), par lots. */
+async function weatherTick(): Promise<void> {
+  // 10 par minute, une demi-seconde entre deux appels : l'historique de toutes
+  // les fermes se complète en quelques heures sans saturer Open-Meteo.
+  for (const { id, farm_id } of await pendingWeather(db(), 10)) {
+    if (stopping) return;
+    await fillInterventionWeather(db(), farm_id, id);
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
+
 async function tick(): Promise<void> {
-  for (const [name, job] of [["lexicon", lexiconTick], ["eau", waterTick], ["ift", iftTick]] as const) {
+  for (const [name, job] of [["lexicon", lexiconTick], ["eau", waterTick], ["ift", iftTick], ["météo", weatherTick]] as const) {
     if (stopping) return;
     await job().catch((e) => console.warn(`[worker] ${name} : ${e instanceof Error ? e.message : e}`));
   }

@@ -8,9 +8,16 @@ import { db } from "../db.js";
 import { checkComplianceFor, farmWater, parcelDelays, phytoArticles, phytoStatus, searchProducts, syncFarmWater } from "../repos/phyto.js";
 import { readIntervention } from "../repos/interventions.js";
 import { computeInterventionIft, iftBalance } from "../repos/ift.js";
+import { interventionWeather, sprayingForecast } from "../repos/weather.js";
+import { workPeriod, interventionTarget } from "@fourmy/contracts";
 import { BadRequest, NotFound, problem, uuidParam } from "./helpers.js";
 
 const checkWrite = interventionPlanWrite.extend({ interventionId: z.string().uuid().optional() });
+const weatherWrite = z.object({
+  periods: z.array(workPeriod).default([]),
+  plannedAt: z.string().datetime({ offset: true }).optional(),
+  targets: z.array(interventionTarget).default([]),
+});
 
 /**
  * Réglementation phytosanitaire (lot 2) : contrôle à la demande (formulaire),
@@ -57,6 +64,24 @@ export const phytoRoutes = new Hono<Env>()
     const at = c.req.query("at") ? new Date(c.req.query("at")!) : new Date();
     if (Number.isNaN(at.getTime())) throw new BadRequest("at : date ISO attendue");
     return c.json(await parcelDelays(db(), c.get("farmId"), uuidParam(c, "id"), at.toISOString()));
+  })
+  // Météo (lot 3) : pré-remplissage d'une intervention, créneaux de pulvérisation.
+  .post("/weather/intervention", async (c) => {
+    const parsed = weatherWrite.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.message);
+    try {
+      return c.json({ weather: await interventionWeather(db(), c.get("farmId"), parsed.data) });
+    } catch (e) {
+      return problem(c, 502, "Météo indisponible", e instanceof Error ? e.message : String(e));
+    }
+  })
+  .get("/weather/spraying", async (c) => {
+    const days = Math.min(Math.max(Number(c.req.query("days") ?? 3) || 3, 1), 5);
+    try {
+      return c.json(await sprayingForecast(db(), c.get("farmId"), days));
+    } catch (e) {
+      return problem(c, 502, "Météo indisponible", e instanceof Error ? e.message : String(e));
+    }
   })
   .get("/phyto/status", async (c) => c.json(await phytoStatus(db(), c.get("farmId"))))
   .get("/phyto/products", async (c) => c.json({ items: await searchProducts(db(), c.get("farmId"), c.req.query("q") ?? "") }))

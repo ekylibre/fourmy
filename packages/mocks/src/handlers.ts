@@ -87,6 +87,21 @@ export const handlers = [
   http.post(`*${base}/interventions/:id/cancel`, ({ params }) =>
     HttpResponse.json({ ...demoInterventions[0], id: params.id, status: "cancelled" }),
   ),
+  // Météo (lot 3).
+  http.post(`*${base}/weather/intervention`, () =>
+    HttpResponse.json({ weather: { source: "open_meteo", kind: "observed", temperatureC: 14.2, humidityPct: 82, windKmh: 6.5, windMaxKmh: 11, precipitationMm: 0, fetchedAt: "2026-06-10T09:00:00.000Z" } }),
+  ),
+  http.get(`*${base}/weather/spraying`, () =>
+    HttpResponse.json({
+      source: "open_meteo",
+      latitude: 44.8,
+      longitude: 0.5,
+      slots: [
+        { at: "2026-06-10T08:00:00.000Z", stepHours: 1, level: "stop", reasons: ["vent 22 km/h"], temperatureC: 15, humidityPct: 80, windKmh: 22, precipitationMm: 0 },
+        { at: "2026-06-10T09:00:00.000Z", stepHours: 1, level: "go", reasons: [], temperatureC: 16, humidityPct: 82, windKmh: 6, precipitationMm: 0 },
+      ],
+    }),
+  ),
   // Réglementation phyto (lot 2) : par défaut, rien à signaler.
   http.post(`*${base}/phyto/check`, () =>
     HttpResponse.json({ level: "ok", checkedAt: new Date().toISOString(), referential: "2026.11.07.1", checks: [], reason: null }),

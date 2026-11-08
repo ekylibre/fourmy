@@ -1,5 +1,6 @@
 import { TraccarClient, matchDevices, syncTraccar } from "@fourmy/connector-traccar";
 import type { IntegrationProvider } from "@fourmy/contracts";
+import { meteoblueTest, openWeatherTest } from "@fourmy/weather";
 import { BadRequest } from "../routes/helpers.js";
 
 /**
@@ -85,4 +86,25 @@ const traccar: ProviderAdapter = {
   },
 };
 
-export const PROVIDERS: Record<IntegrationProvider, ProviderAdapter> = { traccar };
+// Fournisseurs météo : la clé est testée au centre de la France (elle ne
+// dépend pas du lieu) ; pas de synchronisation périodique, la météo est
+// demandée à la saisie et pour le widget (repos/weather.ts).
+const FRANCE = { lat: 46.6, lon: 2.4 };
+const openweather: ProviderAdapter = {
+  async test({ secret }) {
+    return openWeatherTest(secret, FRANCE.lat, FRANCE.lon);
+  },
+  async sync() {
+    return {};
+  },
+};
+const meteoblue: ProviderAdapter = {
+  async test({ secret }) {
+    return meteoblueTest(secret, FRANCE.lat, FRANCE.lon);
+  },
+  async sync() {
+    return {};
+  },
+};
+
+export const PROVIDERS: Record<IntegrationProvider, ProviderAdapter> = { traccar, openweather, meteoblue };

@@ -120,6 +120,7 @@ function toIntervention(r: Record<string, unknown>): Intervention {
     clientId: (r.client_id as string | null) ?? null,
     compliance: (r.compliance as Intervention["compliance"]) ?? null,
     ift: (r.ift as Intervention["ift"]) ?? null,
+    weather: (r.weather as Intervention["weather"]) ?? null,
     createdAt: iso(r.created_at)!,
     updatedAt: iso(r.updated_at)!,
   };
@@ -130,7 +131,7 @@ async function readInterventions(tx: Tx, where: SQL, limit = 1000): Promise<Inte
     tx,
     sql`
       SELECT i.id, i.farm_id, i.procedure, i.status, i.started_at, i.stopped_at, i.origin, i.client_id,
-             i.purposes, i.notes, i.compliance, i.ift, i.created_at, i.updated_at,
+             i.purposes, i.notes, i.compliance, i.ift, i.weather, i.created_at, i.updated_at,
              (SELECT coalesce(json_agg(json_build_object('startedAt', w.started_at, 'stoppedAt', w.stopped_at)
                         ORDER BY w.started_at), '[]') FROM intervention_periods w WHERE w.intervention_id = i.id) AS periods,
              (SELECT coalesce(json_agg(json_build_object(
@@ -286,7 +287,9 @@ async function audit(tx: Tx, farmId: string, ctx: DomainCtx, entityId: string, a
  * motif »). Depuis le mobile (qui ne connaît pas encore les feux), la
  * réalisation est enregistrée et le feu rouge reste visible, sans motif.
  */
-async function recordCompliance(tx: Tx, ctx: DomainCtx, interventionId: string, body: CheckableBody, mode: "plan" | "done") {
+async function recordCompliance(tx: Tx, ctx: DomainCtx, interventionId: string, body: CheckableBody & { weather?: unknown }, mode: "plan" | "done") {
+  // Météo saisie ou pré-remplie : enregistrée avec la saisie (sinon le worker la complète).
+  if (body.weather) await tx.execute(sql`UPDATE interventions SET weather = ${JSON.stringify(body.weather)}::jsonb WHERE id = ${interventionId}`);
   const result = await checkCompliance(tx, body, interventionId);
   if (mode === "done" && result.level === "danger" && ctx.origin === "web" && !body.compliance?.reason?.trim()) {
     const dangers = result.checks.flatMap((c) => c.indicators.filter((i) => i.level === "danger").map((i) => i.message));
