@@ -47,6 +47,14 @@ export async function loadFixture(sql: Sql, fixture: FixtureFile): Promise<void>
     }
     // Fixture antérieure aux activités (migration 0011) : activités déduites des productions.
     for (const farm of fixture.tables.farms ?? []) await tx`SELECT fourmy_ensure_activities(${farm.id as string})`;
+    // Fixture antérieure aux matériels (migration 0017) : compteur d'heures des
+    // tracteurs et automoteurs, comme la migration l'a posé sur les matériels existants.
+    const equipments = fixture.tables.equipments ?? [];
+    if (equipments.length && !equipments.some((r) => "meter_unit" in r)) {
+      await tx`UPDATE equipments SET meter_unit = 'hours'
+               WHERE id = ANY(${equipments.map((r) => r.id as string)}::uuid[]) AND meter_unit IS NULL
+                 AND kind IN ('tractor', 'self_propelled_equipment')`;
+    }
     const interventionIds = (fixture.tables.interventions ?? []).map((r) => r.id as string);
     if (interventionIds.length) {
       for (const child of CHILDREN_OF_INTERVENTIONS) {

@@ -36,6 +36,15 @@ describe.skipIf(!url)("fixtures pilotes", () => {
     expect(await sql`SELECT 1 FROM intervention_periods WHERE id = ${stale}`).toHaveLength(0);
   }, 60_000);
 
+  it("une fixture antérieure aux matériels donne un compteur d'heures aux tracteurs", async () => {
+    for (const fixture of fixtures) {
+      const tractors = (fixture.tables.equipments ?? []).filter((e) => e.kind === "tractor").map((e) => e.id as string);
+      if (!tractors.length) continue;
+      const rows = await sql<{ meter_unit: string | null }[]>`SELECT meter_unit FROM equipments WHERE id = ANY(${tractors}::uuid[])`;
+      expect(rows.every((r) => r.meter_unit === "hours")).toBe(true);
+    }
+  });
+
   for (const [i, f] of FILES.entries()) {
     it(`${f} : volumes et registre phyto conformes, sous RLS`, async () => {
       const fixture = fixtures[i]!;
