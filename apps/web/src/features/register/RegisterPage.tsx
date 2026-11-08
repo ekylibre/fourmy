@@ -9,6 +9,7 @@ import { useFarm } from "../../app/farm";
 import { formatDate, formatNumber, unitLabel } from "../../app/labels";
 import { usePhytoRegister } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
+import { IftBalance } from "./IftBalance";
 
 /** Registre phytosanitaire d'une campagne — calculé, jamais saisi (FR-REG-1). */
 export function RegisterPage() {
@@ -51,6 +52,7 @@ export function RegisterPage() {
           </Button>
         </Group>
       </Group>
+      <IftBalance farmId={farm.id} campaign={campaign} />
       {register.isLoading && <Loading />}
       {register.error && <ErrorAlert error={register.error} />}
       {register.data && (

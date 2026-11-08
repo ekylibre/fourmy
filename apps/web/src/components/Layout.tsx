@@ -1,6 +1,6 @@
 import { AppShell, Badge, Burger, Button, Group, NavLink, Stack, Text } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { Box, Boxes, ClipboardList, Database, FileText, LayoutDashboard, Map, Plug, Users, Wine } from "lucide-react";
+import { Box, Boxes, ClipboardList, Database, FileText, LayoutDashboard, Map, Plug, Users, Wine, FlaskConical } from "lucide-react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { Wordmark } from "@fourmy/ui-lyvre";
 import { useFarm } from "../app/farm";
@@ -15,6 +15,7 @@ const SECTIONS = [
   { path: "/stocks", label: "Stocks", icon: Boxes },
   { path: "/cuverie", label: "Cuverie", icon: Wine },
   { path: "/registre", label: "Registre phyto", icon: FileText },
+  { path: "/phyto", label: "Produits phyto", icon: FlaskConical },
 ] as const;
 
 /** Coquille : en-tête, navigation (night), frise temporelle, contenu. */

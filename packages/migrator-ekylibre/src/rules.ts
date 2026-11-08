@@ -41,6 +41,18 @@ export function productionNature(
   return null;
 }
 
+/**
+ * Culture d'une production (taxonomie Lexicon, la même que celle d'Ekylibre :
+ * zea_mays, vitis…) : la variété cultivée de l'activité ; une vigne sans
+ * variété renseignée reste de la vigne. Sert aux contrôles phyto (usages
+ * autorisés par culture) et à l'IFT.
+ */
+export function cultivationOf(cultivationVariety: string | null, nature: "field_crop" | "vine" | "grassland"): string | null {
+  const v = cultivationVariety?.trim().toLowerCase() || null;
+  if (v && /^[a-z_]+$/.test(v) && v !== "plant") return v;
+  return nature === "vine" ? "vitis" : null;
+}
+
 /** Statut d'intervention : seules les interventions réalisées entrent au journal. */
 export function interventionStatus(state: string | null): "done" | "planned" | null {
   if (state === "done" || state === "validated") return "done";

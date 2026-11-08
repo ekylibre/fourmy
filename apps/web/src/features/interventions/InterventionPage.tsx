@@ -19,6 +19,7 @@ import { ParcelMap } from "../map/ParcelMap";
 import { CancelModal } from "./CancelModal";
 import { InterventionForm } from "./InterventionForm";
 import { actionLabel, changeLines, interventionDay, STATUS, targetName, type Names } from "./presenters";
+import { ComplianceSection, IftSection } from "./RegulatorySections";
 
 const EMPTY_FC: FeatureCollection = { type: "FeatureCollection", features: [] };
 const ORIGINS: Record<string, string> = { web: "Web", mobile: "Mobile", migration: "Reprise d'Ekylibre", plugin: "Extension" };
@@ -254,6 +255,8 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
                 Trace GPS des matériels pendant l'intervention (orange : travail, pointillés : transport).
               </Text>
             )}
+            <ComplianceSection farmId={farm.id} intervention={i} />
+            <IftSection farmId={farm.id} intervention={i} names={names} />
             <Paper p="md" withBorder>
               <Title order={4} mb="sm">
                 Historique

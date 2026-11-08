@@ -43,7 +43,7 @@ describe.skipIf(!url)("interventions (intégration)", () => {
     await sql`INSERT INTO place_versions (id, place_id, kind, source, valid) VALUES (${crypto.randomUUID()}, ${hangarId}, 'building', 'manual', tstzrange('2000-01-01', NULL))`;
     await sql`INSERT INTO containers (id, farm_id, place_id, name) VALUES (${cuveId}, ${farmId}, ${hangarId}, 'Cuve 1')`;
     await sql`INSERT INTO container_versions (id, container_id, kind, capacity_l, placement, valid) VALUES (${crypto.randomUUID()}, ${cuveId}, 'tank', 5000, 'auto', tstzrange('2000-01-01', NULL))`;
-    await sql`INSERT INTO articles (id, farm_id, name, kind, unit, amm) VALUES (${fongicideId}, ${farmId}, 'Fongicide X', 'phyto', 'liter', '2100001')`;
+    await sql`INSERT INTO articles (id, farm_id, name, kind, unit, amm) VALUES (${fongicideId}, ${farmId}, 'Fongicide X', 'phyto', 'liter', '9100001')`;
     await sql`INSERT INTO articles (id, farm_id, name, kind, unit) VALUES (${raisinId}, ${farmId}, 'Raisin', 'harvest', 'liter')`;
     await sql`INSERT INTO lots (id, farm_id, article_id, code) VALUES (${lotA}, ${farmId}, ${fongicideId}, 'LOT-A')`;
     await sql`INSERT INTO stock_movements (id, farm_id, lot_id, place_id, quantity, unit, occurred_at, cause)
@@ -98,7 +98,7 @@ describe.skipIf(!url)("interventions (intégration)", () => {
 
     const register = await get("/registers/phyto?campaign=2026");
     expect(register.items).toEqual([
-      expect.objectContaining({ parcelName: "Les Vignes", productName: "Fongicide X", amm: "2100001", quantity: 2, unit: "liter_per_hectare" }),
+      expect.objectContaining({ parcelName: "Les Vignes", productName: "Fongicide X", amm: "9100001", quantity: 2, unit: "liter_per_hectare" }),
     ]);
   });
 

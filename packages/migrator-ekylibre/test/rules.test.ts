@@ -62,3 +62,14 @@ describe("règles de correspondance", () => {
     expect(capacityFromLabel("Cuve inox")).toBeNull();
   });
 });
+
+describe("culture des productions", () => {
+  it("reprend la variété cultivée (taxonomie), une vigne sans variété reste de la vigne", async () => {
+    const { cultivationOf } = await import("../src/rules.js");
+    expect(cultivationOf("zea_mays", "field_crop")).toBe("zea_mays");
+    expect(cultivationOf(" Vitis ", "vine")).toBe("vitis");
+    expect(cultivationOf(null, "vine")).toBe("vitis");
+    expect(cultivationOf("plant", "field_crop")).toBeNull();
+    expect(cultivationOf("DKC5196", "field_crop")).toBeNull(); // une variété commerciale n'est pas une culture
+  });
+});

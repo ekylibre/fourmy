@@ -52,6 +52,9 @@ importers:
       '@fourmy/geo-ign':
         specifier: workspace:*
         version: link:../../packages/geo-ign
+      '@fourmy/lexicon':
+        specifier: workspace:*
+        version: link:../../packages/lexicon
       '@fourmy/migrator-ekylibre':
         specifier: workspace:*
         version: link:../../packages/migrator-ekylibre
@@ -359,6 +362,16 @@ importers:
         version: 2.1.8(@types/node@24.19.2)(jsdom@29.1.1(@noble/hashes@2.4.0))(lightningcss@1.33.0)(msw@2.7.0(@types/node@24.19.2)(typescript@5.7.3))(sugarss@5.0.2(postcss@8.5.32))
 
   packages/geo-ign:
+    devDependencies:
+      vitest:
+        specifier: 2.1.8
+        version: 2.1.8(@types/node@24.19.2)(jsdom@29.1.1(@noble/hashes@2.4.0))(lightningcss@1.33.0)(msw@2.7.0(@types/node@24.19.2)(typescript@5.7.3))(sugarss@5.0.2(postcss@8.5.32))
+
+  packages/lexicon:
+    dependencies:
+      postgres:
+        specifier: 3.4.5
+        version: 3.4.5
     devDependencies:
       vitest:
         specifier: 2.1.8

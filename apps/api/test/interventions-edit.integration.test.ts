@@ -43,7 +43,7 @@ describe.skipIf(!url)("interventions : fiche et correction tracée (intégration
       (${crypto.randomUUID()}, ${farmId}, 2026, '2026-01-01', '2026-12-31')`;
     await sql`INSERT INTO places (id, farm_id, name) VALUES (${hangarId}, ${farmId}, 'Hangar')`;
     await sql`INSERT INTO place_versions (id, place_id, kind, source, valid) VALUES (${crypto.randomUUID()}, ${hangarId}, 'building', 'manual', tstzrange('2000-01-01', NULL))`;
-    await sql`INSERT INTO articles (id, farm_id, name, kind, unit, amm) VALUES (${fongicideId}, ${farmId}, 'Fongicide X', 'phyto', 'liter', '2100001')`;
+    await sql`INSERT INTO articles (id, farm_id, name, kind, unit, amm) VALUES (${fongicideId}, ${farmId}, 'Fongicide X', 'phyto', 'liter', '9100001')`;
     await sql`INSERT INTO lots (id, farm_id, article_id, code) VALUES (${lotA}, ${farmId}, ${fongicideId}, 'LOT-A')`;
     await sql`INSERT INTO stock_movements (id, farm_id, lot_id, place_id, quantity, unit, occurred_at, cause)
       VALUES (${crypto.randomUUID()}, ${farmId}, ${lotA}, ${hangarId}, 20, 'liter', '2025-03-01', 'purchase')`;

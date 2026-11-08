@@ -1,0 +1,19 @@
+{
+  "name": "@fourmy/lexicon",
+  "version": "0.0.0",
+  "description": "Référentiel Lexicon (OSFarm) : paquets phytosanitary et taxonomy copiés dans Fourmy",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "bin": { "fourmy-lexicon-sync": "./dist/cli.js" },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "lint": "eslint src"
+  },
+  "dependencies": { "postgres": "3.4.5" },
+  "devDependencies": { "vitest": "2.1.8" }
+}

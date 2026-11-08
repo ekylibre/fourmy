@@ -31,6 +31,7 @@ import {
   type TreatmentPurpose,
 } from "@fourmy/contracts";
 import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
+import { checkCompliance, type CheckableBody } from "./phyto.js";
 
 /**
  * Interventions (docs/interventions.md). L'API parle la forme structurée
@@ -117,6 +118,8 @@ function toIntervention(r: Record<string, unknown>): Intervention {
     notes: (r.notes as string | null) ?? null,
     origin: r.origin as Intervention["origin"],
     clientId: (r.client_id as string | null) ?? null,
+    compliance: (r.compliance as Intervention["compliance"]) ?? null,
+    ift: (r.ift as Intervention["ift"]) ?? null,
     createdAt: iso(r.created_at)!,
     updatedAt: iso(r.updated_at)!,
   };
@@ -127,7 +130,7 @@ async function readInterventions(tx: Tx, where: SQL, limit = 1000): Promise<Inte
     tx,
     sql`
       SELECT i.id, i.farm_id, i.procedure, i.status, i.started_at, i.stopped_at, i.origin, i.client_id,
-             i.purposes, i.notes, i.created_at, i.updated_at,
+             i.purposes, i.notes, i.compliance, i.ift, i.created_at, i.updated_at,
              (SELECT coalesce(json_agg(json_build_object('startedAt', w.started_at, 'stoppedAt', w.stopped_at)
                         ORDER BY w.started_at), '[]') FROM intervention_periods w WHERE w.intervention_id = i.id) AS periods,
              (SELECT coalesce(json_agg(json_build_object(
@@ -274,6 +277,26 @@ async function audit(tx: Tx, farmId: string, ctx: DomainCtx, entityId: string, a
 }
 
 // ---------------------------------------------------------------------------
+// Contrôle réglementaire (lot 2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Contrôle phyto de la saisie, enregistré avec l'intervention. Réalisation
+ * saisie sur le web avec un feu rouge : refusée sans motif (« alerte +
+ * motif »). Depuis le mobile (qui ne connaît pas encore les feux), la
+ * réalisation est enregistrée et le feu rouge reste visible, sans motif.
+ */
+async function recordCompliance(tx: Tx, ctx: DomainCtx, interventionId: string, body: CheckableBody, mode: "plan" | "done") {
+  const result = await checkCompliance(tx, body, interventionId);
+  if (mode === "done" && result.level === "danger" && ctx.origin === "web" && !body.compliance?.reason?.trim()) {
+    const dangers = result.checks.flatMap((c) => c.indicators.filter((i) => i.level === "danger").map((i) => i.message));
+    throw new DomainError(`Feu rouge réglementaire : ${dangers.join(" ")} Pour enregistrer quand même, indiquez un motif.`);
+  }
+  await tx.execute(sql`UPDATE interventions SET compliance = ${JSON.stringify(result)}::jsonb WHERE id = ${interventionId}`);
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Planification
 // ---------------------------------------------------------------------------
 
@@ -294,6 +317,7 @@ export async function planInTx(
     VALUES (${id}, ${farmId}, ${input.procedure}, 'planned', ${bounds.startedAt ?? input.plannedAt ?? null}, ${bounds.stoppedAt},
             ${ctx.origin}, ${clientId}, ${sql`ARRAY[${sql.join(input.purposes.map((p) => sql`${p}`), sql`, `)}]::text[]`}, ${input.notes ?? null})`);
   await writeBody(tx, id, input, articles);
+  await recordCompliance(tx, ctx, id, input, "plan");
   await audit(tx, farmId, ctx, id, "planned", { procedure: input.procedure });
   await outbox(tx, farmId, buildEvent(ctx, farmId, "intervention.planned", { interventionId: id }));
   return { intervention: await readIntervention(tx, id), created: true };
@@ -435,6 +459,9 @@ async function applyCompletion(
   const articles = await validate(tx, procedure, input, "complete");
   const { startedAt, stoppedAt } = periodBounds(input.periods);
   await writeBody(tx, interventionId, input, articles);
+  await recordCompliance(tx, ctx, interventionId, { ...input, procedure }, "done");
+  // Contenu (re)écrit : l'IFT sera recalculé (worker, ou à la demande depuis la fiche).
+  await tx.execute(sql`UPDATE interventions SET ift = NULL WHERE id = ${interventionId}`);
   const areaHa = await treatedAreaHa(tx, input, stoppedAt!);
 
   const warnings: string[] = [];
@@ -569,6 +596,7 @@ export async function updateIntervention(
       const articles = await validate(tx, input.procedure, input, "plan");
       const bounds = periodBounds(input.periods);
       await writeBody(tx, interventionId, input, articles);
+      await recordCompliance(tx, ctx, interventionId, input, "plan");
       await tx.execute(sql`
         UPDATE interventions SET procedure = ${input.procedure},
           started_at = ${bounds.startedAt ?? input.plannedAt ?? before.startedAt}, stopped_at = ${bounds.stoppedAt},

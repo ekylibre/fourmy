@@ -6,6 +6,7 @@ import {
   Divider,
   Group,
   Loader,
+  Modal,
   MultiSelect,
   NumberInput,
   SegmentedControl,
@@ -39,6 +40,8 @@ import { invalidateAfterIntervention } from "../../app/queries";
 import { MapBoundary } from "../../components/MapBoundary";
 import { ProcedureIcon } from "../../components/ProcedureIcon";
 import { treatedAreaM2 } from "./zones";
+import { CompliancePanel, type ComplianceDraft } from "./CompliancePanel";
+import type { ComplianceResult } from "@fourmy/contracts";
 
 // La carte (MapLibre, terra-draw) n'est chargée qu'en mode « Carte ».
 const ParcelPicker = lazy(() => import("./ParcelPicker").then((m) => ({ default: m.ParcelPicker })));
@@ -111,6 +114,13 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   const correcting = editing?.status === "done";
   const [correctionId] = useState(() => crypto.randomUUID());
   const [reason, setReason] = useState("");
+  // Contrôle réglementaire : cible (usage E-Phy) choisie par produit, dernier résultat, motif d'un feu rouge.
+  const [usageChoices, setUsageChoices] = useState<Record<string, string>>(() =>
+    Object.fromEntries(((toComplete ?? editing)?.compliance?.checks ?? []).filter((c) => c.usageId).map((c) => [c.articleId, c.usageId!])),
+  );
+  const [compliance, setCompliance] = useState<ComplianceResult | null>(null);
+  const [overrideReason, setOverrideReason] = useState((toComplete ?? editing)?.compliance?.reason ?? "");
+  const [askOverride, setAskOverride] = useState(false);
   const [code, setCode] = useState<string | null>(planned?.procedure ?? null);
   const procedure: ProcedureCatalogueItem | undefined = catalogue.items.find((p) => p.code === code);
   const shape = procedure?.shape;
@@ -234,8 +244,29 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       doers: doers.map((personId) => ({ personId })),
       purposes,
       ...(notes.trim() ? { notes: notes.trim() } : {}),
+      compliance: { usages: usageChoices, ...(overrideReason.trim() ? { reason: overrideReason.trim() } : {}) },
     } satisfies InterventionCompleteWrite;
   };
+
+  // Brouillon soumis au contrôle réglementaire (produits phyto seulement).
+  const phytoIds = new Set(articles.filter((a) => a.kind === "phyto").map((a) => a.id));
+  let draft: ComplianceDraft | null = null;
+  if (code && inputKinds.includes("phyto")) {
+    try {
+      const full = body();
+      draft = {
+        procedure: code,
+        periods: completing ? full.periods : [],
+        plannedAt: completing ? undefined : full.periods[0]?.startedAt,
+        targets: full.targets,
+        inputs: full.inputs.filter((i) => phytoIds.has(i.articleId)).map(({ articleId, quantity, per }) => ({ articleId, quantity, per })),
+        compliance: { usages: usageChoices },
+      };
+    } catch {
+      draft = null; // date en cours de saisie
+    }
+  }
+  const dangers = (compliance?.checks ?? []).flatMap((c) => c.indicators.filter((i) => i.level === "danger").map((i) => i.message));
 
   const submit = useMutation({
     mutationFn: async () => {
@@ -354,6 +385,8 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         setError(null);
         if (!code) return setError("Choisissez une intervention.");
         if (periods.some((p) => !p.startedAt || (completing && !p.stoppedAt))) return setError("Renseignez les dates.");
+        // Feu rouge sur une réalisation : motif obligatoire (alerte + motif).
+        if (completing && dangers.length > 0 && overrideReason.trim().length < 3) return setAskOverride(true);
         submit.mutate();
       }}
     >
@@ -538,6 +571,23 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
           />
         )}
 
+        {draft && (
+          <CompliancePanel
+            farmId={farmId}
+            draft={draft}
+            interventionId={editing?.id ?? toComplete?.id}
+            onResult={setCompliance}
+            onUsage={(articleId, usageId) =>
+              setUsageChoices((m) => {
+                const next = { ...m };
+                if (usageId) next[articleId] = usageId;
+                else delete next[articleId];
+                return next;
+              })
+            }
+          />
+        )}
+
         {procedure && (
           <>
             <Divider label="Moyens" labelPosition="left" />
@@ -585,6 +635,48 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
           {editing ? (correcting ? "Enregistrer la correction" : "Enregistrer les modifications") : planned ? "Enregistrer la réalisation" : mode === "planned" ? "Planifier" : "Enregistrer"}
         </Button>
       </Stack>
+      <Modal opened={askOverride} onClose={() => setAskOverride(false)} title="Feu rouge réglementaire" size="lg">
+        <Stack>
+          <Alert color="brique" variant="light">
+            <Stack gap={4}>
+              {dangers.map((d, k) => (
+                <Text key={k} size="sm">
+                  {d}
+                </Text>
+              ))}
+            </Stack>
+          </Alert>
+          <Text size="sm">
+            Pour enregistrer quand même, indiquez le motif. Il reste attaché à l'intervention, visible sur sa fiche.
+          </Text>
+          <Textarea
+            label="Motif"
+            required
+            autosize
+            minRows={2}
+            maxLength={500}
+            value={overrideReason}
+            onChange={(e) => setOverrideReason(e.currentTarget.value)}
+            data-autofocus
+          />
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setAskOverride(false)}>
+              Revenir à la saisie
+            </Button>
+            <Button
+              color="brique"
+              disabled={overrideReason.trim().length < 3}
+              loading={submit.isPending}
+              onClick={() => {
+                setAskOverride(false);
+                submit.mutate();
+              }}
+            >
+              Enregistrer malgré tout
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </form>
   );
 }

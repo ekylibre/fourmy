@@ -14,6 +14,7 @@ import { useSnapshot } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
 import { MapBoundary } from "../../components/MapBoundary";
 import { ParcelMap, type Basemap } from "./ParcelMap";
+import { ParcelDelays } from "./ParcelDelays";
 
 /** Carte 2D : parcellaire à la date de la frise, bâtiments, trace GPS du jour (US-1). */
 export function MapPage() {
@@ -133,6 +134,7 @@ export function MapPage() {
                 <Text>{formatHa(Number(selected.areaM2))}</Text>
                 <Text c="dimmed">{NATURE_LABELS[String(selected.nature)] ?? "Sans production cette campagne"}</Text>
                 {typeof selected.variety === "string" && selected.variety !== "null" && <Badge color="lichen">{selected.variety}</Badge>}
+                <ParcelDelays farmId={farm.id} parcelId={String(selected.id)} at={at} />
               </Paper>
             )}
             <Paper p="md">

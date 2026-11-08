@@ -1,0 +1,87 @@
+# Réglementation phytosanitaire
+
+Lot 2 des retours de test (`claudedocs/exigences_interventions.md` : PHY-1 à
+PHY-4, GEO-1, IFT-1). Réalisé le 2026-11-08.
+
+## Sources (toutes ouvertes, sans compte)
+
+| Donnée | Source | Dans Fourmy |
+|---|---|---|
+| Produits, usages autorisés (dose, délai avant récolte, ZNT, nombre d'applications), ensembles de cultures | **Lexicon** (OSFarm), paquet `phytosanitary` — catalogue E-Phy de l'ANSES et AMM 120 jours du ministère | tables `phyto_products`, `phyto_usages`, `phyto_cropsets`, `phyto_target_pfi` |
+| Parenté des espèces (zea_mays → zea → poaceae → plant) | Lexicon, paquet `taxonomy` | table `taxonomy` |
+| Cours d'eau et plans d'eau | **BD TOPO de l'IGN** (WFS Géoplateforme : tronçons et surfaces hydrographiques), la même source que l'hydrographie de Lexicon, avec les tracés | table `water_items`, par ferme (RLS) |
+| IFT | **API IFT v5** du ministère de l'Agriculture | `interventions.ift` |
+
+- Paquets Lexicon : `https://lexicon-packages.osfarm.org` (`index.json`,
+  versions, `manifest.json`, CSV gzip). Le worker vérifie chaque jour ; une
+  nouvelle version remplace l'ancienne d'un bloc (`@fourmy/lexicon`,
+  `COPY` dans une transaction). Le `structure.sql` des paquets n'est jamais
+  exécuté : seuls les noms de colonnes en sont lus. CLI :
+  `node packages/lexicon/dist/cli.js [--force]`.
+- L'API REST de Lexicon (`/phytosanitary/usages.json`…) n'expose ni le délai
+  de ré-entrée ni les dates de retrait ; les paquets les contiennent.
+- Eau : emprise de toutes les parcelles de la ferme + 200 m, rechargée tous
+  les 30 jours par le worker, ou à la demande (page Produits phyto).
+- IFT : `https://ecoagri.api.agriculture.gouv.fr/ift/v5/api` (sans compte).
+
+## Contrôle d'un traitement (`@fourmy/domain`, `checkTreatment`)
+
+Pour chaque produit phyto, à la **date du traitement** (un traitement de 2016
+est jugé sur la réglementation de 2016) :
+
+| Indicateur | Rouge si… | Orange si… |
+|---|---|---|
+| Autorisation | produit retiré ou pas encore autorisé à la date ; aucun usage valable sur la culture d'une parcelle | pas de n° AMM, AMM inconnu, culture inconnue, référentiel non chargé |
+| Dose maximale | dose à l'hectare (saisie, ou totale ramenée à la surface traitée) au-dessus du maximum | unité non comparable (L/hL, g/m²…) |
+| Applications | maximum par campagne dépassé (même n° AMM, même parcelle) | — |
+| ZNT | la zone traitée (zone de travail, sinon la parcelle) est plus près de l'eau que la ZNT ; distance réelle PostGIS, **fossés exclus**, cours d'eau intermittents compris | eau non chargée autour de la ferme |
+| Délai avant récolte | une récolte (réalisée ou planifiée) tombe avant la fin du délai | — (sinon : « récolte possible à partir du… ») |
+| Ré-entrée | — | — (information : « ré-entrée possible le … à … ») |
+
+- Un usage vaut pour une culture si ses espèces contiennent la culture, un
+  de ses ancêtres (« plant » = traitements généraux) ou un ensemble E-Phy qui
+  la contient (logique d'Ekylibre).
+- **Cible** : la saisie peut préciser l'usage (cible) de chaque produit ;
+  sinon la valeur la plus permissive pour la dose et les applications, la
+  plus stricte pour la ZNT et le délai avant récolte.
+- **Culture** : `productions.cultivation` (taxonomie), reprise de la
+  `cultivation_variety` d'Ekylibre ; une vigne sans variété reste `vitis`.
+- **Unités** des articles repris (« Litre », « Kg », « Sac de 12 kg »)
+  ramenées au litre ou au kilo.
+
+## Saisie, fiche, registre
+
+- **Formulaire** : panneau « Contrôle réglementaire » en direct
+  (`POST /phyto/check`), choix de la cible. Une réalisation avec un feu rouge
+  demande un **motif** (« alerte + motif ») ; le serveur refuse une
+  réalisation web rouge sans motif. Depuis le mobile (qui ne connaît pas
+  encore les feux), la réalisation est enregistrée, feu rouge visible.
+- **Fiche** : contrôle enregistré à la saisie (`interventions.compliance`,
+  avec le motif), sinon calculé à la date (`GET /interventions/:id/compliance`,
+  reprises d'Ekylibre comprises) ; IFT par produit et parcelle.
+- **Carte** : délais en cours sur la parcelle sélectionnée (ré-entrée
+  interdite jusqu'au…, récolte possible à partir du…).
+- **Registre phyto** : bilan IFT de la campagne (ferme, segments, parcelles).
+- **Produits phyto** (menu) : version du référentiel, eau chargée, articles
+  et leur rattachement E-Phy ; rattacher un n° AMM, ajouter un produit depuis
+  le référentiel (recherche par nom, autre nom commercial ou n° AMM).
+
+## IFT (`apps/api/src/repos/ift.ts`)
+
+Un appel par produit et par parcelle : campagne (année du traitement), n°
+AMM, culture IFT (libellé de la culture, sinon de ses ancêtres dans la
+taxonomie : « Blé tendre » → « Blé »), type de traitement d'après la nature
+E-Phy (herbicide T21, fongicide T23, insecticide T22, autre T24), unité L/ha
+ou kg/ha, dose à l'hectare. IFT × part de la parcelle réellement traitée.
+Total de l'intervention et bilan de campagne : moyenne pondérée par les
+surfaces (parcelles non traitées comprises pour la ferme). Calculé par le
+worker ; API indisponible → « en attente », nouvel essai une heure plus tard.
+
+## Constat sur les fermes pilotes (2026-11-08)
+
+- Pierre : 24 produits sur 24 rattachés par leur n° AMM (certains sous un
+  autre nom commercial, ex. BARBARIAN ST = GLISTER ULTRA 360) ; 135 cours
+  d'eau et plans d'eau autour de la ferme. Exemple de feu rouge réel : un
+  écoulement intermittent traverse Lespourcy Maïs 2025 sur 110 m.
+- 36 productions de Pierre n'ont qu'une culture générique dans Ekylibre :
+  autorisation « non vérifiable » (orange) sur ces parcelles.

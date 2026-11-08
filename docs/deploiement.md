@@ -22,7 +22,7 @@ demandera d'abord de les retirer. Dokploy y accède par l'application GitHub
 |---|---|---|
 | `db` | `timescale/timescaledb-ha:pg17` | PostgreSQL + PostGIS + TimescaleDB, volume `fourmy_pgdata` |
 | `api` | `Dockerfile`, cible `api` | API Hono ; applique les migrations au démarrage |
-| `worker` | même image, `node apps/api/dist/worker.js` | synchronise les intégrations des fermes (Traccar : chaque minute) |
+| `worker` | même image, `node apps/api/dist/worker.js` | synchronise les intégrations des fermes (Traccar : chaque minute), le référentiel phyto Lexicon (chaque jour), l'eau autour des fermes (BD TOPO, tous les 30 jours) et l'IFT des traitements |
 | `web` | `Dockerfile`, cible `web` (nginx) | application React + relais `/api` → `api` |
 | `site` | `ghcr.io/ekylibre/fourmy-site:main`, construite par la CI depuis `docker/site.Dockerfile` (nginx) | site public fourmy.org ; relaie seulement `/api/public/` (formulaire de contact) ; `www` → apex |
 
@@ -41,6 +41,8 @@ l'API partagent la même origine : cookies de session sans CORS.
 | `FOURMY_MOBILE_ORIGINS` | non | `zeromobile://` par défaut (application mobile) |
 | `FOURMY_SMTP_HOST`, `_PORT`, `_USER`, `_PASSWORD`, `_FROM` | non | envoi du formulaire de contact de fourmy.org vers `FOURMY_CONTACT_TO` (contact@fourmy.org) ; sans eux, le formulaire répond « indisponible » |
 | `SITE_IMAGE` | non | image du site, `ghcr.io/ekylibre/fourmy-site:main` par défaut (prod : une étiquette `sha-…` précise) |
+| `FOURMY_LEXICON_PACKAGES_URL` | non | serveur des paquets Lexicon (référentiel phyto), `https://lexicon-packages.osfarm.org` par défaut ; `off` pour ne pas synchroniser (`docs/phyto.md`) |
+| `FOURMY_IFT_API_URL` | non | API IFT du ministère, `https://ecoagri.api.agriculture.gouv.fr/ift/v5/api` par défaut (ouverte, sans compte) |
 | `EKYLIBRE_SOURCES_URL` | non | serveur des bases Ekylibre restaurées pour les imports depuis l'interface |
 
 Aucun secret dans le dépôt : ils sont générés directement dans Dokploy.

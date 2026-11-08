@@ -87,6 +87,25 @@ export const handlers = [
   http.post(`*${base}/interventions/:id/cancel`, ({ params }) =>
     HttpResponse.json({ ...demoInterventions[0], id: params.id, status: "cancelled" }),
   ),
+  // Réglementation phyto (lot 2) : par défaut, rien à signaler.
+  http.post(`*${base}/phyto/check`, () =>
+    HttpResponse.json({ level: "ok", checkedAt: new Date().toISOString(), referential: "2026.11.07.1", checks: [], reason: null }),
+  ),
+  http.get(`*${base}/interventions/:id/compliance`, () =>
+    HttpResponse.json({ level: "ok", checkedAt: new Date().toISOString(), referential: "2026.11.07.1", checks: [], reason: null }),
+  ),
+  http.get(`*${base}/phyto/ift`, () => HttpResponse.json({ campaign: 2026, total: 0, segments: {}, pendingInterventions: 0, parcels: [] })),
+  http.get(`*${base}/phyto/parcels/:id/delays`, () => HttpResponse.json({ reentry: null, harvest: null })),
+  http.get(`*${base}/phyto/status`, () =>
+    HttpResponse.json({
+      referential: { phytosanitary: "2026.11.07.1", taxonomy: "2026.10.07.1", loadedAt: "2026-11-08T11:00:00.000Z" },
+      water: { syncedAt: "2026-11-08T11:05:00.000Z", items: 12, lastError: null },
+      articles: { phyto: 1, linked: 1, withoutAmm: 0, unknownAmm: 0 },
+    }),
+  ),
+  http.get(`*${base}/phyto/articles`, () =>
+    HttpResponse.json({ items: [{ id: demoArticles[0]!.id, name: demoArticles[0]!.name, unit: "liter", amm: "2100001", product: { name: "GUILD", state: "authorized", stoppedOn: null } }] }),
+  ),
   http.get(`*${base}/procedures`, () => HttpResponse.json(demoProcedures)),
   http.get(`*${base}/people`, () => page(demoPeople)),
   http.get(`*${base}/registers/phyto`, ({ request }) => {

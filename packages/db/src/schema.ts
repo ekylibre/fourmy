@@ -83,6 +83,8 @@ export const productions = pgTable("productions", {
   landParcelId: uuid("land_parcel_id").notNull(),
   nature: text("nature").notNull(),
   species: text("species"),
+  /** Culture (taxonomie Lexicon : zea_mays, vitis…) ; `species` garde la variété saisie. */
+  cultivation: text("cultivation"),
   ...audit,
 });
 
@@ -192,6 +194,10 @@ export const interventions = pgTable("interventions", {
   clientId: text("client_id"),
   purposes: text("purposes").array().notNull().default([]),
   notes: text("notes"),
+  /** Contrôle réglementaire phyto à l'enregistrement (feux, motif d'un passage outre). */
+  compliance: jsonb("compliance"),
+  /** IFT des traitements (API IFT du ministère), calculé après réalisation. */
+  ift: jsonb("ift"),
   ...audit,
 });
 
@@ -268,3 +274,84 @@ export const importRuns = pgTable("import_runs", {
   status: text("status").notNull(),
   report: jsonb("report"),
 });
+
+// --- Réglementation phytosanitaire (migration 0009) ---------------------------
+
+/** Référentiel copié des paquets Lexicon (global, lecture seule pour l'application). */
+export const lexiconPackages = pgTable("lexicon_packages", {
+  name: text("name").primaryKey(),
+  version: text("version").notNull(),
+  source: text("source").notNull(),
+  rows: integer("rows").notNull(),
+  loadedAt: timestamp("loaded_at", { withTimezone: true }).notNull(),
+});
+
+export const phytoProducts = pgTable("phyto_products", {
+  id: integer("id").primaryKey(),
+  amm: text("amm").notNull(),
+  name: text("name").notNull(),
+  otherNames: text("other_names").array().notNull(),
+  natures: text("natures").array().notNull(),
+  activeCompounds: text("active_compounds").array().notNull(),
+  reentryDelayHours: integer("reentry_delay_hours"),
+  state: text("state").notNull(),
+  startedOn: date("started_on"),
+  stoppedOn: date("stopped_on"),
+  firm: text("firm"),
+  productType: text("product_type"),
+  isDerogation: boolean("is_derogation").notNull(),
+});
+
+export const phytoUsages = pgTable("phyto_usages", {
+  id: text("id").primaryKey(),
+  productId: integer("product_id").notNull(),
+  phrase: text("phrase").notNull(),
+  cropLabel: text("crop_label"),
+  species: text("species").array().notNull(),
+  targetLabel: text("target_label"),
+  treatmentLabel: text("treatment_label"),
+  doseQuantity: numeric("dose_quantity"),
+  doseUnit: text("dose_unit"),
+  doseUnitLabel: text("dose_unit_label"),
+  preHarvestDelayDays: integer("pre_harvest_delay_days"),
+  applicationsCount: integer("applications_count"),
+  applicationsFrequencyDays: integer("applications_frequency_days"),
+  untreatedBufferAquatic: integer("untreated_buffer_aquatic"),
+  untreatedBufferArthropod: integer("untreated_buffer_arthropod"),
+  untreatedBufferPlants: integer("untreated_buffer_plants"),
+  usageConditions: text("usage_conditions"),
+  decisionDate: date("decision_date"),
+  state: text("state").notNull(),
+  isDerogation: boolean("is_derogation").notNull(),
+  derogationStartedOn: date("derogation_started_on"),
+  derogationStoppedOn: date("derogation_stopped_on"),
+});
+
+export const phytoCropsets = pgTable("phyto_cropsets", {
+  name: text("name").primaryKey(),
+  label: text("label"),
+  cropNames: text("crop_names").array().notNull(),
+});
+
+export const taxonomy = pgTable("taxonomy", {
+  referenceName: text("reference_name").primaryKey(),
+  parent: text("parent"),
+  rank: text("rank"),
+  label: text("label"),
+});
+
+/** Eau autour de la ferme (BD TOPO), sous RLS. */
+export const waterItems = pgTable(
+  "water_items",
+  {
+    id: text("id").notNull(),
+    farmId: uuid("farm_id").notNull(),
+    kind: text("kind").notNull(),
+    nature: text("nature"),
+    name: text("name"),
+    permanent: boolean("permanent"),
+    ditch: boolean("ditch").notNull(),
+    geom: geometry("geom").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.farmId, t.id] })],
+);

@@ -116,3 +116,24 @@ describe("tuiles fines interpolées depuis un ancêtre", () => {
     expect(child[size * size - 1]).toBeCloseTo(parent[32 * size + 32]!, 3); // milieu du parent
   });
 });
+
+describe("eau de la BD TOPO", () => {
+  it("lit tronçons et surfaces : nature, nom, permanence, fossé ; écarte le fictif", async () => {
+    const { parseWater, waterUrl } = await import("../src/index.js");
+    const items = parseWater(
+      {
+        features: [
+          { geometry: { type: "LineString", coordinates: [[0, 0], [1, 1]] }, properties: { cleabs: "T1", nature: "Ecoulement naturel", persistance: "Permanent", fosse: false, cpx_toponyme_de_cours_d_eau: "Ruisseau Labésiau" } },
+          { geometry: { type: "LineString", coordinates: [[0, 0], [1, 0]] }, properties: { cleabs: "T2", nature: "Ecoulement canalisé", persistance: "Intermittent", fosse: true } },
+          { geometry: { type: "LineString", coordinates: [[0, 0], [0, 1]] }, properties: { cleabs: "T3", fictif: true } },
+        ],
+      },
+      "line",
+    );
+    expect(items).toEqual([
+      expect.objectContaining({ id: "T1", kind: "line", name: "Ruisseau Labésiau", permanent: true, ditch: false }),
+      expect.objectContaining({ id: "T2", permanent: false, ditch: true, name: null }),
+    ]);
+    expect(waterUrl("BDTOPO_V3:troncon_hydrographique", { west: -0.2, south: 43.3, east: -0.1, north: 43.4 }, 1000)).toContain("STARTINDEX=1000");
+  });
+});

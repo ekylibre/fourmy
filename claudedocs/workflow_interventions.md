@@ -13,7 +13,14 @@ chargement des fixtures). Essai complet en lecture seule sur les fermes de
 Pierre (612 interventions, 2015–2026) et de Frédéric (151, 2020–2023) :
 aucun nom non résolu, aucune erreur.
 
-Constaté pendant l'essai, à décider :
+**Lot 2 réalisé** (2026-11-08) : référentiel Lexicon copié et synchronisé,
+eau de la BD TOPO autour des fermes, contrôle réglementaire (autorisation,
+dose, applications, ZNT, délai avant récolte, ré-entrée) dans le formulaire,
+la fiche et la carte, motif obligatoire sur un feu rouge, IFT par l'API du
+ministère (ouverte, sans compte) et bilan de campagne, page Produits phyto.
+Détail : `docs/phyto.md`.
+
+Constaté pendant l'essai du lot 1 (traité) :
 
 - **Cible rattachée à la mauvaise parcelle (migration)** : pour une cible
   « Plant », la reprise prend la parcelle support de la production

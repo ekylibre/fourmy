@@ -20,6 +20,7 @@
     "@fourmy/db": "workspace:*",
     "@fourmy/domain": "workspace:*",
     "@fourmy/geo-ign": "workspace:*",
+    "@fourmy/lexicon": "workspace:*",
     "@fourmy/migrator-ekylibre": "workspace:*",
     "@hono/node-server": "1.13.8",
     "@hono/zod-openapi": "0.18.3",

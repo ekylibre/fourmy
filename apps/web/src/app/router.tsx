@@ -9,6 +9,7 @@ import { FarmsPage } from "../features/farms/FarmsPage";
 import { ImportsPage } from "../features/imports/ImportsPage";
 import { InterventionsPage } from "../features/interventions/InterventionsPage";
 import { InterventionEditPage } from "../features/interventions/InterventionEditPage";
+import { PhytoProductsPage } from "../features/phyto/PhytoProductsPage";
 import { LoginPage } from "../features/login/LoginPage";
 import { RegisterPage } from "../features/register/RegisterPage";
 import { StockPage } from "../features/stock/StockPage";
@@ -79,6 +80,7 @@ export const routes = [
       { path: "stocks", element: <StockPage /> },
       { path: "cuverie", element: <CellarPage /> },
       { path: "registre", element: <RegisterPage /> },
+      { path: "phyto", element: <PhytoProductsPage /> },
       { path: "imports", element: <ImportsPage /> },
       { path: "equipe", element: <TeamPage /> },
       { path: "integrations", element: <IntegrationsPage /> },

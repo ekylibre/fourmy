@@ -39,6 +39,7 @@ services:
       # Chiffrement des secrets d'intégration (jetons Traccar…) : 32 octets base64.
       # La perdre rend les secrets illisibles (à ressaisir dans Intégrations).
       FOURMY_SECRETS_KEY: ${FOURMY_SECRETS_KEY:?FOURMY_SECRETS_KEY requis (openssl rand -base64 32)}
+      FOURMY_IFT_API_URL: ${FOURMY_IFT_API_URL:-https://ecoagri.api.agriculture.gouv.fr/ift/v5/api}
       # Formulaire de contact de fourmy.org (désactivé sans FOURMY_SMTP_HOST).
       FOURMY_SMTP_HOST: ${FOURMY_SMTP_HOST:-}
       FOURMY_SMTP_PORT: ${FOURMY_SMTP_PORT:-587}
@@ -68,6 +69,9 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-fourmy}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-fourmy}
       NODE_ENV: production
       FOURMY_SECRETS_KEY: ${FOURMY_SECRETS_KEY}
+      # Référentiel phyto et IFT (docs/phyto.md) : serveurs publics par défaut.
+      FOURMY_LEXICON_PACKAGES_URL: ${FOURMY_LEXICON_PACKAGES_URL:-}
+      FOURMY_IFT_API_URL: ${FOURMY_IFT_API_URL:-https://ecoagri.api.agriculture.gouv.fr/ift/v5/api}
 
   web:
     build:

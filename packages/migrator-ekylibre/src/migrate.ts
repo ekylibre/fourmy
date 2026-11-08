@@ -10,6 +10,7 @@ import {
   parameterRole,
   containerKind,
   capacityFromLabel,
+  cultivationOf,
 } from "./rules.js";
 
 /**
@@ -207,10 +208,11 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
           }
           for (const t of targets) {
             await tx`
-              INSERT INTO productions (id, farm_id, campaign_id, land_parcel_id, nature, species)
+              INSERT INTO productions (id, farm_id, campaign_id, land_parcel_id, nature, species, cultivation)
               VALUES (${t.pid}, ${farmId}, ${t.campaignId}, ${id("products", p.support_id)}, ${nature},
-                      ${p.plant_variety ?? p.cultivation_variety})
-              ON CONFLICT (id) DO UPDATE SET nature = excluded.nature, species = excluded.species`;
+                      ${p.plant_variety ?? p.cultivation_variety}, ${cultivationOf(p.cultivation_variety, nature)})
+              ON CONFLICT (id) DO UPDATE SET nature = excluded.nature, species = excluded.species,
+                cultivation = excluded.cultivation`;
             inc("productions");
           }
         }

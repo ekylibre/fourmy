@@ -13,6 +13,7 @@ import { peopleRoutes } from "./people.js";
 import { memberRoutes } from "./members.js";
 import { integrationRoutes } from "./integrations.js";
 import { procedureRoutes } from "./procedures.js";
+import { phytoRoutes } from "./phyto.js";
 
 /**
  * Routes métier sous `/api/v1/farms/:farmId` (architecture §5.1), découpées
@@ -31,4 +32,5 @@ export const farmRoutes = new Hono<Env>()
   .route("/", peopleRoutes)
   .route("/", memberRoutes)
   .route("/", integrationRoutes)
-  .route("/", procedureRoutes);
+  .route("/", procedureRoutes)
+  .route("/", phytoRoutes);
