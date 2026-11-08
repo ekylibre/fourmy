@@ -10,12 +10,16 @@ const KIND_ICONS: Record<string, ComponentType<{ size?: number }>> = {
   connected_object: Cable,
 };
 
+/** Visuel par défaut des tracteurs (kit Ekylibre, illustration isométrique). */
+export const TRACTOR_PICTURE = "/kit/tracteur.svg";
+
 /** Adresse d'un fichier de la ferme (logo). */
 export const assetUrl = (farmId: string, assetId: string) => `/api/v1/farms/${farmId}/assets/${assetId}`;
 
 /**
  * Logo 2D d'un matériel (FR-MAT-80) : le sien, sinon celui de sa marque
- * (résolu par l'API), sinon un pictogramme selon la nature. Toujours en
+ * (résolu par l'API), sinon le dessin du kit pour un tracteur, sinon un
+ * pictogramme selon la nature. Toujours en
  * `<img>` : un SVG n'est jamais injecté dans la page.
  */
 export function EquipmentLogo({ farmId, assetId, kind, size = 32 }: { farmId: string; assetId: string | null; kind: string; size?: number }) {
@@ -23,6 +27,14 @@ export function EquipmentLogo({ farmId, assetId, kind, size = 32 }: { farmId: st
     return (
       <Box w={size} h={size} style={{ flex: "none", display: "grid", placeItems: "center" }}>
         <img src={assetUrl(farmId, assetId)} alt="" style={{ maxWidth: size, maxHeight: size, objectFit: "contain" }} />
+      </Box>
+    );
+  }
+  // Tracteur sans logo : le dessin « tracteur bleu » du kit Ekylibre.
+  if (kind === "tractor") {
+    return (
+      <Box w={size} h={size} style={{ flex: "none", display: "grid", placeItems: "center" }}>
+        <img src={TRACTOR_PICTURE} alt="" style={{ maxWidth: size, maxHeight: size, objectFit: "contain" }} />
       </Box>
     );
   }

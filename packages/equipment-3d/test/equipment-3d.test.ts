@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { WebIO } from "@gltf-transform/core";
+import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
 import { buildAvatarGlb, inspectGlb, pngRatio, resolveAvatar, templateForKind, tyreDiameterM } from "../src/index.js";
 
 // Extrait (anonyme) d'une fiche technique au format de la base matériel.
@@ -30,6 +31,8 @@ describe("paramètres de l'avatar", () => {
     const r = resolveAvatar({ kind: "tractor", technical, brandColor: "#3F9A2B", saved: { widthM: 2.4, colors: { cab: "#111111" } } });
     expect(r.params).toMatchObject({ template: "tractor", lengthM: 4.89, wheelbaseM: 2.56, widthM: 2.4, rearWheelDiameterM: 1.68, frontWheelDiameterM: 1.29, heightM: 2.83 });
     expect(r.params.colors).toMatchObject({ body: "#3F9A2B", cab: "#111111" });
+    // Sans saisie ni marque : les couleurs du dessin du kit.
+    expect(resolveAvatar({ kind: "tractor" }).params.colors).toEqual({ body: "#3FBEE0", cab: "#5C2930", wheels: "#4F1F26", accent: "#E89E00" });
     expect(r.provenance).toMatchObject({ lengthM: "technical", widthM: "input", hitchOffsetM: "default", "colors.body": "technical", "colors.cab": "input" });
     expect(resolveAvatar({ kind: "tractor", technical }).hash).not.toBe(r.hash);
     expect(resolveAvatar({ kind: "tractor", technical, brandColor: "#3F9A2B", saved: { widthM: 2.4, colors: { cab: "#111111" } } }).hash).toBe(r.hash);
@@ -43,11 +46,12 @@ describe("modèle glTF", () => {
     const a = await buildAvatarGlb(params, PNG);
     expect(new TextDecoder().decode(a.glb.subarray(0, 4))).toBe("glTF");
     expect(a.triangles).toBeGreaterThan(100);
-    expect(a.triangles).toBeLessThan(2000);
+    expect(a.triangles).toBeLessThan(10_000);
     // Hauteur et largeur à ± 15 cm de la fiche (roues, toit).
     expect(a.bounds.max[2]).toBeCloseTo(params.heightM, 0);
     expect(a.bounds.max[1] - a.bounds.min[1]).toBeGreaterThan(params.widthM - 0.15);
-    const doc = await new WebIO().readBinary(a.glb);
+    const doc = await new WebIO().registerExtensions(ALL_EXTENSIONS).readBinary(a.glb);
+    expect(doc.getRoot().listExtensionsUsed().map((e) => e.extensionName)).toContain("KHR_materials_unlit");
     expect(doc.getRoot().listTextures()).toHaveLength(1);
     expect(doc.getRoot().listMaterials().map((m) => m.getName())).toContain("logo");
     expect(await inspectGlb(a.glb)).toEqual({ triangles: a.triangles });

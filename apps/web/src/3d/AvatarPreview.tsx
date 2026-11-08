@@ -8,7 +8,7 @@ import { Cartesian3, Color, HeadingPitchRange, HeadingPitchRoll, Math as CesiumM
  * trois quarts avant. Le GLB est passé en octets (généré dans le navigateur
  * pendant le réglage, ou importé).
  */
-export default function AvatarPreview({ glb, height = 320, sizeM = 6 }: { glb: Uint8Array | null; height?: number; sizeM?: number }) {
+export default function AvatarPreview({ glb, height = 320, sizeM = 6, centerM = 0 }: { glb: Uint8Array | null; height?: number; sizeM?: number; centerM?: number }) {
   const container = useRef<HTMLDivElement>(null);
   const viewer = useRef<Viewer | null>(null);
   const entity = useRef<Entity | null>(null);
@@ -54,9 +54,15 @@ export default function AvatarPreview({ glb, height = 320, sizeM = 6 }: { glb: U
       model: { uri: url },
     });
     // Caméra posée d'emblée (zoomTo attendrait le chargement du modèle) : trois quarts avant, à distance de la taille.
-    if (first) v.camera.lookAt(Cartesian3.fromDegrees(0, 45, sizeM * 0.15), new HeadingPitchRange(CesiumMath.toRadians(215), CesiumMath.toRadians(-18), Math.max(6, sizeM * 2.2)));
+    // Comme le dessin du kit : trois quarts avant gauche, vu d'au-dessus, centré sur le matériel.
+    if (first) {
+      v.camera.lookAt(
+        Cartesian3.fromDegrees(0, 45 + centerM / 111_320, sizeM * 0.18),
+        new HeadingPitchRange(CesiumMath.toRadians(135), CesiumMath.toRadians(-28), Math.max(6, sizeM * 2.1)),
+      );
+    }
     return () => URL.revokeObjectURL(url);
-  }, [glb, sizeM]);
+  }, [glb, sizeM, centerM]);
 
   return <div ref={container} style={{ height, borderRadius: 12, overflow: "hidden" }} aria-label="Aperçu 3D" />;
 }

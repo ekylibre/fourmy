@@ -47,6 +47,8 @@ const DEFAULTS: Record<AvatarTemplate, Omit<AvatarParams, "template" | "colors" 
   box: { lengthM: 2, widthM: 2, heightM: 2, wheelbaseM: 0, frontWheelDiameterM: 0, rearWheelDiameterM: 0, workingWidthM: 0, hitchOffsetM: 0 },
 };
 const DEFAULT_COLORS: AvatarParams["colors"] = { body: "#7A8C80", cab: "#2B3A42", wheels: "#1E1E1E", accent: "#C9CDC9" };
+/** Tracteur : couleurs du dessin « tracteur bleu » du kit Ekylibre (carrosserie turquoise, vitres teintées, pneus bordeaux, jantes orangées). */
+const TRACTOR_COLORS: AvatarParams["colors"] = { body: "#3FBEE0", cab: "#5C2930", wheels: "#4F1F26", accent: "#E89E00" };
 
 /** Gabarit déduit de la nature Ekylibre du matériel. */
 export function templateForKind(kind: string): AvatarTemplate {
@@ -147,7 +149,7 @@ export function resolveAvatar(input: { kind: string; technical?: unknown; brandC
       return input.brandColor;
     }
     provenance[`colors.${k}`] = "default";
-    return DEFAULT_COLORS[k];
+    return (template === "tractor" ? TRACTOR_COLORS : DEFAULT_COLORS)[k];
   };
   const params: AvatarParams = {
     template,

@@ -311,9 +311,28 @@ d'intervention s'adapte à cette forme.
 
 ### Avatar généré (`@fourmy/equipment-3d`)
 
-- **Modèle** : un modèle glTF à l'échelle réelle, en formes simples (un
-  tracteur fait environ 700 triangles). Il donne la silhouette et les
-  proportions, **pas le dessin du constructeur**.
+- **Modèle** : un modèle glTF à l'échelle réelle. Il donne la silhouette
+  et les proportions, **pas le dessin du constructeur**.
+- **Tracteur d'après le kit** : tous les tracteurs partent du dessin
+  « tracteur bleu » du kit Ekylibre (`apps/web/public/kit/tracteur.svg`).
+  - Ce dessin est une illustration isométrique : on ne peut pas en tirer
+    un volume automatiquement. Le modèle 3D est donc redessiné d'après
+    lui.
+  - Parties reprises : toit blanc et gyrophare, vitres teintées, capot
+    effilé au dessus plus clair, liseré blanc, calandre sombre et phares,
+    ailes galbées, échappement, rétroviseurs, pneus à crampons, jantes et
+    moyeux orangés. Environ 4 000 triangles.
+  - Ajusté par les données de l'avatar : longueur, largeur, hauteur,
+    empattement, diamètre des roues, couleurs (carrosserie et ses nuances,
+    vitres, pneus, jantes), logo.
+  - Couleurs par défaut, celles du dessin : carrosserie `#3FBEE0`, vitres
+    `#5C2930`, pneus `#4F1F26`, jantes `#E89E00`.
+- **Rendu en aplats**, comme l'illustration : matériaux sans éclairage
+  (`KHR_materials_unlit`), teinte de chaque face précalculée selon son
+  orientation (dessus plus clairs, flanc droit et arrière plus sombres).
+  Le rendu ne dépend donc pas de la lumière de la scène.
+- **Visuel 2D par défaut** : sans logo propre ni logo de marque, un
+  tracteur affiche ce dessin dans les listes et les fiches.
 - **Gabarits** :
   - tracteur ;
   - automoteur ;

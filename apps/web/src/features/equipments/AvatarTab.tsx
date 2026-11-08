@@ -128,7 +128,9 @@ export function AvatarTab({ sheet: s }: { sheet: EquipmentSheet }) {
       <Grid.Col span={{ base: 12, md: 7 }}>
         <Paper withBorder p="xs">
           <MapBoundary>
-            <Suspense fallback={<Loader size="sm" />}>{glb ? <AvatarPreview glb={glb} height={380} sizeM={Math.max(p.lengthM ?? 5, p.widthM ?? 2.5, p.workingWidthM ?? 0)} /> : <Loader size="sm" />}</Suspense>
+            <Suspense fallback={<Loader size="sm" />}>{glb ? <AvatarPreview glb={glb} height={380} sizeM={Math.max(p.lengthM ?? 5, p.widthM ?? 2.5, p.workingWidthM ?? 0)}
+                  centerM={["tractor", "self_propelled"].includes(resolved.params.template) ? (p.wheelbaseM ?? 0) / 2 : -(p.lengthM ?? 0) / 2}
+                /> : <Loader size="sm" />}</Suspense>
           </MapBoundary>
         </Paper>
         <Text size="xs" c="dimmed" mt={4}>
