@@ -268,7 +268,51 @@ Ce que l'intervention doit apprendre pour couvrir FR-MAT-30 à 35 :
 - **FR-MAT-73 (M) Accès** depuis le menu principal (« Matériels ») et depuis
   le tableau de bord de la ferme (FR-MAT-24).
 
-### 3.8 Hors périmètre
+### 3.8 Logo 2D et avatar 3D (demande du 2026-11-08)
+
+- **FR-MAT-80 (M) Logo 2D par matériel.** On attache une image à un
+  matériel : logo, pictogramme ou photo détourée. Formats PNG, SVG ou JPEG.
+  - **Repli** : sans image propre, on affiche le **logo de la marque**,
+    partagé par marque (FR-MAT-6), puis un pictogramme selon la nature.
+  - **Usages** :
+    - liste et fiche des matériels ;
+    - formulaires d'intervention ;
+    - marqueur du matériel sur la carte 2D ;
+    - étiquette au-dessus de l'avatar 3D.
+- **FR-MAT-81 (M) Avatar 3D généré.** Fourmy **génère** un modèle 3D
+  (glTF) de chaque matériel à partir de :
+  - sa **nature** : tracteur, automoteur, outil traîné, outil porté,
+    pulvérisateur, remorque… ;
+  - ses **dimensions** : celles de la fiche technique (longueur,
+    empattement, largeurs, hauteur, pneumatiques), sinon des valeurs par
+    défaut de la nature ;
+  - sa **couleur** : celle de la marque ou une couleur choisie ;
+  - son **logo 2D**, posé sur les flancs.
+
+  L'avatar est à l'échelle réelle, sans prétendre reproduire le dessin du
+  constructeur. Il est regénéré quand ses paramètres changent.
+- **FR-MAT-82 (S) Réglage de l'avatar.** Sur la fiche matériel, on voit
+  l'aperçu 3D et on ajuste les paramètres : gabarit, dimensions, couleurs,
+  largeur de travail d'un outil. Chaque valeur indique d'où elle vient
+  (fiche technique, défaut, saisie).
+- **FR-MAT-83 (S) Modèle 3D importé.** On peut remplacer l'avatar généré
+  par un fichier glTF/GLB fourni, avec une taille et un nombre de triangles
+  limités.
+- **FR-MAT-84 (M) Avatar dans la vue 3D avec Traccar.** Au rejeu d'une
+  trace, le matériel est représenté par son avatar, et non plus par un
+  point.
+  - L'avatar est orienté selon le cap.
+  - Il est posé sur le relief et à l'échelle.
+  - Il garde une taille minimale à l'écran quand on dézoome.
+- **FR-MAT-85 (S) Attelage.** Si un outil est connu à cet instant, son
+  avatar est attelé derrière le tracteur, à la largeur de travail.
+  - L'outil est connu par l'attribut `tool` de Traccar ou par les
+    matériels de l'intervention en cours.
+- **FR-MAT-86 (S) Tous les matériels à la date.** La vue 3D peut afficher
+  la dernière position connue de chaque matériel suivi, à la date de
+  l'horloge, avec son avatar. C'est la ferme rejouée dans le temps.
+
+### 3.9 Hors périmètre
 - Réservation de matériel, planning partagé entre exploitations,
   répartition des heures entre adhérents, facturation de travaux.
 - Valorisation, prix et coûts des pièces (Lyvre).

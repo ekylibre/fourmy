@@ -4,6 +4,8 @@
 > [`materiels-entretien.md`](materiels-entretien.md) (FR-MAT-4 à 73, NFR-MAT,
 > arbitrages des §6 et §8).
 > Il est découpé en lots **I → J → K → L**, dans l'ordre validé.
+> Le lot **M** (avatar 3D, demandé le 2026-11-08) s'ajoute à la suite. Il ne
+> dépend que du lot I et peut donc remonter avant J.
 > Phase suivante : `/sc:implement` lot par lot.
 
 ## 1. Principes
@@ -63,6 +65,8 @@ erDiagram
   intervention_operations }o--|| equipment_operations : ""
   interventions ||--o{ meter_readings : "origin = intervention"
   equipments ||--o{ equipment_usage_days : "heures estimées (lot L)"
+  equipments ||--o{ equipment_assets : "logo 2D, GLB importé"
+  equipments }o--o| farm_brands : "marque : logo et couleur partagés"
 ```
 
 ### 2.1 Lot I — migration `0017_equipments.sql`
@@ -123,6 +127,34 @@ INDEX (equipment_id, read_at)
   d'usage continue (§3.1).
 - `traccar` est réservé à un vrai compteur remonté par le boîtier, plus
   tard. Les estimations vont dans `equipment_usage_days` (lot L).
+
+**Logo 2D (FR-MAT-80)** : deux tables de fichiers sous RLS. Les fichiers
+sont stockés en base (bytea), comme `lexicon_pictures`, sans stockage
+objet en v1.
+
+```
+farm_brands (id, farm_id, name, name_norm, color text,   -- '#3F9A2B'
+             logo_asset_id NULL → equipment_assets,
+             UNIQUE (farm_id, name_norm))
+equipment_assets (id, farm_id, equipment_id NULL → equipments ON DELETE CASCADE,
+                  kind CHECK IN ('logo','logo_raster','model'),
+                  media_type CHECK IN ('image/png','image/jpeg','image/svg+xml','model/gltf-binary'),
+                  bytes bytea, size int CHECK (size <= 5 MB), sha256 text, created_at)
+ALTER equipments ADD logo_asset_id NULL → equipment_assets,
+                 ADD brand_id NULL → farm_brands      -- `brand` texte reste pour l'affichage
+```
+
+- Un logo de marque est rattaché à `farm_brands`, et donc partagé par tous
+  les matériels de cette marque dans la ferme.
+- Les logos sont des marques déposées : ils sont **propres à la ferme**,
+  jamais versionnés dans le dépôt ni partagés entre fermes.
+- **SVG** : le navigateur produit aussi un PNG à l'envoi
+  (`logo_raster`, 512 px). C'est lui qui sert de texture 3D, ce qui évite
+  une bibliothèque de rendu SVG côté serveur.
+- **Sécurité** : un SVG est servi avec `Content-Security-Policy: sandbox`
+  et `Content-Type` strict, et n'est jamais injecté dans le DOM ; il est
+  affiché par `<img>`. On vérifie le type par les octets, pas par
+  l'extension.
 
 `articles.kind` : la contrainte s'étend à `'part'` et `'fluid'` dès le lot I,
 pour que les pièces importées existent avant le plan.
@@ -569,16 +601,154 @@ découle du calcul.
 3. Une alerte reste visible sur le tableau de bord tant que l'échéance est
    dépassée.
 
-## 10. Lots, contenu et tests
+## 10. Logo 2D et avatar 3D (FR-MAT-80 à 86)
+
+### 10.1 Paramètres de l'avatar
+
+Colonne `equipments.avatar jsonb` : seulement ce que l'utilisateur a
+**saisi**. Le reste est déduit à chaque fois.
+
+```ts
+avatarParams = {
+  template: "tractor" | "self_propelled" | "sprayer_self_propelled" | "trailed_tool"
+          | "mounted_tool" | "trailed_sprayer" | "trailer" | "spreader" | "seeder" | "box",
+  lengthM, widthM, heightM, wheelbaseM?, frontWheelDiameterM?, rearWheelDiameterM?,
+  workingWidthM?,                         // outils : largeur de travail (attelage, FR-MAT-85)
+  hitchOffsetM?,                          // tracteur : attelage arrière ; outil : flèche
+  colors: { body, cab?, wheels, accent? },
+  logo: "sides" | "none",
+}
+
+/** Domaine, pur : saisie > fiche technique > défaut de la nature, avec la provenance. */
+resolveAvatar(equipment, technical, brand):
+  { params: avatarParams; provenance: Record<keyof avatarParams, "input" | "technical" | "default">;
+    hash: string }
+```
+
+- **Gabarit** : il est déduit de `kind`.
+
+  | Nature Ekylibre | Gabarit |
+  |---|---|
+  | `tractor` | `tractor` |
+  | `self_propelled_equipment` | `self_propelled` |
+  | `trailed_equipment` | `trailed_tool` |
+  | `fixed_equipment` | `box` |
+
+  Il est modifiable, par exemple pour faire de l'Amazone UF1201 un
+  `trailed_sprayer`.
+- **Dimensions** : lues dans la fiche technique (`dimensions.longueur`,
+  `empattement`, `largeur_max_arriere`, `hauteur_cabine_depuis_axe_ar` +
+  rayon arrière, `pneumatiques.*_monte_base`).
+  - Le diamètre d'une roue se calcule depuis la désignation du pneu :
+    `540/65 R30` donne 30 × 25,4 mm + 2 × 540 × 0,65 mm, soit 1,46 m.
+  - Sans fiche technique, on prend les défauts du gabarit (tracteur
+    4,5 × 2,3 × 2,9 m).
+- **Couleur** : saisie, sinon celle de la marque (`farm_brands.color`),
+  sinon celle du gabarit.
+
+### 10.2 Génération (`packages/equipment-3d`)
+
+- **Fonction** :
+  `buildAvatarGlb(params, logoPng?: Uint8Array): Promise<Uint8Array>`.
+  - Elle est pure et sans DOM.
+  - Elle s'appuie sur `@gltf-transform/core`, qui fonctionne sous Node et
+    dans le navigateur. La version sera choisie à l'implémentation, publiée
+    depuis au moins deux semaines.
+- **Formes simples par gabarit**, quelques centaines de triangles :
+  - tracteur : capot, cabine vitrée, quatre roues aux bons diamètres ;
+  - outil traîné : châssis, poutre de la largeur de travail, roues ;
+  - pulvérisateur : cuve et rampe repliée ou dépliée.
+- **Logo** : un quad texturé sur chaque flanc (capot ou cuve), aux
+  proportions du logo.
+- **Repère** : l'avant suit **+X** et le haut suit **+Z** après conversion,
+  pour que `HeadingPitchRoll(cap)` de Cesium oriente le modèle sans
+  correction.
+- **Origine** :
+  - tracteur : au sol, sous l'essieu arrière ;
+  - outil : au point d'attelage.
+
+  L'attelage n'est alors qu'un décalage le long du cap.
+- **Même code des deux côtés** :
+  - **API** : `GET /equipments/:id/avatar.glb` génère à la demande. La
+    réponse a `ETag = hash`, et le GLB est mis en cache dans
+    `equipment_assets` (`kind = 'model'`, généré), puis réutilisé tant que
+    le hash ne change pas.
+  - **Web** : l'aperçu de la fiche (FR-MAT-82) appelle la même fonction
+    dans le navigateur. Le rendu est instantané pendant le réglage.
+- **Modèle importé** (FR-MAT-83) : un GLB jusqu'à 5 Mo et 100 000
+  triangles, vérifié à l'envoi (en-tête `glTF`, nombre de triangles).
+  - Il remplace l'avatar généré, que l'on peut rétablir.
+  - On saisit son échelle et son orientation si son repère diffère.
+
+### 10.3 Vue 3D (Cesium, `FarmScene.ts`)
+
+- **Rejeu d'une trace** (FR-MAT-84) : le point `track:vehicle` devient une
+  entité `model`.
+
+  ```ts
+  { uri: avatarUrl, minimumPixelSize: 48, maximumScale: 20,
+    heightReference: CLAMP_TO_GROUND, silhouetteColor (sélection) }
+  ```
+
+  Le reste de l'entité :
+  - **orientation** : quaternion échantillonné depuis `positions.heading`.
+    À l'arrêt (vitesse < 1 km/h), on garde le dernier cap, pour que
+    l'engin ne pivote pas sur place. Sans cap, on prend
+    `VelocityOrientationProperty`.
+  - **logo 2D** : billboard au-dessus du modèle, masqué au-delà de 2 km,
+    avec le nom en libellé.
+- **Attelage** (FR-MAT-85) : l'outil attelé à un instant est cherché dans
+  cet ordre :
+  1. l'attribut Traccar `tool`, rapproché d'un matériel par
+     `external_ids.traccarTool` ou par le nom ;
+  2. sinon, l'intervention `done` dont une période couvre l'instant, qui
+     cible ce tracteur dans `tools[]` avec un outil.
+
+  La position de l'outil est échantillonnée sur celle du tracteur, reculée
+  de `hitchOffsetM` (tracteur) + `hitchOffsetM` (outil) le long du cap
+  courant. Pour un outil traîné, on suit le point de la trace situé à la
+  bonne distance, ce qui donne un suivi en virage plus naturel.
+- **Tous les matériels à la date** (FR-MAT-86) :
+  - la route `GET /tracks/latest?at=` renvoie la dernière position de
+    chaque rattachement actif, avant `at`, sur au plus 30 jours ;
+  - chaque matériel est posé avec son avatar ;
+  - la scène se met à jour quand l'horloge saute, avec une requête
+    regroupée toutes les 2 s au plus.
+- **Carte 2D** (MapLibre) : le logo 2D sert d'icône (`addImage`) au
+  marqueur de dernière position.
+- **Performances** : un GLB par matériel, chargé une fois par vue (cache
+  HTTP grâce à l'ETag). Une ferme pilote compte moins de 30 matériels.
+
+### 10.4 API et écrans
+
+| Lot | Route | Droits | Rôle |
+|---|---|---|---|
+| I | `PUT /equipments/:id/logo` (multipart : fichier + PNG dérivé si SVG) · `DELETE` | O | logo du matériel |
+| I | `GET/PUT /brands/:id` · `PUT /brands/:id/logo` | O écrit · W lit | marque de la ferme : logo et couleur |
+| I | `GET /assets/:id` | W | fichier (cache long, adressé par hash) |
+| M | `GET /equipments/:id/avatar.glb` | W | avatar généré ou importé |
+| M | `PUT /equipments/:id/avatar` (paramètres) · `PUT /equipments/:id/model` (GLB) | O | réglage, import |
+| M | `GET /tracks/latest?at=` | W | dernière position de chaque matériel |
+
+Écrans :
+- **Lot I** : le logo s'affiche dans la liste, la fiche et les sélecteurs
+  de matériel. Le dépôt se fait dans l'onglet Général.
+- **Lot M** : nouvel onglet **3D** sur la fiche matériel, avec l'aperçu
+  Cesium (déjà chargé pour la vue 3D), les paramètres et leur provenance, et
+  l'import d'un GLB. Dans `3d-plan`, une case « Tous les matériels » et
+  l'attelage automatique.
+
+## 11. Lots, contenu et tests
 
 | Lot | Contenu | Migration | Tests clés |
 |---|---|---|---|
-| **I** | fiche, compteur, options, relevés, liste et fiche web, natures `part`/`fluid`, synchro des relevés | 0017 | domaine : `checkReading`, `usageSeries` (correction, remplacement). API : relevé idempotent, 409 avec le voisin, droits worker/owner. Web : saisie rapide, onglets. e2e : relevé depuis la liste. |
+| **I** | fiche, compteur, options, relevés, liste et fiche web, natures `part`/`fluid`, synchro des relevés, **logo 2D et marques de la ferme** | 0017 | domaine : `checkReading`, `usageSeries` (correction, remplacement). API : relevé idempotent, 409 avec le voisin, droits worker/owner. Web : saisie rapide, onglets. e2e : relevé depuis la liste. |
 | **J** | catalogue, plan de la ferme, `computeDue`, tableau de bord, onglet Entretien, import Arion | 0018 | domaine : `computeDue` (heures ou mois au premier terme, visite initiale, baseline, interpolation, option absente, rejeu à une date). Import : dossier fictif rejoué deux fois sans doublon. API : échéances triées. |
 | **K** | intervention d'entretien (bloc, relevé par cible, opérations, intrants rattachés), panneau de droite, pré-remplissage, fiche, relevé de fin de chantier | 0019 | domaine : `deriveNature`, `validateMaintenance`, `prefillMaintenance`. API : `done` remet à zéro, `planned` non, annulation et suppression recalculent (US-MAT-9), sortie de stock des pièces. e2e : vidange de bout en bout (US-MAT-3). |
 | **L** | heures Traccar estimées, écart signalé, pièces à commander, notifications, réglages | 0020 | domaine : durée de fonctionnement d'un jour, `estimateGap`, `partsForecast`. Worker : idempotence, désactivation sans perte. Notification unique par échéance. |
+| **M** | avatar 3D : paramètres et provenance, génération GLB, onglet 3D, import GLB, rejeu avec avatar orienté, attelage, tous les matériels à la date | 0021 (`equipments.avatar`) | domaine : `resolveAvatar` (saisie, fiche, défaut ; diamètre depuis `540/65 R30`). `equipment-3d` : GLB valide (gltf-validator), à l'échelle (boîte englobante), logo présent, sortie stable pour un hash. API : ETag et cache. Web : avatar à la place du point, cap à l'arrêt conservé, outil attelé. |
 
-## 11. Risques et points ouverts
+## 12. Risques et points ouverts
 
 - **Modèle de mesure** : le domaine travaille sur l'échelle d'usage.
   L'écran doit montrer la **valeur du compteur**, sinon un relevé après
@@ -591,3 +761,9 @@ découle du calcul.
   domaine sont prêts dès le lot I. Les écrans mobiles se font de leur côté.
 - **Droits de la base Arion** : à confirmer avant toute diffusion du
   catalogue au-delà de la ferme pilote (§7).
+- **Avatar générique** : il donne la silhouette et les proportions, pas le
+  dessin du constructeur. C'est voulu, pour rester léger et éviter toute
+  reproduction d'un modèle protégé. Un GLB fidèle peut être importé.
+- **Attelage par l'attribut `tool`** : il dépend de la façon dont le
+  boîtier nomme l'outil. Le rapprochement par `external_ids.traccarTool`
+  est à renseigner une fois par outil.
