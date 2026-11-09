@@ -27,10 +27,10 @@ Contrôle d'O1 sur l'Arion 430 le 28/10 (réglages par défaut) :
   positions `working` ;
 - déplacement 14:59-15:21.
 
-**À trancher en O2** : le matin (10:37-11:06), le tracteur roule à 5 km/h
-avec l'outil « Tigre », mais `working` est faux. La règle actuelle en fait
-un déplacement. Si c'était du travail sans le signal, il faudrait déduire
-« au travail » d'un outil présent et d'une vitesse de travail.
+**Tranché (2026-11-09)** : le matin (10:37-11:06), le tracteur roule à
+5 km/h avec l'outil « Tigre », mais `working` est faux. La règle est
+conservée : seul le signal `working` du boîtier fait le travail, ce trajet
+reste un déplacement. Pas de déduction depuis l'outil et la vitesse en v1.
 
 **Traces de Pierre disponibles** (jeton mis à jour le 2026-11-09) : la
 synchro a importé 7 592 positions, du 5 au 29 octobre 2026, sur les trois
