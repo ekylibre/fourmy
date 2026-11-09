@@ -8,6 +8,7 @@ import { syncFarmWater } from "./repos/phyto.js";
 import { computeInterventionIft, pendingIft } from "./repos/ift.js";
 import { fillInterventionWeather, pendingWeather } from "./repos/weather.js";
 import { computeUsageDays, farmsWithTraccar } from "./repos/usage.js";
+import { computeTrackSessions } from "./repos/track-sessions.js";
 import { farmsWithAlerts } from "./repos/maintenance.js";
 import { sendMaintenanceAlerts } from "./repos/alerts.js";
 import { appMailer } from "./mail.js";
@@ -90,6 +91,22 @@ async function usageTick(): Promise<void> {
   }
 }
 
+// --- Parcours GPS (lot O) ------------------------------------------------------
+
+const TRACKS_EVERY_MS = 5 * 60_000;
+let tracksAt = 0;
+/** Parcours (sessions de travail et déplacements) des boîtiers Traccar, toutes les 5 minutes. */
+async function trackSessionsTick(): Promise<void> {
+  if (Date.now() - tracksAt < TRACKS_EVERY_MS) return;
+  tracksAt = Date.now();
+  for (const farmId of await farmsWithTraccar(db())) {
+    if (stopping) return;
+    const r = await computeTrackSessions(db(), farmId);
+    if (r.inserted || r.deleted || r.drifted)
+      console.log(`[worker] parcours ferme ${farmId.slice(0, 8)} : ${r.inserted} calculé(s), ${r.deleted} remplacé(s), ${r.drifted} rattaché(s) en dérive`);
+  }
+}
+
 const ALERTS_EVERY_MS = 60 * 60_000;
 let alertsAt = 0;
 /** Alertes d'entretien par e-mail, au plus une fois par heure. */
@@ -110,6 +127,7 @@ async function tick(): Promise<void> {
     ["ift", iftTick],
     ["météo", weatherTick],
     ["heures", usageTick],
+    ["parcours", trackSessionsTick],
     ["alertes", alertsTick],
   ] as const) {
     if (stopping) return;

@@ -239,6 +239,30 @@ export const interventionCrews = pgTable("intervention_crews", {
   templateId: uuid("template_id"),
 });
 
+/** Parcours GPS calculés par le worker (0023) : libres, ou figés une fois rattachés. */
+export const trackSessions = pgTable("track_sessions", {
+  id: uuid("id").primaryKey(),
+  farmId: uuid("farm_id").notNull(),
+  equipmentId: uuid("equipment_id").notNull(),
+  bindingId: uuid("binding_id").notNull(),
+  kind: text("kind").notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+  stoppedAt: timestamp("stopped_at", { withTimezone: true }).notNull(),
+  positionCount: integer("position_count").notNull(),
+  distanceM: numeric("distance_m").notNull(),
+  coveredAreaM2: numeric("covered_area_m2"),
+  coverage: geometry("coverage"),
+  parcels: jsonb("parcels").notNull().default([]),
+  toolHint: text("tool_hint"),
+  toolEquipmentId: uuid("tool_equipment_id"),
+  interventionId: uuid("intervention_id"),
+  crewId: uuid("crew_id"),
+  linkedExtent: tstzrange("linked_extent"),
+  drift: jsonb("drift"),
+  settingsHash: text("settings_hash").notNull(),
+  computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const people = pgTable("people", {
   id: uuid("id").primaryKey(),
   farmId: uuid("farm_id").notNull(),

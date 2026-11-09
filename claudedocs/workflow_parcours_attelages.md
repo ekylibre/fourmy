@@ -19,6 +19,26 @@ Phases réalisées, sur la branche `feat/parcours-attelages` :
 - **O1** `a63be54` : `segmentSessions`, `settingsHash` (SHA-256 en
   TypeScript pur, car le domaine sert aussi au web et au mobile) et
   `trackSettings`.
+- **N2** `c4cb4a2` : `crewRules`, `flattenCrews`, `mergePeriods`,
+  `toCrews`, `toFree` (avec la liste des pertes) et `crewDurations` (pour
+  `spanS` et `workDurationS` en N3). Deux périodes qui se touchent ne se
+  chevauchent pas.
+- **O2** : migration 0023 (`track_sessions`, `farm_settings.tracks`),
+  `computeTrackSessions` (une transaction par boîtier) et tâche du worker
+  toutes les 5 min. Choix :
+  - les positions des plages figées sont retirées et chaque tronçon entre
+    deux plages est découpé à part : un parcours libre ne chevauche jamais
+    un parcours rattaché ;
+  - la dérive se calcule sur ± 2 × `stopMin` autour de la plage figée ;
+  - la part d'une parcelle est la surface couverte divisée par la surface
+    de la parcelle ;
+  - l'outil est résolu dans l'ordre de FR-GPS-17 : attelage déclaré, puis
+    `tool` Traccar (`external_ids.traccarTool` ou nom identique, jamais
+    par inclusion), puis seul outil d'une intervention libre sur la plage.
+  Sur la base locale : 12 parcours pour les 3 boîtiers de Pierre (0,26 s,
+  puis 0,09 s par passage incrémental). Le travail du 28/10 ne donne
+  aucune parcelle : les parcelles en pente n'ont plus de version valide
+  depuis 2023 (lacune du parcellaire, pas du calcul).
 
 Contrôle d'O1 sur l'Arion 430 le 28/10 (réglages par défaut) :
 - déplacement 10:37-11:06, puis coupure de 2 h à midi ;
