@@ -54,8 +54,10 @@ Points qui touchent le design :
     300, UF1201 → Amazone UF1201) ;
   - ou faire un rapprochement par inclusion du nom ou du modèle (« Tigre »
     est contenu dans « Maschio Tigre 300 »).
-  À trancher en O2. La remorque MC18R n'existe pas dans les matériels
-  migrés.
+  Tranché (2026-11-09) : lien à la main par `external_ids.traccarTool`
+  sur le matériel ; le rapprochement par inclusion n'est qu'une
+  suggestion proposée à l'utilisateur, jamais appliquée seule. La
+  remorque MC18R n'existe pas dans les matériels migrés.
 - **Pas de synchro continue en local** : le worker n'est pas lancé, et
   l'API compilée tourne seule. Lancer le worker
   (`corepack pnpm --filter @fourmy/api worker`) pour recevoir les nouvelles
