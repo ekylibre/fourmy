@@ -15,7 +15,10 @@ productions : une production = une parcelle × une campagne.
 | `lexicon_pictures` | images d'Ekylibre : 9 familles d'activité, ~230 variétés (nom latin) |
 
 - Référentiel : paquets Lexicon `productions` et `agricultural_pictures`,
-  synchronisés par le worker avec `phytosanitary` et `taxonomy`.
+  synchronisés par le worker avec `phytosanitary` et `taxonomy` (en local :
+  `seed:dev` ou `corepack pnpm --filter @fourmy/lexicon sync`). Tables vides :
+  l'API l'annonce au démarrage, et une référence est refusée avec « Référentiel
+  Lexicon non chargé » plutôt que « inconnue ».
 - Image d'une activité (`fourmy_activity_picture`) : sa variété cultivée ou
   l'ancêtre le plus proche dans la taxonomie (`zea_mays` → `zea`), sinon sa
   famille. Servie sans session : `GET /api/v1/lexicon/pictures/:domaine/:nom`.

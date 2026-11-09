@@ -69,9 +69,16 @@ corepack pnpm install
 docker compose -f docker/compose.dev.yml up -d   # FOURMY_DB_PORT=5434 si un PostgreSQL local occupe 5432 (adapter DATABASE_URL)
 export DATABASE_URL=postgres://fourmy:fourmy@localhost:5432/fourmy
 corepack pnpm build && corepack pnpm migrate
-corepack pnpm --filter @fourmy/api seed:dev  # compte dev@fourmy.local, owner de toutes les fermes
+corepack pnpm --filter @fourmy/api seed:dev  # compte dev@fourmy.local, owner de toutes les fermes + référentiel Lexicon
 corepack pnpm dev                              # API :3000, web :5173 (relaie /api)
 ```
+
+Le **référentiel Lexicon** (productions de référence et images des activités,
+E-Phy, taxonomie) est copié dans la base : par le worker en production
+(`corepack pnpm --filter @fourmy/api worker`), par `seed:dev` en local, ou à
+la demande avec `corepack pnpm --filter @fourmy/lexicon sync`. Sans lui,
+l'API l'annonce au démarrage : activités sans image, références refusées,
+contrôle phyto faux.
 
 Application web : http://localhost:5173 — connexion avec le compte affiché
 par `seed:dev` (e-mail prérempli en développement). Parcours de bout en bout :
