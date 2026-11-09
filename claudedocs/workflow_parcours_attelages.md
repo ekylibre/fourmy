@@ -10,7 +10,27 @@
 
 ## État (2026-11-09)
 
-Rien n'est réalisé.
+Phases réalisées, sur la branche `feat/parcours-attelages` :
+- **N1** `bf6267f` :
+  - migration 0022 (attelages, trigger de garde différé, index manquant
+    sur `intervention_parameters`) ;
+  - contrats `staffing` et `crews` ;
+  - API, mobile et web restent en mode libre jusqu'à N3, N4 et R3.
+- **O1** `a63be54` : `segmentSessions`, `settingsHash` (SHA-256 en
+  TypeScript pur, car le domaine sert aussi au web et au mobile) et
+  `trackSettings`.
+
+Contrôle d'O1 sur l'Arion 430 le 28/10 (réglages par défaut) :
+- déplacement 10:37-11:06, puis coupure de 2 h à midi ;
+- déplacement 13:13-13:20 ;
+- travail 13:21-14:59 (98 min, 6,6 km), qui correspond exactement aux
+  positions `working` ;
+- déplacement 14:59-15:21.
+
+**À trancher en O2** : le matin (10:37-11:06), le tracteur roule à 5 km/h
+avec l'outil « Tigre », mais `working` est faux. La règle actuelle en fait
+un déplacement. Si c'était du travail sans le signal, il faudrait déduire
+« au travail » d'un outil présent et d'une vitesse de travail.
 
 **Traces de Pierre disponibles** (jeton mis à jour le 2026-11-09) : la
 synchro a importé 7 592 positions, du 5 au 29 octobre 2026, sur les trois
