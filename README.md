@@ -25,6 +25,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | [`docs/phyto.md`](docs/phyto.md) · [`docs/meteo.md`](docs/meteo.md) | Contrôle réglementaire des traitements (E-Phy, ZNT, IFT, mélanges) ; météo des interventions |
 | [`docs/activites.md`](docs/activites.md) · [`docs/parcelles.md`](docs/parcelles.md) · [`docs/carto.md`](docs/carto.md) | Activités et productions ; création de parcelles (PAC, cadastre) et fiche ; outils de cartographie |
 | [`docs/materiels.md`](docs/materiels.md) | Matériels : fiche, compteur et relevés, plan d'entretien et échéances, interventions d'entretien, pièces à commander, alertes, avatar 3D (mode d'emploi et API) |
+| [`docs/parcours-attelages.md`](docs/parcours-attelages.md) · [`docs/parcours-attelages-design.md`](docs/parcours-attelages-design.md) | Parcours GPS d'un matériel, intervention tirée des parcours, attelages dans l'intervention : exigences et design |
 | [`docs/materiels-entretien.md`](docs/materiels-entretien.md) · [`docs/materiels-entretien-design.md`](docs/materiels-entretien-design.md) | Matériels et entretien : exigences (et bilan de réalisation), design (et écarts à la réalisation) |
 
 ## État du projet (2026-11-08)
