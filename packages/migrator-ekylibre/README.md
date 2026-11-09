@@ -30,7 +30,13 @@ node packages/migrator-ekylibre/dist/cli.js \
 |---|---|
 | `LandParcel` + `initial_shape` | `land_parcels` + version (géométrie nettoyée `ST_MakeValid`) |
 | `activity_productions` annuelles | une production par campagne |
-| `activity_productions` pérennes (vigne, sans campagne) | une production par campagne couverte par `[started_on, stopped_on]` |
+| `activity_productions` pérennes (vigne, sans campagne) | une production par campagne couverte par `[started_on, stopped_on]` ; production en cours (`opened`) : `stopped_on` n'est qu'une durée de vie prévue (30 ans par défaut), la production et sa parcelle support restent ouvertes |
+| `Equipment` (hors contenants) | `equipments` : nature, état, n° de série (`identification_number`), mise en service (`born_at`, sauf 1970-01-01), compteur d'heures pour tracteurs et automoteurs, `work_number` en identifiant externe ; une saisie faite dans Fourmy n'est pas écrasée |
+| recopie Samsys (`work_number = SAMSYS_…`) inutilisée d'un matériel de même nom | fusionnée dans ce matériel (id Samsys gardé en identifiant externe) |
+| `Matter` employé comme outil (variante mal classée) | matériel (avertissement au rapport) |
+| `connected_object` (boîtier GPS) | non migré (traceurs : Intégrations) |
+| relevés `hour_counter` | non migrés (Ekylibre n'y enregistre que des 0) |
+| `identifiers.openweathermap_api_key` (en clair) | intégration OpenWeather de la ferme, testée puis chiffrée — par l'import depuis l'API seulement (la CLI la signale) |
 | `Building`, `BuildingDivision` | `places` (plus grand polygone comme emprise) |
 | produits `variety = tank…` + `nominal_storable_net_volume` | `containers` (capacité en litres) |
 | cible `Plant` | parcelle support de sa production — sauf si la zone de travail tombe à plus de 50 % sur une autre parcelle à la date : celle-ci fait foi (avertissement au rapport) |

@@ -9,6 +9,10 @@ import {
   parameterRole,
   containerKind,
   capacityFromLabel,
+  hasHourMeter,
+  samsysId,
+  equipmentExternalIds,
+  commissionedAt,
 } from "../src/index.js";
 
 describe("uuidv5", () => {
@@ -71,5 +75,26 @@ describe("culture des productions", () => {
     expect(cultivationOf(null, "vine")).toBe("vitis");
     expect(cultivationOf("plant", "field_crop")).toBeNull();
     expect(cultivationOf("DKC5196", "field_crop")).toBeNull(); // une variété commerciale n'est pas une culture
+  });
+});
+
+describe("matériels", () => {
+  it("donne un compteur d'heures aux tracteurs et automoteurs seulement", () => {
+    expect(hasHourMeter("tractor")).toBe(true);
+    expect(hasHourMeter("self_propelled_equipment")).toBe(true);
+    expect(hasHourMeter("trailed_equipment")).toBe(false);
+    expect(hasHourMeter(null)).toBe(false);
+  });
+  it("reconnaît les recopies Samsys et garde le n° de travail", () => {
+    expect(samsysId("SAMSYS_63f63f5dc5a720c514eb1c39")).toBe("63f63f5dc5a720c514eb1c39");
+    expect(samsysId("MF_140")).toBeNull();
+    expect(equipmentExternalIds({ work_number: "SAMSYS_594726C1" })).toEqual({ samsys: "594726C1" });
+    expect(equipmentExternalIds({ work_number: "AC308VA" })).toEqual({ ekylibre_work_number: "AC308VA" });
+    expect(equipmentExternalIds({ work_number: null })).toEqual({});
+  });
+  it("ignore la date de naissance par défaut (époque Unix)", () => {
+    expect(commissionedAt(new Date("1970-01-01T00:00:00Z"))).toBeNull();
+    expect(commissionedAt(null)).toBeNull();
+    expect(commissionedAt(new Date("2013-11-30T00:00:00Z"))?.toISOString()).toBe("2013-11-30T00:00:00.000Z");
   });
 });

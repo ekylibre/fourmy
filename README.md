@@ -66,7 +66,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 
 ```bash
 corepack pnpm install
-docker compose -f docker/compose.dev.yml up -d
+docker compose -f docker/compose.dev.yml up -d   # FOURMY_DB_PORT=5434 si un PostgreSQL local occupe 5432 (adapter DATABASE_URL)
 export DATABASE_URL=postgres://fourmy:fourmy@localhost:5432/fourmy
 corepack pnpm build && corepack pnpm migrate
 corepack pnpm --filter @fourmy/api seed:dev  # compte dev@fourmy.local, owner de toutes les fermes

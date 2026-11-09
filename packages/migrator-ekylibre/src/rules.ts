@@ -112,3 +112,29 @@ export function capacityFromLabel(label: string | null): number | null {
   const value = Number(m[1]!.replace(",", "."));
   return m[2]!.toLowerCase() === "hl" ? value * 100 : value;
 }
+
+/** Natures de matériel à compteur d'heures (mêmes que METERED_KINDS de @fourmy/contracts). */
+const METERED = new Set(["tractor", "self_propelled_equipment"]);
+export const hasHourMeter = (variety: string | null) => METERED.has(variety ?? "");
+
+/**
+ * Identifiant Samsys d'un matériel : Ekylibre recopie les matériels de
+ * Samsys avec un n° de travail `SAMSYS_<id>`, souvent en double d'un matériel
+ * déjà saisi sous le même nom.
+ */
+export function samsysId(workNumber: string | null): string | null {
+  return /^SAMSYS_(.+)$/.exec(workNumber ?? "")?.[1] ?? null;
+}
+
+/** Identifiants externes d'un matériel : n° de travail (immatriculation…) ou id Samsys. */
+export function equipmentExternalIds(e: { work_number: string | null }): Record<string, string> {
+  const samsys = samsysId(e.work_number);
+  if (samsys) return { samsys };
+  return e.work_number ? { ekylibre_work_number: e.work_number } : {};
+}
+
+/** Date de mise en service : la date de naissance Ekylibre, sauf l'époque Unix (valeur par défaut). */
+export function commissionedAt(bornAt: Date | null): Date | null {
+  if (!bornAt || bornAt.getUTCFullYear() <= 1970) return null;
+  return bornAt;
+}

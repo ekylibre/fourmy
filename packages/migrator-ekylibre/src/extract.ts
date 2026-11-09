@@ -67,13 +67,15 @@ export type ProductionRow = {
   family: string | null;
   cultivation_variety: string | null;
   plant_variety: string | null;
+  /** `opened` : en cours (la date de fin d'une pérenne n'est alors qu'une prévision). */
+  state: string | null;
 };
 /** Productions + cépage/espèce de la culture (Plant) rattachée. */
 export const productions = (s: Sql) =>
   s<ProductionRow[]>`
     SELECT ap.id, ap.activity_id, ap.campaign_id, ap.support_id,
            ap.started_on::text AS started_on, ap.stopped_on::text AS stopped_on,
-           a.family, a.cultivation_variety,
+           a.family, a.cultivation_variety, ap.state,
            (SELECT coalesce(nullif(p.specie_variety->>'specie_variety_name', ''), p.variety) FROM products p
              WHERE p.type = 'Plant' AND p.activity_production_id = ap.id
              ORDER BY p.id LIMIT 1) AS plant_variety
@@ -123,12 +125,45 @@ export const containers = (s: Sql) =>
     WHERE p.variety IN ('tank', 'vat', 'silo', 'barrel', 'cask')
     ORDER BY p.id`;
 
-export type EquipmentRow = { id: number; name: string; variety: string | null; dead_at: Date | null };
+export type EquipmentRow = {
+  id: number;
+  name: string;
+  variety: string | null;
+  born_at: Date | null;
+  dead_at: Date | null;
+  /** Immatriculation, n° interne, ou identifiant Samsys (`SAMSYS_…`). */
+  work_number: string | null;
+  /** N° de série. */
+  identification_number: string | null;
+  /** Nombre de paramètres d'intervention qui l'utilisent. */
+  uses: number;
+  /** Type Ekylibre (`Equipment`, ou `Matter` saisi par erreur mais utilisé comme outil). */
+  type: string;
+};
 export const equipments = (s: Sql) =>
   s<EquipmentRow[]>`
-    SELECT id, name, variety, dead_at FROM products
-    WHERE type = 'Equipment' AND coalesce(variety, '') NOT IN ('tank', 'vat', 'silo', 'barrel', 'cask')
-    ORDER BY id`;
+    SELECT p.id, p.name, p.variety, p.type, p.born_at, p.dead_at,
+           nullif(btrim(p.work_number), '') AS work_number,
+           nullif(btrim(p.identification_number), '') AS identification_number,
+           (SELECT count(*)::int FROM intervention_parameters ip WHERE ip.product_id = p.id) AS uses
+    FROM products p
+    WHERE coalesce(p.variety, '') NOT IN ('tank', 'vat', 'silo', 'barrel', 'cask')
+      AND (p.type = 'Equipment'
+        -- Variante mal classée (ex. une rogneuse en « Matter ») mais employée comme outil.
+        OR (p.type = 'Matter' AND EXISTS (SELECT 1 FROM intervention_parameters ip
+              WHERE ip.product_id = p.id AND ip.type = 'InterventionTool')))
+    ORDER BY p.id`;
+
+/** Clé OpenWeatherMap de l'instance (en clair dans `identifiers`), si saisie. */
+export async function openWeatherKey(s: Sql): Promise<string | null> {
+  const exists = await s`SELECT to_regclass('identifiers') IS NOT NULL AS ok`;
+  if (!exists[0]?.ok) return null;
+  const rows = await s<{ value: string }[]>`
+    SELECT btrim(value) AS value FROM identifiers
+    WHERE nature = 'openweathermap_api_key' AND nullif(btrim(value), '') IS NOT NULL
+    ORDER BY updated_at DESC LIMIT 1`;
+  return rows[0]?.value ?? null;
+}
 
 export type MatterRow = {
   id: number;

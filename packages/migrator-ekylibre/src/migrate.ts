@@ -12,6 +12,10 @@ import {
   capacityFromLabel,
   cultivationOf,
   ACTIVITY_FAMILIES,
+  hasHourMeter,
+  samsysId,
+  equipmentExternalIds,
+  commissionedAt,
 } from "./rules.js";
 
 /**
@@ -47,6 +51,12 @@ export interface Report {
   /** Données migrées telles quelles mais suspectes, à vérifier par l'exploitant. */
   warnings: { entity: string; id: string; message: string }[];
   phyto: { year: number; ekylibre: number; fourmy: number }[];
+  /**
+   * Secrets trouvés dans la source (clé OpenWeatherMap), en clair : jamais
+   * écrits par le migrateur ni dans `import_runs.report`. L'API les enregistre
+   * chiffrés comme intégration de la ferme, après test (repos/imports.ts).
+   */
+  secrets: { openweather?: string };
 }
 
 const FAR_PAST = "1900-01-01T00:00:00Z";
@@ -93,6 +103,7 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
       workingPeriods: await x.workingPeriods(s),
       harvests: await x.harvests(s),
       phytoRef: await x.phytoReference(s),
+      openWeatherKey: await x.openWeatherKey(s),
     }));
 
     const runId = opts.runId ?? uuidv5(`${instance}:run:${new Date().toISOString()}`);
@@ -140,6 +151,13 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
 
         // ---- Parcellaire (avec attributs viti issus des productions vigne) --
         const vitiBySupport = new Map<number, string>();
+        // Pérenne en cours (`opened`) : sa date de fin et celle de sa parcelle
+        // support ne sont qu'une durée de vie prévue (30 ans par défaut dans
+        // Ekylibre), pas un arrachage. On les laisse ouvertes.
+        const isOpenedPerennial = (p: x.ProductionRow) => !p.campaign_id && p.state === "opened";
+        const openedPerennialSupports = new Set(
+          data.productions.filter((p) => isOpenedPerennial(p) && p.support_id).map((p) => p.support_id!),
+        );
         for (const p of data.productions) {
           if (p.family === "vine_farming" && p.support_id && p.plant_variety) {
             vitiBySupport.set(p.support_id, p.plant_variety);
@@ -153,7 +171,7 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
           }
           const pid = id("products", lp.id);
           const lower = iso(lp.born_at) ?? FAR_PAST;
-          let upper = iso(lp.dead_at);
+          let upper = openedPerennialSupports.has(lp.id) ? null : iso(lp.dead_at);
           if (upper && upper <= lower) upper = null;
           const variety = vitiBySupport.get(lp.id);
           await tx`
@@ -223,7 +241,7 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
             targets.push({ pid: id("activity_productions", p.id), campaignId: id("campaigns", p.campaign_id) });
           } else {
             const from = p.started_on ? Number(p.started_on.slice(0, 4)) : -Infinity;
-            const to = p.stopped_on ? Number(p.stopped_on.slice(0, 4)) : Infinity;
+            const to = p.stopped_on && !isOpenedPerennial(p) ? Number(p.stopped_on.slice(0, 4)) : Infinity;
             for (const [year, campaignId] of campaignByYear) {
               if (year >= from && year <= to) {
                 targets.push({ pid: id("activity_productions", `${p.id}:${year}`), campaignId });
@@ -363,17 +381,61 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
         }
 
         // ---- Matériels -----------------------------------------------------
-        const equipmentIds = new Set<number>();
+        // Les recopies Samsys (`SAMSYS_…`) inutilisées d'un matériel de même nom
+        // y sont fusionnées (l'id Samsys est gardé) ; les boîtiers de
+        // géolocalisation ne sont pas des matériels (traceurs : Intégrations).
+        const equipmentRef = new Map<number, string>();
+        const originals = new Map<string, x.EquipmentRow>();
         for (const e of data.equipments) {
+          if (!samsysId(e.work_number)) originals.set(e.name.trim().toLowerCase(), e);
+        }
+        const samsysOf = new Map<number, string[]>();
+        for (const e of data.equipments) {
+          const sid = samsysId(e.work_number);
+          const original = originals.get(e.name.trim().toLowerCase());
+          if (sid && original && e.uses === 0) {
+            equipmentRef.set(e.id, id("products", original.id));
+            samsysOf.set(original.id, [...(samsysOf.get(original.id) ?? []), sid]);
+            // Créée par une migration précédente : retirée si rien n'y renvoie.
+            await tx.savepoint((sp) => sp`DELETE FROM equipments WHERE id = ${id("products", e.id)}`).catch(() => {});
+            inc("equipments_merged");
+          }
+        }
+        for (const e of data.equipments) {
+          if (equipmentRef.has(e.id)) continue;
+          if (e.variety === "connected_object") {
+            reject("equipment", e.id, `boîtier de géolocalisation « ${e.name} », pas un matériel (traceurs : Intégrations)`);
+            continue;
+          }
+          if (e.type !== "Equipment") {
+            warnings.push({
+              entity: "equipment",
+              id: String(e.id),
+              message: `${e.name} : saisi comme ${e.type} dans Ekylibre mais utilisé comme outil, repris comme matériel`,
+            });
+          }
+          const eid = id("products", e.id);
+          const ids = equipmentExternalIds(e);
+          const merged = samsysOf.get(e.id);
+          if (merged) ids.samsys = merged.join(", ");
           await tx`
-            INSERT INTO equipments (id, farm_id, name, kind, state)
-            VALUES (${id("products", e.id)}, ${farmId}, ${e.name}, ${e.variety ?? "equipment"},
-                    ${e.dead_at ? "retired" : "active"})
+            INSERT INTO equipments (id, farm_id, name, kind, state, serial_number, meter_unit, commissioned_at, external_ids)
+            VALUES (${eid}, ${farmId}, ${e.name}, ${e.variety ?? "equipment"},
+                    ${e.dead_at ? "retired" : "active"}, ${e.identification_number},
+                    ${hasHourMeter(e.variety) ? "hours" : null}, ${iso(commissionedAt(e.born_at))},
+                    ${tx.json(ids)})
             ON CONFLICT (id) DO UPDATE SET name = excluded.name, kind = excluded.kind,
-              state = excluded.state, updated_at = now()`;
-          equipmentIds.add(e.id);
+              state = excluded.state,
+              -- Complétés seulement s'ils sont vides : une saisie dans Fourmy est conservée.
+              serial_number = coalesce(equipments.serial_number, excluded.serial_number),
+              commissioned_at = coalesce(equipments.commissioned_at, excluded.commissioned_at),
+              external_ids = excluded.external_ids || coalesce(equipments.external_ids, '{}'),
+              updated_at = now()`;
+          equipmentRef.set(e.id, eid);
           inc("equipments");
         }
+        const equipmentIds = { has: (pid: number) => equipmentRef.has(pid) };
+        const equipmentUuid = (pid: number) => equipmentRef.get(pid)!;
 
         // ---- Articles et lots ------------------------------------------------
         const lotByMatter = new Map<number, { lotId: string; unit: string; placeId: string | null }>();
@@ -492,7 +554,7 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
                 refId = id("products", p.product_id);
               } else if (p.product_id && equipmentIds.has(p.product_id)) {
                 refType = "equipment";
-                refId = id("products", p.product_id);
+                refId = equipmentUuid(p.product_id);
               } else if (p.product_id && placeIds.has(p.product_id)) {
                 refType = "place";
                 refId = id("products", p.product_id);
@@ -531,7 +593,7 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
               }
             } else if (role === "tool") {
               refType = "equipment";
-              refId = p.product_id && equipmentIds.has(p.product_id) ? id("products", p.product_id) : null;
+              refId = p.product_id && equipmentIds.has(p.product_id) ? equipmentUuid(p.product_id) : null;
             } else if (role === "doer") {
               if (p.product_id && migratedPeople.has(p.product_id)) {
                 refType = "person";
@@ -658,6 +720,13 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
         fourmy: Number(fourmy.find((r) => r.year === year)?.rows ?? 0),
       }));
 
+      if (data.openWeatherKey) {
+        warnings.push({
+          entity: "integration",
+          id: "openweathermap_api_key",
+          message: `clé OpenWeatherMap trouvée (…${data.openWeatherKey.slice(-4)}) : reprise comme intégration OpenWeather par l'import depuis l'API, sinon à saisir dans Intégrations`,
+        });
+      }
       const report: Report = {
         runId,
         farmId,
@@ -667,6 +736,7 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
         rejected,
         warnings,
         phyto,
+        secrets: data.openWeatherKey ? { openweather: data.openWeatherKey } : {},
       };
       await target`
         UPDATE import_runs SET farm_id = ${farmId}, status = 'completed', finished_at = now(),
