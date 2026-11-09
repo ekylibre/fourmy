@@ -89,6 +89,9 @@ function toIntervention(r: Record<string, unknown>): Intervention {
     startedAt: iso(r.started_at),
     stoppedAt: iso(r.stopped_at),
     periods,
+    // Attelages : lus au lot N3 ; aucun écrivain n'en crée avant.
+    staffing: (r.staffing as Intervention["staffing"] | undefined) ?? "free",
+    crews: [],
     targets: of("target")
       .filter((p) => TARGET_KINDS.includes(p.ref_type as TargetKind))
       .map((p) => ({

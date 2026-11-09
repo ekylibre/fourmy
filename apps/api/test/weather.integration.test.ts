@@ -139,7 +139,8 @@ describe.skipIf(!url)("météo des interventions (intégration)", () => {
 
     // Météo d'avant les icônes : complétée (temps dominant, frise) ; la saisie à la main jamais.
     await sql`UPDATE interventions SET weather = weather - 'icon' - 'hours' WHERE id = ${other}`;
-    const pending = (await pendingWeather(db, 1000)).map((p) => p.id);
+    // Limite large : une base de dev peut avoir des milliers d'interventions sans météo (worker arrêté).
+    const pending = (await pendingWeather(db, 1_000_000)).map((p) => p.id);
     expect(pending).toContain(other);
     expect(pending).not.toContain(id);
     await fillInterventionWeather(db, farmId, other, fakeWeather().fetchImpl);

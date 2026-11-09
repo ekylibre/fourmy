@@ -223,14 +223,18 @@ export async function push(db: Database, farmId: string, ctx: DomainCtx, body: S
       const outcome = await withFarm(db, farmId, async (tx) => {
         const [current] = await rows<{ status: string }>(tx, sql`SELECT status FROM interventions WHERE id = ${r.id}`);
         if (current?.status === "done") return "unchanged" as const; // re-push idempotent
-        const { id, procedure, status, ...body } = r;
+        // Le mobile déclare ses moyens en mode libre (attelages : lot R3).
+        const { id, procedure, status, ...pushed } = r;
+        const body = { ...pushed, staffing: "free" as const, crews: [] };
         if (!current) {
           // Réalisée d'emblée : on planifie à vide puis on réalise avec le corps complet.
           await planInTx(
             tx,
             farmId,
             ctx,
-            status === "planned" ? { id, procedure, ...body } : { id, procedure, periods: [], targets: [], inputs: [], outputs: [], tools: [], doers: [], purposes: [] },
+            status === "planned"
+              ? { id, procedure, ...body }
+              : { id, procedure, staffing: "free", crews: [], periods: [], targets: [], inputs: [], outputs: [], tools: [], doers: [], purposes: [] },
             id,
           );
         }

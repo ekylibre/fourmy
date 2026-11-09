@@ -31,7 +31,10 @@ const CHILDREN_OF_INTERVENTIONS = ["intervention_periods", "intervention_paramet
 
 export async function loadFixture(sql: Sql, fixture: FixtureFile): Promise<void> {
   await sql.begin(async (tx) => {
-    for (const [table, rows] of Object.entries(fixture.tables)) {
+    for (const [table, given] of Object.entries(fixture.tables)) {
+      // json_populate_recordset ignore les valeurs par défaut : une fixture
+      // antérieure aux attelages (0022) déclare ses moyens en mode libre.
+      const rows = table === "interventions" ? given.map((r) => ("staffing" in r ? r : { ...r, staffing: "free" })) : given;
       if (!/^[a-z_]+$/.test(table)) throw new Error(`table invalide : ${table}`);
       if (rows.length === 0) continue;
       const cols = await tx<{ c: string }[]>`

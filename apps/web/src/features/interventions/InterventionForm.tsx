@@ -301,6 +301,9 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       tools: shape === "maintenance" ? [] : tools.map((equipmentId) => ({ equipmentId })),
       ...(shape === "maintenance" ? { maintenance: maintenanceBody(maint, maintained) } : {}),
       doers: doers.map((personId) => ({ personId })),
+      // Saisie en mode libre ; les attelages arrivent au lot N4.
+      staffing: "free",
+      crews: [],
       purposes,
       ...(notes.trim() ? { notes: notes.trim() } : {}),
       compliance: { usages: usageChoices, ...(overrideReason.trim() ? { reason: overrideReason.trim() } : {}) },

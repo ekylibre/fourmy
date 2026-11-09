@@ -232,6 +232,8 @@ export const demoInterventions: Intervention[] = [
     outputs: [],
     tools: [],
     doers: [{ personId: "00000000-0000-7000-8000-000000000601" }],
+    staffing: "free",
+    crews: [],
     purposes: ["fungicide"],
     notes: null,
     origin: "mobile",

@@ -208,6 +208,8 @@ export const interventions = pgTable("interventions", {
   stoppedAt: timestamp("stopped_at", { withTimezone: true }),
   origin: text("origin").notNull(),
   clientId: text("client_id"),
+  /** 'free' : matériels, intervenants et périodes indépendants ; 'crews' : par attelage (0022). */
+  staffing: text("staffing").notNull().default("free"),
   purposes: text("purposes").array().notNull().default([]),
   notes: text("notes"),
   /** Contrôle réglementaire phyto à l'enregistrement (feux, motif d'un passage outre). */
@@ -224,6 +226,17 @@ export const interventionPeriods = pgTable("intervention_periods", {
   interventionId: uuid("intervention_id").notNull(),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
   stoppedAt: timestamp("stopped_at", { withTimezone: true }).notNull(),
+  /** Attelage de la période (mode 'crews'), sinon NULL. */
+  crewId: uuid("crew_id"),
+});
+
+/** Attelages d'une intervention (0022) : matériels, intervenants et périodes y sont rattachés. */
+export const interventionCrews = pgTable("intervention_crews", {
+  id: uuid("id").primaryKey(),
+  interventionId: uuid("intervention_id").notNull(),
+  rank: integer("rank").notNull(),
+  label: text("label"),
+  templateId: uuid("template_id"),
 });
 
 export const people = pgTable("people", {
@@ -246,6 +259,8 @@ export const interventionParameters = pgTable("intervention_parameters", {
   unit: text("unit"),
   workingZone: geometry("working_zone"),
   attrs: jsonb("attrs"),
+  /** Attelage du matériel ou de l'intervenant (mode 'crews'), sinon NULL. */
+  crewId: uuid("crew_id"),
 });
 
 export const stockMovements = pgTable("stock_movements", {
