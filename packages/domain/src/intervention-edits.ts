@@ -1,4 +1,4 @@
-import type { Intervention, InterventionDisplayStatus, InterventionInput, InterventionOutput, StockMovement } from "@fourmy/contracts";
+import type { Intervention, InterventionCrew, InterventionDisplayStatus, InterventionInput, InterventionOutput, StockMovement } from "@fourmy/contracts";
 import { DomainError } from "./time.js";
 
 /**
@@ -9,6 +9,8 @@ import { DomainError } from "./time.js";
 /** Champs d'une intervention que l'on peut modifier (et donc comparer). */
 export const EDITABLE_FIELDS = [
   "procedure",
+  "staffing",
+  "crews",
   "periods",
   "targets",
   "inputs",
@@ -19,23 +21,43 @@ export const EDITABLE_FIELDS = [
   "notes",
 ] as const;
 export type EditableField = (typeof EDITABLE_FIELDS)[number];
+/** Attelage lu (id, rang) ou saisi : seuls libellé, matériels, intervenants et périodes se comparent. */
+type EditableCrew = Pick<InterventionCrew, "tools" | "periods"> & { label?: string | null; doers?: InterventionCrew["doers"] };
+
 /** Version lue (intrants avec leur unité) ou saisie (sans) : les deux se comparent. */
-export type EditableIntervention = Omit<Pick<Intervention, EditableField>, "inputs" | "outputs"> & {
+export type EditableIntervention = Omit<Pick<Intervention, EditableField>, "inputs" | "outputs" | "staffing" | "crews"> & {
   inputs: InterventionInput[];
   outputs: InterventionOutput[];
+  /** Absent : mode libre (clients antérieurs aux attelages). */
+  staffing?: Intervention["staffing"];
+  crews?: readonly EditableCrew[];
 };
+
+const isoPeriods = (value: unknown) =>
+  ((value as { startedAt: string; stoppedAt: string }[]) ?? [])
+    .map((p) => ({ startedAt: new Date(p.startedAt).toISOString(), stoppedAt: new Date(p.stoppedAt).toISOString() }))
+    .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+const byKey = (key: string) => (a: unknown, b: unknown) =>
+  String((a as Record<string, unknown>)[key]).localeCompare(String((b as Record<string, unknown>)[key]));
 
 export type InterventionChanges = Partial<Record<EditableField, { before: unknown; after: unknown }>>;
 
 /** Forme comparable : dates normalisées, unités d'affichage retirées, champs vides égaux à absents. */
 function canonical(field: EditableField, value: unknown): unknown {
   if (field === "notes") return (value as string | null | undefined)?.trim() || null;
-  if (field === "periods") {
-    return ((value as { startedAt: string; stoppedAt: string }[]) ?? []).map((p) => ({
-      startedAt: new Date(p.startedAt).toISOString(),
-      stoppedAt: new Date(p.stoppedAt).toISOString(),
+  if (field === "staffing") return value ?? "free";
+  if (field === "periods") return isoPeriods(value);
+  if (field === "crews") {
+    // Ordre des attelages conservé (rang) ; dans chacun, ordre sans importance.
+    return ((value as EditableCrew[]) ?? []).map((c) => ({
+      label: c.label?.trim() || null,
+      tools: c.tools.map(sortKeys).sort(byKey("equipmentId")),
+      doers: (c.doers ?? []).map(sortKeys).sort(byKey("personId")),
+      periods: isoPeriods(c.periods),
     }));
   }
+  if (field === "tools") return ((value as unknown[]) ?? []).map(sortKeys).sort(byKey("equipmentId"));
+  if (field === "doers") return ((value as unknown[]) ?? []).map(sortKeys).sort(byKey("personId"));
   if (field === "inputs" || field === "outputs") {
     // `unit` est ajouté à la lecture (unité de l'article), jamais saisi.
     return ((value as Record<string, unknown>[]) ?? []).map(({ unit: _unit, ...rest }) => sortKeys(rest));
@@ -63,7 +85,11 @@ function sortKeys(v: unknown): unknown {
  */
 export function diffIntervention(before: EditableIntervention, after: EditableIntervention): InterventionChanges {
   const changes: InterventionChanges = {};
+  // En attelages des deux côtés, matériels, intervenants et périodes de premier
+  // niveau sont déduits des attelages : seul le détail des attelages compte.
+  const derived = new Set<EditableField>(before.staffing === "crews" && after.staffing === "crews" ? ["tools", "doers", "periods"] : []);
   for (const field of EDITABLE_FIELDS) {
+    if (derived.has(field)) continue;
     const b = canonical(field, before[field]);
     const a = canonical(field, after[field]);
     if (JSON.stringify(b) !== JSON.stringify(a)) changes[field] = { before: b, after: a };

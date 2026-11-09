@@ -18,6 +18,9 @@ import {
   type ResolvedStockLine,
   dangerMessages,
   deriveNature,
+  crewRules,
+  flattenCrews,
+  crewDurations,
 } from "@fourmy/domain";
 import {
   getProcedure,
@@ -51,6 +54,15 @@ const iso = (v: unknown) => (v ? new Date(v as string).toISOString() : null);
 
 type Body = Omit<InterventionCompleteWrite, "periods"> & { periods: InterventionCompleteWrite["periods"] };
 
+/**
+ * Attelages (lot N3) : toutes les règles et écritures existantes (formes,
+ * doses, compteurs, contrôle phyto, stocks, bornes) travaillent sur la forme
+ * aplatie ; seul `writeBody` écrit les attelages eux-mêmes.
+ */
+function flat<B extends Pick<Body, "staffing" | "crews" | "tools" | "doers" | "periods">>(body: B): B {
+  return body.staffing === "crews" ? { ...body, ...flattenCrews(body.crews) } : body;
+}
+
 // ---------------------------------------------------------------------------
 // Lecture : lignes par rôle → forme structurée
 // ---------------------------------------------------------------------------
@@ -72,6 +84,7 @@ function toIntervention(r: Record<string, unknown>): Intervention {
     stoppedAt: iso(p.stoppedAt)!,
   }));
   const of = (role: string) => params.filter((p) => p.role === role && p.ref_id);
+  const staffing = (r.staffing as Intervention["staffing"] | undefined) ?? "free";
   const a = (p: ParamRow) => p.attrs ?? {};
   const meters = new Map(
     ((r.meters as { equipment_id: string; value: string; correction: string | null; correction_reason: string | null }[]) ?? []).map((m) => [
@@ -81,7 +94,7 @@ function toIntervention(r: Record<string, unknown>): Intervention {
   );
   const maint = r.maintenance as { nature?: string; problem?: string | null; workshop?: { name: string; reference?: string | null } | null } | null;
   const ops = (r.operations as { equipment_id: string; operation_id: string; label: string; kind: string; result: string; note: string | null }[]) ?? [];
-  return {
+  const out: Intervention = {
     id: r.id as string,
     farmId: r.farm_id as string,
     procedure: r.procedure as string,
@@ -89,8 +102,7 @@ function toIntervention(r: Record<string, unknown>): Intervention {
     startedAt: iso(r.started_at),
     stoppedAt: iso(r.stopped_at),
     periods,
-    // Attelages : lus au lot N3 ; aucun écrivain n'en crée avant.
-    staffing: (r.staffing as Intervention["staffing"] | undefined) ?? "free",
+    staffing,
     crews: [],
     targets: of("target")
       .filter((p) => TARGET_KINDS.includes(p.ref_type as TargetKind))
@@ -151,13 +163,36 @@ function toIntervention(r: Record<string, unknown>): Intervention {
     createdAt: iso(r.created_at)!,
     updatedAt: iso(r.updated_at)!,
   };
+  return withCrews(out, r.crews as CrewRow[] | undefined, meters);
+}
+
+type CrewRow = { id: string; rank: number; label: string | null; template_id: string | null; tools: string[]; doers: string[]; periods: { startedAt: string; stoppedAt: string }[] };
+
+/**
+ * Attelages lus ; en mode `crews`, matériels, intervenants et périodes de
+ * premier niveau = leur réunion (périodes fusionnées), pour les anciens
+ * clients. Le relevé de compteur d'un matériel est porté dans chaque attelage
+ * où il figure.
+ */
+function withCrews(out: Intervention, rows: CrewRow[] | undefined, meters: Map<string, NonNullable<Intervention["tools"][number]["meter"]>>): Intervention {
+  const crews = (rows ?? []).map((c) => ({
+    id: c.id,
+    rank: c.rank,
+    label: c.label,
+    templateId: c.template_id,
+    tools: c.tools.map((id) => ({ equipmentId: id, ...(meters.has(id) ? { meter: meters.get(id)! } : {}) })),
+    doers: c.doers.map((id) => ({ personId: id })),
+    periods: c.periods.map((p) => ({ startedAt: iso(p.startedAt)!, stoppedAt: iso(p.stoppedAt)! })),
+  }));
+  const read = out.staffing === "crews" ? { ...out, crews, ...flattenCrews(crews) } : out;
+  return { ...read, ...crewDurations(read) };
 }
 
 async function readInterventions(tx: Tx, where: SQL, limit = 1000): Promise<Intervention[]> {
   const list = await rows<Record<string, unknown>>(
     tx,
     sql`
-      SELECT i.id, i.farm_id, i.procedure, i.status, i.started_at, i.stopped_at, i.origin, i.client_id,
+      SELECT i.id, i.farm_id, i.procedure, i.status, i.started_at, i.stopped_at, i.origin, i.client_id, i.staffing,
              i.purposes, i.notes, i.compliance, i.ift, i.weather, i.maintenance, i.created_at, i.updated_at,
              (SELECT coalesce(json_agg(json_build_object('equipment_id', m.equipment_id, 'value', m.value, 'correction', m.correction,
                                                          'correction_reason', m.correction_reason)), '[]')
@@ -172,7 +207,16 @@ async function readInterventions(tx: Tx, where: SQL, limit = 1000): Promise<Inte
                  'role', p.role, 'ref_type', p.ref_type, 'ref_id', p.ref_id, 'quantity', p.quantity, 'unit', p.unit,
                  'attrs', p.attrs,
                  'working_zone', CASE WHEN p.working_zone IS NULL THEN NULL ELSE ST_AsGeoJSON(p.working_zone)::json END
-               ) ORDER BY p.role, p.id), '[]') FROM intervention_parameters p WHERE p.intervention_id = i.id) AS parameters
+               ) ORDER BY p.role, p.id), '[]') FROM intervention_parameters p WHERE p.intervention_id = i.id) AS parameters,
+             (SELECT coalesce(json_agg(json_build_object(
+                 'id', c.id, 'rank', c.rank, 'label', c.label, 'template_id', c.template_id,
+                 'tools', (SELECT coalesce(json_agg(p.ref_id ORDER BY p.id), '[]') FROM intervention_parameters p
+                            WHERE p.crew_id = c.id AND p.role = 'tool' AND p.ref_type = 'equipment'),
+                 'doers', (SELECT coalesce(json_agg(p.ref_id ORDER BY p.id), '[]') FROM intervention_parameters p
+                            WHERE p.crew_id = c.id AND p.role = 'doer' AND p.ref_type = 'person'),
+                 'periods', (SELECT coalesce(json_agg(json_build_object('startedAt', w.started_at, 'stoppedAt', w.stopped_at)
+                               ORDER BY w.started_at), '[]') FROM intervention_periods w WHERE w.crew_id = c.id)
+               ) ORDER BY c.rank), '[]') FROM intervention_crews c WHERE c.intervention_id = i.id) AS crews
       FROM interventions i
       WHERE ${where}
       ORDER BY coalesce(i.started_at, i.stopped_at, i.created_at), i.id
@@ -254,7 +298,10 @@ const TABLE_OF: Record<TargetKind, "land_parcels" | "equipments" | "places" | "c
   container: "containers",
 };
 
-async function validate(tx: Tx, procedureCode: string, body: Body, mode: "plan" | "complete") {
+async function validate(tx: Tx, procedureCode: string, raw: Body, mode: "plan" | "complete") {
+  const crewErrors = crewRules(raw, await crewNames(tx, raw));
+  if (crewErrors.length) throw new DomainError(crewErrors.join(" "));
+  const body = flat(raw);
   const articles = await loadArticles(tx, [...body.inputs.map((i) => i.articleId), ...body.outputs.map((o) => o.articleId)]);
   const errors = validateIntervention(getProcedure(procedureCode), body, mode, {
     articleKind: (id) => articles.get(id)?.kind,
@@ -268,19 +315,55 @@ async function validate(tx: Tx, procedureCode: string, body: Body, mode: "plan" 
   return articles;
 }
 
+/** Noms des matériels et personnes des attelages, pour des messages lisibles. */
+async function crewNames(tx: Tx, body: Body) {
+  if (body.staffing !== "crews") return {};
+  const ids = [...new Set(body.crews.flatMap((c) => [...c.tools.map((t) => t.equipmentId), ...c.doers.map((d) => d.personId)]))];
+  if (!ids.length) return {};
+  const list = await rows<{ id: string; name: string }>(
+    tx,
+    sql`SELECT id, name FROM equipments WHERE id IN (${sql.join(ids.map((i) => sql`${i}::uuid`), sql`, `)})
+        UNION ALL SELECT id, name FROM people WHERE id IN (${sql.join(ids.map((i) => sql`${i}::uuid`), sql`, `)})`,
+  );
+  const names = new Map(list.map((r) => [r.id, r.name]));
+  return { equipment: (id: string) => names.get(id), person: (id: string) => names.get(id) };
+}
+
 // ---------------------------------------------------------------------------
 // Écriture : forme structurée → lignes par rôle
 // ---------------------------------------------------------------------------
 
 async function writeBody(tx: Tx, interventionId: string, body: Body, articles: Map<string, Article>) {
+  // Parcours GPS rattachés à un attelage : `crew_id` est remis à NULL par la
+  // suppression des attelages ; on le repose après réécriture (même id
+  // d'attelage, sinon l'attelage qui contient le matériel suivi).
+  const linked = await rows<{ id: string; crew_id: string }>(
+    tx,
+    sql`SELECT id, crew_id FROM track_sessions WHERE intervention_id = ${interventionId} AND crew_id IS NOT NULL`,
+  );
+  await tx.execute(sql`UPDATE interventions SET staffing = ${body.staffing ?? "free"} WHERE id = ${interventionId}`);
+  await tx.execute(sql`DELETE FROM intervention_crews WHERE intervention_id = ${interventionId}`);
   await tx.execute(sql`DELETE FROM intervention_parameters WHERE intervention_id = ${interventionId}`);
   await tx.execute(sql`DELETE FROM intervention_periods WHERE intervention_id = ${interventionId}`);
-  const insert = (role: string, refType: string, refId: string, quantity: number | null, unit: string | null, attrs: object | null, zone?: unknown) =>
+  const insert = (
+    role: string,
+    refType: string,
+    refId: string,
+    quantity: number | null,
+    unit: string | null,
+    attrs: object | null,
+    zone?: unknown,
+    crewId: string | null = null,
+  ) =>
     tx.execute(sql`
-      INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id, quantity, unit, attrs, working_zone)
+      INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id, quantity, unit, attrs, working_zone, crew_id)
       VALUES (${crypto.randomUUID()}, ${interventionId}, ${role}, ${refType}, ${refId}, ${quantity}, ${unit},
               ${attrs && Object.keys(attrs).length ? JSON.stringify(attrs) : null}::jsonb,
-              ${zone ? sql`ST_SetSRID(ST_GeomFromGeoJSON(${JSON.stringify(zone)}), 4326)` : null})`);
+              ${zone ? sql`ST_SetSRID(ST_GeomFromGeoJSON(${JSON.stringify(zone)}), 4326)` : null}, ${crewId})`);
+  const period = (p: { startedAt: string; stoppedAt: string }, crewId: string | null = null) =>
+    tx.execute(sql`
+      INSERT INTO intervention_periods (id, intervention_id, started_at, stopped_at, crew_id)
+      VALUES (${crypto.randomUUID()}, ${interventionId}, ${p.startedAt}::timestamptz, ${p.stoppedAt}::timestamptz, ${crewId})`);
   for (const t of body.targets) {
     await insert("target", t.kind, t.id, null, null, t.workedAreaM2 ? { workedAreaM2: t.workedAreaM2 } : null, t.workingZone);
   }
@@ -296,12 +379,40 @@ async function writeBody(tx: Tx, interventionId: string, body: Body, articles: M
     const a = articles.get(o.articleId)!;
     await insert("output", "article", o.articleId, o.quantity, storedUnit(a.unit, o.per), { ...(o.lotId ? { lotId: o.lotId } : {}), ...(o.to ? { to: o.to } : {}) });
   }
-  for (const t of body.tools) await insert("tool", "equipment", t.equipmentId, null, null, null);
-  for (const d of body.doers) await insert("doer", "person", d.personId, null, null, null);
-  for (const p of body.periods) {
+  if (body.staffing !== "crews") {
+    for (const t of body.tools) await insert("tool", "equipment", t.equipmentId, null, null, null);
+    for (const d of body.doers) await insert("doer", "person", d.personId, null, null, null);
+    for (const p of body.periods) await period(p);
+    return;
+  }
+  // Attelages : id client conservé (stable entre deux modifications).
+  const clientIds = body.crews.map((c) => c.id).filter((id): id is string => !!id);
+  if (new Set(clientIds).size !== clientIds.length) throw new BadRequest("Deux attelages portent le même identifiant.");
+  if (clientIds.length) {
+    const taken = await rows<{ id: string }>(
+      tx,
+      sql`SELECT id FROM intervention_crews WHERE id IN (${sql.join(clientIds.map((i) => sql`${i}::uuid`), sql`, `)})`,
+    );
+    if (taken.length) throw new BadRequest("Identifiant d'attelage déjà utilisé par une autre intervention.");
+  }
+  for (const [rank, crew] of body.crews.entries()) {
+    const crewId = crew.id ?? crypto.randomUUID();
     await tx.execute(sql`
-      INSERT INTO intervention_periods (id, intervention_id, started_at, stopped_at)
-      VALUES (${crypto.randomUUID()}, ${interventionId}, ${p.startedAt}::timestamptz, ${p.stoppedAt}::timestamptz)`);
+      INSERT INTO intervention_crews (id, intervention_id, rank, label, template_id)
+      VALUES (${crewId}, ${interventionId}, ${rank}, ${crew.label?.trim() || null}, ${crew.templateId ?? null})`);
+    for (const id of new Set(crew.tools.map((t) => t.equipmentId))) await insert("tool", "equipment", id, null, null, null, undefined, crewId);
+    for (const id of new Set(crew.doers.map((d) => d.personId))) await insert("doer", "person", id, null, null, null, undefined, crewId);
+    for (const p of crew.periods) await period(p, crewId);
+  }
+  for (const l of linked) {
+    await tx.execute(sql`
+      UPDATE track_sessions s SET crew_id = (
+        SELECT c.id FROM intervention_crews c
+        WHERE c.intervention_id = ${interventionId}
+          AND (c.id = ${l.crew_id} OR EXISTS (SELECT 1 FROM intervention_parameters p
+                 WHERE p.crew_id = c.id AND p.role = 'tool' AND p.ref_id = s.equipment_id))
+        ORDER BY (c.id = ${l.crew_id}) DESC, c.rank LIMIT 1)
+      WHERE s.id = ${l.id}`);
   }
 }
 
@@ -342,6 +453,38 @@ async function writeMaintenance(tx: Tx, farmId: string, ctx: DomainCtx, interven
       { origin: "intervention", interventionId },
     );
   }
+}
+
+/**
+ * FR-ATT-3 : un matériel ou une personne d'un attelage qui travaille aussi,
+ * au même moment, dans une autre intervention (non annulée) : avertissement,
+ * sans blocage. Les périodes comparées sont celles de l'attelage de chaque
+ * côté (toutes les périodes pour une intervention en mode libre).
+ */
+async function crewOverlapWarnings(tx: Tx, interventionId: string, body: Body): Promise<string[]> {
+  if (body.staffing !== "crews") return [];
+  const list = await rows<{ name: string; started_at: string; procedure: string }>(
+    tx,
+    sql`WITH mine AS (
+          SELECT p.ref_id, w.started_at, w.stopped_at
+          FROM intervention_parameters p
+          JOIN intervention_periods w ON w.intervention_id = p.intervention_id AND (p.crew_id IS NULL OR w.crew_id = p.crew_id)
+          WHERE p.intervention_id = ${interventionId} AND p.role IN ('tool', 'doer'))
+        SELECT DISTINCT ON (m.ref_id, i.id) coalesce(e.name, pe.name) AS name, ow.started_at, i.procedure
+        FROM mine m
+        JOIN intervention_parameters op ON op.ref_id = m.ref_id AND op.role IN ('tool', 'doer') AND op.intervention_id <> ${interventionId}
+        JOIN interventions i ON i.id = op.intervention_id AND i.status <> 'cancelled'
+        JOIN intervention_periods ow ON ow.intervention_id = i.id AND (op.crew_id IS NULL OR ow.crew_id = op.crew_id)
+        LEFT JOIN equipments e ON e.id = m.ref_id
+        LEFT JOIN people pe ON pe.id = m.ref_id
+        WHERE ow.started_at < m.stopped_at AND ow.stopped_at > m.started_at
+        ORDER BY m.ref_id, i.id, ow.started_at
+        LIMIT 20`,
+  );
+  return list.map(
+    (r) =>
+      `${r.name ?? "Un matériel"} travaille aussi dans une autre intervention (${getProcedure(r.procedure).label}) le ${new Date(r.started_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}, sur une période qui se chevauche.`,
+  );
 }
 
 async function outbox(tx: Tx, farmId: string, event: ReturnType<typeof buildEvent>) {
@@ -391,14 +534,16 @@ export async function planInTx(
   const existing = await rows(tx, sql`SELECT 1 FROM interventions WHERE id = ${id}`);
   if (existing.length > 0) return { intervention: await readIntervention(tx, id), created: false };
   const articles = await validate(tx, input.procedure, input, "plan");
-  const bounds = periodBounds(input.periods);
+  const body = flat(input);
+  const bounds = periodBounds(body.periods);
   await tx.execute(sql`
-    INSERT INTO interventions (id, farm_id, procedure, status, started_at, stopped_at, origin, client_id, purposes, notes)
+    INSERT INTO interventions (id, farm_id, procedure, status, started_at, stopped_at, origin, client_id, purposes, notes, staffing)
     VALUES (${id}, ${farmId}, ${input.procedure}, 'planned', ${bounds.startedAt ?? input.plannedAt ?? null}, ${bounds.stoppedAt},
-            ${ctx.origin}, ${clientId}, ${sql`ARRAY[${sql.join(input.purposes.map((p) => sql`${p}`), sql`, `)}]::text[]`}, ${input.notes ?? null})`);
+            ${ctx.origin}, ${clientId}, ${sql`ARRAY[${sql.join(input.purposes.map((p) => sql`${p}`), sql`, `)}]::text[]`}, ${input.notes ?? null},
+            ${input.staffing ?? "free"})`);
   await writeBody(tx, id, input, articles);
-  await writeMaintenance(tx, farmId, ctx, id, input, false, null);
-  await recordCompliance(tx, ctx, id, input, "plan");
+  await writeMaintenance(tx, farmId, ctx, id, body, false, null);
+  await recordCompliance(tx, ctx, id, body, "plan");
   await audit(tx, farmId, ctx, id, "planned", { procedure: input.procedure });
   await outbox(tx, farmId, buildEvent(ctx, farmId, "intervention.planned", { interventionId: id }));
   return { intervention: await readIntervention(tx, id), created: true };
@@ -535,18 +680,19 @@ async function applyCompletion(
   ctx: DomainCtx,
   interventionId: string,
   procedure: string,
-  input: InterventionCompleteWrite,
+  raw: InterventionCompleteWrite,
 ) {
-  const articles = await validate(tx, procedure, input, "complete");
+  const articles = await validate(tx, procedure, raw, "complete");
+  const input = flat(raw);
   const { startedAt, stoppedAt } = periodBounds(input.periods);
-  await writeBody(tx, interventionId, input, articles);
+  await writeBody(tx, interventionId, raw, articles);
   await writeMaintenance(tx, farmId, ctx, interventionId, input, true, stoppedAt);
   await recordCompliance(tx, ctx, interventionId, { ...input, procedure }, "done");
   // Contenu (re)écrit : l'IFT sera recalculé (worker, ou à la demande depuis la fiche).
   await tx.execute(sql`UPDATE interventions SET ift = NULL WHERE id = ${interventionId}`);
   const areaHa = await treatedAreaHa(tx, input, stoppedAt!);
 
-  const warnings: string[] = [];
+  const warnings: string[] = await crewOverlapWarnings(tx, interventionId, input);
   const lines: ResolvedStockLine[] = [];
   for (const i of input.inputs) {
     const article = articles.get(i.articleId)!;
@@ -653,8 +799,9 @@ export async function updateIntervention(
   farmId: string,
   ctx: DomainCtx,
   interventionId: string,
-  input: InterventionUpdateWrite,
+  raw: InterventionUpdateWrite,
 ): Promise<{ intervention: Intervention; warnings: string[] }> {
+  const input = flat(raw);
   return withFarm(db, farmId, async (tx) => {
     const [current] = await rows<{ status: Intervention["status"] }>(
       tx,
@@ -675,9 +822,9 @@ export async function updateIntervention(
     const reason = input.reason || null;
 
     if (current.status === "planned") {
-      const articles = await validate(tx, input.procedure, input, "plan");
+      const articles = await validate(tx, input.procedure, raw, "plan");
       const bounds = periodBounds(input.periods);
-      await writeBody(tx, interventionId, input, articles);
+      await writeBody(tx, interventionId, raw, articles);
       await writeMaintenance(tx, farmId, ctx, interventionId, input, false, null);
       await recordCompliance(tx, ctx, interventionId, input, "plan");
       await tx.execute(sql`
@@ -686,6 +833,7 @@ export async function updateIntervention(
           purposes = ${sql`ARRAY[${sql.join(input.purposes.map((p) => sql`${p}`), sql`, `)}]::text[]`},
           notes = ${input.notes ?? null}, updated_at = now()
         WHERE id = ${interventionId}`);
+      warnings.push(...(await crewOverlapWarnings(tx, interventionId, input)));
       await auditAs(tx, farmId, ctx, auditId, interventionId, "updated", { changes, reason, warnings });
       await outbox(tx, farmId, buildEvent(ctx, farmId, "intervention.updated", { interventionId }));
       return { intervention: await readIntervention(tx, interventionId), warnings };
@@ -694,7 +842,7 @@ export async function updateIntervention(
     // Réalisée : correction tracée.
     if (input.periods.length === 0) throw new DomainError("Au moins une période de travail.");
     const reversal = await reverseMovements(tx, farmId, ctx, interventionId);
-    const { plan, areaHa, warnings: stockWarnings } = await applyCompletion(tx, farmId, ctx, interventionId, input.procedure, input);
+    const { plan, areaHa, warnings: stockWarnings } = await applyCompletion(tx, farmId, ctx, interventionId, input.procedure, raw);
     warnings.push(...stockWarnings);
     await auditAs(tx, farmId, ctx, auditId, interventionId, "corrected", {
       changes,
@@ -772,6 +920,10 @@ export async function cancelIntervention(
     await tx.execute(sql`UPDATE interventions SET status = 'cancelled', updated_at = now() WHERE id = ${interventionId}`);
     // Ses relevés de compteur disparaissent avec elle ; ses opérations ne comptent plus (annulée).
     await tx.execute(sql`DELETE FROM meter_readings WHERE intervention_id = ${interventionId}`);
+    // Ses parcours GPS redeviennent libres (le worker pourra les recalculer).
+    await tx.execute(sql`
+      UPDATE track_sessions SET intervention_id = NULL, crew_id = NULL, linked_extent = NULL, drift = NULL
+      WHERE intervention_id = ${interventionId}`);
     await audit(tx, farmId, ctx, interventionId, "cancelled", { reason, previousStatus: current.status });
     return readIntervention(tx, interventionId);
   });

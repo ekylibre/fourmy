@@ -156,12 +156,16 @@ export async function hitches(db: Database, farmId: string, equipmentId: string,
   return withFarm(db, farmId, async (tx) => {
     const list = await rows<Record<string, unknown> & Row & { tool_id: string; name: string; started_at: string; stopped_at: string }>(
       tx,
+      // Attelages (lot N3) : outils du même attelage que le matériel, sur les
+      // périodes de cet attelage. Mode libre : tous les outils de
+      // l'intervention, sur toutes ses périodes (déduction d'avant).
       sql`SELECT e.id AS tool_id, e.name, e.kind, e.technical, e.avatar, e.model_asset_id, b.color AS brand_color, ${LOGO_PNG} AS logo_id,
                  w.started_at, w.stopped_at
           FROM interventions i
-          JOIN intervention_periods w ON w.intervention_id = i.id
           JOIN intervention_parameters me ON me.intervention_id = i.id AND me.role = 'tool' AND me.ref_id = ${equipmentId}
           JOIN intervention_parameters o ON o.intervention_id = i.id AND o.role = 'tool' AND o.ref_type = 'equipment' AND o.ref_id <> ${equipmentId}
+           AND (i.staffing = 'free' OR o.crew_id = me.crew_id)
+          JOIN intervention_periods w ON w.intervention_id = i.id AND (i.staffing = 'free' OR w.crew_id = me.crew_id)
           JOIN equipments e ON e.id = o.ref_id
           LEFT JOIN farm_brands b ON b.id = e.brand_id
           WHERE i.status = 'done' AND w.stopped_at > ${from}::timestamptz AND w.started_at < ${to}::timestamptz

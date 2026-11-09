@@ -39,6 +39,21 @@ Phases réalisées, sur la branche `feat/parcours-attelages` :
   puis 0,09 s par passage incrémental). Le travail du 28/10 ne donne
   aucune parcelle : les parcelles en pente n'ont plus de version valide
   depuis 2023 (lacune du parcellaire, pas du calcul).
+- **N3** : l'API écrit et lit les attelages.
+  - Validation : `crewRules` (noms des matériels et personnes dans les
+    messages), puis les règles existantes sur la forme aplatie, qui sert
+    aussi aux compteurs, au contrôle phyto, aux stocks et aux bornes.
+  - Écriture : id d'attelage du client conservé ; le `crew_id` des parcours
+    rattachés est reposé après réécriture.
+  - Lecture : `crews` par sous-requête dans la lecture commune (fiche,
+    liste, synchro) ; forme aplatie, `spanS` et `workDurationS`.
+  - Avertissement (non bloquant) quand un matériel ou une personne d'un
+    attelage travaille au même moment dans une autre intervention.
+  - Historique : `staffing` et `crews` comparés ; en attelages, matériels,
+    intervenants et périodes de premier niveau ne sont pas répétés.
+  - `hitches()` : outils du même attelage, sur ses périodes.
+  - Annulation : les parcours rattachés redeviennent libres.
+  - Synchro mobile toujours forcée en mode libre (R3).
 
 Contrôle d'O1 sur l'Arion 430 le 28/10 (réglages par défaut) :
 - déplacement 10:37-11:06, puis coupure de 2 h à midi ;
