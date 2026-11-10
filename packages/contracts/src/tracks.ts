@@ -105,3 +105,24 @@ export interface TrackDraft {
   /** Noms des parcelles des cibles (affichage). */
   parcelNames: Record<string, string>;
 }
+
+/** Synthèse des parcours d'une ferme sur une période (tableau de bord, retours du 10/11/2026). */
+export interface TrackSummaryItem {
+  equipment: { id: string; name: string };
+  work: { count: number; durationS: number; distanceM: number; coveredAreaM2: number };
+  transit: { count: number; durationS: number; distanceM: number };
+  /** Parcours de travail non rattachés à une intervention. */
+  freeWork: number;
+  /** Parcelles travaillées, surface couverte cumulée (décroissante). */
+  parcels: { landParcelId: string; name: string; areaM2: number }[];
+  firstAt: string;
+  lastAt: string;
+}
+
+export interface TrackSummary {
+  /** Intégration Traccar active sur la ferme. */
+  enabled: boolean;
+  from: string;
+  to: string;
+  items: TrackSummaryItem[];
+}

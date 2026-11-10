@@ -59,6 +59,11 @@ export const handlers = [
     signedIn = false;
     return HttpResponse.json({ success: true });
   }),
+  // Synthèse des parcours (tableau de bord) : Traccar inactif dans la démo.
+  http.get(`*${base}/tracks/summary`, ({ request }) => {
+    const u = new URL(request.url);
+    return HttpResponse.json({ enabled: false, from: u.searchParams.get("from"), to: u.searchParams.get("to"), items: [] });
+  }),
   http.get(`*${base}/integrations`, () => HttpResponse.json({ providers: INTEGRATION_PROVIDERS, items: [] })),
   http.get(`*${base}/members`, () =>
     page([{ userId: DEMO_USER_ID, email: demoUser.email, name: demoUser.name, role: "owner", personId: null }]),

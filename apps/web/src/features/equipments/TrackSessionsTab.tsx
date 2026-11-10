@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { Alert, Badge, Button, Checkbox, Grid, Group, Modal, Paper, SegmentedControl, Select, Stack, Table, Text, TextInput, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -47,15 +47,19 @@ export function useHasTrackSessions(farmId: string, equipmentId: string) {
 
 type Filters = { from: string; to: string; kind: "" | "work" | "transit"; state: "" | "free" | "linked"; parcel: string | null };
 
+const isDay = (v: string | null): v is string => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
 export function TrackSessionsTab({ farmId, equipmentId }: { farmId: string; equipmentId: string }) {
   const today = new Date();
-  const [filters, setFilters] = useState<Filters>({
-    from: dayOf(new Date(today.getTime() - 30 * DAY)),
-    to: dayOf(today),
-    kind: "",
-    state: "",
+  // Filtres initiaux depuis l'adresse (lien du tableau de bord) : tracksFrom, tracksTo, tracksKind, tracksState.
+  const [params] = useSearchParams();
+  const [filters, setFilters] = useState<Filters>(() => ({
+    from: isDay(params.get("tracksFrom")) ? params.get("tracksFrom")! : dayOf(new Date(today.getTime() - 30 * DAY)),
+    to: isDay(params.get("tracksTo")) ? params.get("tracksTo")! : dayOf(today),
+    kind: (["work", "transit"] as const).find((k) => k === params.get("tracksKind")) ?? "",
+    state: (["free", "linked"] as const).find((k) => k === params.get("tracksState")) ?? "",
     parcel: null,
-  });
+  }));
   const [selected, setSelected] = useState<string[]>([]);
   const set = (patch: Partial<Filters>) => {
     setFilters((f) => ({ ...f, ...patch }));

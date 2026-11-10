@@ -209,3 +209,9 @@ Rappel des questions :
   registre phyto, bilan IFT, matériels, attelages types, équipe (membres,
   personnes), produits phyto, entretien, pièces, parcours. Cuverie (cartes)
   et Imports (rapport) n'ont pas de liste tabulaire : sans objet.
+- **V** (2026-11-10) : `GET /tracks/summary?from&to` (membres, ≤ 31 jours,
+  `enabled` = Traccar actif, lu sans exposer la configuration) ; widget
+  « Parcours GPS » sur le tableau de bord (jour / 7 jours, D4), liens vers
+  l'onglet Parcours filtré (paramètres `tracksFrom/To/Kind/State`).
+  Vérifié sur Pierre, semaine du 2 au 8/10 : Arion 430, 2 parcours de
+  travail (2 h 21, 17,3 ha couverts, 1 libre), 5 déplacements (21,4 km).

@@ -7,6 +7,7 @@ import { useFarmDues, useInterventions, useSnapshot } from "../../app/queries";
 import { Link, useLocation } from "react-router";
 import { ErrorAlert, Loading } from "../../components/states";
 import { SprayingConditions } from "../weather/Weather";
+import { TrackSummaryWidget } from "./TrackSummaryWidget";
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -72,6 +73,8 @@ export function DashboardPage() {
 
       {/* Prévisions : seulement quand la frise est sur aujourd'hui. */}
       {isToday && <SprayingConditions farmId={farm.id} />}
+
+      <TrackSummaryWidget farmId={farm.id} day={day} />
 
       <Paper p="md">
         <Title order={3} mb="sm">

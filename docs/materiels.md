@@ -416,6 +416,15 @@ d'intervention s'adapte à cette forme.
 Exigences et design : [`parcours-attelages.md`](parcours-attelages.md),
 [`parcours-attelages-design.md`](parcours-attelages-design.md).
 
+**Tableau de bord** (retours du 10/11/2026) : quand Traccar est actif, le
+widget « Parcours GPS » résume les parcours du jour de la frise (ou des
+7 jours qui finissent ce jour-là) par matériel suivi : durée et nombre de
+parcours de travail, distance, surface couverte, déplacements, parcelles,
+parcours de travail libres. Chaque ligne ouvre l'onglet Parcours du
+matériel sur la même période (`tracksFrom`, `tracksTo`, et `tracksKind`,
+`tracksState` pour les libres). Un parcours à cheval sur la période compte
+entier.
+
 ### Onglet Parcours de la fiche (`?tab=tracks`)
 
 Visible quand le matériel a au moins un parcours sur les 400 derniers
@@ -472,6 +481,7 @@ jours, comme tracteur suivi ou comme outil reconnu.
 | Route | Accès |
 |---|---|
 | `GET /equipments/:id/track-sessions` · `GET /track-sessions/:id` | membre |
+| `GET /tracks/summary?from&to` (≤ 31 jours) : synthèse par matériel suivi (travail, déplacements, parcours libres, parcelles) et `enabled` (Traccar actif) — widget « Parcours GPS » du tableau de bord | membre |
 | `POST /track-sessions/draft` · `GET/POST /interventions/:id/track-sessions` | membre |
 | `POST /track-sessions/recompute` · `PUT /settings/tracks` | responsable |
 | `GET /crew-templates` · `POST`, `PUT`, `DELETE /crew-templates[/:id]` | membre · responsable |
