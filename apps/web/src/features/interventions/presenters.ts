@@ -46,6 +46,8 @@ export const actionLabel = (a: string) => ACTIONS[a] ?? a;
 
 const FIELDS: Record<string, string> = {
   procedure: "Intervention",
+  staffing: "Déclaration",
+  crews: "Attelages",
   periods: "Périodes",
   targets: "Cibles",
   inputs: "Intrants",
@@ -63,6 +65,19 @@ function valueText(names: Names, field: string, value: unknown): string {
   switch (field) {
     case "procedure":
       return procedureLabel(String(value));
+    case "staffing":
+      return value === "crews" ? "Attelages" : "Libre";
+    case "crews":
+      return (
+        list
+          .map((c, n) => {
+            const crew = c as { label?: string | null; tools?: Record<string, unknown>[]; doers?: Record<string, unknown>[]; periods?: Record<string, unknown>[] };
+            const who = [...(crew.tools ?? []).map((t) => names.equipment.get(String(t.equipmentId)) ?? "?"), ...(crew.doers ?? []).map((d) => names.person.get(String(d.personId)) ?? "?")];
+            const when = (crew.periods ?? []).map((p) => formatPeriod(String(p.startedAt), String(p.stoppedAt))).join(", ");
+            return `${crew.label || `Attelage ${n + 1}`} : ${who.join(", ")}${when ? ` (${when})` : ""}`;
+          })
+          .join(" ; ") || "—"
+      );
     case "periods":
       return list.map((p) => formatPeriod(String(p.startedAt), String(p.stoppedAt))).join(" ; ") || "—";
     case "targets":

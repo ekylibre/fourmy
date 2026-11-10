@@ -86,7 +86,16 @@ export async function listActivities(db: Database, farmId: string, year: number)
 async function checkReference(tx: Tx, body: ActivityWrite) {
   if (!body.reference) return;
   const [ref] = await rows<{ family: string }>(tx, sql`SELECT family FROM lexicon_productions WHERE reference_name = ${body.reference}`);
-  if (!ref) throw new DomainError(`Production de référence inconnue : ${body.reference}.`);
+  if (!ref) {
+    // Table vide : le référentiel n'est pas chargé (worker non lancé), la référence n'est pas en cause.
+    const [any] = await rows<{ one: number }>(tx, sql`SELECT 1 AS one FROM lexicon_productions LIMIT 1`);
+    if (!any) {
+      throw new DomainError(
+        "Référentiel Lexicon non chargé : productions de référence indisponibles. Lancer le worker ou `corepack pnpm --filter @fourmy/lexicon sync`.",
+      );
+    }
+    throw new DomainError(`Production de référence inconnue : ${body.reference}.`);
+  }
 }
 
 async function uniqueName(tx: Tx, name: string, self: string | null) {

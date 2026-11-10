@@ -152,4 +152,44 @@ describe.skipIf(!url)("synchro mobile (intégration)", () => {
     expect(body).toMatchObject({ purposes: ["herbicide"], doers: [{ personId }] });
     expect(body.periods).toHaveLength(1);
   });
+
+  it("attelages (FR-ATT-8) : poussés par une version récente, redescendus avec la forme aplatie", async () => {
+    const tractor = crypto.randomUUID();
+    await sql`INSERT INTO equipments (id, farm_id, name, kind) VALUES (${tractor}, ${farmId}, 'Tracteur mobile', 'tractor')`;
+    const since = new Date().toISOString();
+    const id = crypto.randomUUID();
+    const { periods, doers, ...rest } = done(id);
+    const crews = [{ label: "Pulvé", tools: [{ equipmentId: tractor }], doers, periods }];
+    const r = await (await push({ lastPulledAt: since, changes: { interventions: { created: [{ ...rest, staffing: "crews", crews }], updated: [], deleted: [] } } })).json();
+    expect(r).toEqual({ applied: [{ id, outcome: "completed" }], failed: [] });
+    const [row] = await sql`SELECT staffing FROM interventions WHERE id = ${id}`;
+    expect(row?.staffing).toBe("crews");
+    const pulled = (await pull(since)).changes.interventions.updated.find((i: { id: string }) => i.id === id);
+    const body = JSON.parse(pulled.body_json);
+    expect(body.staffing).toBe("crews");
+    expect(body.crews).toHaveLength(1);
+    expect(body.crews[0]).toMatchObject({ label: "Pulvé", tools: [{ equipmentId: tractor }], doers: [{ personId }] });
+    // Anciennes versions : la forme aplatie reste lisible.
+    expect(body).toMatchObject({ tools: [{ equipmentId: tractor }], doers: [{ personId }] });
+    expect(body.periods).toHaveLength(1);
+  });
+
+  it("une version sans attelages ne réalise pas une intervention à attelages : refus dans failed", async () => {
+    const tractor = crypto.randomUUID();
+    await sql`INSERT INTO equipments (id, farm_id, name, kind) VALUES (${tractor}, ${farmId}, 'Tracteur web', 'tractor')`;
+    const id = crypto.randomUUID();
+    const P = { startedAt: "2026-05-03T07:00:00Z", stoppedAt: "2026-05-03T08:00:00Z" };
+    const planned = await app.request(`${base}/interventions`, {
+      method: "POST",
+      headers: owner.headers,
+      body: JSON.stringify({ id, procedure: "spraying", staffing: "crews", crews: [{ tools: [{ equipmentId: tractor }], doers: [{ personId }], periods: [P] }] }),
+    });
+    expect(planned.status).toBe(201);
+    const since = new Date().toISOString();
+    const r = await (await push({ lastPulledAt: since, changes: { interventions: { created: [], updated: [done(id)], deleted: [] } } })).json();
+    expect(r.applied).toEqual([]);
+    expect(r.failed).toEqual([{ id, error: "Intervention à attelages : à modifier sur le web ou avec une version récente." }]);
+    const [row] = await sql`SELECT status, staffing FROM interventions WHERE id = ${id}`;
+    expect(row).toEqual({ status: "planned", staffing: "crews" });
+  });
 });

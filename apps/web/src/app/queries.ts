@@ -15,6 +15,7 @@ import type {
   InterventionDetail,
   Person,
   PhytoRegisterEntry,
+  CrewTemplate,
   ProcedureCatalogue,
   Snapshot,
   StockLevel,
@@ -87,7 +88,7 @@ export function useParcelNames(farmId: string) {
 
 /** Après une écriture sur les interventions : tout ce qui en dépend est relu. */
 export function invalidateAfterIntervention(queryClient: QueryClient) {
-  for (const key of ["interventions", "intervention", "stock", "register", "snapshot", "contents", "procedures"]) {
+  for (const key of ["interventions", "intervention", "stock", "register", "snapshot", "contents", "procedures", "track-sessions", "intervention-track-sessions"]) {
     void queryClient.invalidateQueries({ queryKey: [key] });
   }
 }
@@ -165,6 +166,15 @@ export function useCertifications(farmId: string) {
 }
 
 /** Matériels de la ferme (fiche résumée, dernier relevé, logo). */
+/** Attelages types de la ferme (FR-ATT-6). */
+export function useCrewTemplates(farmId: string) {
+  return useQuery({
+    queryKey: ["crew-templates", farmId],
+    queryFn: () => api.get<{ items: CrewTemplate[] }>(farmPath(farmId, "/crew-templates")),
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useEquipments(farmId: string) {
   return useQuery({
     queryKey: ["equipments", farmId],

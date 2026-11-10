@@ -18,6 +18,7 @@ import { activityRoutes } from "./activities.js";
 import { certificationRoutes } from "./certifications.js";
 import { equipmentRoutes } from "./equipments.js";
 import { maintenanceRoutes } from "./maintenance.js";
+import { crewTemplateRoutes } from "./crew-templates.js";
 
 /**
  * Routes métier sous `/api/v1/farms/:farmId` (architecture §5.1), découpées
@@ -33,6 +34,7 @@ export const farmRoutes = new Hono<Env>()
   .route("/", registerRoutes)
   .route("/", trackRoutes)
   .route("/", interventionRoutes)
+  .route("/", crewTemplateRoutes)
   .route("/", syncRoutes)
   .route("/", importRoutes)
   .route("/", articleRoutes)

@@ -208,6 +208,8 @@ export const interventions = pgTable("interventions", {
   stoppedAt: timestamp("stopped_at", { withTimezone: true }),
   origin: text("origin").notNull(),
   clientId: text("client_id"),
+  /** 'free' : matériels, intervenants et périodes indépendants ; 'crews' : par attelage (0022). */
+  staffing: text("staffing").notNull().default("free"),
   purposes: text("purposes").array().notNull().default([]),
   notes: text("notes"),
   /** Contrôle réglementaire phyto à l'enregistrement (feux, motif d'un passage outre). */
@@ -224,6 +226,59 @@ export const interventionPeriods = pgTable("intervention_periods", {
   interventionId: uuid("intervention_id").notNull(),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
   stoppedAt: timestamp("stopped_at", { withTimezone: true }).notNull(),
+  /** Attelage de la période (mode 'crews'), sinon NULL. */
+  crewId: uuid("crew_id"),
+});
+
+/** Attelages d'une intervention (0022) : matériels, intervenants et périodes y sont rattachés. */
+export const interventionCrews = pgTable("intervention_crews", {
+  id: uuid("id").primaryKey(),
+  interventionId: uuid("intervention_id").notNull(),
+  rank: integer("rank").notNull(),
+  label: text("label"),
+  templateId: uuid("template_id"),
+});
+
+/** Attelages types de la ferme (0025, FR-ATT-6) : composition reprise en un clic à la saisie. */
+export const crewTemplates = pgTable("crew_templates", {
+  id: uuid("id").primaryKey(),
+  farmId: uuid("farm_id").notNull(),
+  name: text("name").notNull(),
+  active: boolean("active").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+});
+
+/** Membres d'un attelage type : un matériel ou un intervenant, dans l'ordre saisi. */
+export const crewTemplateMembers = pgTable("crew_template_members", {
+  templateId: uuid("template_id").notNull(),
+  rank: integer("rank").notNull(),
+  equipmentId: uuid("equipment_id"),
+  personId: uuid("person_id"),
+});
+
+/** Parcours GPS calculés par le worker (0023) : libres, ou figés une fois rattachés. */
+export const trackSessions = pgTable("track_sessions", {
+  id: uuid("id").primaryKey(),
+  farmId: uuid("farm_id").notNull(),
+  equipmentId: uuid("equipment_id").notNull(),
+  bindingId: uuid("binding_id").notNull(),
+  kind: text("kind").notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+  stoppedAt: timestamp("stopped_at", { withTimezone: true }).notNull(),
+  positionCount: integer("position_count").notNull(),
+  distanceM: numeric("distance_m").notNull(),
+  coveredAreaM2: numeric("covered_area_m2"),
+  coverage: geometry("coverage"),
+  parcels: jsonb("parcels").notNull().default([]),
+  toolHint: text("tool_hint"),
+  toolEquipmentId: uuid("tool_equipment_id"),
+  interventionId: uuid("intervention_id"),
+  crewId: uuid("crew_id"),
+  linkedExtent: tstzrange("linked_extent"),
+  drift: jsonb("drift"),
+  settingsHash: text("settings_hash").notNull(),
+  computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const people = pgTable("people", {
@@ -246,6 +301,8 @@ export const interventionParameters = pgTable("intervention_parameters", {
   unit: text("unit"),
   workingZone: geometry("working_zone"),
   attrs: jsonb("attrs"),
+  /** Attelage du matériel ou de l'intervenant (mode 'crews'), sinon NULL. */
+  crewId: uuid("crew_id"),
 });
 
 export const stockMovements = pgTable("stock_movements", {

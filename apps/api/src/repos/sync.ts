@@ -167,7 +167,8 @@ export async function pull(db: Database, farmId: string, lastPulledAt: string | 
       });
     }
     for (const i of interventions) {
-      const { periods, targets, inputs, outputs, tools, doers, purposes, notes } = i;
+      // Forme aplatie (anciennes versions, en lecture seule si attelages), plus le mode et les attelages.
+      const { periods, targets, inputs, outputs, tools, doers, purposes, notes, staffing, crews } = i;
       put("interventions", {
         id: i.id,
         procedure: i.procedure,
@@ -176,7 +177,7 @@ export async function pull(db: Database, farmId: string, lastPulledAt: string | 
         stopped_at: ms(i.stoppedAt),
         origin: i.origin,
         client_id: i.clientId,
-        body_json: JSON.stringify({ periods, targets, inputs, outputs, tools, doers, purposes, notes }),
+        body_json: JSON.stringify({ periods, targets, inputs, outputs, tools, doers, purposes, notes, staffing, crews }),
         updated_at_server: ms(i.updatedAt),
       });
     }
@@ -197,6 +198,8 @@ async function modifiedElsewhereSince(db: Database, farmId: string, id: string, 
   );
   return found.length > 0;
 }
+
+export const CREWS_NEED_RECENT_CLIENT = "Intervention à attelages : à modifier sur le web ou avec une version récente.";
 
 export async function push(db: Database, farmId: string, ctx: DomainCtx, body: SyncPushRequest): Promise<SyncPushResult> {
   const result: SyncPushResult = { applied: [], failed: [] };
@@ -221,16 +224,21 @@ export async function push(db: Database, farmId: string, ctx: DomainCtx, body: S
       // Tout ou rien par intervention : planification et réalisation partagent
       // une transaction (un enregistrement rejeté ne laisse aucune trace).
       const outcome = await withFarm(db, farmId, async (tx) => {
-        const [current] = await rows<{ status: string }>(tx, sql`SELECT status FROM interventions WHERE id = ${r.id}`);
+        const [current] = await rows<{ status: string; staffing: string }>(tx, sql`SELECT status, staffing FROM interventions WHERE id = ${r.id}`);
         if (current?.status === "done") return "unchanged" as const; // re-push idempotent
-        const { id, procedure, status, ...body } = r;
+        // Version mobile sans attelages : elle ne doit pas aplatir en silence (FR-ATT-8).
+        if (current?.staffing === "crews" && !r.staffing) throw new DomainError(CREWS_NEED_RECENT_CLIENT);
+        const { id, procedure, status, staffing, crews, ...pushed } = r;
+        const body = staffing === "crews" ? { ...pushed, staffing, crews: crews ?? [], tools: [], doers: [], periods: [] } : { ...pushed, staffing: "free" as const, crews: [] };
         if (!current) {
           // Réalisée d'emblée : on planifie à vide puis on réalise avec le corps complet.
           await planInTx(
             tx,
             farmId,
             ctx,
-            status === "planned" ? { id, procedure, ...body } : { id, procedure, periods: [], targets: [], inputs: [], outputs: [], tools: [], doers: [], purposes: [] },
+            status === "planned"
+              ? { id, procedure, ...body }
+              : { id, procedure, staffing: "free", crews: [], periods: [], targets: [], inputs: [], outputs: [], tools: [], doers: [], purposes: [] },
             id,
           );
         }

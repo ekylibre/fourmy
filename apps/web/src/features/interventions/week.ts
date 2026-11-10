@@ -45,21 +45,37 @@ export function weekLabel(w: Week): string {
   return `du ${from} au ${to}`;
 }
 
+/** Nom d'un attelage : son libellé, sinon « Attelage n ». */
+export const crewLabel = (c: { label: string | null; rank: number }) => c.label || `Attelage ${c.rank + 1}`;
+
+export interface Slot {
+  day: string;
+  startedAt: string;
+  stoppedAt: string | null;
+  /** Mode attelages : l'attelage de la période. */
+  crew?: string;
+}
+
 /**
  * Créneaux d'une intervention, jour par jour : chaque période (une période
- * sur plusieurs jours apparaît chaque jour) ; une intervention planifiée sans
- * période apparaît à sa date prévue.
+ * sur plusieurs jours apparaît chaque jour) ; en attelages, chaque période de
+ * chaque attelage (FR-ATT-5) ; une intervention planifiée sans période
+ * apparaît à sa date prévue.
  */
-export function slots(i: Intervention): { day: string; startedAt: string; stoppedAt: string | null }[] {
-  if (i.periods.length === 0) {
+export function slots(i: Intervention): Slot[] {
+  const periods =
+    i.staffing === "crews" && i.crews.length
+      ? i.crews.flatMap((c) => c.periods.map((p) => ({ ...p, crew: crewLabel(c) })))
+      : i.periods.map((p) => ({ ...p, crew: undefined }));
+  if (periods.length === 0) {
     const at = i.startedAt ?? i.stoppedAt ?? i.createdAt;
     return [{ day: localDay(new Date(at)), startedAt: at, stoppedAt: null }];
   }
-  return i.periods.flatMap((p) => {
+  return periods.flatMap((p) => {
     const first = localDay(new Date(p.startedAt));
     const last = localDay(new Date(p.stoppedAt));
-    const out: { day: string; startedAt: string; stoppedAt: string | null }[] = [];
-    for (let day = first; day <= last; day = addDays(day, 1)) out.push({ day, startedAt: p.startedAt, stoppedAt: p.stoppedAt });
+    const out: Slot[] = [];
+    for (let day = first; day <= last; day = addDays(day, 1)) out.push({ day, startedAt: p.startedAt, stoppedAt: p.stoppedAt, ...(p.crew ? { crew: p.crew } : {}) });
     return out;
   });
 }

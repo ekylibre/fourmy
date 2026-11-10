@@ -7,7 +7,7 @@ export async function phytoRegister(db: Database, farmId: string, year: number):
   return withFarm(db, farmId, async (tx) => {
     const rows = (await tx.execute(sql`
       SELECT intervention_id, done_at, parcel_name, area_m2::float8 AS area_m2, crop,
-             product_name, amm, quantity::float8 AS quantity, unit
+             product_name, amm, quantity::float8 AS quantity, unit, applicators
       FROM phyto_register
       WHERE extract(year FROM done_at)::int = ${year}
       ORDER BY done_at, parcel_name, product_name`)) as unknown as {
@@ -20,6 +20,7 @@ export async function phytoRegister(db: Database, farmId: string, year: number):
       amm: string | null;
       quantity: number | null;
       unit: string | null;
+      applicators: string[];
     }[];
     return rows.map((r) => ({
       interventionId: r.intervention_id,
@@ -31,6 +32,7 @@ export async function phytoRegister(db: Database, farmId: string, year: number):
       amm: r.amm ?? undefined,
       quantity: r.quantity ?? 0,
       unit: r.unit ?? "",
+      applicators: r.applicators,
     }));
   });
 }
@@ -39,7 +41,7 @@ export async function phytoRegister(db: Database, farmId: string, year: number):
 export function phytoRegisterCsv(entries: PhytoRegisterEntry[]): string {
   const fr = (n: number, digits = 2) => n.toFixed(digits).replace(".", ",");
   const cell = (v: string) => (/[;"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-  const header = ["Date", "Parcelle", "Surface (ha)", "Culture", "Produit", "N° AMM", "Dose", "Unité"];
+  const header = ["Date", "Parcelle", "Surface (ha)", "Culture", "Produit", "N° AMM", "Dose", "Unité", "Applicateur"];
   const lines = entries.map((e) =>
     [
       e.doneOn.slice(0, 10),
@@ -50,6 +52,7 @@ export function phytoRegisterCsv(entries: PhytoRegisterEntry[]): string {
       e.amm ?? "",
       fr(e.quantity, 3),
       e.unit,
+      e.applicators.join(", ") || "non renseigné",
     ]
       .map((v) => cell(String(v)))
       .join(";"),

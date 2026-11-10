@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from "react";
-import type { MaintenanceNature } from "@fourmy/contracts";
+import { lazy, Suspense, useState } from "react";
+import type { MaintenanceNature, TrackDraft } from "@fourmy/contracts";
 import { draftFrom, draftNature, maintenanceBody, MaintenanceAside, MaintenanceFields, type MaintenanceDraft } from "../maintenance/MaintenanceFields";
 import {
   ActionIcon,
@@ -40,15 +40,17 @@ import type {
 import { formatHa } from "@fourmy/ui-lyvre";
 import { api, ApiError, farmPath } from "../../app/api";
 import { unitLabel } from "../../app/labels";
-import { invalidateAfterIntervention, useActivities, useEquipments, usePhytoArticles } from "../../app/queries";
+import { invalidateAfterIntervention, useActivities, useCrewTemplates, useEquipments, usePhytoArticles } from "../../app/queries";
+import { useFarm } from "../../app/farm";
 import { RegulatoryPictos } from "../phyto/Hazards";
 import { PrecautionsPanel } from "../phyto/Precautions";
-import { dangerMessages } from "@fourmy/domain";
+import { crewRules, dangerMessages, mergePeriods, toFree } from "@fourmy/domain";
 import { ActivityBadge, activityOfParcel } from "../activities/ActivityBadge";
 import { MapBoundary } from "../../components/MapBoundary";
 import { ProcedureIcon } from "../../components/ProcedureIcon";
 import { treatedAreaM2 } from "./zones";
-import { durationMinutes, formatDuration, parseDuration, withDuration, withStart } from "./periods";
+import { withStart } from "./periods";
+import { CrewsEditor, CrewsSummary, PeriodsEditor, crewRowsOf, crewsBody, newCrew, toLocal, type CrewRow } from "./Crews";
 import { ComplianceSummary, TreatmentCheckView, useComplianceCheck, type ComplianceDraft } from "./CompliancePanel";
 import type { Activity, InterventionWeather } from "@fourmy/contracts";
 import type { FeatureCollection, Geometry } from "geojson";
@@ -96,6 +98,8 @@ export interface FormInitial {
   mode?: "planned" | "done";
   nature?: MaintenanceNature | null;
   problem?: string;
+  /** Brouillon tiré de parcours GPS (lot P) : attelage, périodes, cibles, parcours à rattacher. */
+  trackDraft?: TrackDraft;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -152,7 +156,8 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   const shape = procedure?.shape;
   const start = planned?.startedAt ? local(planned.startedAt) : `${defaultDay}T08:00`;
   // Nouvelle intervention : réalisée si son début est passé, à planifier sinon (modifiable).
-  const [mode, setMode] = useState<"done" | "planned">(() => initial?.mode ?? (!planned && new Date(start).getTime() > Date.now() ? "planned" : "done"));
+  const fromTracks = planned ? undefined : initial?.trackDraft;
+  const [mode, setMode] = useState<"done" | "planned">(() => initial?.mode ?? (fromTracks ? "done" : undefined) ?? (!planned && new Date(start).getTime() > Date.now() ? "planned" : "done"));
   const followStart = (startedAt: string) => {
     if (planned) return;
     const t = new Date(startedAt).getTime();
@@ -165,19 +170,26 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       ? planned.periods.map((p) => ({ startedAt: local(p.startedAt), stoppedAt: local(p.stoppedAt) }))
       : [{ startedAt: start, stoppedAt: `${start.slice(0, 10)}T10:00` }],
   );
-  const [parcels, setParcels] = useState<string[]>(planned?.targets.filter((t) => t.kind === "land_parcel").map((t) => t.id) ?? []);
+  const [parcels, setParcels] = useState<string[]>(
+    planned?.targets.filter((t) => t.kind === "land_parcel").map((t) => t.id) ?? fromTracks?.body.targets.map((t) => t.id) ?? [],
+  );
   const [maintained, setMaintained] = useState<string[]>(
     planned?.targets.filter((t) => t.kind === "equipment").map((t) => t.id) ?? (initial?.equipmentId ? [initial.equipmentId] : []),
   );
   // Entretien (lot K) : relevés, opérations du plan, nature, problème, atelier.
   const [maint, setMaint] = useState<MaintenanceDraft>(() => draftFrom(planned, initial));
   const equipmentList = useEquipments(farmId);
+  const farmRole = useFarm().role;
+  const crewTemplates = useCrewTemplates(farmId);
   // Surface travaillée et zone de travail des cibles : conservées telles quelles.
   // Surface travaillée et zone de travail des cibles : conservées, ou dessinées sur la carte.
   const [targetExtras, setTargetExtras] = useState(
     () =>
       new Map<string, { workedAreaM2?: number; workingZone?: InterventionTarget["workingZone"] }>(
-        (planned?.targets ?? []).map((t) => [t.id, { workedAreaM2: t.workedAreaM2, workingZone: t.workingZone }]),
+        (planned?.targets ?? fromTracks?.body.targets ?? []).map((t) => [
+          t.id,
+          { workedAreaM2: t.workedAreaM2, workingZone: t.workingZone as InterventionTarget["workingZone"] },
+        ]),
       ),
   );
   const [parcelMode, setParcelMode] = useState<"list" | "map">("list");
@@ -209,13 +221,37 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   );
   const [tools, setTools] = useState<string[]>(planned?.tools.map((t) => t.equipmentId) ?? []);
   const [doers, setDoers] = useState<string[]>(planned?.doers.map((d) => d.personId) ?? []);
+  // Moyens (lot N4) : mode libre (comme avant), ou attelages avec leurs périodes.
+  const [staffing, setStaffing] = useState<"free" | "crews">((planned?.staffing === "crews" && planned.crews.length) || fromTracks ? "crews" : "free");
+  const [crews, setCrews] = useState<CrewRow[]>(() =>
+    planned?.staffing === "crews"
+      ? crewRowsOf(planned.crews)
+      : fromTracks
+        ? fromTracks.body.crews.map((c) =>
+            newCrew({
+              tools: c.tools.map((t) => t.equipmentId),
+              doers: c.doers.map((d) => d.personId),
+              periods: c.periods.map((p) => ({ startedAt: toLocal(p.startedAt), stoppedAt: toLocal(p.stoppedAt) })),
+            }),
+          )
+        : [],
+  );
+  const [freeLosses, setFreeLosses] = useState<string[] | null>(null);
+  const inCrews = staffing === "crews" && shape !== "maintenance";
+  /** Périodes de l'intervention : celles du mode libre, ou la réunion de celles des attelages (heure locale). */
+  const allPeriods = inCrews
+    ? crews
+        .flatMap((c) => c.periods)
+        .filter((p) => p.startedAt)
+        .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
+    : periods;
   const [purposes, setPurposes] = useState<TreatmentPurpose[]>(planned?.purposes ?? []);
   const [notes, setNotes] = useState(planned?.notes ?? "");
   const [error, setError] = useState<string | null>(null);
 
   // Échéances lues au jour de l'intervention.
   const maintenanceAt = (() => {
-    const d = periods[0]?.startedAt?.slice(0, 10);
+    const d = allPeriods[0]?.startedAt?.slice(0, 10);
     return d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d}T23:59:59.000Z` : snapshot.at;
   })();
   const article = (id: string | null) => articles.find((a) => a.id === id);
@@ -256,6 +292,11 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
     if (p.shape === "maintenance") setTools([]);
     else if (tools.length === 0) setTools(p.suggestions.tools.slice(0, 1));
     if (doers.length === 0) setDoers(p.suggestions.doers.slice(0, 1));
+    setCrews((rows) =>
+      rows.map((c, k) =>
+        k === 0 ? { ...c, tools: c.tools.length ? c.tools : p.suggestions.tools.slice(0, 1), doers: c.doers.length ? c.doers : p.suggestions.doers.slice(0, 1) } : c,
+      ),
+    );
   };
 
   const body = () => {
@@ -266,7 +307,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       return kind === "container" ? { containerId: id! } : { placeId: id! };
     };
     return {
-      periods: periods.map((p) => ({ startedAt: toIso(p.startedAt), stoppedAt: toIso(p.stoppedAt) })),
+      periods: inCrews ? [] : periods.map((p) => ({ startedAt: toIso(p.startedAt), stoppedAt: toIso(p.stoppedAt) })),
       targets:
         shape === "maintenance"
           ? maintained.map((id) => ({
@@ -298,15 +339,21 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         ...(r.keep?.lotId ? { lotId: r.keep.lotId } : {}),
         ...(r.to ? { to: location(r.to) } : {}),
       })),
-      tools: shape === "maintenance" ? [] : tools.map((equipmentId) => ({ equipmentId })),
+      tools: shape === "maintenance" || inCrews ? [] : tools.map((equipmentId) => ({ equipmentId })),
       ...(shape === "maintenance" ? { maintenance: maintenanceBody(maint, maintained) } : {}),
-      doers: doers.map((personId) => ({ personId })),
+      doers: inCrews ? [] : doers.map((personId) => ({ personId })),
+      staffing: inCrews ? "crews" : "free",
+      crews: inCrews ? crewsBody(crews) : [],
       purposes,
       ...(notes.trim() ? { notes: notes.trim() } : {}),
       compliance: { usages: usageChoices, ...(overrideReason.trim() ? { reason: overrideReason.trim() } : {}) },
       ...(weather ? { weather } : {}),
+      ...(fromTracks ? { trackSessionIds: fromTracks.body.trackSessionIds } : {}),
     } satisfies InterventionCompleteWrite;
   };
+
+  /** Périodes à plat (ISO) : en attelages, réunion fusionnée de leurs périodes. */
+  const flatPeriods = (full: ReturnType<typeof body>) => (inCrews ? mergePeriods(full.crews.flatMap((c) => c.periods)) : full.periods);
 
   // Brouillon soumis au contrôle réglementaire (produits phyto seulement).
   const phytoIds = new Set(articles.filter((a) => a.kind === "phyto").map((a) => a.id));
@@ -316,11 +363,13 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       const full = body();
       draft = {
         procedure: code,
-        periods: completing ? full.periods : [],
-        plannedAt: completing ? undefined : full.periods[0]?.startedAt,
+        periods: completing ? flatPeriods(full) : [],
+        plannedAt: completing ? undefined : flatPeriods(full)[0]?.startedAt,
         targets: full.targets,
-        inputs: full.inputs.filter((i) => phytoIds.has(i.articleId)).map(({ articleId, quantity, per }) => ({ articleId, quantity, per })),
+        inputs: full.inputs.filter((i) => phytoIds.has(i.articleId)).map(({ articleId, quantity, per, equipmentId }) => ({ articleId, quantity, per, ...(equipmentId ? { equipmentId } : {}) })),
         compliance: { usages: usageChoices },
+        // Attelages en cours de saisie (sans matériel ou sans période) : pas encore contrôlés.
+        ...(inCrews && full.crews.length && full.crews.every((c) => c.tools.length && c.periods.length) ? { staffing: "crews" as const, crews: full.crews } : {}),
       };
     } catch {
       draft = null; // date en cours de saisie
@@ -331,8 +380,8 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
     try {
       const full = body();
       weatherRequest = completing
-        ? { periods: full.periods, targets: full.targets }
-        : { periods: [], plannedAt: full.periods[0]?.startedAt, targets: full.targets };
+        ? { periods: flatPeriods(full), targets: full.targets }
+        : { periods: [], plannedAt: flatPeriods(full)[0]?.startedAt, targets: full.targets };
     } catch {
       weatherRequest = null; // date en cours de saisie
     }
@@ -355,7 +404,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         const write = {
           procedure: code,
           ...full,
-          ...(correcting ? {} : { periods: [], plannedAt: full.periods[0]?.startedAt }),
+          ...(correcting ? {} : { periods: [], plannedAt: flatPeriods(full)[0]?.startedAt }),
           correctionId,
           ...(reason.trim() ? { reason: reason.trim() } : {}),
         };
@@ -368,7 +417,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         await api.post<Intervention>(
           farmPath(farmId, "/interventions"),
           mode === "planned"
-            ? { id, procedure: code, ...full, periods: [], plannedAt: full.periods[0]?.startedAt }
+            ? { id, procedure: code, ...full, periods: [], plannedAt: flatPeriods(full)[0]?.startedAt }
             : { id, procedure: code },
         );
       }
@@ -475,7 +524,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   // Conditions de pulvérisation autour du début : le jour même (observées) pour un
   // traitement passé, les 3 jours à partir du jour prévu pour un traitement à venir.
   const sprayWindow = (() => {
-    const t = new Date(periods[0]?.startedAt ?? "");
+    const t = new Date(allPeriods[0]?.startedAt ?? "");
     if (Number.isNaN(t.getTime())) return null;
     const midnight = new Date(t.getFullYear(), t.getMonth(), t.getDate());
     const today = new Date();
@@ -503,6 +552,52 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   });
   const bufferLayer: FeatureCollection | undefined =
     bufferRequest && zntBuffer.data?.buffer ? { type: "FeatureCollection", features: [{ type: "Feature", geometry: zntBuffer.data.buffer, properties: {} }] } : undefined;
+
+  let crewSummary: React.ReactNode = null;
+  try {
+    crewSummary = inCrews ? <CrewsSummary crews={crewsBody(crews)} /> : null;
+  } catch {
+    crewSummary = null; // date en cours de saisie
+  }
+  // Règles des attelages, en direct (le serveur les applique aussi).
+  const equipmentName = new Map(snapshot.equipments.map((e) => [e.id, e.name]));
+  const personName = new Map(people.map((p) => [p.id, p.name]));
+  let crewErrors: string[] = [];
+  if (inCrews) {
+    try {
+      crewErrors = crewRules({ staffing: "crews", crews: crewsBody(crews) }, { equipment: (id) => equipmentName.get(id), person: (id) => personName.get(id) });
+    } catch {
+      crewErrors = [];
+    }
+  }
+  const equipmentOptions = withSuggestions(snapshot.equipments.map((e) => ({ value: e.id, label: e.name })), procedure?.suggestions.tools ?? []);
+  const peopleOptions = withSuggestions(
+    people
+      .filter((p) => p.active || doers.includes(p.id) || crews.some((c) => c.doers.includes(p.id)))
+      .map((p) => ({ value: p.id, label: p.role ? `${p.name} (${p.role})` : p.name })),
+    procedure?.suggestions.doers ?? [],
+  );
+  /** Libre → attelages : un attelage avec tous les moyens et toutes les périodes (FR-ATT-4). */
+  const switchToCrews = () => {
+    setCrews([newCrew({ tools: [...tools], doers: [...doers], periods: periods.map((p) => ({ ...p })) })]);
+    setStaffing("crews");
+  };
+  /** Attelages → libre : réunion des moyens et des périodes, après confirmation des pertes. */
+  const switchToFree = (confirmed: boolean) => {
+    let result: ReturnType<typeof toFree>;
+    try {
+      result = toFree({ crews: crewsBody(crews) });
+    } catch {
+      return setError("Renseignez les dates des attelages avant de changer de mode.");
+    }
+    if (!confirmed && result.losses.length) return setFreeLosses(result.losses);
+    setTools(result.body.tools.map((t) => t.equipmentId));
+    setDoers(result.body.doers.map((d) => d.personId));
+    if (result.body.periods.length) setPeriods(result.body.periods.map((p) => ({ startedAt: toLocal(p.startedAt), stoppedAt: toLocal(p.stoppedAt) })));
+    setCrews([]);
+    setStaffing("free");
+    setFreeLosses(null);
+  };
 
   const aside = (
     <Stack gap="md" style={{ position: "sticky", top: 16 }}>
@@ -556,7 +651,9 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         e.preventDefault();
         setError(null);
         if (!code) return setError("Choisissez une intervention.");
-        if (periods.some((p) => !p.startedAt || (completing && !p.stoppedAt))) return setError("Renseignez les dates.");
+        if (inCrews ? crews.some((c) => c.periods.some((p) => !p.startedAt || !p.stoppedAt)) : periods.some((p) => !p.startedAt || (completing && !p.stoppedAt))) {
+          return setError("Renseignez les dates.");
+        }
         if (shape === "maintenance" && completing && draftNature(maint) === "corrective" && !maint.problem.trim()) {
           return setError("Une réparation (entretien curatif) demande la description du problème.");
         }
@@ -584,6 +681,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               required
               disabled={Boolean(toComplete)}
             />
+            {fromTracks && <TrackDraftBanner draft={fromTracks} catalogue={catalogue} chosen={code} onChoose={chooseProcedure} />}
             {correcting && (
               <Alert color="ardoise" variant="light" title="Correction tracée">
                 Les mouvements de stock de cette intervention sont repris puis repassés avec les nouvelles valeurs ; le registre phyto suit.
@@ -607,53 +705,16 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               </Stack>
             )}
 
-            {completing ? (
+            {inCrews ? (
+              <Paper withBorder p="xs">
+                <Text size="sm" c="dimmed">
+                  Périodes de travail : dans chaque attelage (Moyens, plus bas).
+                </Text>
+                {crewSummary}
+              </Paper>
+            ) : completing ? (
               <>
-                {periods.map((p, i) => (
-                  <Group key={i} grow align="flex-end" wrap="nowrap">
-                    <TextInput
-                      type="datetime-local"
-                      label={i === 0 ? "Début" : undefined}
-                      aria-label="Début"
-                      value={p.startedAt}
-                      onChange={(e) => {
-                        const v = e.currentTarget.value;
-                        setPeriods(periods.map((x, j) => (j === i ? withStart(x, v) : x)));
-                        if (i === 0) followStart(v);
-                      }}
-                      required
-                    />
-                    <DurationInput
-                      label={i === 0 ? "Durée" : undefined}
-                      minutes={durationMinutes(p)}
-                      onChange={(m) => setPeriods(periods.map((x, j) => (j === i ? withDuration(x, m) : x)))}
-                    />
-                    <TextInput
-                      type="datetime-local"
-                      label={i === 0 ? "Fin" : undefined}
-                      aria-label="Fin"
-                      value={p.stoppedAt}
-                      onChange={(e) => setPeriods(periods.map((x, j) => (j === i ? { ...x, stoppedAt: e.currentTarget.value } : x)))}
-                      required
-                    />
-                    {periods.length > 1 && (
-                      <ActionIcon variant="subtle" color="brique" aria-label="Retirer la période" style={{ flex: "none" }} onClick={() => setPeriods(periods.filter((_, j) => j !== i))}>
-                        <Trash2 size={16} />
-                      </ActionIcon>
-                    )}
-                  </Group>
-                ))}
-                <Button
-                  variant="subtle"
-                  size="xs"
-                  leftSection={<Plus size={14} />}
-                  onClick={() => {
-                    const day = periods.at(-1)!.startedAt.slice(0, 10);
-                    setPeriods([...periods, { startedAt: `${day}T14:00`, stoppedAt: `${day}T17:00` }]);
-                  }}
-                >
-                  Ajouter une période de travail
-                </Button>
+                <PeriodsEditor periods={periods} onChange={setPeriods} onFirstStart={followStart} />
               </>
             ) : (
               <TextInput
@@ -776,25 +837,46 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               <>
                 <Divider label="Moyens" labelPosition="left" />
                 {shape !== "maintenance" && (
-                  <MultiSelect
-                    label="Matériels"
-                    searchable
-                    data={withSuggestions(snapshot.equipments.map((e) => ({ value: e.id, label: e.name })), procedure.suggestions.tools)}
-                    value={tools}
-                    onChange={setTools}
-                  />
+                  <Stack gap={2}>
+                    <SegmentedControl
+                      aria-label="Déclaration des moyens"
+                      value={inCrews ? "crews" : "free"}
+                      onChange={(v) => (v === "crews" ? switchToCrews() : switchToFree(false))}
+                      data={[
+                        { value: "free", label: "Libre" },
+                        { value: "crews", label: "Attelages" },
+                      ]}
+                    />
+                    <Text size="xs" c="dimmed">
+                      {inCrews
+                        ? "Chaque attelage : ses matériels, ses intervenants et ses propres périodes (deux tracteurs en même temps, par exemple)."
+                        : "Matériels, intervenants et périodes indépendants."}
+                    </Text>
+                  </Stack>
                 )}
-                <MultiSelect
-                  label="Intervenants"
-                  searchable
-                  data={withSuggestions(
-                    people.filter((p) => p.active || doers.includes(p.id)).map((p) => ({ value: p.id, label: p.role ? `${p.name} (${p.role})` : p.name })),
-                    procedure.suggestions.doers,
-                  )}
-                  value={doers}
-                  onChange={setDoers}
-                  nothingFoundMessage="Aucune personne — à ajouter dans Équipe"
-                />
+                {inCrews ? (
+                  <CrewsEditor
+                    crews={crews}
+                    onChange={setCrews}
+                    equipmentOptions={equipmentOptions}
+                    peopleOptions={peopleOptions}
+                    defaultDay={defaultDay}
+                    errors={crewErrors}
+                    templates={{ farmId, items: crewTemplates.data?.items ?? [], canWrite: farmRole === "owner" }}
+                  />
+                ) : (
+                  <>
+                    {shape !== "maintenance" && <MultiSelect label="Matériels" searchable data={equipmentOptions} value={tools} onChange={setTools} />}
+                    <MultiSelect
+                      label="Intervenants"
+                      searchable
+                      data={peopleOptions}
+                      value={doers}
+                      onChange={setDoers}
+                      nothingFoundMessage="Aucune personne — à ajouter dans Équipe"
+                    />
+                  </>
+                )}
                 <Textarea label="Notes" autosize minRows={2} maxLength={2000} value={notes} onChange={(e) => setNotes(e.currentTarget.value)} />
               </>
             )}
@@ -866,38 +948,66 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
           </Group>
         </Stack>
       </Modal>
+      <Modal opened={freeLosses !== null} onClose={() => setFreeLosses(null)} title="Passer en mode libre ?">
+        <Stack>
+          <Text size="sm">Les attelages sont réunis : matériels, intervenants et périodes de l'intervention.</Text>
+          <Alert color="paille" variant="light">
+            <Stack gap={4}>
+              {(freeLosses ?? []).map((l) => (
+                <Text key={l} size="sm">
+                  {l}
+                </Text>
+              ))}
+            </Stack>
+          </Alert>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setFreeLosses(null)}>
+              Garder les attelages
+            </Button>
+            <Button onClick={() => switchToFree(true)}>Passer en mode libre</Button>
+          </Group>
+        </Stack>
+      </Modal>
     </form>
   );
 }
 
-/**
- * Durée d'une période (« 2 h 30 », « 2,5 », « 45 min ») : la fin se calcule
- * en quittant le champ (ou avec Entrée).
- */
-function DurationInput({ label, minutes, onChange }: { label?: string; minutes: number | null; onChange: (minutes: number) => void }) {
-  const shown = minutes === null ? "" : formatDuration(minutes);
-  const [text, setText] = useState(shown);
-  useEffect(() => setText(shown), [shown]);
-  const commit = () => {
-    const m = parseDuration(text);
-    if (m === null) setText(shown);
-    else if (m !== minutes) onChange(m);
-  };
+/** Bandeau d'une intervention tirée de parcours GPS (FR-GPS-21) : parcours rattachés, indices, procédures suggérées. */
+function TrackDraftBanner({
+  draft,
+  catalogue,
+  chosen,
+  onChoose,
+}: {
+  draft: TrackDraft;
+  catalogue: ProcedureCatalogue;
+  chosen: string | null;
+  onChoose: (code: string) => void;
+}) {
+  const n = draft.body.trackSessionIds.length;
+  const suggestions = draft.procedureSuggestions
+    .map((code) => catalogue.items.find((p) => p.code === code))
+    .filter((p): p is ProcedureCatalogueItem => !!p);
   return (
-    <TextInput
-      label={label}
-      aria-label="Durée"
-      placeholder="2 h 30"
-      value={text}
-      onChange={(e) => setText(e.currentTarget.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          commit();
-        }
-      }}
-      style={{ flex: "0 0 7rem" }}
-    />
+    <Alert color="lichen" variant="light" title={`${n} parcours GPS ${n > 1 ? "seront rattachés" : "sera rattaché"}`} aria-label="Parcours GPS">
+      <Stack gap={6}>
+        <Text size="sm">Attelage, périodes et parcelles viennent des traces. Tout reste modifiable avant l'enregistrement.</Text>
+        {suggestions.length > 0 && (
+          <Group gap={6}>
+            <Text size="sm">Procédure suggérée :</Text>
+            {suggestions.map((p) => (
+              <Button key={p.code} size="compact-xs" variant={chosen === p.code ? "filled" : "light"} onClick={() => onChoose(p.code)}>
+                {p.label}
+              </Button>
+            ))}
+          </Group>
+        )}
+        {draft.hints.map((h) => (
+          <Text key={h} size="sm" c="dimmed">
+            {h}
+          </Text>
+        ))}
+      </Stack>
+    </Alert>
   );
 }

@@ -42,4 +42,14 @@ describe("semaine de la frise", () => {
     const planned = { ...base, status: "planned" as const, periods: [], startedAt: "2025-09-30T08:00:00.000Z", stoppedAt: null };
     expect(slots(planned)).toEqual([{ day: "2025-09-30", startedAt: "2025-09-30T08:00:00.000Z", stoppedAt: null }]);
   });
+
+  it("en attelages : un créneau par période de chaque attelage, avec son nom", () => {
+    const P = (from: string, to: string) => ({ startedAt: `2025-09-26T${from}:00.000Z`, stoppedAt: `2025-09-26T${to}:00.000Z` });
+    const crew = (rank: number, label: string | null, periods: ReturnType<typeof P>[]) => ({ id: `c${rank}`, rank, label, templateId: null, tools: [], doers: [], periods });
+    const i = { ...base, staffing: "crews" as const, periods: [P("08:00", "12:00")], crews: [crew(0, "Pulvé", [P("08:00", "10:00")]), crew(1, null, [P("09:00", "12:00")])] };
+    expect(slots(i).map((s) => [s.startedAt.slice(11, 16), s.crew])).toEqual([
+      ["08:00", "Pulvé"],
+      ["09:00", "Attelage 2"],
+    ]);
+  });
 });

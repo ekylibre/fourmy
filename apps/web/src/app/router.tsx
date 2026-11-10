@@ -15,6 +15,7 @@ import { PhytoProductsPage } from "../features/phyto/PhytoProductsPage";
 import { ActivitiesPage } from "../features/activities/ActivitiesPage";
 import { EquipmentsPage } from "../features/equipments/EquipmentsPage";
 import { EquipmentSheetPage } from "../features/equipments/EquipmentSheetPage";
+import { CrewTemplatesPage } from "../features/equipments/CrewTemplatesPage";
 import { MaintenancePage } from "../features/maintenance/MaintenancePage";
 import { PartsPage } from "../features/maintenance/PartsPage";
 import { ParcelCreatePage } from "../features/parcels/ParcelCreatePage";
@@ -133,6 +134,7 @@ export const routes = [
       { path: "phyto", element: <PhytoProductsPage /> },
       { path: "activities", element: <ActivitiesPage /> },
       { path: "equipments", element: <EquipmentsPage /> },
+      { path: "equipments/crew-templates", element: <CrewTemplatesPage /> },
       { path: "equipments/:equipmentId", element: <EquipmentSheetPage /> },
       { path: "maintenance", element: <MaintenancePage /> },
       { path: "maintenance/parts", element: <PartsPage /> },

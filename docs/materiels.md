@@ -20,6 +20,9 @@ d'entretien et les échéances viennent avec le lot J.
 - **Relevé** : tout membre de la ferme saisit les heures en deux gestes
   (date et valeur).
 - **Nouveau matériel** : réservé au responsable.
+- **Attelages types** (lot Q) : les compositions habituelles de la ferme
+  (matériels dans l'ordre, intervenants), reprises en un clic dans une
+  intervention en attelages. Voir « Parcours GPS et attelages » plus bas.
 
 ## Compteur et relevés
 
@@ -391,7 +394,9 @@ d'intervention s'adapte à cette forme.
   dimensions n'est pas une texture WebGL valide.
 - **Attelage** : les autres matériels (non tracteurs) des interventions
   réalisées qui utilisent ce matériel, sur leurs périodes de travail, sont
-  attelés derrière lui. Ils sont reculés de la distance d'attelage du
+  attelés derrière lui. En mode attelage (lot N), seuls les outils du même
+  attelage comptent, sur les périodes de cet attelage : deux tracteurs du
+  même chantier ne tirent plus chacun les outils de l'autre. Ils sont reculés de la distance d'attelage du
   tracteur, le long du cap (`GET /tracks/hitches`).
 - **« Tous les matériels suivis »** : la dernière position connue de chaque
   matériel rattaché à un boîtier, à la date de la frise, sur 30 jours au
@@ -405,3 +410,69 @@ d'intervention s'adapte à cette forme.
   virage.
 - **Logo JPEG** : il n'est pas plaqué sur l'avatar. Il faut un PNG ou un
   SVG.
+
+## Parcours GPS et attelages (lots N à R, 2026-11-10)
+
+Exigences et design : [`parcours-attelages.md`](parcours-attelages.md),
+[`parcours-attelages-design.md`](parcours-attelages-design.md).
+
+### Onglet Parcours de la fiche (`?tab=tracks`)
+
+Visible quand le matériel a au moins un parcours sur les 400 derniers
+jours, comme tracteur suivi ou comme outil reconnu.
+
+- **Parcours** : le worker découpe les positions en sessions de **travail**
+  (attribut `working` du boîtier) et de **déplacement**, toutes les 5 min
+  (`track_sessions`, migration 0023). Un arrêt de plus de 15 min coupe la
+  session ; les sessions trop courtes sont écartées.
+- **Liste** (30 derniers jours par défaut, période au choix) : date,
+  heures, durée, type, distance, surface couverte, parcelles travaillées,
+  outil, état (libre ou rattaché à une intervention, badge « trace
+  modifiée » si le recalcul diffère).
+- **Filtres** : période, type, parcelle, état. **Carte** des parcours
+  cochés avec leur surface couverte.
+- **Outil** : celui que le boîtier annonce (attribut `tool`), relié à un
+  matériel **à la main** par `external_ids.traccarTool` sur ce matériel.
+  Un nom approchant n'est qu'une suggestion, jamais appliquée seule.
+- **Outil** (fiche d'un outil sans boîtier) : les parcours des tracteurs
+  pendant qu'il y était attelé, avec une colonne « Tracteur ».
+- **Réglages « Parcours GPS »** (page Entretien, responsable) : seuils de
+  découpage par ferme (arrêt, durée et distance minimales, vitesse, part et
+  surface minimales d'une parcelle), et « Recalculer maintenant ». Les
+  changer recalcule les parcours libres ; les parcours rattachés restent
+  figés.
+
+### Parcours → intervention (lot P)
+
+- Cocher un ou plusieurs parcours d'un même boîtier, puis :
+  - **Créer l'intervention** : formulaire pré-rempli en mode attelages,
+    statut réalisé (tracteur et outil, conducteur habituel, une période par
+    parcours, parcelles et zones travaillées), avec un bandeau de
+    procédures suggérées et d'indices (outil déduit de l'habitude, aucun
+    conducteur connu…) ;
+  - **Ajouter à une intervention** du même jour : périodes et parcelles
+    ajoutées à l'attelage du tracteur, correction tracée si elle est
+    réalisée.
+- Un parcours rattaché n'est plus cochable. Annuler ou supprimer
+  l'intervention le libère (migration 0024).
+- La fiche d'intervention liste ses « Parcours GPS rattachés ».
+
+### Attelages types (lot Q, `/f/:ferme/equipments/crew-templates`)
+
+- Liste pour tous, création, modification, mise hors service et
+  suppression pour le responsable (migration 0025).
+- Dans le formulaire d'intervention, « Reprendre un attelage type… »
+  remplit les matériels et intervenants d'un attelage ; « Enregistrer comme
+  attelage type » crée un modèle depuis un attelage saisi.
+- L'intervention copie la composition : modifier ou supprimer un attelage
+  type ne change pas le passé.
+
+### API
+
+| Route | Accès |
+|---|---|
+| `GET /equipments/:id/track-sessions` · `GET /track-sessions/:id` | membre |
+| `POST /track-sessions/draft` · `GET/POST /interventions/:id/track-sessions` | membre |
+| `POST /track-sessions/recompute` · `PUT /settings/tracks` | responsable |
+| `GET /crew-templates` · `POST`, `PUT`, `DELETE /crew-templates[/:id]` | membre · responsable |
+

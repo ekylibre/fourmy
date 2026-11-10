@@ -3,6 +3,7 @@ import postgres from "postgres";
 import { withFarm, type Database } from "@fourmy/db";
 import { migrate } from "@fourmy/migrator-ekylibre";
 import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
+import { configureIntegration, listIntegrations } from "../integrations/repo.js";
 
 /**
  * Imports Ekylibre depuis l'API (FR-MIG-1/3). Sécurité : le client ne fournit
@@ -61,7 +62,9 @@ export async function startImport(
     return toView(row!);
   });
 
-  const job = migrate({ sourceUrl: src, targetUrl, farmId, runId }).catch(async (e: unknown) => {
+  const job = migrate({ sourceUrl: src, targetUrl, farmId, runId })
+    .then((report) => importSecrets(db, farmId, runId, report.secrets))
+    .catch(async (e: unknown) => {
     const sqlc = postgres(targetUrl, { max: 1, onnotice: () => {} });
     try {
       await sqlc`UPDATE import_runs SET status = 'failed', finished_at = now(),
@@ -72,6 +75,37 @@ export async function startImport(
   });
   onSettled?.(job);
   return run;
+}
+
+/**
+ * Clé OpenWeatherMap de l'instance Ekylibre → intégration OpenWeather de la
+ * ferme, testée puis chiffrée (configureIntegration). Une intégration déjà
+ * configurée n'est jamais remplacée. Le résultat s'ajoute au rapport d'import.
+ */
+async function importSecrets(
+  db: Database,
+  farmId: string,
+  runId: string,
+  secrets: { openweather?: string },
+): Promise<void> {
+  if (!secrets.openweather) return;
+  let message: string;
+  if ((await listIntegrations(db, farmId)).some((i) => i.provider === "openweather")) {
+    message = "clé OpenWeatherMap d'Ekylibre ignorée : une intégration OpenWeather existe déjà";
+  } else {
+    try {
+      await configureIntegration(db, farmId, "openweather", { settings: {}, secret: secrets.openweather });
+      message = "clé OpenWeatherMap d'Ekylibre testée et enregistrée (Intégrations › OpenWeather)";
+    } catch (e) {
+      message = `clé OpenWeatherMap d'Ekylibre non reprise : ${e instanceof Error ? e.message : String(e)}`;
+    }
+  }
+  await withFarm(db, farmId, (tx) =>
+    tx.execute(sql`
+      UPDATE import_runs SET report = jsonb_set(coalesce(report, '{}'), '{warnings}',
+        coalesce(report->'warnings', '[]') || ${JSON.stringify([{ entity: "integration", id: "openweather", message }])}::jsonb)
+      WHERE id = ${runId}`),
+  );
 }
 
 function toView(r: Record<string, unknown>): ImportRunView {

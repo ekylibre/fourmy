@@ -7,7 +7,8 @@ services:
       POSTGRES_PASSWORD: fourmy
       POSTGRES_DB: fourmy
     ports:
-      - "5432:5432"
+      # FOURMY_DB_PORT : autre port hôte si un PostgreSQL local occupe déjà 5432.
+      - "${FOURMY_DB_PORT:-5432}:5432"
     volumes:
       - fourmy_pgdata:/home/postgres/pgdata/data
     healthcheck:

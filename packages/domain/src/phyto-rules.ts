@@ -14,7 +14,7 @@
  */
 
 export type ComplianceLevel = "ok" | "info" | "warning" | "danger";
-export type ComplianceCode = "authorization" | "organic" | "dose" | "applications" | "znt" | "dar" | "reentry";
+export type ComplianceCode = "authorization" | "organic" | "dose" | "applications" | "znt" | "dar" | "reentry" | "applicator";
 
 export interface ComplianceIndicator {
   code: ComplianceCode;

@@ -133,8 +133,12 @@ Intervention {
                      //   workingZone?   (géométrie, ex. tirée de la trace GPS) }
   inputs[]           // { articleId, quantity, per: "total" | "hectare", lotId?, from? }
   outputs[]          // { articleId, quantity, per: "total" | "hectare", to (lieu/cuve) }
-  tools[]            // { equipmentId }
-  doers[]            // { personId }
+  staffing           // free | crews — mode de déclaration des moyens (2026-11-09)
+  crews[]            // mode crews : { id, label?, templateId?, tools[] ≥ 1,
+                     //   doers[] (0..n), periods[] ≥ 1 } — un attelage par
+                     //   tracteur, avec ses propres périodes
+  tools[]            // { equipmentId } — mode libre ; en attelages, leur réunion
+  doers[]            // { personId }    — idem
   purposes[]         // traitement : herbicide, fongicide, insecticide… (facultatif)
   notes
   origin             // web | mobile | migration | plugin
@@ -143,6 +147,19 @@ Intervention {
 
 `startedAt` / `stoppedAt` d'une intervention = début de la première période,
 fin de la dernière.
+
+**Attelages ou mode libre** (`docs/parcours-attelages.md` §4.3) : en mode
+`free` (défaut, et tout ce qui existait avant), matériels, intervenants et
+périodes sont indépendants. En mode `crews`, chaque attelage porte ses
+matériels, ses intervenants et ses périodes ; deux attelages peuvent
+travailler en même temps. À la lecture, `tools`, `doers` et `periods`
+valent la réunion des attelages : registre, stocks, compteurs et anciens
+clients lisent l'intervention à plat. Deux durées sont montrées : le
+**chantier** (premier début → dernière fin) et le **temps de travail**
+(somme des périodes de chaque attelage). Les attelages types de la ferme
+(Matériels › Attelages types) remplissent un attelage en un clic.
+L'applicateur d'un traitement est l'intervenant de l'attelage qui porte le
+pulvérisateur (registre phyto, FR-ATT-12).
 
 ### 4.2 Ce qui disparaît (par rapport à Ekylibre)
 
@@ -181,6 +198,11 @@ La couverture calculée depuis Traccar (US-1 : surface travaillée par parcelle)
 peut **pré-remplir** `workedAreaM2` et `workingZone` d'une intervention sur la
 même journée et le même matériel. C'est ce qui rend la dose par hectare juste
 quand seule une partie de la parcelle est traitée.
+
+Depuis le lot P (2026-11-10), les **parcours GPS** d'un matériel (onglet
+Parcours) se transforment en intervention : attelage, périodes, parcelles
+et zones travaillées sont pré-remplis, et les parcours sont rattachés à
+l'intervention (`docs/parcours-attelages.md` §4.2).
 
 ## 5. Correspondance avec Ekylibre (migration)
 

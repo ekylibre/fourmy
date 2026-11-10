@@ -2,7 +2,7 @@ import { Alert, Badge, Group, Loader, Paper, Select, Stack, Text, ThemeIcon } fr
 import { useDebouncedValue } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { CircleAlert, CircleCheck, Info, OctagonX } from "lucide-react";
-import type { ComplianceLevelName, ComplianceResult, TreatmentCheckDto } from "@fourmy/contracts";
+import type { ComplianceLevelName, ComplianceResult, InterventionCrew, TreatmentCheckDto } from "@fourmy/contracts";
 import { api, farmPath } from "../../app/api";
 
 /** Feux du contrôle réglementaire : couleurs et icônes communes (formulaire, fiche). */
@@ -104,8 +104,11 @@ export interface ComplianceDraft {
   periods: { startedAt: string; stoppedAt: string }[];
   plannedAt?: string;
   targets: unknown[];
-  inputs: { articleId: string; quantity: number; per: string }[];
+  inputs: { articleId: string; quantity: number; per: string; equipmentId?: string }[];
   compliance: { usages: Record<string, string> };
+  /** Attelages complets (matériel et période) : contrôle de l'applicateur (FR-ATT-12). */
+  staffing?: "crews";
+  crews?: InterventionCrew[];
 }
 
 /**

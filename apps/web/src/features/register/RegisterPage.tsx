@@ -85,6 +85,18 @@ export function RegisterPage() {
                   </span>
                 ),
               },
+              {
+                accessor: "applicators",
+                title: "Applicateur",
+                render: (r) =>
+                  r.applicators.length ? (
+                    r.applicators.join(", ")
+                  ) : (
+                    <Text span size="sm" c="paille.8">
+                      non renseigné
+                    </Text>
+                  ),
+              },
             ]}
           />
         </>

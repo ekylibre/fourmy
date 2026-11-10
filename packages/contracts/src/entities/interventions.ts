@@ -92,6 +92,42 @@ export const interventionTool = z.object({
 });
 export const interventionDoer = z.object({ personId: uuid });
 
+/**
+ * Déclaration des moyens (docs/parcours-attelages.md FR-ATT-1) :
+ * - `free` : matériels, intervenants et périodes indépendants (`tools`,
+ *   `doers`, `periods` de premier niveau) ;
+ * - `crews` : attelages, chacun avec ses matériels (≥ 1), ses intervenants
+ *   (0..n, conducteur inconnu accepté) et ses périodes (≥ 1). Les `tools`,
+ *   `doers` et `periods` de premier niveau sont alors vides à l'écriture, et
+ *   à la lecture ils valent la réunion des attelages (anciens clients).
+ */
+export const staffing = z.enum(["free", "crews"]);
+export type Staffing = z.infer<typeof staffing>;
+
+export const interventionCrew = z.object({
+  /** Identifiant stable entre deux modifications (rattachement des parcours GPS). */
+  id: uuid.optional(),
+  label: z.string().trim().max(80).optional(),
+  /** Attelage type d'origine (information : la composition est copiée). */
+  templateId: uuid.optional(),
+  tools: z.array(interventionTool).min(1, "Un attelage a au moins un matériel."),
+  doers: z.array(interventionDoer).default([]),
+  periods: z.array(workPeriod).min(1, "Un attelage a au moins une période."),
+});
+export type InterventionCrew = z.infer<typeof interventionCrew>;
+
+/** Attelage tel que lu. */
+export const interventionCrewRead = z.object({
+  id: uuid,
+  rank: z.number().int(),
+  label: z.string().nullable(),
+  templateId: uuid.nullable(),
+  tools: z.array(interventionTool),
+  doers: z.array(interventionDoer),
+  periods: z.array(workPeriod),
+});
+export type InterventionCrewRead = z.infer<typeof interventionCrewRead>;
+
 /** Entretien (FR-MAT-30 à 33, 50 à 55) : nature, problème, atelier, opérations du plan réalisées. */
 export const maintenanceNature = z.enum(["preventive", "corrective"]);
 export type MaintenanceNature = z.infer<typeof maintenanceNature>;
@@ -109,6 +145,10 @@ export type MaintenanceBlock = z.infer<typeof maintenanceBlock>;
 /** Corps commun de saisie (planification ou réalisation). */
 const interventionBody = z.object({
   procedure: z.string().min(1),
+  /** Mode de déclaration des moyens ; `free` par défaut (clients antérieurs aux attelages). */
+  staffing: staffing.default("free"),
+  /** Mode `crews` : les attelages ; vide en mode `free`. */
+  crews: z.array(interventionCrew).default([]),
   periods: z.array(workPeriod).default([]),
   targets: z.array(interventionTarget).default([]),
   inputs: z.array(interventionInput).default([]),
@@ -123,6 +163,11 @@ const interventionBody = z.object({
   weather: interventionWeather.optional(),
   /** Forme `maintenance` : nature, problème, atelier, opérations du plan. */
   maintenance: maintenanceBlock.optional(),
+  /**
+   * Parcours GPS à rattacher à l'enregistrement (FR-GPS-23), en plus de ceux
+   * déjà rattachés : absent ou vide, les rattachements existants restent.
+   */
+  trackSessionIds: z.array(uuid).max(50).optional(),
 });
 
 /** Planification (POST /interventions). `id` client → idempotent. */
@@ -133,9 +178,17 @@ export const interventionPlanWrite = interventionBody.extend({
 });
 export type InterventionPlanWrite = z.infer<typeof interventionPlanWrite>;
 
-/** Réalisation (POST /interventions/:id/complete) : au moins une période. */
-export const interventionCompleteWrite = interventionBody.omit({ procedure: true }).extend({
-  periods: z.array(workPeriod).min(1, "Au moins une période de travail."),
+/**
+ * Réalisation (POST /interventions/:id/complete) : au moins une période — de
+ * premier niveau en mode libre, dans les attelages sinon (au moins un attelage).
+ */
+export const interventionCompleteWrite = interventionBody.omit({ procedure: true }).superRefine((b, ctx) => {
+  if (b.staffing === "free" && b.periods.length === 0) {
+    ctx.addIssue({ code: z.ZodIssueCode.too_small, minimum: 1, type: "array", inclusive: true, path: ["periods"], message: "Au moins une période de travail." });
+  }
+  if (b.staffing === "crews" && b.crews.length === 0) {
+    ctx.addIssue({ code: z.ZodIssueCode.too_small, minimum: 1, type: "array", inclusive: true, path: ["crews"], message: "Au moins un attelage." });
+  }
 });
 export type InterventionCompleteWrite = z.infer<typeof interventionCompleteWrite>;
 
@@ -176,8 +229,15 @@ export const intervention = z
     targets: z.array(interventionTarget),
     inputs: z.array(interventionInput.extend({ unit: z.string() })),
     outputs: z.array(interventionOutput.extend({ unit: z.string() })),
+    /** Mode `crews` : réunion des matériels, intervenants et périodes (fusionnées) des attelages. */
     tools: z.array(interventionTool),
     doers: z.array(interventionDoer),
+    staffing: staffing.default("free"),
+    crews: z.array(interventionCrewRead).default([]),
+    /** Du premier début à la dernière fin (secondes). */
+    spanS: z.number().nullable().optional(),
+    /** Somme des périodes de chaque attelage, ou des périodes en mode libre (secondes). */
+    workDurationS: z.number().nullable().optional(),
     purposes: z.array(treatmentPurpose),
     notes: z.string().nullable(),
     origin: interventionOrigin,
@@ -230,6 +290,11 @@ export const phytoRegisterEntry = z.object({
   amm: z.string().optional(),
   quantity: z.number(),
   unit: z.string(),
+  /**
+   * Applicateur(s) : intervenants de l'attelage qui porte le pulvérisateur,
+   * tous les intervenants en mode libre (FR-ATT-12). Vide : non renseigné.
+   */
+  applicators: z.array(z.string()),
 });
 export type PhytoRegisterEntry = z.infer<typeof phytoRegisterEntry>;
 
@@ -254,6 +319,30 @@ export const personWrite = z.object({
   active: z.boolean().optional(),
 });
 export type PersonWrite = z.infer<typeof personWrite>;
+
+/**
+ * Attelage type (FR-ATT-6) : composition habituelle de la ferme, reprise en
+ * un clic à la saisie (l'intervention la copie et garde `templateId` à titre
+ * d'information). `equipmentIds` et `personIds` dans l'ordre saisi.
+ */
+export const crewTemplate = z.object({
+  id: uuid,
+  name: z.string(),
+  active: z.boolean(),
+  equipmentIds: z.array(uuid),
+  personIds: z.array(uuid),
+  updatedAt: z.string(),
+});
+export type CrewTemplate = z.infer<typeof crewTemplate>;
+
+export const crewTemplateWrite = z.object({
+  id: uuid.optional(),
+  name: z.string().trim().min(1, "Nom obligatoire.").max(80),
+  active: z.boolean().optional(),
+  equipmentIds: z.array(uuid).min(1, "Un attelage type a au moins un matériel.").max(20),
+  personIds: z.array(uuid).max(20).default([]),
+});
+export type CrewTemplateWrite = z.input<typeof crewTemplateWrite>;
 
 /** Membre d'une ferme : un compte et son rôle, avec la personne qui lui est rattachée. */
 export const farmMember = z.object({

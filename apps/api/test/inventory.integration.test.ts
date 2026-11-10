@@ -83,7 +83,7 @@ describe.skipIf(!url)("snapshot, cuves, stocks, registre (fixture viticole)", ()
     const csv = await app.request(`${base}/registers/phyto?campaign=2021&format=csv`, { headers });
     expect(csv.headers.get("content-type")).toContain("text/csv");
     const lines = (await csv.text()).trim().split("\r\n");
-    expect(lines[0]).toBe("Date;Parcelle;Surface (ha);Culture;Produit;N° AMM;Dose;Unité");
+    expect(lines[0]).toBe("Date;Parcelle;Surface (ha);Culture;Produit;N° AMM;Dose;Unité;Applicateur");
     expect(lines).toHaveLength(261);
   });
 

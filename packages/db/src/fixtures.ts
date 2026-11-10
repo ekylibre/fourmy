@@ -27,11 +27,15 @@ export interface FixtureFile {
  * qui ne viennent pas de la fixture (saisies des tests) ne sont pas touchées.
  */
 /** Tables filles réécrites avec leur intervention (identifiants propres à la fixture). */
-const CHILDREN_OF_INTERVENTIONS = ["intervention_periods", "intervention_parameters"] as const;
+// Attelages en dernier : leur suppression emporte les lignes qui leur restent rattachées.
+const CHILDREN_OF_INTERVENTIONS = ["intervention_periods", "intervention_parameters", "intervention_crews"] as const;
 
 export async function loadFixture(sql: Sql, fixture: FixtureFile): Promise<void> {
   await sql.begin(async (tx) => {
-    for (const [table, rows] of Object.entries(fixture.tables)) {
+    for (const [table, given] of Object.entries(fixture.tables)) {
+      // json_populate_recordset ignore les valeurs par défaut : une fixture
+      // antérieure aux attelages (0022) déclare ses moyens en mode libre.
+      const rows = table === "interventions" ? given.map((r) => ("staffing" in r ? r : { ...r, staffing: "free" })) : given;
       if (!/^[a-z_]+$/.test(table)) throw new Error(`table invalide : ${table}`);
       if (rows.length === 0) continue;
       const cols = await tx<{ c: string }[]>`

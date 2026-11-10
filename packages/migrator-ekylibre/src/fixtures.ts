@@ -47,6 +47,7 @@ export const FIXTURE_TABLES = [
   "lot_lineage",
   "people",
   "interventions",
+  "intervention_crews",
   "intervention_periods",
   "intervention_parameters",
   "stock_movements",
@@ -91,6 +92,10 @@ function exportQuery(table: (typeof FIXTURE_TABLES)[number], label: string): str
     case "people":
       return `SELECT to_jsonb(t) || jsonb_build_object('name', 'Personne ' || ${rank("t")}, 'user_id', NULL)
               FROM people t WHERE t.farm_id = $1`;
+    case "intervention_crews":
+      // Attelages (0022) : avant périodes et paramètres, qui les référencent ; l'attelage type n'est pas exporté.
+      return `SELECT to_jsonb(t) || jsonb_build_object('template_id', NULL) FROM intervention_crews t
+              JOIN interventions i ON i.id = t.intervention_id WHERE i.farm_id = $1`;
     case "intervention_periods":
       return `SELECT to_jsonb(t) FROM intervention_periods t
               JOIN interventions i ON i.id = t.intervention_id WHERE i.farm_id = $1`;

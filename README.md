@@ -25,9 +25,10 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | [`docs/phyto.md`](docs/phyto.md) · [`docs/meteo.md`](docs/meteo.md) | Contrôle réglementaire des traitements (E-Phy, ZNT, IFT, mélanges) ; météo des interventions |
 | [`docs/activites.md`](docs/activites.md) · [`docs/parcelles.md`](docs/parcelles.md) · [`docs/carto.md`](docs/carto.md) | Activités et productions ; création de parcelles (PAC, cadastre) et fiche ; outils de cartographie |
 | [`docs/materiels.md`](docs/materiels.md) | Matériels : fiche, compteur et relevés, plan d'entretien et échéances, interventions d'entretien, pièces à commander, alertes, avatar 3D (mode d'emploi et API) |
+| [`docs/parcours-attelages.md`](docs/parcours-attelages.md) · [`docs/parcours-attelages-design.md`](docs/parcours-attelages-design.md) | Parcours GPS d'un matériel, intervention tirée des parcours, attelages dans l'intervention : exigences et design |
 | [`docs/materiels-entretien.md`](docs/materiels-entretien.md) · [`docs/materiels-entretien-design.md`](docs/materiels-entretien-design.md) | Matériels et entretien : exigences (et bilan de réalisation), design (et écarts à la réalisation) |
 
-## État du projet (2026-11-08)
+## État du projet (2026-11-10)
 
 | Étape | État |
 |---|---|
@@ -49,6 +50,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | zero-mobile (étape 3) | ✅ branche `fourmy-backend` : compte Fourmy, catalogue, formulaire générique par forme, push par intervention ; vérifié contre l'API — reste le passage sur appareil |
 | Retours de test des pilotes (interventions, phyto, activités, parcelles) | ✅ lots A à H : saisie pleine page, contrôle réglementaire, précautions et mélanges, activités, certifications, parcelles depuis la carte (PAC, cadastre) |
 | Matériels et entretien (lots I à M) | ✅ fiche et relevés d'heures, plan d'entretien et échéances, import de la base matériel, interventions d'entretien, heures estimées par Traccar, pièces à commander, alertes, avatar 3D et rejeu dans le plan 3D (`docs/materiels.md`) |
+| Parcours GPS et attelages (lots N à R) | ✅ attelages dans l'intervention (mode libre conservé), parcours GPS par matériel, intervention tirée des parcours, attelages types, applicateur au registre phyto, reprise Ekylibre et synchro mobile (`docs/parcours-attelages.md` §8) |
 | Jours 6-7 — migration réelle + recette | ⏳ à faire |
 
 ### À reprendre
@@ -59,19 +61,30 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 3. Export PDF du registre phyto (JSON et CSV disponibles).
 4. Matériels : documents et photos (lot fichiers), rattachement des
    entretiens migrés au plan, relevé en fin de chantier dans le formulaire,
-   attelage d'après l'attribut `tool` de Traccar (bilan :
+   attelage 3D d'après l'attribut `tool` de Traccar (bilan :
    `docs/materiels-entretien.md` §9).
+5. Parcours et attelages : zero-mobile doit suivre le contrat des attelages
+   (pull et push), lien des parcours vers le rejeu, relier les outils
+   annoncés par les boîtiers (`external_ids.traccarTool`) ; bilan :
+   `docs/parcours-attelages.md` §8.
 
 ### Démarrage local
 
 ```bash
 corepack pnpm install
-docker compose -f docker/compose.dev.yml up -d
+docker compose -f docker/compose.dev.yml up -d   # FOURMY_DB_PORT=5434 si un PostgreSQL local occupe 5432 (adapter DATABASE_URL)
 export DATABASE_URL=postgres://fourmy:fourmy@localhost:5432/fourmy
 corepack pnpm build && corepack pnpm migrate
-corepack pnpm --filter @fourmy/api seed:dev  # compte dev@fourmy.local, owner de toutes les fermes
+corepack pnpm --filter @fourmy/api seed:dev  # compte dev@fourmy.local, owner de toutes les fermes + référentiel Lexicon
 corepack pnpm dev                              # API :3000, web :5173 (relaie /api)
 ```
+
+Le **référentiel Lexicon** (productions de référence et images des activités,
+E-Phy, taxonomie) est copié dans la base : par le worker en production
+(`corepack pnpm --filter @fourmy/api worker`), par `seed:dev` en local, ou à
+la demande avec `corepack pnpm --filter @fourmy/lexicon sync`. Sans lui,
+l'API l'annonce au démarrage : activités sans image, références refusées,
+contrôle phyto faux.
 
 Application web : http://localhost:5173 — connexion avec le compte affiché
 par `seed:dev` (e-mail prérempli en développement). Parcours de bout en bout :
