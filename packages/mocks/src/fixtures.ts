@@ -12,7 +12,8 @@ import type {
   ContainerContents,
   TrackCoverage,
 } from "@fourmy/contracts";
-import { PROCEDURES, SHAPE_LABELS, TREATMENT_PURPOSE_LABELS } from "@fourmy/contracts";
+import { PROCEDURES, SHAPE_LABELS, TREATMENT_PURPOSE_LABELS, copernicusAttribution } from "@fourmy/contracts";
+import type { ParcelIndexSeries, ParcelIndicesAt } from "@fourmy/contracts";
 import type { Activity, Article, Intervention, Person, PhytoRegisterEntry, ProcedureCatalogue, StockLevel } from "@fourmy/contracts";
 
 /**
@@ -308,3 +309,57 @@ export const demoPhytoRegister: PhytoRegisterEntry[] = [
     applicators: ["Camille"],
   },
 ];
+
+// --- Télédétection (démo, données synthétiques) ------------------------------
+
+/** NDVI synthétique d'une culture d'été : sol nu, levée en mai, pic fin juin, récolte fin août. */
+function demoNdvi(date: string): number {
+  const doy = Math.floor((Date.parse(`${date}T00:00:00Z`) - Date.UTC(Number(date.slice(0, 4)), 0, 1)) / 86_400_000);
+  const grow = 1 / (1 + Math.exp(-(doy - 160) / 8));
+  const senesce = 1 / (1 + Math.exp((doy - 215) / 7));
+  return Math.round((0.2 + 0.6 * grow * senesce) * 1000) / 1000;
+}
+
+const isoAdd = (iso: string, days: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+
+/** Valeurs à une date : chaque parcelle a sa dernière mesure exploitable 3 jours avant (aucune image dans la démo). */
+export function demoParcelIndicesAt(at: string): ParcelIndicesAt {
+  const date = isoAdd(at, -3);
+  return {
+    at,
+    index: "ndvi",
+    items: demoLandParcelsAt.map((p, i) => {
+      const mean = Math.max(0, demoNdvi(date) - i * 0.03);
+      return { parcelId: p.id, versionId: p.version.id, status: "ok", date, ageDays: 3, mean, p10: mean - 0.08, p50: mean, p90: mean + 0.06, validRatio: 0.97, parcelPixels: 400 + i * 50 };
+    }),
+    images: [],
+    attribution: copernicusAttribution([Number(date.slice(0, 4))]),
+  };
+}
+
+/** Série d'une parcelle : un passage tous les 5 jours, un sur trois nuageux. */
+export function demoParcelSeries(parcelId: string, from: string, to: string): ParcelIndexSeries {
+  const points: ParcelIndexSeries["points"] = [];
+  for (let d = from, k = 0; d <= to; d = isoAdd(d, 5), k++) {
+    const usable = k % 3 !== 1;
+    const mean = usable ? demoNdvi(d) : Math.round(demoNdvi(d) * 0.4 * 1000) / 1000;
+    points.push({ date: d, mean, p10: mean - 0.08, p90: mean + 0.06, validRatio: usable ? 0.95 : 0.35, usable });
+  }
+  const smoothed: ParcelIndexSeries["smoothed"] = [];
+  const usable = points.filter((p) => p.usable);
+  for (let d = usable[0]?.date ?? to; usable.length && d <= usable[usable.length - 1]!.date; d = isoAdd(d, 1)) smoothed.push({ date: d, value: demoNdvi(d) });
+  return {
+    parcelId,
+    index: "ndvi",
+    from,
+    to,
+    parcelPixels: 640,
+    tooSmall: false,
+    points,
+    smoothed,
+    reference: smoothed.map((p) => ({ date: p.date, median: Math.round(demoNdvi(isoAdd(p.date, -9)) * 950) / 1000, years: 2 })),
+    referenceYears: [Number(from.slice(0, 4)) - 2, Number(from.slice(0, 4)) - 1],
+    interventions: [{ id: "demo-semis", procedure: "sowing", at: `${to.slice(0, 4)}-04-12` }],
+    attribution: copernicusAttribution([Number(from.slice(0, 4)), Number(to.slice(0, 4))]),
+  };
+}

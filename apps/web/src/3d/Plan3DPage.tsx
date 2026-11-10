@@ -17,6 +17,9 @@ import { ErrorPanel } from "../components/RouteError";
 import { TankContents } from "../features/cellar/CellarPage";
 import { FarmScene, TERRAIN_TILE_BYTES, type PlanData } from "./FarmScene";
 import { placementFromClick } from "./geometry";
+import { ndviColor } from "@fourmy/contracts";
+import { imageFor, useParcelIndicesAt, useRemoteSensingStatus, useSatelliteLayer } from "../features/remote-sensing/remote-sensing";
+import { SatelliteControl } from "../features/remote-sensing/SatelliteControl";
 
 type Plan = PlanData & { at: string; unplaced: { id: string; name: string; reason: string }[] };
 
@@ -103,6 +106,24 @@ export function Plan3DPage() {
     if (plan.data) scene.current?.setPlan(plan.data);
   }, [plan.data]);
   useEffect(() => scene.current?.selectTank(selected), [selected]);
+
+  // Télédétection (FR-TWIN-5) : image Sentinel-2 drapée sur le relief, ou parcelles teintées par leur NDVI.
+  const [sat, setSat] = useSatelliteLayer();
+  const rsStatus = useRemoteSensingStatus(farm.id);
+  const rsEnabled = rsStatus.data?.enabled ?? false;
+  const rs = useParcelIndicesAt(farm.id, day, rsEnabled && sat !== "none");
+  const satImage = imageFor(rs.data, sat);
+  useEffect(() => {
+    scene.current?.setSatellite(satImage ? { href: satImage.href, bbox: satImage.bbox } : null).catch((e) => console.warn("Image satellite non chargée", e));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [satImage?.href]);
+  useEffect(() => {
+    const tint =
+      sat === "parcels" && rs.data
+        ? new Map(rs.data.items.filter((i) => i.mean !== null && (i.status === "ok" || i.status === "stale")).map((i) => [i.parcelId, ndviColor(i.mean!)]))
+        : null;
+    scene.current?.setParcelStyle(tint, satImage ? 0.05 : sat === "parcels" ? 0.7 : 0.4);
+  }, [sat, rs.data, satImage, plan.data]);
 
   // Placement manuel : cuve choisie, puis clic dans son bâtiment.
   const place = useMutation({
@@ -192,6 +213,7 @@ export function Plan3DPage() {
         </Grid.Col>
         <Grid.Col span={{ base: 12, lg: 4 }}>
           <Stack>
+            <SatelliteControl farmId={farm.id} enabled={rsEnabled} data={rs.data} layer={sat} onChange={setSat} />
             <Paper p="md">
               <Group justify="space-between">
                 <Title order={4}>Cuverie</Title>

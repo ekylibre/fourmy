@@ -3,6 +3,8 @@ import type { IntegrationProvider } from "@fourmy/contracts";
 import { meteoblueTest, openWeatherTest, SencropClient, WeenatClient, type StationClient } from "@fourmy/weather";
 import { db } from "../db.js";
 import { syncStations } from "../repos/weather-stations.js";
+import { SentinelClient } from "@fourmy/sentinel";
+import { BudgetReached, farmBbox, monthUsage, monthlyBudget, recordUsage, syncRemoteSensing } from "../repos/remote-sensing.js";
 import { BadRequest } from "../routes/helpers.js";
 
 /**
@@ -134,4 +136,43 @@ const required = (v: string | undefined, label: string) => {
 const weenat = stationsAdapter("weenat", (settings, secret) => new WeenatClient(required(settings.email, "E-mail Weenat"), secret));
 const sencrop = stationsAdapter("sencrop", (settings, secret) => new SencropClient(required(settings.applicationId, "Identifiant d'application Sencrop"), secret));
 
-export const PROVIDERS: Record<IntegrationProvider, ProviderAdapter> = { traccar, openweather, meteoblue, weenat, sencrop };
+// Copernicus (télédétection) : un compte CDSE par exploitant. Chaque requête
+// facturable est comptée pour la ferme ; au-delà du budget mensuel, la synchro
+// s'arrête (ce qui est déjà obtenu reste).
+function copernicusClient(farmId: string, settings: Record<string, string>, secret: string, counter = { requests: 0, pu: 0 }) {
+  const budget = monthlyBudget(settings);
+  return new SentinelClient(
+    { clientId: required(settings.clientId, "Identifiant client OAuth"), clientSecret: secret },
+    {
+      beforeRequest: async () => {
+        if ((await monthUsage(db(), farmId)).requests >= budget) throw new BudgetReached(budget);
+      },
+      onUsage: async ({ pu }) => {
+        counter.requests++;
+        counter.pu += pu;
+        await recordUsage(db(), farmId, pu);
+      },
+    },
+  );
+}
+const copernicus: ProviderAdapter = {
+  async test({ farmId, settings, secret }) {
+    const client = copernicusClient(farmId, settings, secret);
+    await client.token();
+    const bbox = await farmBbox(db(), farmId);
+    if (!bbox) return { token: "ok", acquisitions: null, note: "Aucune parcelle : rien à observer pour l'instant." };
+    const to = new Date().toISOString().slice(0, 10);
+    const from = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+    const list = await client.acquisitions(bbox, from, to);
+    return { token: "ok", acquisitions: list.length, dates: list.map((a) => a.date) };
+  },
+  async sync({ farmId, settings, secret }) {
+    const counter = { requests: 0, pu: 0 };
+    return syncRemoteSensing(db(), farmId, copernicusClient(farmId, settings, secret, counter), {
+      historyFrom: /^\d{4}-\d{2}-\d{2}$/.test(settings.historyFrom ?? "") ? settings.historyFrom : undefined,
+      counter,
+    });
+  },
+};
+
+export const PROVIDERS: Record<IntegrationProvider, ProviderAdapter> = { traccar, openweather, meteoblue, weenat, sencrop, copernicus };

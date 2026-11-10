@@ -8,7 +8,7 @@ import { isoDateTime, uuid } from "./primitives.js";
  * fournisseur. Un champ `secret` est chiffré côté serveur et jamais renvoyé.
  */
 
-export const integrationProvider = z.enum(["traccar", "openweather", "meteoblue", "weenat", "sencrop"]);
+export const integrationProvider = z.enum(["traccar", "openweather", "meteoblue", "weenat", "sencrop", "copernicus"]);
 export type IntegrationProvider = z.infer<typeof integrationProvider>;
 
 export interface IntegrationField {
@@ -21,11 +21,12 @@ export interface IntegrationField {
 }
 
 /** Thème d'une intégration : regroupe les fournisseurs à l'écran. */
-export type IntegrationCategory = "weather" | "gps_equipment" | "decision_support";
+export type IntegrationCategory = "weather" | "gps_equipment" | "remote_sensing" | "decision_support";
 
 export const INTEGRATION_CATEGORIES: { category: IntegrationCategory; label: string; description: string }[] = [
   { category: "weather", label: "Météo", description: "Prévisions et mesures pour la météo des interventions et les conditions de pulvérisation." },
   { category: "gps_equipment", label: "Suivi GPS – Matériels", description: "Positions et parcours des matériels." },
+  { category: "remote_sensing", label: "Télédétection", description: "Images satellite et indices de végétation des parcelles." },
   { category: "decision_support", label: "OAD", description: "Outils d'aide à la décision (modèles de risque, préconisations)." },
 ];
 
@@ -112,6 +113,32 @@ export const INTEGRATION_PROVIDERS: IntegrationProviderDefinition[] = [
         kind: "secret",
         required: true,
         help: "Créés dans votre compte Sencrop (accès API / applications).",
+      },
+    ],
+  },
+  {
+    provider: "copernicus",
+    category: "remote_sensing",
+    label: "Copernicus — images Sentinel-2",
+    description:
+      "Indices de végétation (NDVI, NDRE, NDMI) de chaque parcelle à chaque passage du satellite, et images de la ferme pour la carte et le plan 3D. Compte gratuit du Copernicus Data Space Ecosystem. À l'activation, l'historique remonte au 1er janvier de l'année précédente ; ensuite, vérification toutes les 6 heures.",
+    fields: [
+      {
+        key: "clientId",
+        label: "Identifiant client OAuth",
+        kind: "text",
+        required: true,
+        placeholder: "sh-…",
+        help: "Sur shapps.dataspace.copernicus.eu/dashboard : User settings, OAuth clients, Create. Ne pas cocher « SPA ».",
+      },
+      { key: "clientSecret", label: "Secret client OAuth", kind: "secret", required: true, help: "Affiché une seule fois à la création du client." },
+      {
+        key: "monthlyRequests",
+        label: "Budget mensuel de requêtes",
+        kind: "text",
+        required: false,
+        placeholder: "3000",
+        help: "Plafond de requêtes par mois pour cette ferme (le compte gratuit en permet 10 000). Vide : 3 000.",
       },
     ],
   },

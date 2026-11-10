@@ -19,6 +19,7 @@ import { certificationRoutes } from "./certifications.js";
 import { equipmentRoutes } from "./equipments.js";
 import { maintenanceRoutes } from "./maintenance.js";
 import { crewTemplateRoutes } from "./crew-templates.js";
+import { remoteSensingRoutes } from "./remote-sensing.js";
 
 /**
  * Routes métier sous `/api/v1/farms/:farmId` (architecture §5.1), découpées
@@ -39,6 +40,7 @@ export const farmRoutes = new Hono<Env>()
   .route("/", importRoutes)
   .route("/", articleRoutes)
   .route("/", plan3dRoutes)
+  .route("/", remoteSensingRoutes)
   .route("/", peopleRoutes)
   .route("/", memberRoutes)
   .route("/", integrationRoutes)
