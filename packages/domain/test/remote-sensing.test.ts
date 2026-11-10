@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ndviColor, copernicusAttribution } from "@fourmy/contracts";
-import { addDays, imageSize, isUsable, minusYears, parcelIndexStatus, referenceCurve, smoothDaily, utmEpsg, whittaker } from "../src/index.js";
+import { addDays, coverLossEvents, explainsCoverLoss, imageSize, isUsable, minusYears, parcelIndexStatus, referenceCurve, smoothDaily, utmEpsg, whittaker } from "../src/index.js";
 
 describe("télédétection : règles", () => {
   it("choisit la zone UTM nord", () => {
@@ -80,5 +80,45 @@ describe("télédétection : lissage", () => {
     expect(june.years).toBe(3);
     expect(june.median).toBeCloseTo(0.5, 2); // 2024 : 0,2 + 3 × 0,1
     expect(curve.every((p) => p.date >= "2026-01-01" && p.date <= "2026-12-31")).toBe(true);
+  });
+});
+
+describe("télédétection : chutes du couvert (lot Z)", () => {
+  const opts = { high: 0.5, low: 0.3, maxDays: 45, confirmDays: 30 };
+  // Maïs de Pierre (Monassut, 2026), mesures exploitables arrondies.
+  const maize = [
+    ["06-26", 0.79], ["07-11", 0.77], ["07-23", 0.58], ["07-28", 0.56], ["08-02", 0.49], ["08-07", 0.44],
+    ["08-12", 0.35], ["08-19", 0.27], ["08-22", 0.27], ["08-29", 0.19], ["09-14", 0.19],
+  ].map(([d, v]) => ({ date: `2026-${d}`, value: v as number }));
+
+  it("détecte la récolte du maïs : du dernier passage couvert au premier passage en sol nu", () => {
+    expect(coverLossEvents(maize, opts)).toEqual([{ from: "2026-07-28", to: "2026-08-19", high: 0.56, low: 0.27, confirmed: true }]);
+  });
+
+  it("une intervention saisie de 7 jours avant à 30 jours après la chute l'explique (maïs qui sèche sur pied)", () => {
+    const [e] = coverLossEvents(maize, opts);
+    const tol = { beforeDays: 7, afterDays: 30 };
+    expect(explainsCoverLoss(e!, ["2026-07-21"], tol)).toBe(true);
+    expect(explainsCoverLoss(e!, ["2026-09-18"], tol)).toBe(true); // récolte 30 jours après le sol nu
+    expect(explainsCoverLoss(e!, ["2026-09-19"], tol)).toBe(false);
+    expect(explainsCoverLoss(e!, ["2025-09-16"], tol)).toBe(false); // récolte de l'an dernier
+  });
+
+  it("écarte un creux isolé et une chute trop lente ; laisse à confirmer sans mesure suivante", () => {
+    const dip = [{ date: "2026-07-01", value: 0.8 }, { date: "2026-07-06", value: 0.25 }, { date: "2026-07-11", value: 0.78 }];
+    expect(coverLossEvents(dip, opts)).toEqual([]);
+    const slow = [{ date: "2026-06-01", value: 0.6 }, { date: "2026-08-01", value: 0.2 }, { date: "2026-08-10", value: 0.2 }];
+    expect(coverLossEvents(slow, opts)).toEqual([]);
+    const last = [{ date: "2026-07-01", value: 0.7 }, { date: "2026-07-20", value: 0.22 }];
+    expect(coverLossEvents(last, opts)).toEqual([{ from: "2026-07-01", to: "2026-07-20", high: 0.7, low: 0.22, confirmed: false }]);
+  });
+
+  it("deux cultures dans l'année donnent deux chutes", () => {
+    const two = [
+      { date: "2026-04-20", value: 0.85 }, { date: "2026-07-05", value: 0.25 }, { date: "2026-07-10", value: 0.24 },
+      { date: "2026-09-20", value: 0.6 }, { date: "2026-10-15", value: 0.21 }, { date: "2026-10-20", value: 0.2 },
+    ];
+    // Triticale : 76 jours entre le dernier haut et le sol nu → trop lent ; dérobée : chute nette.
+    expect(coverLossEvents(two, opts).map((e) => [e.from, e.to])).toEqual([["2026-09-20", "2026-10-15"]]);
   });
 });

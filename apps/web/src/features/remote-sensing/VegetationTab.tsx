@@ -3,12 +3,14 @@ import { useMemo } from "react";
 import { Link, useLocation } from "react-router";
 import { Alert, Anchor, Group, Paper, Stack, Text, Title } from "@mantine/core";
 import { CompositeChart } from "@mantine/charts";
+import { ReferenceArea } from "recharts";
 import { MIN_PARCEL_PIXELS, type ParcelIndexSeries } from "@fourmy/contracts";
 import { useAt } from "../../app/at";
 import { formatDate, procedureLabel } from "../../app/labels";
 import { ErrorAlert, Loading } from "../../components/states";
 import { formatNdvi, useParcelSeries, useRemoteSensingStatus } from "./remote-sensing";
 import { NdviLegend } from "./SatelliteControl";
+import { CoverLossBanner, useCoverLossAnomalies } from "./CoverLossAlerts";
 
 const DAY_MS = 86_400_000;
 const shift = (iso: string, days: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
@@ -58,6 +60,8 @@ export function VegetationTab({ farmId, parcelId }: { farmId: string; parcelId: 
   const status = useRemoteSensingStatus(farmId);
   const series = useParcelSeries(farmId, parcelId, from, day);
   const data = useMemo(() => (series.data ? chartRows(series.data) : []), [series.data]);
+  const anomalies = useCoverLossAnomalies(farmId, from, day, status.data?.enabled ?? false);
+  const mine = (anomalies.data?.items ?? []).filter((a) => a.parcelId === parcelId);
 
   if (status.isLoading || series.isLoading) return <Loading />;
   if (series.error) return <ErrorAlert error={series.error} />;
@@ -95,6 +99,7 @@ export function VegetationTab({ farmId, parcelId }: { farmId: string; parcelId: 
   const ticks = data.filter((r) => r.date.endsWith("-01")).map((r) => r.date);
   return (
     <Stack>
+      <CoverLossBanner farmId={farmId} items={mine} />
       <Paper withBorder p="md">
         <Group justify="space-between" align="flex-start" mb="sm">
           <div>
@@ -136,7 +141,11 @@ export function VegetationTab({ farmId, parcelId }: { farmId: string; parcelId: 
           }
           areaProps={{ fillOpacity: 0.35, strokeWidth: 0, isAnimationActive: false }}
           referenceLines={s.interventions.map((i) => ({ x: i.at, label: procedureLabel(i.procedure), color: "ardoise.4", labelPosition: "insideTopLeft" }))}
-        />
+        >
+          {mine.map((a) => (
+            <ReferenceArea key={a.to} x1={a.from} x2={a.to} fill="var(--mantine-color-paille-3)" fillOpacity={0.35} ifOverflow="extendDomain" label={{ value: "Récolte probable", position: "insideTop", fontSize: 11 }} />
+          ))}
+        </CompositeChart>
         <Text size="xs" c="dimmed" mt="xs">
           Une mesure est écartée quand moins de 80 % des pixels de la parcelle sont visibles (nuages, ombres). Les bords de la parcelle
           (10 m) ne sont pas mesurés. {s.attribution}.

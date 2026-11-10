@@ -182,3 +182,70 @@ describe.skipIf(!url)("télédétection (intégration)", () => {
     expect(await monthUsage(db, farmId, "2026-06-15")).toEqual({ requests: 2, pu: 0.75 });
   });
 });
+
+/**
+ * Interventions probablement manquantes (lot Z) : chute du NDVI sans récolte
+ * saisie ; vigne exclue ; récolte saisie dans les 30 jours ; délai non écoulé ;
+ * chute écartée par l'exploitant.
+ */
+describe.skipIf(!url)("récoltes probables non saisies (intégration)", () => {
+  const sql = postgres(url!, { max: 1, onnotice: () => {} });
+  const db = createDb(url!);
+  let farmId = "";
+  let userId = "";
+  let headers: Record<string, string> = {};
+  const parcels = { maize: crypto.randomUUID(), harvested: crypto.randomUUID(), vine: crypto.randomUUID(), late: crypto.randomUUID() };
+  // Maïs : haut le 28/07, sol nu le 19/08 (confirmé le 29/08).
+  const season = [["06-26", 0.79], ["07-28", 0.56], ["08-07", 0.44], ["08-19", 0.27], ["08-29", 0.19]] as const;
+
+  beforeAll(async () => {
+    ({ farmId, userId, headers } = await setupFarm(sql, "Ferme test récoltes probables"));
+    const campaign = crypto.randomUUID();
+    await sql`INSERT INTO campaigns (id, farm_id, year, starts_on, stops_on) VALUES (${campaign}, ${farmId}, 2026, '2026-01-01', '2026-12-31')`;
+    for (const [name, id] of Object.entries(parcels)) {
+      const version = crypto.randomUUID();
+      await sql`INSERT INTO land_parcels (id, farm_id, name) VALUES (${id}, ${farmId}, ${name})`;
+      await sql`INSERT INTO land_parcel_versions (id, land_parcel_id, shape, area_m2, valid)
+        VALUES (${version}, ${id}, ST_GeomFromText(${BIG}, 4326), 90000, tstzrange('2026-01-01', NULL))`;
+      // « late » : même courbe décalée d'un mois (délai de 30 jours pas encore écoulé au 10/10).
+      const shiftMonth = (md: string) => (name === "late" ? `${String(Number(md.slice(0, 2)) + 1).padStart(2, "0")}${md.slice(2)}` : md);
+      for (const [md, ndvi] of season) {
+        await sql`INSERT INTO parcel_indices (farm_id, land_parcel_version_id, acquired_on, vegetation_index, mean, valid_px, parcel_px, method)
+          VALUES (${farmId}, ${version}, ${`2026-${shiftMonth(md)}`}, 'ndvi', ${ndvi}, 700, 784, 'test')`;
+      }
+    }
+    await sql`INSERT INTO productions (id, farm_id, campaign_id, land_parcel_id, nature) VALUES (${crypto.randomUUID()}, ${farmId}, ${campaign}, ${parcels.vine}, 'vine')`;
+    const harvest = crypto.randomUUID();
+    await sql`INSERT INTO interventions (id, farm_id, procedure, status, origin, started_at, stopped_at) VALUES (${harvest}, ${farmId}, 'grains_harvest', 'done', 'web', '2026-09-12T08:00:00Z', '2026-09-12T18:00:00Z')`;
+    await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id) VALUES (${crypto.randomUUID()}, ${harvest}, 'target', 'land_parcel', ${parcels.harvested})`;
+  });
+  afterAll(async () => {
+    await teardown(sql, farmId, [userId]);
+    await sql.end();
+  });
+
+  it("signale seulement le maïs sans récolte saisie dont le délai est écoulé", async () => {
+    const { coverLossAnomalies } = await import("../src/repos/remote-sensing.js");
+    const items = await coverLossAnomalies(db, farmId, "2026-01-01", "2026-10-10", "2026-10-10");
+    expect(items).toEqual([
+      expect.objectContaining({ parcelId: parcels.maize, from: "2026-07-28", to: "2026-08-19", confirmed: true, dueSince: "2026-09-18", suggestedProcedure: "harvesting" }),
+    ]);
+    // Un mois plus tard, la chute décalée est à son tour signalée.
+    const later = await coverLossAnomalies(db, farmId, "2026-01-01", "2026-11-30", "2026-11-30");
+    expect(later.map((a) => a.parcelId).sort()).toEqual([parcels.maize, parcels.late].sort());
+  });
+
+  it("l'exploitant écarte une chute ; elle n'est plus signalée", async () => {
+    const res = await app.request(`/api/v1/farms/${farmId}/remote-sensing/anomalies/dismiss`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ parcelId: parcels.maize, to: "2026-08-19", reason: "Ensilage saisi dans un autre logiciel" }),
+    });
+    expect(res.status).toBe(204);
+    const list = await app.request(`/api/v1/farms/${farmId}/remote-sensing/anomalies?from=2026-01-01&to=2026-11-10`, { headers });
+    const body = (await list.json()) as { items: { parcelId: string }[] };
+    expect(body.items.map((a) => a.parcelId)).toEqual([parcels.late]);
+    const [row] = await sql`SELECT reason, dismissed_by FROM remote_sensing_dismissals WHERE land_parcel_id = ${parcels.maize}`;
+    expect(row).toMatchObject({ reason: "Ensilage saisi dans un autre logiciel", dismissed_by: userId });
+  });
+});

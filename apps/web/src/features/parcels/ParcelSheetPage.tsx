@@ -19,6 +19,9 @@ import { CertificationBadges, ParcelCertificationsModal } from "../certification
 import { ParcelMap } from "../map/ParcelMap";
 import { SprayingConditions } from "../weather/Weather";
 
+/** Onglets ouvrables par l'URL (`?tab=vegetation` depuis une alerte satellite). */
+const TABS = ["general", "crops", "cadastre", "water", "vegetation", "weather", "interventions"];
+
 // Le graphique (recharts) n'est chargé qu'à l'ouverture de l'onglet.
 const VegetationTab = lazy(() => import("../remote-sensing/VegetationTab").then((m) => ({ default: m.VegetationTab })));
 
@@ -100,7 +103,7 @@ function Sheet({ sheet: s }: { sheet: ParcelSheet }) {
         )}
       </Group>
 
-      <Tabs defaultValue="general" keepMounted={false}>
+      <Tabs defaultValue={TABS.includes(new URLSearchParams(location.search).get("tab") ?? "") ? new URLSearchParams(location.search).get("tab")! : "general"} keepMounted={false}>
         <Tabs.List>
           <Tabs.Tab value="general">Général</Tabs.Tab>
           <Tabs.Tab value="crops">Cultures ({capByYear.length})</Tabs.Tab>

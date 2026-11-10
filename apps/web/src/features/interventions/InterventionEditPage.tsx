@@ -26,6 +26,7 @@ function initialFromParams(p: URLSearchParams): FormInitial | undefined {
     mode: p.get("status") === "planned" ? "planned" : p.get("status") === "done" ? "done" : undefined,
     nature: nature === "corrective" || nature === "preventive" ? nature : null,
     problem: p.get("problem") ?? undefined,
+    landParcelIds: (p.get("parcels") ?? "").split(",").filter(Boolean),
   };
 }
 import { interventionDay } from "./presenters";

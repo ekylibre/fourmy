@@ -78,6 +78,8 @@ export const handlers = [
     HttpResponse.json(demoParcelIndicesAt(new URL(request.url).searchParams.get("at") ?? "2026-06-01")),
   ),
   http.get(`*${base}/remote-sensing/scenes`, () => HttpResponse.json({ items: [] })),
+  http.get(`*${base}/remote-sensing/anomalies`, () => HttpResponse.json({ items: [] })),
+  http.post(`*${base}/remote-sensing/anomalies/dismiss`, () => new HttpResponse(null, { status: 204 })),
   http.get(`*${base}/land-parcels/:id/indices`, ({ request, params }) => {
     const q = new URL(request.url).searchParams;
     return HttpResponse.json(demoParcelSeries(String(params.id), q.get("from") ?? "2025-06-02", q.get("to") ?? "2026-06-01"));

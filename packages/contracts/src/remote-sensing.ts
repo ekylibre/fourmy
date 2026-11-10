@@ -1,3 +1,5 @@
+import { PROCEDURES } from "./procedures.js";
+
 /**
  * Télédétection par parcelle (docs/teledetection-design.md) : indices de
  * végétation Sentinel-2 calculés par Copernicus (CDSE), stockés par version de
@@ -136,4 +138,49 @@ export interface ParcelIndexSeries {
   referenceYears: number[];
   interventions: { id: string; procedure: string; at: string }[];
   attribution: string;
+}
+
+// --- Interventions probablement manquantes (lot Z) ---------------------------
+
+
+/**
+ * Procédures qui retirent le couvert (récoltes hors vigne, broyages, fauche,
+ * labours) : l'une d'elles saisie autour d'une chute du NDVI l'explique.
+ */
+export const COVER_REMOVING_PROCEDURES: readonly string[] = [
+  ...PROCEDURES.filter((p) => p.shape === "harvest" && p.category !== "vine").map((p) => p.code),
+  "plowing",
+  "superficial_plowing",
+  "crop_residues_grinding",
+  "plant_grinding",
+  "plant_mowing",
+];
+
+/**
+ * Chute du couvert : d'un NDVI ≥ 0,5 à ≤ 0,3 en 45 jours au plus. Une
+ * intervention saisie de 7 jours avant la chute à 30 jours après l'explique :
+ * un maïs grain sèche sur pied et atteint 0,3 deux à quatre semaines avant
+ * la récolte (constaté chez Pierre en 2025). On n'alerte donc qu'une fois ces
+ * 30 jours écoulés.
+ */
+export const COVER_LOSS = { high: 0.5, low: 0.3, maxDays: 45, beforeDays: 7, afterDays: 30, confirmDays: 30 } as const;
+
+/**
+ * Chute du NDVI vers le sol nu sans intervention saisie qui retire le
+ * couvert (récolte probable). `from` : dernière mesure couverte ; `to` :
+ * première mesure au niveau du sol nu.
+ */
+export interface CoverLossAnomaly {
+  parcelId: string;
+  parcelName: string;
+  from: string;
+  to: string;
+  high: number;
+  low: number;
+  /** Une mesure suivante reste au niveau du sol nu (sinon : une seule mesure basse). */
+  confirmed: boolean;
+  /** Fin du délai laissé à la saisie (to + 30 jours), dépassé. */
+  dueSince: string;
+  /** Procédure proposée pour la saisie. */
+  suggestedProcedure: string;
 }
