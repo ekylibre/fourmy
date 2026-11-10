@@ -118,6 +118,23 @@ Phases réalisées, sur la branche `feat/parcours-attelages` :
   boîtier annonce « Arion UF1201 », non relié ; le brouillon prend l'outil
   d'habitude (semoir Monosem) et propose des semis. L'indice le signale ;
   renseigner `external_ids.traccarTool` sur l'Amazone UF1201 corrige.
+- **Q1-Q2** (lot Q, attelages types) :
+  - migration 0025 : `crew_templates`, `crew_template_members` (avec `rank`
+    pour garder l'ordre saisi, tracteur d'abord) et la clé étrangère
+    `intervention_crews.template_id` (`ON DELETE SET NULL`), absente en
+    0022 ;
+  - API `GET/POST /crew-templates`, `PUT/DELETE /crew-templates/:id`
+    (écriture owner, création idempotente). Matériels et intervenants
+    vérifiés dans la ferme. Une origine inconnue à l'écriture d'une
+    intervention est oubliée (NULL) au lieu d'échouer ;
+  - web : Matériels › Attelages types (liste, fenêtre de création et de
+    modification, suppression) ; dans chaque carte d'attelage, « Reprendre
+    un attelage type… » copie matériels, intervenants et origine (les
+    périodes restent) ; bouton « Enregistrer comme attelage type » (owner) ;
+  - défaut trouvé par l'e2e : l'envoi de la fenêtre remontait (portail
+    React) jusqu'au formulaire d'intervention et l'enregistrait ;
+    `stopPropagation` ;
+  - tests : 5 intégration, 1 web, e2e `crew-templates.spec.ts` (US-ATT-C).
 
 Contrôle d'O1 sur l'Arion 430 le 28/10 (réglages par défaut) :
 - déplacement 10:37-11:06, puis coupure de 2 h à midi ;

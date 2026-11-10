@@ -40,7 +40,8 @@ import type {
 import { formatHa } from "@fourmy/ui-lyvre";
 import { api, ApiError, farmPath } from "../../app/api";
 import { unitLabel } from "../../app/labels";
-import { invalidateAfterIntervention, useActivities, useEquipments, usePhytoArticles } from "../../app/queries";
+import { invalidateAfterIntervention, useActivities, useCrewTemplates, useEquipments, usePhytoArticles } from "../../app/queries";
+import { useFarm } from "../../app/farm";
 import { RegulatoryPictos } from "../phyto/Hazards";
 import { PrecautionsPanel } from "../phyto/Precautions";
 import { crewRules, dangerMessages, mergePeriods, toFree } from "@fourmy/domain";
@@ -178,6 +179,8 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   // Entretien (lot K) : relevés, opérations du plan, nature, problème, atelier.
   const [maint, setMaint] = useState<MaintenanceDraft>(() => draftFrom(planned, initial));
   const equipmentList = useEquipments(farmId);
+  const farmRole = useFarm().role;
+  const crewTemplates = useCrewTemplates(farmId);
   // Surface travaillée et zone de travail des cibles : conservées telles quelles.
   // Surface travaillée et zone de travail des cibles : conservées, ou dessinées sur la carte.
   const [targetExtras, setTargetExtras] = useState(
@@ -857,6 +860,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
                     peopleOptions={peopleOptions}
                     defaultDay={defaultDay}
                     errors={crewErrors}
+                    templates={{ farmId, items: crewTemplates.data?.items ?? [], canWrite: farmRole === "owner" }}
                   />
                 ) : (
                   <>

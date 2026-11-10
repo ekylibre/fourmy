@@ -315,6 +315,30 @@ export const personWrite = z.object({
 });
 export type PersonWrite = z.infer<typeof personWrite>;
 
+/**
+ * Attelage type (FR-ATT-6) : composition habituelle de la ferme, reprise en
+ * un clic à la saisie (l'intervention la copie et garde `templateId` à titre
+ * d'information). `equipmentIds` et `personIds` dans l'ordre saisi.
+ */
+export const crewTemplate = z.object({
+  id: uuid,
+  name: z.string(),
+  active: z.boolean(),
+  equipmentIds: z.array(uuid),
+  personIds: z.array(uuid),
+  updatedAt: z.string(),
+});
+export type CrewTemplate = z.infer<typeof crewTemplate>;
+
+export const crewTemplateWrite = z.object({
+  id: uuid.optional(),
+  name: z.string().trim().min(1, "Nom obligatoire.").max(80),
+  active: z.boolean().optional(),
+  equipmentIds: z.array(uuid).min(1, "Un attelage type a au moins un matériel.").max(20),
+  personIds: z.array(uuid).max(20).default([]),
+});
+export type CrewTemplateWrite = z.input<typeof crewTemplateWrite>;
+
 /** Membre d'une ferme : un compte et son rôle, avec la personne qui lui est rattachée. */
 export const farmMember = z.object({
   userId: uuid,

@@ -239,6 +239,24 @@ export const interventionCrews = pgTable("intervention_crews", {
   templateId: uuid("template_id"),
 });
 
+/** Attelages types de la ferme (0025, FR-ATT-6) : composition reprise en un clic à la saisie. */
+export const crewTemplates = pgTable("crew_templates", {
+  id: uuid("id").primaryKey(),
+  farmId: uuid("farm_id").notNull(),
+  name: text("name").notNull(),
+  active: boolean("active").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+});
+
+/** Membres d'un attelage type : un matériel ou un intervenant, dans l'ordre saisi. */
+export const crewTemplateMembers = pgTable("crew_template_members", {
+  templateId: uuid("template_id").notNull(),
+  rank: integer("rank").notNull(),
+  equipmentId: uuid("equipment_id"),
+  personId: uuid("person_id"),
+});
+
 /** Parcours GPS calculés par le worker (0023) : libres, ou figés une fois rattachés. */
 export const trackSessions = pgTable("track_sessions", {
   id: uuid("id").primaryKey(),

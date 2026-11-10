@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { ActionIcon, Alert, Button, Group, MultiSelect, Paper, Stack, Text, TextInput } from "@mantine/core";
-import { Copy, Plus, Trash2 } from "lucide-react";
-import type { InterventionCrew, InterventionCrewRead, WorkPeriod } from "@fourmy/contracts";
+import { ActionIcon, Alert, Button, Group, MultiSelect, Paper, Select, Stack, Text, TextInput } from "@mantine/core";
+import { BookmarkPlus, Copy, Plus, Trash2 } from "lucide-react";
+import type { CrewTemplate, InterventionCrew, InterventionCrewRead, WorkPeriod } from "@fourmy/contracts";
+import { CrewTemplateModal } from "../equipments/CrewTemplatesPage";
 import { crewDurations } from "@fourmy/domain";
 import { formatPeriod } from "../../app/labels";
 import { durationMinutes, formatDuration, parseDuration, withDuration, withStart, type LocalPeriod } from "./periods";
@@ -48,6 +49,18 @@ export function duplicate(c: CrewRow): CrewRow {
   const periods = last && minutes !== null ? [withDuration({ startedAt: last.stoppedAt, stoppedAt: last.stoppedAt }, minutes)] : [];
   return newCrew({ tools: [...c.tools], doers: [...c.doers], periods, ...(c.templateId ? { templateId: c.templateId } : {}) });
 }
+
+/**
+ * Reprise d'un attelage type (FR-ATT-6) : matériels et intervenants copiés,
+ * origine gardée ; les périodes saisies restent, le nom aussi s'il y en a un.
+ */
+export const fromTemplate = (c: CrewRow, t: CrewTemplate): CrewRow => ({
+  ...c,
+  label: c.label.trim() ? c.label : t.name,
+  templateId: t.id,
+  tools: [...t.equipmentIds],
+  doers: [...t.personIds],
+});
 
 /** Attelages lus → lignes du formulaire. */
 export const crewRowsOf = (crews: InterventionCrewRead[]): CrewRow[] =>
@@ -161,6 +174,7 @@ export function CrewsEditor({
   peopleOptions,
   defaultDay,
   errors,
+  templates,
 }: {
   crews: CrewRow[];
   onChange: (crews: CrewRow[]) => void;
@@ -168,8 +182,13 @@ export function CrewsEditor({
   peopleOptions: Option[];
   defaultDay: string;
   errors: string[];
+  /** Attelages types de la ferme ; `canWrite` : « Enregistrer comme attelage type » (responsable). */
+  templates?: { farmId: string; items: CrewTemplate[]; canWrite: boolean };
 }) {
   const update = (k: number, patch: Partial<CrewRow>) => onChange(crews.map((c, j) => (j === k ? { ...c, ...patch } : c)));
+  const [saving, setSaving] = useState<number | null>(null);
+  const flat = (options: Option[]) => options.flatMap((o) => ("group" in o ? o.items : [o]));
+  const templateOptions = (templates?.items ?? []).filter((t) => t.active).map((t) => ({ value: t.id, label: t.name }));
   let body: InterventionCrew[] | null = null;
   try {
     body = crewsBody(crews);
@@ -188,6 +207,11 @@ export function CrewsEditor({
                   {name}
                 </Text>
                 <Group gap={4} wrap="nowrap">
+                  {templates?.canWrite && c.tools.length > 0 && (
+                    <ActionIcon variant="subtle" aria-label="Créer un attelage type depuis cet attelage" title="Enregistrer comme attelage type" onClick={() => setSaving(k)}>
+                      <BookmarkPlus size={16} />
+                    </ActionIcon>
+                  )}
                   <ActionIcon
                     variant="subtle"
                     aria-label="Dupliquer l'attelage"
@@ -203,6 +227,20 @@ export function CrewsEditor({
                   )}
                 </Group>
               </Group>
+              {templateOptions.length > 0 && (
+                <Select
+                  size="xs"
+                  aria-label="Attelage type"
+                  placeholder="Reprendre un attelage type…"
+                  data={templateOptions}
+                  value={c.templateId && templateOptions.some((o) => o.value === c.templateId) ? c.templateId : null}
+                  onChange={(id) => {
+                    const t = templates?.items.find((x) => x.id === id);
+                    if (t) onChange(crews.map((x, j) => (j === k ? fromTemplate(x, t) : x)));
+                  }}
+                  searchable
+                />
+              )}
               <TextInput size="xs" aria-label="Nom de l'attelage" placeholder="Nom (facultatif)" maxLength={80} value={c.label} onChange={(e) => update(k, { label: e.currentTarget.value })} />
               <MultiSelect label="Matériels" searchable data={equipmentOptions} value={c.tools} onChange={(tools) => update(k, { tools })} />
               <MultiSelect
@@ -232,6 +270,17 @@ export function CrewsEditor({
         Ajouter un attelage
       </Button>
       {body && <CrewsSummary crews={body} />}
+      {saving !== null && templates && crews[saving] && (
+        <CrewTemplateModal
+          farmId={templates.farmId}
+          template={null}
+          initial={{ name: crews[saving]!.label.trim(), equipmentIds: crews[saving]!.tools, personIds: crews[saving]!.doers }}
+          equipmentOptions={flat(equipmentOptions)}
+          peopleOptions={flat(peopleOptions)}
+          onClose={() => setSaving(null)}
+          onSaved={(t) => update(saving, { templateId: t.id, label: crews[saving]!.label.trim() ? crews[saving]!.label : t.name })}
+        />
+      )}
       {errors.length > 0 && (
         <Alert color="paille" variant="light" title="Attelages à compléter">
           <Stack gap={2}>

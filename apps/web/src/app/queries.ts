@@ -15,6 +15,7 @@ import type {
   InterventionDetail,
   Person,
   PhytoRegisterEntry,
+  CrewTemplate,
   ProcedureCatalogue,
   Snapshot,
   StockLevel,
@@ -165,6 +166,15 @@ export function useCertifications(farmId: string) {
 }
 
 /** Matériels de la ferme (fiche résumée, dernier relevé, logo). */
+/** Attelages types de la ferme (FR-ATT-6). */
+export function useCrewTemplates(farmId: string) {
+  return useQuery({
+    queryKey: ["crew-templates", farmId],
+    queryFn: () => api.get<{ items: CrewTemplate[] }>(farmPath(farmId, "/crew-templates")),
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useEquipments(farmId: string) {
   return useQuery({
     queryKey: ["equipments", farmId],

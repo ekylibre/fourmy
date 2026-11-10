@@ -403,7 +403,9 @@ async function writeBody(tx: Tx, interventionId: string, body: Body, articles: M
     const crewId = crew.id ?? crypto.randomUUID();
     await tx.execute(sql`
       INSERT INTO intervention_crews (id, intervention_id, rank, label, template_id)
-      VALUES (${crewId}, ${interventionId}, ${rank}, ${crew.label?.trim() || null}, ${crew.templateId ?? null})`);
+      VALUES (${crewId}, ${interventionId}, ${rank}, ${crew.label?.trim() || null},
+              -- origine inconnue de la ferme (supprimée, autre ferme) : simplement oubliée
+              (SELECT id FROM crew_templates WHERE id = ${crew.templateId ?? null}::uuid))`);
     for (const id of new Set(crew.tools.map((t) => t.equipmentId))) await insert("tool", "equipment", id, null, null, null, undefined, crewId);
     for (const id of new Set(crew.doers.map((d) => d.personId))) await insert("doer", "person", id, null, null, null, undefined, crewId);
     for (const p of crew.periods) await period(p, crewId);

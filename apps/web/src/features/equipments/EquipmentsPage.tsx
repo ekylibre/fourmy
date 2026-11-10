@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { Badge, Button, Group, Paper, SegmentedControl, Select, Stack, Table, Text, TextInput, Title } from "@mantine/core";
-import { Gauge, Plus, Radio, Search, Wrench } from "lucide-react";
+import { Gauge, Link2, Plus, Radio, Search, Wrench } from "lucide-react";
 import { equipmentKindLabel, equipmentStateLabel, type EquipmentSummary } from "@fourmy/contracts";
 import { useFarm } from "../../app/farm";
 import { formatDate } from "../../app/labels";
@@ -45,6 +45,9 @@ export function EquipmentsPage() {
       <Group justify="space-between">
         <Title order={1}>Matériels</Title>
         <Group>
+          <Button component={Link} to={`/f/${farm.id}/equipments/crew-templates${location.search}`} variant="light" leftSection={<Link2 size={16} />}>
+            Attelages types
+          </Button>
           <Button component={Link} to={`/f/${farm.id}/maintenance${location.search}`} variant="light" leftSection={<Wrench size={16} />}>
             Entretien
           </Button>
