@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Alert, Badge, Button, Group, List, Paper, PasswordInput, Stack, Switch, Text, TextInput, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Integration, IntegrationProviderDefinition } from "@fourmy/contracts";
+import { INTEGRATION_CATEGORIES, type Integration, type IntegrationProviderDefinition } from "@fourmy/contracts";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { formatDate } from "../../app/labels";
@@ -39,25 +39,48 @@ export function IntegrationsPage() {
       <Text c="dimmed" size="sm">
         Services externes reliés à cette ferme. Les accès (jetons, mots de passe) sont chiffrés et ne sont jamais réaffichés.
       </Text>
-      {providers.map((definition) => (
-        <ProviderCard
-          key={definition.provider}
-          farmId={farm.id}
-          definition={definition}
-          integration={items.find((i) => i.provider === definition.provider) ?? null}
-        />
-      ))}
-      <Paper p="md" data-testid="integration-open-meteo">
-        <Group justify="space-between">
-          <Title order={2}>Open-Meteo — météo</Title>
-          <Badge color="lichen">Actif par défaut</Badge>
-        </Group>
-        <Text size="sm" c="dimmed" mt={4}>
-          Gratuit et sans clé : prévisions et historique depuis 1940 pour la météo des interventions et les conditions de
-          pulvérisation. Utilisé quand ni meteoblue ni OpenWeather ne sont actifs, et toujours pour le passé.
-        </Text>
-      </Paper>
+      {INTEGRATION_CATEGORIES.map(({ category, label, description }) => {
+        const inCategory = providers.filter((d) => d.category === category);
+        const withOpenMeteo = category === "weather";
+        if (!inCategory.length && !withOpenMeteo) return null;
+        return (
+          <Stack key={category} gap="sm" component="section" aria-labelledby={`integrations-${category}`}>
+            <div>
+              <Title order={2} size="h3" id={`integrations-${category}`}>
+                {label}
+              </Title>
+              <Text size="sm" c="dimmed">
+                {description}
+              </Text>
+            </div>
+            {inCategory.map((definition) => (
+              <ProviderCard
+                key={definition.provider}
+                farmId={farm.id}
+                definition={definition}
+                integration={items.find((i) => i.provider === definition.provider) ?? null}
+              />
+            ))}
+            {withOpenMeteo && <OpenMeteoCard />}
+          </Stack>
+        );
+      })}
     </Stack>
+  );
+}
+
+function OpenMeteoCard() {
+  return (
+    <Paper p="md" data-testid="integration-open-meteo">
+      <Group justify="space-between">
+        <Title order={3}>Open-Meteo — météo</Title>
+        <Badge color="lichen">Actif par défaut</Badge>
+      </Group>
+      <Text size="sm" c="dimmed" mt={4}>
+        Gratuit et sans clé : prévisions et historique depuis 1940 pour la météo des interventions et les conditions de
+        pulvérisation. Utilisé quand ni meteoblue ni OpenWeather ne sont actifs, et toujours pour le passé.
+      </Text>
+    </Paper>
   );
 }
 
@@ -125,7 +148,7 @@ function ProviderCard({
     <Paper p="md" data-testid={`integration-${definition.provider}`}>
       <Stack>
         <Group justify="space-between">
-          <Title order={2}>{definition.label}</Title>
+          <Title order={3}>{definition.label}</Title>
           {integration && (
             <Group gap="xs">
               {integration.running ? (

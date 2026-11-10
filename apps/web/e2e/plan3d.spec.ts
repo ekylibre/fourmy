@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { login } from "./shared";
+import { login, navTo } from "./shared";
 
 /**
  * Plan 3D (US-4, US-9) sur la ferme pilote viticole : la cuverie apparaît,
@@ -19,7 +19,7 @@ test("plan 3D : cuverie placée, remplissage qui suit la frise", async ({ page }
   await page.getByRole("link", { name: /Ferme pilote — viticulture/ }).click();
 
   await page.getByLabel("Date de la frise").fill("2021-12-31");
-  await page.getByRole("link", { name: "Plan 3D" }).click();
+  await navTo(page, "Plan 3D", "Cartes");
   await expect(page.locator(".cesium-widget canvas")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("5 cuve(s) placée(s) · 1 non localisée(s)")).toBeVisible({ timeout: 30_000 });
   const cuve1 = page.getByRole("button", { name: "Cuve 1", exact: true }).locator("xpath=../..");

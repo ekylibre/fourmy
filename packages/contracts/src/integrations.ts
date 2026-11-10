@@ -20,8 +20,18 @@ export interface IntegrationField {
   help?: string;
 }
 
+/** Thème d'une intégration : regroupe les fournisseurs à l'écran. */
+export type IntegrationCategory = "weather" | "gps_equipment" | "decision_support";
+
+export const INTEGRATION_CATEGORIES: { category: IntegrationCategory; label: string; description: string }[] = [
+  { category: "weather", label: "Météo", description: "Prévisions et mesures pour la météo des interventions et les conditions de pulvérisation." },
+  { category: "gps_equipment", label: "Suivi GPS – Matériels", description: "Positions et parcours des matériels." },
+  { category: "decision_support", label: "OAD", description: "Outils d'aide à la décision (modèles de risque, préconisations)." },
+];
+
 export interface IntegrationProviderDefinition {
   provider: IntegrationProvider;
+  category: IntegrationCategory;
   label: string;
   description: string;
   fields: IntegrationField[];
@@ -30,6 +40,7 @@ export interface IntegrationProviderDefinition {
 export const INTEGRATION_PROVIDERS: IntegrationProviderDefinition[] = [
   {
     provider: "traccar",
+    category: "gps_equipment",
     label: "Traccar — traceurs GPS",
     description:
       "Positions des boîtiers GPS des matériels (travail au champ, transport). Chaque boîtier est rattaché au matériel de même nom.",
@@ -46,6 +57,7 @@ export const INTEGRATION_PROVIDERS: IntegrationProviderDefinition[] = [
   },
   {
     provider: "openweather",
+    category: "weather",
     label: "OpenWeather — météo",
     description:
       "Prévisions à 5 jours pour la météo des interventions et les conditions de pulvérisation. Sans intégration météo, Open-Meteo (gratuit, sans clé) est utilisé ; l'historique vient toujours d'Open-Meteo.",
@@ -61,6 +73,7 @@ export const INTEGRATION_PROVIDERS: IntegrationProviderDefinition[] = [
   },
   {
     provider: "meteoblue",
+    category: "weather",
     label: "meteoblue — météo agricole",
     description:
       "Prévisions horaires du paquet agro de meteoblue pour la météo des interventions et les conditions de pulvérisation. Prioritaire sur OpenWeather et Open-Meteo quand il est actif.",

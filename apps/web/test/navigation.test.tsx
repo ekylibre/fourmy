@@ -1,0 +1,31 @@
+import { screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { isActivePath } from "../src/components/Layout";
+import { FARM, renderApp } from "./render";
+
+describe("menu principal", () => {
+  it("sections et sous-menus, ouverts sur la section active", async () => {
+    const user = userEvent.setup();
+    const { router } = renderApp(`/f/${FARM}/register`);
+    const nav = await screen.findByRole("navigation", { name: "Menu principal" });
+    // Ordre des sections (retours du 10/11/2026).
+    const top = ["Tableau de bord", "Cartes", "Activités", "Interventions", "Matériels", "Stocks", "Réglementaire"];
+    const labels = within(nav)
+      .getAllByText(new RegExp(`^(${top.join("|")})$`))
+      .map((e) => e.textContent);
+    expect(labels).toEqual(top);
+    // Section active ouverte : le registre est visible.
+    expect(within(nav).getByRole("link", { name: "Registre phyto" })).toBeVisible();
+    // Sous-menu Cartes : ouvert au clic.
+    await user.click(within(nav).getByRole("button", { name: "Cartes" }));
+    await user.click(await within(nav).findByRole("link", { name: "Plan 2D" }));
+    expect(router.state.location.pathname).toBe(`/f/${FARM}/map`);
+  });
+
+  it("entrée active par segment de chemin", () => {
+    expect(isActivePath("", "")).toBe(true);
+    expect(isActivePath("/map", "")).toBe(false);
+    expect(isActivePath("/equipments/crew-templates", "/equipments")).toBe(true);
+    expect(isActivePath("/phytosanitary", "/phyto")).toBe(false);
+  });
+});
