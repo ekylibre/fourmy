@@ -180,10 +180,13 @@ conception : [`teledetection-design.md`](teledetection-design.md).
   repères. *Réalisé (lot Y).*
 - **FR-TWIN-5 (S)** Images satellite (NDVI, couleurs naturelles) drapées sur
   la carte 2D et sur le relief du plan 3D. *Réalisé (lot Y).*
+- **FR-TWIN-10 (S)** Signaler une **intervention probablement manquante** :
+  le satellite voit le couvert d'une parcelle disparaître sans récolte,
+  broyage, fauche ni labour saisi. L'exploitant saisit l'intervention
+  pré-remplie ou écarte le signalement. *Réalisé (lot Z,
+  [`teledetection.md`](teledetection.md)).*
 - **FR-TWIN-3, 4, 6 à 9** (végétation 3D, météo visible, modulation ISO-XML,
   ISOBUS, modèle de culture, capteurs) : voir l'étude, lots ultérieurs.
-  Prochain lot : alerte « intervention probablement manquante » (chute du
-  NDVI sans récolte saisie).
 
 ### 4.10 Réglementaire
 - **FR-REG-1 (M)** **Registre phytosanitaire** produit à partir des

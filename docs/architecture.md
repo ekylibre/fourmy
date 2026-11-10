@@ -223,6 +223,7 @@ Toutes les routes sont préfixées par `/api/v1/farms/:farmId` et acceptent
 | `GET /equipments/:id/maintenance?at=` · `GET /maintenance/due?at=` · `GET /maintenance/parts` | Plan d'entretien et échéances à une date, tableau de bord, pièces à commander | FR-MAT-20 à 24, 42 |
 | `GET /equipments/:id/avatar.glb` | Avatar 3D généré (ETag) ou importé | FR-MAT-81 à 84 |
 | `GET /remote-sensing/parcels?at=&index=` · `GET /land-parcels/:id/indices?from=&to=` | NDVI de chaque parcelle à une date et dernière image ; série d'une parcelle lissée, référence des années précédentes | FR-TWIN-1/2 |
+| `GET /remote-sensing/anomalies?from=&to=` · `POST /remote-sensing/anomalies/dismiss` | Récoltes probables non saisies (chute du NDVI sans intervention qui retire le couvert) ; écarter un signalement | FR-TWIN-10 |
 | `GET /remote-sensing/images/:date/:kind` · `GET /remote-sensing/scenes` · `GET /remote-sensing/status` · `POST /remote-sensing/history` | Images Sentinel-2 (NDVI, couleurs naturelles) pour la carte et le plan 3D ; acquisitions ; budget ; historique profond | FR-TWIN-5, ADR-16 |
 | `GET /terrain/heightmap/:z/:x/:y` | Grille d'altitude pour Cesium | ADR-9 |
 | `GET /sync/pull?last_pulled_at=` · `POST /sync/push` | Synchro mobile | ADR-13, FR-INT-2 |
