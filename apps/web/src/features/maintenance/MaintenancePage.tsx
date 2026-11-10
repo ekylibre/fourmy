@@ -14,6 +14,7 @@ import { useEquipments, useFarmDues, useMembers } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
 import { EquipmentLogo } from "../equipments/EquipmentLogo";
 import { DueBadge } from "./Maintenance";
+import { TrackSettingsPanel } from "../equipments/TrackSettingsPanel";
 
 /**
  * Tableau de bord de l'entretien (FR-MAT-24) : opérations en retard ou à
@@ -114,6 +115,7 @@ export function MaintenancePage() {
         </Paper>
       )}
       {farm.role === "owner" && <SettingsPanel farmId={farm.id} />}
+      {farm.role === "owner" && <TrackSettingsPanel farmId={farm.id} />}
     </Stack>
   );
 }

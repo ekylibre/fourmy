@@ -65,6 +65,28 @@ Phases réalisées, sur la branche `feat/parcours-attelages` :
   - Calendrier : un créneau par période de chaque attelage, avec son nom.
   - e2e `crews.spec.ts` (US-ATT-A) ; les parcours e2e existants passent.
   - Report : attelages types (lot Q), bandeau des parcours (lot P).
+- **O3** `c84bdd8` : `GET /equipments/:id/track-sessions` (période,
+  30 jours par défaut et 400 au plus ; type, parcelle, état ; curseur
+  « début|id »), `GET /track-sessions/:id` (trace simplifiée et
+  couverture), `GET`/`PUT /settings/tracks`, `POST /track-sessions/recompute`
+  (owner). Un outil voit les parcours où il est l'outil résolu ou dans
+  l'attelage rattaché, avec le tracteur. 90 jours × 3 matériels (2 700
+  parcours) : liste bien en dessous de 2 s.
+- **O4** : onglet « Parcours » de la fiche matériel (visible s'il existe
+  un parcours sur 400 jours) : filtres, tableau paginé, badge « trace
+  modifiée », lien vers l'intervention, mini-carte de la sélection (trace,
+  couverture, parcelles) ; colonne « Tracteur » sur un outil. Réglages
+  « Parcours GPS » sur la page Entretien (owner), avec « Recalculer
+  maintenant ». e2e `track-sessions.spec.ts` (positions synthétiques,
+  recalcul par l'API, liste, filtre, carte).
+- **Point de contrôle O** (traces réelles de Pierre ; pas de positions
+  après le 29/10, donc pas de 07/11) :
+  - les parcours et `trackCoverage` concordent sur les mêmes plages
+    (05/10 : 7,81 ha contre 7,81 ; 9,03 contre 8,90, soit +1,5 %) ;
+  - face à Traccar, non concluant : le compteur `appliedArea` retombe à
+    zéro et se répète (1,33, puis 1,33, puis 1,32), une somme le compte en
+    double. Sa valeur de 15,79 ha (16:57) fait 9,03 ha côté parcours sur
+    16:24-17:46. À trancher avec la sémantique exacte du compteur osfarm.
 
 Contrôle d'O1 sur l'Arion 430 le 28/10 (réglages par défaut) :
 - déplacement 10:37-11:06, puis coupure de 2 h à midi ;

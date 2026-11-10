@@ -15,8 +15,9 @@ import { EquipmentLogo, uploadLogo } from "./EquipmentLogo";
 import { EquipmentFormModal, formatHours, ReadingModal } from "./EquipmentForms";
 import { MaintenanceTab, PartsTab } from "../maintenance/Maintenance";
 import { AvatarTab } from "./AvatarTab";
+import { TrackSessionsTab, useHasTrackSessions } from "./TrackSessionsTab";
 
-const TABS = ["general", "maintenance", "parts", "technical", "readings", "history", "3d"] as const;
+const TABS = ["general", "maintenance", "parts", "technical", "readings", "history", "tracks", "3d"] as const;
 type Tab = (typeof TABS)[number];
 
 /**
@@ -49,6 +50,8 @@ function Sheet({ sheet: s }: { sheet: EquipmentSheet }) {
   const [params, setParams] = useSearchParams();
   const tab: Tab = TABS.includes(params.get("tab") as Tab) ? (params.get("tab") as Tab) : "general";
   const owner = farm.role === "owner";
+  // Onglet Parcours : seulement si le matériel a des parcours (FR-GPS-10).
+  const hasTracks = useHasTrackSessions(farm.id, s.id).data === true;
   const [editing, setEditing] = useState(false);
   const [reading, setReading] = useState(false);
   const back = new URLSearchParams(location.search);
@@ -111,6 +114,7 @@ function Sheet({ sheet: s }: { sheet: EquipmentSheet }) {
           <Tabs.Tab value="technical">Technique</Tabs.Tab>
           <Tabs.Tab value="readings">Relevés ({s.readings.length})</Tabs.Tab>
           <Tabs.Tab value="history">Historique ({s.history.length})</Tabs.Tab>
+          {hasTracks && <Tabs.Tab value="tracks">Parcours</Tabs.Tab>}
           <Tabs.Tab value="3d">3D</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="general" pt="md">
@@ -131,6 +135,11 @@ function Sheet({ sheet: s }: { sheet: EquipmentSheet }) {
         <Tabs.Panel value="history" pt="md">
           <History sheet={s} />
         </Tabs.Panel>
+        {hasTracks && (
+          <Tabs.Panel value="tracks" pt="md">
+            <TrackSessionsTab farmId={farm.id} equipmentId={s.id} />
+          </Tabs.Panel>
+        )}
         <Tabs.Panel value="3d" pt="md">
           <AvatarTab sheet={s} />
         </Tabs.Panel>
