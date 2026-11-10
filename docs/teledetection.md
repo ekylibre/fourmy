@@ -86,6 +86,8 @@ Lot Y, réalisé le 2026-11-10 : FR-TWIN-1, FR-TWIN-2 et FR-TWIN-5
 | `packages/sentinel` | Client CDSE : jeton OAuth en cache, catalogue, Statistical et Process API, réessais sur 401, 429 et 5xx, plafond de PU par minute, budget avant chaque requête. Evalscripts versionnés |
 | `packages/domain/src/remote-sensing.ts` | Zone UTM, lissage de Whittaker (Cholesky en bande), référence multi-annuelle, statut d'une parcelle, taille d'image |
 | `packages/contracts/src/remote-sensing.ts` | Types, seuils, palette, mention Copernicus |
+| `packages/db/migrations/0030_remote_sensing_dismissals.sql` | Signalements écartés (lot Z) |
+| `apps/web/src/features/remote-sensing/CoverLossAlerts.tsx` | Widget du tableau de bord, bandeau, saisie pré-remplie (lot Z) |
 | `packages/db/migrations/0029_remote_sensing.sql` | `satellite_scenes`, `satellite_images`, `parcel_indices`, `parcel_index_cursors`, `remote_sensing_usage` (RLS), synchro `copernicus` toutes les 6 h |
 | `apps/api/src/repos/remote-sensing.ts` | Synchro (curseur par version de parcelle) et lectures |
 | `apps/api/src/routes/remote-sensing.ts` | Routes (§7 de la conception) |
@@ -104,6 +106,48 @@ Lot Y, réalisé le 2026-11-10 : FR-TWIN-1, FR-TWIN-2 et FR-TWIN-5
 - **Données de démonstration** (`@fourmy/mocks`) : saison synthétique
   (aucune image), pour développer sans compte Copernicus.
 
+## Récoltes probables non saisies (lot Z)
+
+Réalisé le 2026-11-10 (FR-TWIN-10). Le satellite signale qu'une parcelle a
+perdu son couvert alors qu'aucune intervention ne l'explique.
+
+- **Chute du couvert** (`coverLossEvents`, domaine) :
+  - une mesure exploitable de NDVI ≥ 0,5, puis une mesure ≤ 0,3 au plus
+    45 jours après ;
+  - **confirmée** si la mesure suivante (dans les 30 jours) reste sous 0,4 ;
+  - **écartée** si elle remonte (simple creux : ombre, nuage résiduel).
+- **Explication** : une intervention **réalisée** qui retire le couvert, sur
+  la parcelle, de 7 jours avant le dernier passage couvert à **30 jours
+  après** le premier passage en sol nu.
+  - Interventions retenues (`COVER_REMOVING_PROCEDURES`) : récoltes hors
+    vigne, labours, broyages, fauche.
+  - Pourquoi 30 jours : un maïs grain sèche sur pied et descend à 0,3 deux à
+    quatre semaines avant la récolte. Chez Pierre en 2025, les récoltes du
+    04/09 et du 16/09 venaient 13 à 18 jours après la chute ; avec 7 jours
+    de tolérance seulement, elles donnaient deux fausses alertes.
+- **Délai** : on n'alerte qu'une fois ces 30 jours écoulés (la récolte peut
+  encore venir).
+- **Exclusions** :
+  - les vignes : la chute des feuilles fait baisser le NDVI chaque automne ;
+  - les chutes écartées par l'exploitant (`remote_sensing_dismissals`).
+- **Écrans** :
+  - **widget « À vérifier : récoltes probables non saisies »** du tableau de
+    bord, sur les 12 mois précédant la date de la frise ;
+  - bandeau et zone colorée sur la courbe de l'onglet Végétation
+    (`?tab=vegetation`).
+- **Actions** :
+  - **« Saisir la récolte »** ouvre une intervention réalisée pré-remplie
+    (`?procedure=harvesting&status=done&parcels=…&at=<date du sol nu>`) ;
+  - **« Ce n'est pas une récolte »** écarte le signalement.
+- **API** : `GET /remote-sensing/anomalies?from=&to=` et
+  `POST /remote-sensing/anomalies/dismiss` (`{ parcelId, to, reason? }`).
+- **Ferme de Pierre** :
+  - 2025 : 0 signalement (récoltes saisies) ;
+  - 2026 : 8 signalements, tous les maïs, sol nu entre le 02/08 et le 18/09
+    et aucune récolte saisie.
+- **Pas de détection** : la récolte d'une céréale suivie d'une repousse
+  (le NDVI ne descend pas sous 0,3, comme le triticale de Pierre).
+
 ## Limites connues
 
 - **Vigne** : un pixel de 10 m mélange les rangs, l'enherbement et le sol.
@@ -111,6 +155,6 @@ Lot Y, réalisé le 2026-11-10 : FR-TWIN-1, FR-TWIN-2 et FR-TWIN-5
 - **Vérification manuelle** : l'encadré Satellite de la carte et du plan 3D
   n'a pas encore été vérifié à l'écran sur la ferme de Pierre. Les images et
   les valeurs l'ont été côté API.
-- **Prochain lot** : alerte « intervention probablement manquante ». Chez
-  Pierre, le NDVI du maïs 2026 retombe au niveau du sol nu le 29/08 sans
-  récolte saisie.
+- **Signalements** (lot Z) : récoltes et destructions du couvert seulement.
+  Un semis non saisi (levée sans semis) ou une confirmation par le NDMI ou
+  Sentinel-1 (maïs sec sur pied ou champ récolté) restent à faire.

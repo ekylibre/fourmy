@@ -184,3 +184,50 @@ export function imageSize(bbox: [number, number, number, number], metersPerPixel
   }
   return { width, height };
 }
+
+export interface CoverLossEvent {
+  from: string;
+  to: string;
+  high: number;
+  low: number;
+  confirmed: boolean;
+}
+
+/**
+ * Chutes du couvert d'une parcelle (lot Z) : une mesure exploitable ≥ `high`,
+ * puis, au plus `maxDays` jours après, une mesure ≤ `low`. La chute est
+ * **confirmée** si la mesure suivante (dans `confirmDays`) reste sous
+ * `low + 0,1` ; si elle remonte, c'était un creux (ombre, nuage résiduel) et
+ * la chute est écartée ; sans mesure suivante, elle reste à confirmer.
+ * Ensuite, il faut repasser au-dessus de `high` pour une nouvelle chute.
+ */
+export function coverLossEvents(
+  points: SeriesPoint[],
+  opts: { high: number; low: number; maxDays: number; confirmDays: number },
+): CoverLossEvent[] {
+  const pts = points.filter((p) => Number.isFinite(p.value)).sort((a, b) => a.date.localeCompare(b.date));
+  const events: CoverLossEvent[] = [];
+  let lastHigh: SeriesPoint | null = null;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i]!;
+    if (p.value >= opts.high) {
+      lastHigh = p;
+      continue;
+    }
+    if (!lastHigh || p.value > opts.low) continue;
+    if (dayNumber(p.date) - dayNumber(lastHigh.date) > opts.maxDays) {
+      lastHigh = null;
+      continue;
+    }
+    const next = pts[i + 1];
+    const followed = next && dayNumber(next.date) - dayNumber(p.date) <= opts.confirmDays ? next : undefined;
+    if (followed && followed.value > opts.low + 0.1) continue; // simple creux : on garde le haut précédent
+    events.push({ from: lastHigh.date, to: p.date, high: lastHigh.value, low: p.value, confirmed: followed !== undefined });
+    lastHigh = null;
+  }
+  return events;
+}
+
+/** Une intervention saisie entre `from − beforeDays` et `to + afterDays` explique la chute. */
+export const explainsCoverLoss = (e: { from: string; to: string }, interventionDays: string[], opts: { beforeDays: number; afterDays: number }) =>
+  interventionDays.some((d) => d >= addDays(e.from, -opts.beforeDays) && d <= addDays(e.to, opts.afterDays));

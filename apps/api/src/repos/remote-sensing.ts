@@ -2,7 +2,10 @@ import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
 import {
+  COVER_LOSS,
+  COVER_REMOVING_PROCEDURES,
   MIN_PARCEL_PIXELS,
+  type CoverLossAnomaly,
   USABLE_VALID_RATIO,
   VEGETATION_INDICES,
   copernicusAttribution,
@@ -14,7 +17,7 @@ import {
   type SatelliteScene,
   type VegetationIndex,
 } from "@fourmy/contracts";
-import { addDays, imageSize, isUsable, minusYears, parcelIndexStatus, referenceCurve, smoothDaily, utmEpsg, validRatio } from "@fourmy/domain";
+import { addDays, coverLossEvents, explainsCoverLoss, imageSize, isUsable, minusYears, parcelIndexStatus, referenceCurve, smoothDaily, utmEpsg, validRatio } from "@fourmy/domain";
 import { INDEX_METHOD, type Bbox, type PolygonGeometry, type SentinelClient } from "@fourmy/sentinel";
 import { NotFound } from "../routes/helpers.js";
 
@@ -496,6 +499,77 @@ export async function parcelSeries(
       interventions,
       attribution: copernicusAttribution(all.map((r) => Number(r.d.slice(0, 4)))),
     };
+  });
+}
+
+/**
+ * Interventions probablement manquantes (lot Z) : chutes du NDVI vers le sol
+ * nu, terminées dans [from, to], sans intervention réalisée qui retire le
+ * couvert de 7 jours avant à 30 jours après (COVER_LOSS), dont ce délai est
+ * écoulé à `asOf`, hors vignes (chute des feuilles) et hors chutes écartées.
+ */
+export async function coverLossAnomalies(db: Database, farmId: string, from: string, to: string, asOf = today()): Promise<CoverLossAnomaly[]> {
+  return withFarm(db, farmId, async (tx) => {
+    const lookFrom = addDays(from, -COVER_LOSS.maxDays);
+    const points = await rows<{ parcel_id: string; name: string; d: string; mean: number }>(
+      tx,
+      sql`SELECT v.land_parcel_id AS parcel_id, lp.name, pi.acquired_on::text AS d, pi.mean
+          FROM parcel_indices pi JOIN land_parcel_versions v ON v.id = pi.land_parcel_version_id
+          JOIN land_parcels lp ON lp.id = v.land_parcel_id
+          WHERE lp.farm_id = ${farmId} AND pi.vegetation_index = 'ndvi' AND pi.mean IS NOT NULL
+            AND pi.parcel_px >= ${MIN_PARCEL_PIXELS} AND pi.valid_px >= ${USABLE_VALID_RATIO}::float8 * pi.parcel_px
+            AND pi.acquired_on BETWEEN ${lookFrom}::date AND ${addDays(to, COVER_LOSS.confirmDays)}::date
+          ORDER BY 1, 3`,
+    );
+    if (points.length === 0) return [];
+    const procedures = sql.join(COVER_REMOVING_PROCEDURES.map((c) => sql`${c}`), sql`, `);
+    const done = await rows<{ parcel_id: string; d: string }>(
+      tx,
+      sql`SELECT DISTINCT t.ref_id AS parcel_id, (i.started_at AT TIME ZONE 'Europe/Paris')::date::text AS d
+          FROM interventions i JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target'
+          WHERE i.status = 'done' AND i.procedure IN (${procedures})
+            AND i.started_at >= ${lookFrom}::date AND i.started_at < ${addDays(to, COVER_LOSS.afterDays + 1)}::date`,
+    );
+    const vines = await rows<{ parcel_id: string; year: number }>(
+      tx,
+      sql`SELECT p.land_parcel_id AS parcel_id, c.year FROM productions p JOIN campaigns c ON c.id = p.campaign_id WHERE p.nature = 'vine'`,
+    );
+    const dismissed = await rows<{ parcel_id: string; d: string }>(tx, sql`SELECT land_parcel_id AS parcel_id, event_to::text AS d FROM remote_sensing_dismissals`);
+
+    const byParcel = new Map<string, { name: string; pts: { date: string; value: number }[] }>();
+    for (const p of points) {
+      const e = byParcel.get(p.parcel_id) ?? { name: p.name, pts: [] };
+      e.pts.push({ date: p.d, value: p.mean });
+      byParcel.set(p.parcel_id, e);
+    }
+    const doneBy = (id: string) => done.filter((d) => d.parcel_id === id).map((d) => d.d);
+    const isVine = new Set(vines.map((v) => `${v.parcel_id}:${v.year}`));
+    const isDismissed = new Set(dismissed.map((d) => `${d.parcel_id}:${d.d}`));
+    const out: CoverLossAnomaly[] = [];
+    for (const [parcelId, { name, pts }] of byParcel) {
+      for (const e of coverLossEvents(pts, COVER_LOSS)) {
+        if (e.to < from || e.to > to) continue;
+        const dueSince = addDays(e.to, COVER_LOSS.afterDays);
+        if (dueSince >= asOf) continue; // la récolte peut encore venir
+        if (isVine.has(`${parcelId}:${Number(e.to.slice(0, 4))}`)) continue;
+        if (isDismissed.has(`${parcelId}:${e.to}`)) continue;
+        if (explainsCoverLoss(e, doneBy(parcelId), COVER_LOSS)) continue;
+        out.push({ parcelId, parcelName: name, ...e, dueSince, suggestedProcedure: "harvesting" });
+      }
+    }
+    return out.sort((a, b) => b.to.localeCompare(a.to) || a.parcelName.localeCompare(b.parcelName));
+  });
+}
+
+/** Écarte une chute signalée (« ce n'est pas une récolte »). */
+export async function dismissCoverLoss(db: Database, farmId: string, userId: string, parcelId: string, to: string, reason: string | null): Promise<void> {
+  await withFarm(db, farmId, async (tx) => {
+    const [parcel] = await rows<{ id: string }>(tx, sql`SELECT id FROM land_parcels WHERE id = ${parcelId} AND farm_id = ${farmId}`);
+    if (!parcel) throw new NotFound("Parcelle introuvable.");
+    await tx.execute(sql`
+      INSERT INTO remote_sensing_dismissals (farm_id, land_parcel_id, event_to, reason, dismissed_by)
+      VALUES (${farmId}, ${parcelId}, ${to}::date, ${reason}, ${userId})
+      ON CONFLICT (land_parcel_id, event_to) DO UPDATE SET reason = excluded.reason, dismissed_by = excluded.dismissed_by, dismissed_at = now()`);
   });
 }
 

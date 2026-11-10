@@ -99,6 +99,8 @@ export interface FormInitial {
   mode?: "planned" | "done";
   nature?: MaintenanceNature | null;
   problem?: string;
+  /** Parcelles ciblées (signalement satellite d'une récolte probable, lot Z). */
+  landParcelIds?: string[];
   /** Brouillon tiré de parcours GPS (lot P) : attelage, périodes, cibles, parcours à rattacher. */
   trackDraft?: TrackDraft;
 }
@@ -172,7 +174,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       : [{ startedAt: start, stoppedAt: `${start.slice(0, 10)}T10:00` }],
   );
   const [parcels, setParcels] = useState<string[]>(
-    planned?.targets.filter((t) => t.kind === "land_parcel").map((t) => t.id) ?? fromTracks?.body.targets.map((t) => t.id) ?? [],
+    planned?.targets.filter((t) => t.kind === "land_parcel").map((t) => t.id) ?? fromTracks?.body.targets.map((t) => t.id) ?? initial?.landParcelIds ?? [],
   );
   const [maintained, setMaintained] = useState<string[]>(
     planned?.targets.filter((t) => t.kind === "equipment").map((t) => t.id) ?? (initial?.equipmentId ? [initial.equipmentId] : []),

@@ -6,7 +6,7 @@ import { addDays, dayNumber } from "@fourmy/domain";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import { syncIntegration } from "../integrations/repo.js";
-import { isVegetationIndex, listScenes, parcelIndicesAt, parcelSeries, remoteSensingStatus, sceneImage } from "../repos/remote-sensing.js";
+import { coverLossAnomalies, dismissCoverLoss, isVegetationIndex, listScenes, parcelIndicesAt, parcelSeries, remoteSensingStatus, sceneImage } from "../repos/remote-sensing.js";
 import { pendingSyncs } from "./integrations.js";
 import { BadRequest, NotFound, uuidParam } from "./helpers.js";
 
@@ -58,6 +58,21 @@ export const remoteSensingRoutes = new Hono<Env>()
     if (from > to) throw new BadRequest("from après to.");
     if (dayNumber(to) - dayNumber(from) > 366 * 3) throw new BadRequest("Période limitée à 3 ans.");
     return c.json(await parcelSeries(db(), c.get("farmId"), uuidParam(c, "id"), index(c.req.query("index")), from, to));
+  })
+  // Interventions probablement manquantes (lot Z).
+  .get("/remote-sensing/anomalies", async (c) => {
+    const to = day(c.req.query("to"), "to", today());
+    const from = day(c.req.query("from"), "from", addDays(to, -365));
+    if (from > to) throw new BadRequest("from après to.");
+    if (dayNumber(to) - dayNumber(from) > 366 * 3) throw new BadRequest("Période limitée à 3 ans.");
+    return c.json({ items: await coverLossAnomalies(db(), c.get("farmId"), from, to) });
+  })
+  .post("/remote-sensing/anomalies/dismiss", async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { parcelId?: string; to?: string; reason?: string };
+    if (!body.parcelId || !/^[0-9a-f-]{36}$/i.test(body.parcelId)) throw new BadRequest("parcelId attendu.");
+    const reason = typeof body.reason === "string" && body.reason.trim() ? body.reason.trim().slice(0, 500) : null;
+    await dismissCoverLoss(db(), c.get("farmId"), c.get("userId"), body.parcelId, day(body.to, "to"), reason);
+    return c.body(null, 204);
   })
   /**
    * Historique plus ancien que le défaut (1er janvier de l'année précédente).
