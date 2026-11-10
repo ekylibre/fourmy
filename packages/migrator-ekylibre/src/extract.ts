@@ -235,6 +235,32 @@ export type WorkingPeriodRow = {
   started_at: Date;
   stopped_at: Date;
 };
+export type ParticipationRow = {
+  intervention_id: number;
+  product_id: number;
+  started_at: Date;
+  stopped_at: Date;
+};
+/**
+ * Participations d'Ekylibre 5 (FR-ATT-10) : les périodes propres à chaque
+ * matériel ou personne d'une intervention. Vide si la version n'en a pas.
+ */
+export async function participations(s: Sql): Promise<ParticipationRow[]> {
+  const [ok] = await s<{ ok: boolean }[]>`
+    SELECT to_regclass('intervention_participations') IS NOT NULL AND EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = current_schema() AND table_name = 'intervention_working_periods'
+        AND column_name = 'intervention_participation_id') AS ok`;
+  if (!ok?.ok) return [];
+  return s<ParticipationRow[]>`
+    SELECT DISTINCT ip.intervention_id, ip.product_id, wp.started_at, wp.stopped_at
+    FROM intervention_participations ip
+    JOIN intervention_working_periods wp ON wp.intervention_participation_id = ip.id
+    WHERE ip.intervention_id IS NOT NULL AND ip.product_id IS NOT NULL
+      AND wp.started_at IS NOT NULL AND wp.stopped_at > wp.started_at
+    ORDER BY ip.intervention_id, ip.product_id, wp.started_at`;
+}
+
 /** Périodes de travail rattachées à l'intervention (pas aux participations individuelles). */
 export const workingPeriods = (s: Sql) =>
   s<WorkingPeriodRow[]>`

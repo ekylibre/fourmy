@@ -13,6 +13,9 @@ import {
   samsysId,
   equipmentExternalIds,
   commissionedAt,
+  crewsOf,
+  isMotorised,
+  mergeSpans,
 } from "../src/index.js";
 
 describe("uuidv5", () => {
@@ -96,5 +99,73 @@ describe("matériels", () => {
     expect(commissionedAt(new Date("1970-01-01T00:00:00Z"))).toBeNull();
     expect(commissionedAt(null)).toBeNull();
     expect(commissionedAt(new Date("2013-11-30T00:00:00Z"))?.toISOString()).toBe("2013-11-30T00:00:00.000Z");
+  });
+});
+
+describe("attelages repris (FR-ATT-10)", () => {
+  const S = (from: string, to: string) => ({ startedAt: `2020-04-09T${from}:00.000Z`, stoppedAt: `2020-04-09T${to}:00.000Z` });
+  const tool = (paramId: number, productId: number, motorised = false) => ({ paramId, role: "tool" as const, productId, motorised });
+  const doer = (paramId: number, productId: number | null) => ({ paramId, role: "doer" as const, productId, motorised: false });
+  const none = new Map<number, ReturnType<typeof S>[]>();
+
+  it("motorisé : tracteurs et automoteurs", () => {
+    expect(isMotorised("tractor")).toBe(true);
+    expect(isMotorised("self_propelled_equipment")).toBe(true);
+    expect(isMotorised("trailed_equipment")).toBe(false);
+    expect(isMotorised(null)).toBe(false);
+  });
+
+  it("fusionne les périodes qui se recouvrent, garde celles qui se touchent, retire les vides", () => {
+    expect(mergeSpans([S("10:00", "11:00"), S("08:00", "09:30"), S("09:00", "10:00"), S("12:00", "12:00")])).toEqual([S("08:00", "10:00"), S("10:00", "11:00")]);
+  });
+
+  it("règle 2 : un tracteur et plusieurs outils et personnes → un attelage, périodes de l'intervention", () => {
+    const plan = crewsOf({ members: [tool(1, 10, true), tool(2, 20), doer(3, 30), doer(4, 31)], periods: [S("08:00", "10:00")], participations: none });
+    expect(plan).toEqual({ staffing: "crews", rule: 2, crews: [{ paramIds: [1, 2, 3, 4], periods: [S("08:00", "10:00")] }] });
+  });
+
+  it("règle 2 : deux tracteurs mais une seule personne (ou intervenant inconnu)", () => {
+    const plan = crewsOf({ members: [tool(1, 10, true), tool(2, 11, true), doer(3, null)], periods: [S("08:00", "10:00")], participations: none });
+    expect(plan).toMatchObject({ staffing: "crews", rule: 2 });
+  });
+
+  it("règle 3 : deux tracteurs et deux personnes sans participations → libre, ambigu", () => {
+    expect(crewsOf({ members: [tool(1, 10, true), tool(2, 11, true), doer(3, 30), doer(4, 31)], periods: [S("08:00", "10:00")], participations: none })).toEqual({
+      staffing: "free",
+      ambiguous: true,
+    });
+  });
+
+  it("sans matériel ou sans période : libre, non ambigu", () => {
+    expect(crewsOf({ members: [doer(1, 30)], periods: [S("08:00", "10:00")], participations: none })).toEqual({ staffing: "free", ambiguous: false });
+    expect(crewsOf({ members: [tool(1, 10, true)], periods: [], participations: none })).toEqual({ staffing: "free", ambiguous: false });
+  });
+
+  it("règle 1 : un attelage par tracteur participant, membres placés par recouvrement, reste au premier", () => {
+    const participations = new Map([
+      [10, [S("08:00", "10:00")]],
+      [11, [S("13:00", "15:00"), S("14:00", "16:00")]],
+      [20, [S("13:30", "14:00")]], // outil de l'après-midi
+      [30, [S("08:00", "09:00")]], // personne du matin
+      [31, [S("15:00", "16:00")]],
+    ]);
+    const plan = crewsOf({
+      members: [tool(1, 11, true), tool(2, 10, true), tool(3, 20), tool(4, 21), doer(5, 30), doer(6, 31)],
+      periods: [S("08:00", "16:00")],
+      participations,
+    });
+    expect(plan).toEqual({
+      staffing: "crews",
+      rule: 1,
+      crews: [
+        { paramIds: [2, 4, 5], periods: [S("08:00", "10:00")] }, // le plus tôt d'abord ; l'outil 21 sans participation y va
+        { paramIds: [1, 3, 6], periods: [S("13:00", "16:00")] },
+      ],
+    });
+  });
+
+  it("participations des seules personnes : on passe à la règle 2", () => {
+    const plan = crewsOf({ members: [tool(1, 10, true), tool(2, 20), doer(3, 30)], periods: [S("08:00", "10:00")], participations: new Map([[30, [S("08:00", "09:00")]]]) });
+    expect(plan).toMatchObject({ staffing: "crews", rule: 2 });
   });
 });

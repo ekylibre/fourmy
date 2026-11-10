@@ -16,6 +16,10 @@ import {
   samsysId,
   equipmentExternalIds,
   commissionedAt,
+  crewsOf,
+  isMotorised,
+  type CrewMember,
+  type Span,
 } from "./rules.js";
 
 /**
@@ -101,6 +105,7 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
       interventions: await x.interventions(s),
       parameters: await x.parameters(s),
       workingPeriods: await x.workingPeriods(s),
+      participations: await x.participations(s),
       harvests: await x.harvests(s),
       phytoRef: await x.phytoReference(s),
       openWeatherKey: await x.openWeatherKey(s),
@@ -494,6 +499,23 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
           inc("people");
         }
 
+        // Attelages (FR-ATT-10) : participations par intervention et par produit,
+        // nature des matériels, interventions corrigées dans Fourmy (non réécrites).
+        const participationsOf = new Map<number, Map<number, Span[]>>();
+        for (const p of data.participations) {
+          const byProduct = participationsOf.get(p.intervention_id) ?? new Map<number, Span[]>();
+          const list = byProduct.get(p.product_id) ?? [];
+          list.push({ startedAt: iso(p.started_at)!, stoppedAt: iso(p.stopped_at)! });
+          byProduct.set(p.product_id, list);
+          participationsOf.set(p.intervention_id, byProduct);
+        }
+        const varietyOf = new Map(data.equipments.map((e) => [e.id, e.variety]));
+        const correctedInterventions = new Set(
+          (await tx<{ id: string }[]>`
+            SELECT DISTINCT entity_id AS id FROM audit_log
+            WHERE farm_id = ${farmId} AND entity = 'intervention' AND action = 'corrected'`).map((r) => r.id),
+        );
+
         for (const it of data.interventions) {
           const status = interventionStatus(it.state);
           if (!status) {
@@ -501,18 +523,15 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
             continue;
           }
           const iid = id("interventions", it.id);
+          if (correctedInterventions.has(iid)) {
+            inc("interventions_preserved"); // corrigée dans Fourmy : ni moyens, ni attelages, ni cibles réécrits
+            continue;
+          }
           const stoppedAt = iso(it.stopped_at);
-          await tx`
-            INSERT INTO interventions (id, farm_id, procedure, status, started_at, stopped_at, origin)
-            VALUES (${iid}, ${farmId}, ${it.procedure_name}, ${status},
-                    ${iso(it.started_at)}, ${stoppedAt}, 'migration')
-            ON CONFLICT (id) DO UPDATE SET procedure = excluded.procedure, status = excluded.status,
-              started_at = excluded.started_at, stopped_at = excluded.stopped_at, updated_at = now()`;
-          inc("interventions");
 
           // Périodes de travail : celles d'Ekylibre, sinon [début, fin] de l'intervention.
           // Recalculées à chaque migration, comme le reste de l'intervention.
-          const periods: { id: string; startedAt: string; stoppedAt: string }[] = [];
+          const periods: { id: string; startedAt: string; stoppedAt: string; crewId?: string }[] = [];
           for (const wp of periodsByIntervention.get(it.id) ?? []) {
             const last = periods.at(-1);
             const startedAt = iso(wp.started_at)!;
@@ -527,11 +546,69 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
           if (periods.length === 0 && it.started_at && it.stopped_at && it.stopped_at > it.started_at) {
             periods.push({ id: id("intervention_period", it.id), startedAt: iso(it.started_at)!, stoppedAt: stoppedAt! });
           }
+
+          // Attelages : règles 1 à 3 (rules.ts). En attelages, chaque matériel,
+          // intervenant et période porte son attelage (garde de 0022).
+          const members: CrewMember[] = [];
+          for (const p of paramsByIntervention.get(it.id) ?? []) {
+            const role = parameterRole(p.type);
+            if (role !== "tool" && role !== "doer") continue;
+            members.push({ paramId: p.id, role, productId: p.product_id, motorised: role === "tool" && p.product_id !== null && isMotorised(varietyOf.get(p.product_id) ?? null) });
+          }
+          const plan = crewsOf({ members, periods, participations: participationsOf.get(it.id) ?? new Map() });
+          const crewIds = plan.staffing === "crews" ? plan.crews.map((_, rank) => id("intervention_crews", `${it.id}:${rank}`)) : [];
+          const crewOfParam = new Map<number, string>();
+          if (plan.staffing === "crews") {
+            plan.crews.forEach((c, rank) => c.paramIds.forEach((pid) => crewOfParam.set(pid, crewIds[rank]!)));
+            if (plan.rule === 2) for (const pr of periods) pr.crewId = crewIds[0]!;
+            else {
+              // Règle 1 : les périodes de l'intervention sont celles des attelages.
+              periods.length = 0;
+              plan.crews.forEach((c, rank) =>
+                c.periods.forEach((s, k) => periods.push({ id: id("intervention_crew_periods", `${it.id}:${rank}:${k}`), ...s, crewId: crewIds[rank]! })),
+              );
+            }
+            inc(`crews_rule_${plan.rule}`);
+          } else if (plan.ambiguous) {
+            inc("crews_ambiguous");
+            const names = (role: "tool" | "doer") =>
+              (paramsByIntervention.get(it.id) ?? [])
+                .filter((p) => parameterRole(p.type) === role)
+                .map((p) => p.product_name ?? `#${p.product_id}`)
+                .join(", ");
+            warnings.push({
+              entity: "intervention",
+              id: String(it.id),
+              message: `${it.procedure_name} du ${(iso(it.started_at) ?? "?").slice(0, 10)} : plusieurs matériels motorisés et plusieurs intervenants sans participations, laissée en mode libre (attelage ambigu) — matériels : ${names("tool")} ; intervenants : ${names("doer")}`,
+            });
+          }
+
+          await tx`
+            INSERT INTO interventions (id, farm_id, procedure, status, started_at, stopped_at, origin, staffing)
+            VALUES (${iid}, ${farmId}, ${it.procedure_name}, ${status},
+                    ${iso(it.started_at)}, ${stoppedAt}, 'migration', ${plan.staffing})
+            ON CONFLICT (id) DO UPDATE SET procedure = excluded.procedure, status = excluded.status,
+              started_at = excluded.started_at, stopped_at = excluded.stopped_at, staffing = excluded.staffing, updated_at = now()`;
+          inc("interventions");
+
+          // Attelages d'un passage précédent qui n'existent plus (leurs matériels,
+          // intervenants et périodes suivent en cascade, puis sont réécrits ci-dessous).
+          await tx`
+            DELETE FROM intervention_crews
+            WHERE intervention_id = ${iid} AND NOT (id = ANY(${`{${crewIds.join(",")}}`}::uuid[]))`;
+          for (const [rank, crewId] of crewIds.entries()) {
+            await tx`
+              INSERT INTO intervention_crews (id, intervention_id, rank)
+              VALUES (${crewId}, ${iid}, ${rank})
+              ON CONFLICT (id) DO UPDATE SET rank = excluded.rank`;
+            inc("crews");
+          }
+
           await tx`DELETE FROM intervention_periods WHERE intervention_id = ${iid}`;
           for (const pr of periods) {
             await tx`
-              INSERT INTO intervention_periods (id, intervention_id, started_at, stopped_at)
-              VALUES (${pr.id}, ${iid}, ${pr.startedAt}, ${pr.stoppedAt})`;
+              INSERT INTO intervention_periods (id, intervention_id, started_at, stopped_at, crew_id)
+              VALUES (${pr.id}, ${iid}, ${pr.startedAt}, ${pr.stoppedAt}, ${pr.crewId ?? null})`;
             inc("intervention_periods");
           }
 
@@ -605,13 +682,14 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
 
             await tx`
               INSERT INTO intervention_parameters
-                (id, intervention_id, role, ref_type, ref_id, quantity, unit, working_zone)
+                (id, intervention_id, role, ref_type, ref_id, quantity, unit, working_zone, crew_id)
               VALUES (${id("intervention_parameters", p.id)}, ${iid}, ${role}, ${refType}, ${refId},
                       ${num(p.quantity_value)}, ${p.quantity_unit_name || null},
-                      ${p.working_zone ? tx`ST_SetSRID(ST_GeomFromGeoJSON(${geo(p.working_zone)}), 4326)` : null})
+                      ${p.working_zone ? tx`ST_SetSRID(ST_GeomFromGeoJSON(${geo(p.working_zone)}), 4326)` : null},
+                      ${crewOfParam.get(p.id) ?? null})
               ON CONFLICT (id) DO UPDATE SET role = excluded.role, ref_type = excluded.ref_type,
                 ref_id = excluded.ref_id, quantity = excluded.quantity, unit = excluded.unit,
-                working_zone = excluded.working_zone`;
+                working_zone = excluded.working_zone, crew_id = excluded.crew_id`;
             inc("intervention_parameters");
 
             // Mouvement de stock pour les intrants / sorties de lots, si réalisée.
