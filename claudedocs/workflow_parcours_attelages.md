@@ -54,6 +54,17 @@ Phases réalisées, sur la branche `feat/parcours-attelages` :
   - `hitches()` : outils du même attelage, sur ses périodes.
   - Annulation : les parcours rattachés redeviennent libres.
   - Synchro mobile toujours forcée en mode libre (R3).
+- **N4** : saisie web des attelages.
+  - Formulaire : sélecteur « Libre | Attelages » dans Moyens ; une carte
+    par attelage (nom, matériels, intervenants, périodes), ajout,
+    duplication (même composition, période suivante pour ne pas chevaucher)
+    et retrait ; règles et synthèse « chantier · temps de travail » en
+    direct ; passage en libre confirmé avec la liste des pertes (`toFree`).
+  - Fiche : un bloc par attelage et la trace GPS de chaque matériel sur les
+    périodes de son attelage (une trace par fenêtre, jamais reliées).
+  - Calendrier : un créneau par période de chaque attelage, avec son nom.
+  - e2e `crews.spec.ts` (US-ATT-A) ; les parcours e2e existants passent.
+  - Report : attelages types (lot Q), bandeau des parcours (lot P).
 
 Contrôle d'O1 sur l'Arion 430 le 28/10 (réglages par défaut) :
 - déplacement 10:37-11:06, puis coupure de 2 h à midi ;
