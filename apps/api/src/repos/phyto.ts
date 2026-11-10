@@ -1,6 +1,19 @@
 import { sql, type SQL } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
-import { checkMixture, checkTreatment, hazardPictograms, worstLevel, type MixtureProduct, type ParcelContext, type PhytoProductRef, type PhytoUsageRef } from "@fourmy/domain";
+import {
+  applicatorsOf,
+  checkMixture,
+  checkTreatment,
+  hazardPictograms,
+  worstLevel,
+  type ComplianceIndicator,
+  type MixtureProduct,
+  type ParcelContext,
+  type PhytoProductRef,
+  type PhytoUsageRef,
+  type SprayerHint,
+  type StaffingBody,
+} from "@fourmy/domain";
 import {
   PROCEDURES,
   type ComplianceResult,
@@ -30,8 +43,12 @@ export interface CheckableBody {
   procedure: string;
   periods: WorkPeriod[];
   targets: InterventionTarget[];
-  inputs: { articleId: string; quantity: number; per: "hectare" | "total" }[];
+  inputs: { articleId: string; quantity: number; per: "hectare" | "total"; equipmentId?: string }[];
   plannedAt?: string;
+  /** Moyens : en attelages, l'applicateur est celui de l'attelage du pulvérisateur (FR-ATT-12). */
+  staffing?: StaffingBody["staffing"];
+  crews?: StaffingBody["crews"];
+  doers?: StaffingBody["doers"];
   compliance?: ComplianceWrite;
 }
 
@@ -244,6 +261,7 @@ export async function checkCompliance(tx: Tx, body: CheckableBody, selfId: strin
   const contexts = await Promise.all(parcelTargets.map((t) => parcelContext(tx, t, at, selfId, waterLoaded)));
   const sets = await cropsets(tx, version);
 
+  const sprayers = await sprayerHints(tx, body);
   const checks: TreatmentCheckDto[] = [];
   const mixable: MixtureProduct[] = [];
   for (const input of phytoInputs) {
@@ -268,6 +286,11 @@ export async function checkCompliance(tx: Tx, body: CheckableBody, selfId: strin
       result.indicators.unshift({ code: "authorization", level: "warning", message: "Référentiel phytosanitaire (Lexicon) non chargé : contrôle impossible." });
       result.level = worstLevel(result.indicators.map((i) => i.level));
     }
+    const applicator = applicatorIndicator(body, input, sprayers);
+    if (applicator) {
+      result.indicators.push(applicator);
+      result.level = worstLevel(result.indicators.map((i) => i.level));
+    }
     checks.push({ articleId: input.articleId, ...result });
     if (product && !mixable.some((m) => m.articleId === input.articleId)) mixable.push({ articleId: input.articleId, name: product.ref.name, mixCodes: product.mixCodes });
   }
@@ -281,6 +304,34 @@ export async function checkCompliance(tx: Tx, body: CheckableBody, selfId: strin
     mixture,
     reason: body.compliance?.reason ?? null,
   };
+}
+
+/** Nature et modèle d'avatar des matériels des attelages (reconnaître le pulvérisateur). */
+async function sprayerHints(tx: Tx, body: CheckableBody): Promise<Map<string, SprayerHint>> {
+  const ids = [...new Set((body.staffing === "crews" ? (body.crews ?? []) : []).flatMap((c) => c.tools.map((t) => t.equipmentId)))];
+  if (!ids.length) return new Map();
+  const list = await rows<{ id: string; kind: string; template: string | null }>(
+    tx,
+    sql`SELECT id, kind, avatar->>'template' AS template FROM equipments WHERE id = ANY(${`{${ids.join(",")}}`}::uuid[])`,
+  );
+  return new Map(list.map((e) => [e.id, { kind: e.kind, avatarTemplate: e.template }]));
+}
+
+/**
+ * Applicateur d'un produit en mode attelage (FR-ATT-12) : feu orange quand
+ * l'attelage retenu n'a pas d'intervenant, information quand il est ambigu.
+ * Le mode libre ne change pas (aucun indicateur).
+ */
+function applicatorIndicator(body: CheckableBody, input: { equipmentId?: string }, hints: Map<string, SprayerHint>): ComplianceIndicator | null {
+  if (body.staffing !== "crews" || !body.crews?.length) return null;
+  const a = applicatorsOf(body, input, (id) => hints.get(id));
+  if (a.rule === "ambiguous")
+    return { code: "applicator", level: "info", message: "Applicateur ambigu : plusieurs attelages et aucun pulvérisateur reconnu, tous les intervenants sont retenus." };
+  if (a.personIds.length === 0) {
+    const crew = body.crews[a.crewIndex!]!;
+    return { code: "applicator", level: "warning", message: `Applicateur non renseigné : ${crew.label?.trim() || `l'attelage ${a.crewIndex! + 1}`} n'a pas d'intervenant.` };
+  }
+  return null;
 }
 
 /** Contrôle à la demande (formulaire), dans le contexte de la ferme. */

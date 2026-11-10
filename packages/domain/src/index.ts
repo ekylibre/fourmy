@@ -14,6 +14,7 @@ export * from "./plan3d.js";
 export * from "./intervention-rules.js";
 export * from "./intervention-edits.js";
 export * from "./crews.js";
+export * from "./applicators.js";
 export * from "./phyto-rules.js";
 export * from "./phyto-hazards.js";
 export * from "./phyto-mixture.js";

@@ -366,8 +366,10 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         periods: completing ? flatPeriods(full) : [],
         plannedAt: completing ? undefined : flatPeriods(full)[0]?.startedAt,
         targets: full.targets,
-        inputs: full.inputs.filter((i) => phytoIds.has(i.articleId)).map(({ articleId, quantity, per }) => ({ articleId, quantity, per })),
+        inputs: full.inputs.filter((i) => phytoIds.has(i.articleId)).map(({ articleId, quantity, per, equipmentId }) => ({ articleId, quantity, per, ...(equipmentId ? { equipmentId } : {}) })),
         compliance: { usages: usageChoices },
+        // Attelages en cours de saisie (sans matériel ou sans période) : pas encore contrôlés.
+        ...(inCrews && full.crews.length && full.crews.every((c) => c.tools.length && c.periods.length) ? { staffing: "crews" as const, crews: full.crews } : {}),
       };
     } catch {
       draft = null; // date en cours de saisie

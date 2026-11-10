@@ -304,5 +304,6 @@ export const demoPhytoRegister: PhytoRegisterEntry[] = [
     amm: "2100001",
     quantity: 2,
     unit: "liter_per_hectare",
+    applicators: ["Camille"],
   },
 ];

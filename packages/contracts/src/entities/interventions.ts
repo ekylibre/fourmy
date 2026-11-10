@@ -290,6 +290,11 @@ export const phytoRegisterEntry = z.object({
   amm: z.string().optional(),
   quantity: z.number(),
   unit: z.string(),
+  /**
+   * Applicateur(s) : intervenants de l'attelage qui porte le pulvérisateur,
+   * tous les intervenants en mode libre (FR-ATT-12). Vide : non renseigné.
+   */
+  applicators: z.array(z.string()),
 });
 export type PhytoRegisterEntry = z.infer<typeof phytoRegisterEntry>;
 
