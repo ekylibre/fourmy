@@ -167,6 +167,24 @@ obligatoire mais demande l'identification individuelle pour les bovins.
 - **FR-VIZ-5 (S)** Suivre un matériel en direct sur la carte.
 - **FR-VIZ-6 (M)** Les plugins peuvent ajouter une couche cartographique.
 
+### 4.9 bis Jumeau observé : télédétection
+Études : `claudedocs/etude_jumeau_3d.md` et `claudedocs/etude_copernicus.md` ;
+conception : [`teledetection-design.md`](teledetection-design.md).
+- **FR-TWIN-1 (M)** Chaque parcelle affiche son **état observé** à la date de
+  la frise : NDVI Sentinel-2, avec la date d'acquisition et la part de
+  pixels valides. Si aucune donnée n'est exploitable, l'interface le dit
+  (pas de mesure, ancienne, parcelle trop petite) et n'invente jamais de
+  valeur. *Réalisé (lot Y).*
+- **FR-TWIN-2 (M)** Série temporelle de l'indice par parcelle, brute et
+  lissée, comparée aux années précédentes, avec les interventions en
+  repères. *Réalisé (lot Y).*
+- **FR-TWIN-5 (S)** Images satellite (NDVI, couleurs naturelles) drapées sur
+  la carte 2D et sur le relief du plan 3D. *Réalisé (lot Y).*
+- **FR-TWIN-3, 4, 6 à 9** (végétation 3D, météo visible, modulation ISO-XML,
+  ISOBUS, modèle de culture, capteurs) : voir l'étude, lots ultérieurs.
+  Prochain lot : alerte « intervention probablement manquante » (chute du
+  NDVI sans récolte saisie).
+
 ### 4.10 Réglementaire
 - **FR-REG-1 (M)** **Registre phytosanitaire** produit à partir des
   interventions.

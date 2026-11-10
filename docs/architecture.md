@@ -44,6 +44,7 @@
 | ADR-13 | Synchro mobile au **protocole de synchronisation de WatermelonDB** (`pull` par curseur, `push` des changements avec identifiants client) | API spécifique | `zero-mobile` utilise déjà WatermelonDB : l'adaptation se limite au connecteur. Les identifiants générés côté client rendent le `push` idempotent (NFR-OFF-1). |
 | ADR-14 | Authentification **better-auth** : comptes locaux en auto-hébergé, **OIDC** vers le SSO commun en SaaS | Keycloak embarqué | Une seule bibliothèque pour les deux modes de distribution (FR-ACC-1/2). |
 | ADR-15 | Déploiement **Docker Compose**, compatible **Dokploy** comme Aiffel | Kubernetes | Même outillage que le reste de l'écosystème ; une commande pour l'auto-hébergement (NFR-OSS-1). |
+| ADR-16 | Télédétection : **client TypeScript** `packages/sentinel` appelé par le worker, sur le compte Copernicus (CDSE) **de chaque exploitant** ; statistiques (Statistical API) et images (Process API) calculées par Sentinel Hub, stockées par **version de parcelle** et par date d'acquisition. *Réalisé le 2026-11-10 (lot Y).* | Service Python `services/agro` avec rasterio et TiTiler ; WMTS Sentinel Hub en direct ; un compte Fourmy commun | Aucun raster n'est traité localement : le service Python serait un conteneur de plus pour de simples appels HTTP. Le WMTS exposerait l'identifiant d'instance et épuiserait le quota de requêtes. Un compte par exploitant respecte les conditions du portail gratuit. Le LAI, les modèles de culture et un fournisseur de secours STAC/COG passeront par `services/agro` (ADR-1). Détail : [`teledetection-design.md`](teledetection-design.md). |
 
 ## 3. Vue d'ensemble
 
@@ -101,6 +102,7 @@ fourmy/
 │   ├── migrator-ekylibre/    # lecture base source → commandes de domaine
 │   ├── geo-ign/              # relief et bâtiments IGN, API Carto (PAC, cadastre)
 │   ├── equipment-3d/         # avatar 3D des matériels (glTF), pur, API et navigateur
+│   ├── sentinel/             # client Copernicus Data Space (Sentinel-2) : catalogue, statistiques, images
 │   └── ui-lyvre/             # thème Mantine et composants React du design system Lyvre
 ├── services/
 │   └── agro/                 # Python (FastAPI, uv) : méthodes agronomiques, sans état
@@ -220,6 +222,8 @@ Toutes les routes sont préfixées par `/api/v1/farms/:farmId` et acceptent
 | `GET /equipments` · `GET /equipments/:id/sheet` · `POST /equipments/:id/readings` | Matériels, fiche, relevés de compteur contrôlés | FR-MAT-4, 10 à 12 |
 | `GET /equipments/:id/maintenance?at=` · `GET /maintenance/due?at=` · `GET /maintenance/parts` | Plan d'entretien et échéances à une date, tableau de bord, pièces à commander | FR-MAT-20 à 24, 42 |
 | `GET /equipments/:id/avatar.glb` | Avatar 3D généré (ETag) ou importé | FR-MAT-81 à 84 |
+| `GET /remote-sensing/parcels?at=&index=` · `GET /land-parcels/:id/indices?from=&to=` | NDVI de chaque parcelle à une date et dernière image ; série d'une parcelle lissée, référence des années précédentes | FR-TWIN-1/2 |
+| `GET /remote-sensing/images/:date/:kind` · `GET /remote-sensing/scenes` · `GET /remote-sensing/status` · `POST /remote-sensing/history` | Images Sentinel-2 (NDVI, couleurs naturelles) pour la carte et le plan 3D ; acquisitions ; budget ; historique profond | FR-TWIN-5, ADR-16 |
 | `GET /terrain/heightmap/:z/:x/:y` | Grille d'altitude pour Cesium | ADR-9 |
 | `GET /sync/pull?last_pulled_at=` · `POST /sync/push` | Synchro mobile | ADR-13, FR-INT-2 |
 | `POST /imports/ekylibre` · `GET /imports/:id` | Lancer et suivre une migration (admin) | FR-MIG-1/3 |
