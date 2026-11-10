@@ -338,6 +338,12 @@ Exigences : `claudedocs/exigences_interventions.md` (INT-UI-2, INT-UI-3).
     carte des parcelles (bouton « Carte ») et la synthèse du contrôle
     réglementaire ; le détail du contrôle est sous chaque intrant. Après
     l'enregistrement : la fiche de l'intervention.
+  - **Ordre des blocs** (retours du 10/11/2026), création, réalisation et
+    modification : 1 · Intervention (type, bandeaux parcours et correction) ;
+    2 · Réalisation et moyens (réalisée / à planifier, libre / attelages,
+    périodes et durées, matériels, intervenants) ; 3 · Parcelles et produits
+    (ou matériel entretenu), puis intrants, sorties, motifs ; 4 · Météo ;
+    5 · Notes.
   - Nouvelle intervention : **réalisée** si son début est passé, **à
     planifier** s'il est à venir (le choix reste modifiable). Chaque période
     a une **durée** qui calcule la fin ; déplacer le début garde la durée.

@@ -196,3 +196,8 @@ Rappel des questions :
   `category` sur chaque fournisseur (`INTEGRATION_CATEGORIES`), page
   Intégrations groupée Météo / Suivi GPS – Matériels / OAD (masqué tant
   qu'aucun fournisseur). e2e : utilitaire `navTo(page, entrée, groupe)`.
+- **T** (2026-11-10) : formulaire en blocs numérotés (1 Intervention,
+  2 Réalisation et moyens, 3 Parcelles et produits / Matériel entretenu,
+  4 Météo, 5 Notes) ; périodes du mode libre, matériels et intervenants
+  regroupés au bloc 2, synthèse des durées sous les attelages ; aucun
+  changement de contrat. Test d'ordre dans `interventions.test.tsx`.

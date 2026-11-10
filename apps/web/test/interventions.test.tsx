@@ -20,6 +20,23 @@ async function openForm(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("interventions", () => {
+  it("ordre des blocs : intervention, réalisation et moyens, parcelles et produits, météo, notes", async () => {
+    const user = userEvent.setup();
+    const form = await openForm(user);
+    const order = (labels: string[]) => {
+      const nodes = labels.map((l) => within(form).getByText(l));
+      for (let k = 1; k < nodes.length; k++) {
+        expect(nodes[k - 1]!.compareDocumentPosition(nodes[k]!) & Node.DOCUMENT_POSITION_FOLLOWING, `${labels[k - 1]} avant ${labels[k]}`).toBeTruthy();
+      }
+    };
+    order(["1 · Intervention", "2 · Réalisation et moyens", "3 · Parcelles et produits", "Intrants", "4 · Météo", "5 · Notes"]);
+    // Moyens (bloc 2) avant les parcelles (bloc 3).
+    const moyens = within(form).getByRole("radiogroup", { name: "Déclaration des moyens" });
+    const parcelles = within(form).getByRole("combobox", { name: "Parcelles" });
+    expect(moyens.compareDocumentPosition(parcelles) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(form).getByRole("textbox", { name: "Notes" })).toBeInTheDocument();
+  });
+
   it("liste les interventions de la campagne avec libellés, intervenants et origine", async () => {
     renderApp(`/f/${FARM}/interventions?at=2026-06-10`);
     expect(await screen.findByText("Pulvérisation")).toBeInTheDocument();

@@ -665,6 +665,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       <Grid>
         <Grid.Col span={{ base: 12, lg: 7 }}>
           <Stack>
+            <Divider label="1 · Intervention" labelPosition="left" />
             <Select
               label="Intervention"
               data={procedureOptions}
@@ -688,6 +689,8 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
                 L'historique garde la version d'avant.
               </Alert>
             )}
+
+            <Divider label="2 · Réalisation et moyens" labelPosition="left" />
             {!planned && (
               <Stack gap={2}>
                 <SegmentedControl
@@ -705,32 +708,73 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               </Stack>
             )}
 
-            {inCrews ? (
-              <Paper withBorder p="xs">
-                <Text size="sm" c="dimmed">
-                  Périodes de travail : dans chaque attelage (Moyens, plus bas).
+            {procedure && shape !== "maintenance" && (
+              <Stack gap={2}>
+                <SegmentedControl
+                  aria-label="Déclaration des moyens"
+                  value={inCrews ? "crews" : "free"}
+                  onChange={(v) => (v === "crews" ? switchToCrews() : switchToFree(false))}
+                  data={[
+                    { value: "free", label: "Libre" },
+                    { value: "crews", label: "Attelages" },
+                  ]}
+                />
+                <Text size="xs" c="dimmed">
+                  {inCrews
+                    ? "Chaque attelage : ses matériels, ses intervenants et ses propres périodes (deux tracteurs en même temps, par exemple)."
+                    : "Matériels, intervenants et périodes indépendants."}
                 </Text>
-                {crewSummary}
-              </Paper>
-            ) : completing ? (
-              <>
+              </Stack>
+            )}
+            {!inCrews &&
+              (completing ? (
                 <PeriodsEditor periods={periods} onChange={setPeriods} onFirstStart={followStart} />
+              ) : (
+                <TextInput
+                  type="datetime-local"
+                  label="Date prévue"
+                  aria-label="Date prévue"
+                  value={periods[0]!.startedAt}
+                  onChange={(e) => {
+                    const v = e.currentTarget.value;
+                    setPeriods([withStart(periods[0]!, v)]);
+                    followStart(v);
+                  }}
+                  required
+                />
+              ))}
+            {procedure && (
+              <>
+                {inCrews ? (
+                  <>
+                    <CrewsEditor
+                      crews={crews}
+                      onChange={setCrews}
+                      equipmentOptions={equipmentOptions}
+                      peopleOptions={peopleOptions}
+                      defaultDay={defaultDay}
+                      errors={crewErrors}
+                      templates={{ farmId, items: crewTemplates.data?.items ?? [], canWrite: farmRole === "owner" }}
+                    />
+                    {crewSummary}
+                  </>
+                ) : (
+                  <>
+                    {shape !== "maintenance" && <MultiSelect label="Matériels" searchable data={equipmentOptions} value={tools} onChange={setTools} />}
+                    <MultiSelect
+                      label="Intervenants"
+                      searchable
+                      data={peopleOptions}
+                      value={doers}
+                      onChange={setDoers}
+                      nothingFoundMessage="Aucune personne — à ajouter dans Équipe"
+                    />
+                  </>
+                )}
               </>
-            ) : (
-              <TextInput
-                type="datetime-local"
-                label="Date prévue"
-                aria-label="Date prévue"
-                value={periods[0]!.startedAt}
-                onChange={(e) => {
-                  const v = e.currentTarget.value;
-                  setPeriods([withStart(periods[0]!, v)]);
-                  followStart(v);
-                }}
-                required
-              />
             )}
 
+            {procedure && <Divider label={shape === "maintenance" ? "3 · Matériel entretenu" : "3 · Parcelles et produits"} labelPosition="left" />}
             {procedure &&
               (shape === "maintenance" ? (
                 <MaintenanceFields
@@ -831,55 +875,16 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               />
             )}
 
-            {procedure && shape !== "maintenance" && <WeatherFields farmId={farmId} request={weatherRequest} value={weather} onChange={setWeather} />}
 
-            {procedure && (
+            {procedure && shape !== "maintenance" && (
               <>
-                <Divider label="Moyens" labelPosition="left" />
-                {shape !== "maintenance" && (
-                  <Stack gap={2}>
-                    <SegmentedControl
-                      aria-label="Déclaration des moyens"
-                      value={inCrews ? "crews" : "free"}
-                      onChange={(v) => (v === "crews" ? switchToCrews() : switchToFree(false))}
-                      data={[
-                        { value: "free", label: "Libre" },
-                        { value: "crews", label: "Attelages" },
-                      ]}
-                    />
-                    <Text size="xs" c="dimmed">
-                      {inCrews
-                        ? "Chaque attelage : ses matériels, ses intervenants et ses propres périodes (deux tracteurs en même temps, par exemple)."
-                        : "Matériels, intervenants et périodes indépendants."}
-                    </Text>
-                  </Stack>
-                )}
-                {inCrews ? (
-                  <CrewsEditor
-                    crews={crews}
-                    onChange={setCrews}
-                    equipmentOptions={equipmentOptions}
-                    peopleOptions={peopleOptions}
-                    defaultDay={defaultDay}
-                    errors={crewErrors}
-                    templates={{ farmId, items: crewTemplates.data?.items ?? [], canWrite: farmRole === "owner" }}
-                  />
-                ) : (
-                  <>
-                    {shape !== "maintenance" && <MultiSelect label="Matériels" searchable data={equipmentOptions} value={tools} onChange={setTools} />}
-                    <MultiSelect
-                      label="Intervenants"
-                      searchable
-                      data={peopleOptions}
-                      value={doers}
-                      onChange={setDoers}
-                      nothingFoundMessage="Aucune personne — à ajouter dans Équipe"
-                    />
-                  </>
-                )}
-                <Textarea label="Notes" autosize minRows={2} maxLength={2000} value={notes} onChange={(e) => setNotes(e.currentTarget.value)} />
+                <Divider label="4 · Météo" labelPosition="left" />
+                <WeatherFields farmId={farmId} request={weatherRequest} value={weather} onChange={setWeather} />
               </>
             )}
+
+            <Divider label={shape === "maintenance" ? "4 · Notes" : "5 · Notes"} labelPosition="left" />
+            <Textarea label="Notes" autosize minRows={2} maxLength={2000} value={notes} onChange={(e) => setNotes(e.currentTarget.value)} />
 
             {error && (
               <Alert color="brique" title="Enregistrement refusé">
