@@ -23,6 +23,7 @@
     "@fourmy/geo-ign": "workspace:*",
     "@fourmy/lexicon": "workspace:*",
     "@fourmy/migrator-ekylibre": "workspace:*",
+    "@fourmy/sentinel": "workspace:*",
     "@fourmy/weather": "workspace:*",
     "@hono/node-server": "1.13.8",
     "@hono/zod-openapi": "0.18.3",

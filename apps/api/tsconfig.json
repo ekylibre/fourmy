@@ -22,6 +22,9 @@
     },
     {
       "path": "../../packages/equipment-3d"
+    },
+    {
+      "path": "../../packages/sentinel"
     }
   ],
   "include": [

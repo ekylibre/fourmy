@@ -36,6 +36,10 @@ export interface ParcelMapProps {
   onMapClick?: (lngLat: { lng: number; lat: number }) => void;
   /** Forme proposée (parcelle PAC ou cadastrale), en surbrillance. */
   highlight?: FeatureCollection;
+  /** Image satellite (PNG transparent hors parcelles) posée sous les contours des parcelles. */
+  satellite?: { href: string; bbox: [number, number, number, number] } | null;
+  /** Opacité du remplissage des parcelles (0,4 par défaut ; plus faible sous une image satellite). */
+  fillOpacity?: number;
 }
 
 function bbox(...fcs: FeatureCollection[]): [[number, number], [number, number]] | null {
@@ -51,7 +55,21 @@ function bbox(...fcs: FeatureCollection[]): [[number, number], [number, number]]
 }
 
 /** Carte de travail (MapLibre) : parcellaire à la date, bâtiments, trace GPS. */
-export function ParcelMap({ parcels, places, track, zones = EMPTY, water = EMPTY, buffer = EMPTY, minHeight = 480, basemap, onSelect, onMapClick, highlight = EMPTY }: ParcelMapProps) {
+export function ParcelMap({
+  parcels,
+  places,
+  track,
+  zones = EMPTY,
+  water = EMPTY,
+  buffer = EMPTY,
+  minHeight = 480,
+  basemap,
+  onSelect,
+  onMapClick,
+  highlight = EMPTY,
+  satellite = null,
+  fillOpacity = 0.4,
+}: ParcelMapProps) {
   const clickRef = useRef(onMapClick);
   clickRef.current = onMapClick;
   const container = useRef<HTMLDivElement>(null);
@@ -185,6 +203,24 @@ export function ParcelMap({ parcels, places, track, zones = EMPTY, water = EMPTY
     m.setLayoutProperty("plan", "visibility", basemap === "plan" ? "visible" : "none");
     m.setLayoutProperty("ortho", "visibility", basemap === "ortho" ? "visible" : "none");
   }, [basemap, ready]);
+
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !ready) return;
+    m.setPaintProperty("parcels-fill", "fill-opacity", fillOpacity);
+  }, [fillOpacity, ready]);
+
+  // Image satellite : source `image` aux 4 coins de son emprise (WGS84), sous les parcelles.
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !ready) return;
+    if (m.getLayer("satellite")) m.removeLayer("satellite");
+    if (m.getSource("satellite")) m.removeSource("satellite");
+    if (!satellite) return;
+    const [w, s, e, n] = satellite.bbox;
+    m.addSource("satellite", { type: "image", url: satellite.href, coordinates: [[w, n], [e, n], [e, s], [w, s]] });
+    m.addLayer({ id: "satellite", type: "raster", source: "satellite", paint: { "raster-fade-duration": 0, "raster-resampling": "nearest" } }, "parcels-fill");
+  }, [satellite?.href, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return <div ref={container} style={{ width: "100%", height: "100%", minHeight, borderRadius: 14, overflow: "hidden" }} />;
 }

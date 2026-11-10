@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import { Alert, Badge, Button, Grid, Group, Paper, Stack, Table, Tabs, Text, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
@@ -18,6 +18,9 @@ import { ActivityBadge } from "../activities/ActivityBadge";
 import { CertificationBadges, ParcelCertificationsModal } from "../certifications/Certifications";
 import { ParcelMap } from "../map/ParcelMap";
 import { SprayingConditions } from "../weather/Weather";
+
+// Le graphique (recharts) n'est chargé qu'à l'ouverture de l'onglet.
+const VegetationTab = lazy(() => import("../remote-sensing/VegetationTab").then((m) => ({ default: m.VegetationTab })));
 
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 const STATUS: Record<string, string> = { done: "Réalisée", planned: "Planifiée", in_progress: "En cours" };
@@ -103,6 +106,7 @@ function Sheet({ sheet: s }: { sheet: ParcelSheet }) {
           <Tabs.Tab value="crops">Cultures ({capByYear.length})</Tabs.Tab>
           <Tabs.Tab value="cadastre">Cadastre ({significant.length})</Tabs.Tab>
           <Tabs.Tab value="water">Eau à proximité ({s.water.filter((w) => !w.ditch).length})</Tabs.Tab>
+          <Tabs.Tab value="vegetation">Végétation</Tabs.Tab>
           <Tabs.Tab value="weather">Météo</Tabs.Tab>
           <Tabs.Tab value="interventions">Interventions ({s.interventions.length})</Tabs.Tab>
         </Tabs.List>
@@ -277,6 +281,12 @@ function Sheet({ sheet: s }: { sheet: ParcelSheet }) {
               </Table>
             )}
           </Paper>
+        </Tabs.Panel>
+
+        <Tabs.Panel value="vegetation" pt="md">
+          <Suspense fallback={<Loading />}>
+            <VegetationTab farmId={farm.id} parcelId={s.id} />
+          </Suspense>
         </Tabs.Panel>
 
         <Tabs.Panel value="weather" pt="md">

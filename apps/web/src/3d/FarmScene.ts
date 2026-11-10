@@ -15,7 +15,11 @@ import {
   SampledProperty,
   Transforms,
   Color,
+  ColorMaterialProperty,
   CustomHeightmapTerrainProvider,
+  ImageryLayer,
+  Rectangle,
+  SingleTileImageryProvider,
   DistanceDisplayCondition,
   Entity,
   GeographicTilingScheme,
@@ -155,6 +159,11 @@ export class FarmScene {
   private selectedTank: string | null = null;
   private plan: PlanData | null = null;
   private framed = false;
+  /** Image satellite drapée (télédétection) et style des parcelles (teinte NDVI, opacité). */
+  private satLayer: ImageryLayer | null = null;
+  private satKey: string | null = null;
+  private parcelTint: Map<string, string> | null = null;
+  private parcelAlpha = 0.4;
   /** Géométries ignorées au dernier affichage (invalides). */
   skipped = 0;
   private readonly handler: ScreenSpaceEventHandler;
@@ -244,7 +253,7 @@ export class FarmScene {
         name: p.name,
         polygon: {
           hierarchy: safeRing(ring),
-          material: (COLORS[(p.nature ?? "none") as keyof typeof COLORS] ?? COLORS.none).withAlpha(0.4),
+          material: this.parcelColor(p),
           classificationType: ClassificationType.TERRAIN,
         },
       }));
@@ -291,6 +300,47 @@ export class FarmScene {
       });
       this.framed = true;
     }
+  }
+
+  private parcelColor(p: PlanData["parcels"][number]): Color {
+    const tint = this.parcelTint?.get(p.id);
+    const base = tint ? Color.fromCssColorString(tint) : (COLORS[(p.nature ?? "none") as keyof typeof COLORS] ?? COLORS.none);
+    return base.withAlpha(this.parcelAlpha);
+  }
+
+  /**
+   * Teinte des parcelles (NDVI par parcelle) et opacité (faible sous une image
+   * satellite). Met à jour les parcelles affichées sans reconstruire le plan.
+   */
+  setParcelStyle(tint: Map<string, string> | null, alpha: number) {
+    this.parcelTint = tint;
+    this.parcelAlpha = alpha;
+    if (!this.plan) return;
+    const byId = new Map(this.plan.parcels.map((p) => [`parcel:${p.id}`, p]));
+    for (const e of this.planEntities) {
+      const p = byId.get(String(e.id));
+      if (p && e.polygon) e.polygon.material = new ColorMaterialProperty(this.parcelColor(p));
+    }
+  }
+
+  /**
+   * Image satellite (PNG transparent hors parcelles) drapée sur le relief,
+   * au-dessus de l'orthophoto. `null` la retire.
+   */
+  async setSatellite(img: { href: string; bbox: [number, number, number, number] } | null) {
+    const key = img?.href ?? null;
+    if (key === this.satKey) return;
+    this.satKey = key;
+    if (this.satLayer) {
+      this.viewer.imageryLayers.remove(this.satLayer, true);
+      this.satLayer = null;
+    }
+    if (!img) return;
+    const [w, s, e, n] = img.bbox;
+    const provider = await SingleTileImageryProvider.fromUrl(img.href, { rectangle: Rectangle.fromDegrees(w, s, e, n), credit: "Copernicus Sentinel-2" });
+    // Une autre image a pu être demandée pendant le chargement.
+    if (this.satKey !== key || this.viewer.isDestroyed()) return;
+    this.satLayer = this.viewer.imageryLayers.addImageryProvider(provider);
   }
 
   private addTank(t: PlanData["tanks"][number], add: (e: Entity.ConstructorOptions) => void) {

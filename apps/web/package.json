@@ -19,6 +19,7 @@
     "@fourmy/domain": "workspace:*",
     "@fourmy/equipment-3d": "workspace:*",
     "@fourmy/ui-lyvre": "workspace:*",
+    "@mantine/charts": "9.7.3",
     "@mantine/core": "9.7.3",
     "@mantine/dates": "9.7.3",
     "@mantine/hooks": "9.7.3",
@@ -33,6 +34,7 @@
     "react": "19.2.9",
     "react-dom": "19.2.9",
     "react-router": "8.5.0",
+    "recharts": "3.10.1",
     "terra-draw": "1.38.0",
     "terra-draw-maplibre-gl-adapter": "1.5.0"
   },

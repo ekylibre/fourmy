@@ -1,4 +1,4 @@
-# Télédétection par parcelle : conception (lot S)
+# Télédétection par parcelle : conception (lot Y)
 
 *2026-11-10. Statut : **validé** le 2026-11-10 (décisions en §13).*
 
@@ -19,7 +19,7 @@ Pierre en donne les chiffres de référence (`claudedocs/etude_copernicus.md` §
 | # | Choix | Écarté | Pourquoi |
 |---|---|---|---|
 | D1 | **Intégration `copernicus`**, thème nouveau « Télédétection ». Réglage `clientId` (texte) et secret `clientSecret` (chiffré) | Variables d'environnement globales | Un compte par exploitant (décision du 2026-11-10) ; reprend tel quel le cadre des intégrations (formulaire décrit dans les contrats, test, synchro par le worker, secret chiffré jamais renvoyé) |
-| D2 | **Client TypeScript `packages/sentinel`**, pur, comme `packages/weather` | Service Python `services/agro` | Le lot ne fait **aucun calcul raster local** : la Statistical API rend du JSON, la Process API rend un PNG déjà colorié et découpé. Le service Python n'est pas encore déployé ; l'ajouter maintenant coûterait un conteneur de plus pour de simples appels HTTP. Il reste prévu pour le LAI et les modèles de culture (lot ultérieur). **→ ADR-11, §9** |
+| D2 | **Client TypeScript `packages/sentinel`**, pur, comme `packages/weather` | Service Python `services/agro` | Le lot ne fait **aucun calcul raster local** : la Statistical API rend du JSON, la Process API rend un PNG déjà colorié et découpé. Le service Python n'est pas encore déployé ; l'ajouter maintenant coûterait un conteneur de plus pour de simples appels HTTP. Il reste prévu pour le LAI et les modèles de culture (lot ultérieur). **→ ADR-16, §9** |
 | D3 | **Stockage en base** des statistiques par **version de parcelle** et par date d'acquisition, et des images PNG en `bytea` | Recalcul à la demande ; COG et TiTiler | La frise et la fiche parcelle lisent en base : réponse immédiate et quota prévisible. Une date passée est immuable. Les versions de parcelle suivent les campagnes, donc la série suit la géométrie de l'époque. Le `bytea` existe déjà (avatars, photos) |
 | D4 | **Synchro déclenchée par les acquisitions** : le Catalog signale une acquisition, un test sur l'ensemble de la ferme la juge exploitable ou non, et les statistiques par parcelle ne partent que dans le premier cas | Synchro quotidienne ou hebdomadaire de toutes les parcelles | Le facteur limitant est le nombre de requêtes (10 000 par mois), pas les PU (§6) |
 | D5 | **Images en EPSG:4326**, emprise des parcelles, transparentes hors parcelles et sous les nuages | WMTS Sentinel Hub en direct | Le WMTS expose l'identifiant d'instance et ruine le quota de requêtes. Une image unique s'affiche dans Cesium (`SingleTileImageryProvider` + `rectangle`) comme dans MapLibre (source `image`) |
@@ -254,10 +254,10 @@ Sous `/api/v1/farms/:farmId`, avec session et RLS, comme le reste.
 |---|---|---|
 | `GET /remote-sensing/status` | État de l'intégration pour l'interface : active, dernière acquisition, budget du mois | `{ enabled, lastSceneOn, usage: { requests, pu, budget } }` |
 | `GET /remote-sensing/scenes?from&to` | Acquisitions de la période (pour la frise) | `[{ date, validRatio, images: ('ndvi'\|'rgb')[] }]` |
-| `GET /remote-sensing/scenes/:date/:kind.png` | Image d'une date | PNG ; `ETag` = sha256 ; `Cache-Control: private, max-age=31536000, immutable` |
+| `GET /remote-sensing/images/:date/:kind` | Image d'une date | PNG ; `ETag` = sha256 ; `Cache-Control: private, max-age=86400` (revalidé par ETag, voir §14) |
 | `GET /remote-sensing/parcels?at=&index=ndvi` | Dernière valeur exploitable de chaque parcelle à la date `at` (fenêtre de 20 jours) | `[{ parcelId, versionId, date, ageDays, mean, p10, p50, p90, validRatio, status: 'ok'\|'stale'\|'none'\|'too_small' }]`, plus `scene: { date, bbox }` = la dernière image exploitable ≤ `at` |
 | `GET /parcels/:parcelId/indices?index=ndvi&from&to` | Série d'une parcelle à travers ses versions | `{ points: [{ date, mean, p10, p90, usable }], smoothed: [{ date, value }], reference: [{ doy, median, years }] }` |
-| `POST /integrations/:id/history` | Historique profond (§3.2) | `{ from, estimate: { requests, pu } }` ; avec `confirm: true`, lancement en tâche de fond |
+| `POST /remote-sensing/history` | Historique profond (§3.2) | `{ from, estimate: { requests, pu } }` ; avec `confirm: true`, lancement en tâche de fond |
 
 Contrats zod dans `packages/contracts/src/remote-sensing.ts`. La
 **mention légale** « Contient des données Copernicus Sentinel modifiées
@@ -322,9 +322,9 @@ Contrats zod dans `packages/contracts/src/remote-sensing.ts`. La
 - **Le rapport de synchro** affiche les acquisitions, les parcelles mises à
   jour, ainsi que les requêtes et PU consommées.
 
-## 9. ADR-11 proposé (à ajouter à `docs/architecture.md`)
+## 9. ADR-16 proposé (à ajouter à `docs/architecture.md`)
 
-> **ADR-11** — Télédétection, premier lot : **client TypeScript**
+> **ADR-16** — Télédétection, premier lot : **client TypeScript**
 > (`packages/sentinel`) appelé par le worker, **sans le service Python**. Les
 > statistiques et le rendu sont faits par Sentinel Hub (CDSE), et Fourmy
 > stocke les résultats par version de parcelle. *Écarté* : le service Python
@@ -371,7 +371,7 @@ développe et se teste sans CDSE.
 6. Web : couche Satellite sur la carte 2D et le plan 3D, coloration des
    parcelles.
 7. Recette sur la ferme de Pierre (compte réel), puis documentation
-   (`docs/teledetection.md`, ADR-11, mise à jour de requirements FR-TWIN).
+   (`docs/teledetection.md`, ADR-16, mise à jour de requirements FR-TWIN).
 
 ## 13. Décisions (2026-11-10)
 1. **Historique** : depuis le **1er janvier de l'année précédente** à
@@ -386,3 +386,46 @@ développe et se teste sans CDSE.
    - l'alerte « intervention probablement manquante » (détection d'une chute
      du NDVI sans récolte saisie, confirmée par le NDMI ou Sentinel-1) fait
      l'objet du **lot suivant**.
+
+## 14. Écarts constatés à la réalisation (2026-11-10)
+
+La réalisation suit cette conception, à six écarts près, tous vérifiés sur la
+ferme de Pierre (`phaurigot`, base de dev, compte CDSE réel) :
+
+1. **Test de nuages de la ferme à 60 m** au lieu de 10 m (`validPixels`).
+   - Constat : Copernicus facture le **rectangle englobant** de la géométrie.
+     Pour des parcelles dispersées (environ 4 × 6 km chez Pierre), le test à
+     10 m coûtait environ 1 PU par date, soit environ 325 PU pour
+     l'historique.
+   - À 60 m, il revient à environ 10 PU. Le masque SCL est natif à 20 m, la
+     part de nuages reste donc bien estimée.
+   - Les statistiques par parcelle restent à 10 m.
+2. **Curseur par version de parcelle** : `fetched_until` est la **dernière
+   date exploitable obtenue**, et non le jour de la synchro.
+   - Une version n'est réinterrogée que pour une date exploitable postérieure.
+   - Une acquisition publiée en retard reste ainsi à prendre, et une synchro
+     toutes les 6 h ne redemande rien tant qu'il n'y a rien de nouveau.
+   - `fetched_from` permet de compléter un historique plus ancien.
+3. **Routes** :
+   - images : `GET /remote-sensing/images/:date/:kind` (au lieu de
+     `…/scenes/:date/:kind.png`) ;
+   - historique profond : `POST /remote-sensing/history` (au lieu de
+     `/integrations/:id/history`), avec la date enregistrée dans les réglages
+     de l'intégration (`historyFrom`).
+4. **Images** : au plus 20 dates par synchro, les plus récentes d'abord ; le
+   reste vient aux synchros suivantes. Le cache HTTP dure un jour, avec
+   revalidation par ETag, car un retraitement peut changer l'image.
+5. **Catalogue** : il répond en `application/geo+json`. Un `Accept:
+   application/json` provoque une erreur 406.
+6. **Coût réel de l'activation chez Pierre** (11 parcelles, du 1er janvier
+   2025 au 10 novembre 2026) :
+   - acquisitions : 325, dont 139 à 153 exploitables pour la ferme ;
+   - valeurs : 9 084 ;
+   - images : 36 (24 au premier passage, 12 au second) ;
+   - environ 50 requêtes ;
+   - environ 190 PU une fois le test de nuages corrigé (482 avec le test à
+     10 m) ;
+   - durée : 2 minutes.
+
+**Nom du lot** : « lot Y ». Les lettres S à X étaient déjà prises par les
+retours du 10/11.

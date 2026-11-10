@@ -15,6 +15,9 @@ import { ErrorAlert, Loading } from "../../components/states";
 import { MapBoundary } from "../../components/MapBoundary";
 import { ParcelMap, type Basemap } from "./ParcelMap";
 import { ParcelDelays } from "./ParcelDelays";
+import { ndviColor } from "@fourmy/contracts";
+import { byParcel, imageFor, useParcelIndicesAt, useRemoteSensingStatus, useSatelliteLayer } from "../remote-sensing/remote-sensing";
+import { ParcelNdvi, SatelliteControl } from "../remote-sensing/SatelliteControl";
 
 /** Carte 2D : parcellaire à la date de la frise, bâtiments, trace GPS du jour (US-1). */
 export function MapPage() {
@@ -26,6 +29,10 @@ export function MapPage() {
   const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
   const [equipment, setEquipment] = useState<string | null>(null);
   const [showTrack, setShowTrack] = useState(false);
+  const [sat, setSat] = useSatelliteLayer();
+  const rsStatus = useRemoteSensingStatus(farm.id);
+  const rsEnabled = rsStatus.data?.enabled ?? false;
+  const rs = useParcelIndicesAt(farm.id, day, rsEnabled);
 
   const from = new Date(`${day}T00:00:00`).toISOString();
   const to = new Date(Date.parse(`${day}T00:00:00`) + 86_400_000).toISOString();
@@ -45,6 +52,13 @@ export function MapPage() {
     const s = snap.data;
     if (!s) return null;
     const nature = new Map(s.productions.map((p) => [p.landParcelId, p.nature]));
+    const ndvi = byParcel(rs.data);
+    // « Par parcelle » : couleur de son dernier NDVI exploitable ; gris sans mesure.
+    const colorOf = (id: string) => {
+      if (sat !== "parcels") return NATURE_COLORS[nature.get(id) ?? "none"];
+      const v = ndvi.get(id);
+      return v && v.mean !== null && (v.status === "ok" || v.status === "stale") ? ndviColor(v.mean) : "#8A948E";
+    };
     const parcels: FeatureCollection = {
       type: "FeatureCollection",
       features: s.landParcels.map((p) => ({
@@ -55,7 +69,7 @@ export function MapPage() {
           name: p.name,
           areaM2: p.version.areaM2,
           nature: nature.get(p.id) ?? "none",
-          color: NATURE_COLORS[nature.get(p.id) ?? "none"],
+          color: colorOf(p.id),
           variety: p.version.viti?.variety ?? null,
         },
       })),
@@ -67,7 +81,9 @@ export function MapPage() {
         .map((p) => ({ type: "Feature", geometry: p.version.footprint as unknown as Geometry, properties: { name: p.name } })),
     };
     return { parcels, places };
-  }, [snap.data]);
+  }, [snap.data, rs.data, sat]);
+  const satellite = imageFor(rs.data, sat);
+  const selectedNdvi = selected ? byParcel(rs.data).get(String(selected.id)) : undefined;
 
   const trackLayer = useMemo<FeatureCollection>(() => {
     const samples = showTrack ? (track.data?.samples ?? []) : [];
@@ -107,7 +123,15 @@ export function MapPage() {
         <Grid.Col span={{ base: 12, md: 8 }} style={{ height: "68vh" }}>
           {layers && (
             <MapBoundary>
-              <ParcelMap parcels={layers.parcels} places={layers.places} track={trackLayer} basemap={basemap} onSelect={setSelected} />
+              <ParcelMap
+                parcels={layers.parcels}
+                places={layers.places}
+                track={trackLayer}
+                basemap={basemap}
+                onSelect={setSelected}
+                satellite={satellite}
+                fillOpacity={satellite ? 0 : sat === "parcels" ? 0.75 : 0.4}
+              />
             </MapBoundary>
           )}
         </Grid.Col>
@@ -128,12 +152,14 @@ export function MapPage() {
                 {s.landParcels.length} parcelles · {formatHa(s.landParcels.reduce((a, p) => a + p.version.areaM2, 0))}
               </Text>
             </Paper>
+            <SatelliteControl farmId={farm.id} enabled={rsEnabled} data={rs.data} layer={sat} onChange={setSat} />
             {selected && (
               <Paper p="md">
                 <Title order={4}>{String(selected.name)}</Title>
                 <Text>{formatHa(Number(selected.areaM2))}</Text>
                 <Text c="dimmed">{NATURE_LABELS[String(selected.nature)] ?? "Sans production cette campagne"}</Text>
                 {typeof selected.variety === "string" && selected.variety !== "null" && <Badge color="lichen">{selected.variety}</Badge>}
+                {rsEnabled && <ParcelNdvi item={selectedNdvi} />}
                 <ParcelDelays farmId={farm.id} parcelId={String(selected.id)} at={at} />
                 <Button component={Link} to={`/f/${farm.id}/land-parcels/${String(selected.id)}${location.search}`} variant="light" size="xs" w="fit-content">
                   Fiche de la parcelle

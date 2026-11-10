@@ -19,6 +19,8 @@ import {
   demoPhytoRegister,
   DEMO_FARM_ID,
   DEMO_USER_ID,
+  demoParcelIndicesAt,
+  demoParcelSeries,
 } from "./fixtures.js";
 
 /**
@@ -68,6 +70,18 @@ export const handlers = [
   http.get(`*${base}/members`, () =>
     page([{ userId: DEMO_USER_ID, email: demoUser.email, name: demoUser.name, role: "owner", personId: null }]),
   ),
+  // Télédétection : Copernicus actif, séries synthétiques, pas d'image.
+  http.get(`*${base}/remote-sensing/status`, () =>
+    HttpResponse.json({ enabled: true, lastSceneOn: "2026-05-29", usage: { month: "2026-06-01", requests: 42, pu: 3.5, budget: 3000 } }),
+  ),
+  http.get(`*${base}/remote-sensing/parcels`, ({ request }) =>
+    HttpResponse.json(demoParcelIndicesAt(new URL(request.url).searchParams.get("at") ?? "2026-06-01")),
+  ),
+  http.get(`*${base}/remote-sensing/scenes`, () => HttpResponse.json({ items: [] })),
+  http.get(`*${base}/land-parcels/:id/indices`, ({ request, params }) => {
+    const q = new URL(request.url).searchParams;
+    return HttpResponse.json(demoParcelSeries(String(params.id), q.get("from") ?? "2025-06-02", q.get("to") ?? "2026-06-01"));
+  }),
   http.get("*/health", () => HttpResponse.json({ status: "ok", service: "mock" })),
   http.get("*/api/v1/me/farms", () => HttpResponse.json({ userId: "mock", items: demoMyFarms })),
   http.get(`*${base}/snapshot`, () => HttpResponse.json(demoSnapshot)),
