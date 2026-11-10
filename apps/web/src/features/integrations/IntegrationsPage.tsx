@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, Badge, Button, Group, List, Paper, PasswordInput, Stack, Switch, Text, TextInput, Title } from "@mantine/core";
+import { Alert, Badge, Button, Group, List, Paper, PasswordInput, Stack, Switch, Table, Text, TextInput, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { INTEGRATION_CATEGORIES, type Integration, type IntegrationProviderDefinition } from "@fourmy/contracts";
@@ -61,11 +61,60 @@ export function IntegrationsPage() {
                 integration={items.find((i) => i.provider === definition.provider) ?? null}
               />
             ))}
+            {withOpenMeteo && <StationsCard farmId={farm.id} />}
             {withOpenMeteo && <OpenMeteoCard />}
           </Stack>
         );
       })}
     </Stack>
+  );
+}
+
+type Station = { id: string; provider: string; name: string; lat: number | null; lon: number | null; lastMeasureAt: string | null; measures: number };
+
+/** Stations Weenat et Sencrop recopiées (lot W) : dernière mesure de chacune. */
+function StationsCard({ farmId }: { farmId: string }) {
+  const q = useQuery({
+    queryKey: ["weather-stations", farmId],
+    queryFn: () => api.get<{ items: Station[] }>(farmPath(farmId, "/weather/stations")),
+  });
+  const items = q.data?.items ?? [];
+  if (!items.length) return null;
+  return (
+    <Paper p="md" data-testid="weather-stations">
+      <Title order={3}>Stations météo de la ferme</Title>
+      <Text size="sm" c="dimmed" mb="xs">
+        Mesures horaires synchronisées toutes les heures. La météo d'une intervention passée prend la station la plus proche des
+        parcelles (moins de 5 km).
+      </Text>
+      <Table aria-label="Stations météo">
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>Station</Table.Th>
+            <Table.Th>Fournisseur</Table.Th>
+            <Table.Th>Dernière mesure</Table.Th>
+            <Table.Th>Mesures</Table.Th>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
+          {items.map((s) => (
+            <Table.Tr key={s.id}>
+              <Table.Td>
+                {s.name}
+                {s.lat === null && (
+                  <Badge ml={6} size="xs" color="paille" variant="light">
+                    sans position
+                  </Badge>
+                )}
+              </Table.Td>
+              <Table.Td>{s.provider === "weenat" ? "Weenat" : "Sencrop"}</Table.Td>
+              <Table.Td className="lv-num">{s.lastMeasureAt ? new Date(s.lastMeasureAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }) : "—"}</Table.Td>
+              <Table.Td className="lv-num">{s.measures.toLocaleString("fr-FR")}</Table.Td>
+            </Table.Tr>
+          ))}
+        </Table.Tbody>
+      </Table>
+    </Paper>
   );
 }
 
@@ -78,7 +127,7 @@ function OpenMeteoCard() {
       </Group>
       <Text size="sm" c="dimmed" mt={4}>
         Gratuit et sans clé : prévisions et historique depuis 1940 pour la météo des interventions et les conditions de
-        pulvérisation. Utilisé quand ni meteoblue ni OpenWeather ne sont actifs, et toujours pour le passé.
+        pulvérisation. Utilisé quand ni meteoblue ni OpenWeather ne sont actifs, et pour le passé quand aucune station Weenat ou Sencrop n'est assez proche.
       </Text>
     </Paper>
   );

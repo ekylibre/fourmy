@@ -138,7 +138,7 @@ export const phytoArticleLink = z.object({ amm: z.string().trim().min(4).max(20)
 
 // --- Météo (lot 3 : MET-1 à MET-3) ---------------------------------------------
 
-export const weatherSource = z.enum(["open_meteo", "openweather", "meteoblue", "manual"]);
+export const weatherSource = z.enum(["open_meteo", "openweather", "meteoblue", "weenat", "sencrop", "manual"]);
 
 /** Météo enregistrée avec l'intervention (pré-remplie, modifiable). */
 export const interventionWeather = z.object({
@@ -151,6 +151,8 @@ export const interventionWeather = z.object({
   windMaxKmh: z.number().min(0).max(300).nullable().optional(),
   precipitationMm: z.number().min(0).max(1000).nullable(),
   fetchedAt: isoDateTime.nullable().optional(),
+  /** Station de mesure (sources weenat, sencrop) et sa distance aux parcelles. */
+  station: z.object({ name: z.string(), distanceM: z.number() }).nullable().optional(),
   /** Temps dominant (code d'icône OpenWeather `01d`…`50n`), quel que soit le fournisseur. */
   icon: z.string().regex(/^\d\d[dn]$/).nullable().optional(),
   /** Heures de la période (frise de la fiche), 48 au plus. */

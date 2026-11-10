@@ -82,3 +82,36 @@ seuils), `apps/api/test/weather.integration.test.ts` (historique, OpenWeather
 actif puis en panne, créneaux, enregistrement, worker),
 `apps/web/test/weather.test.tsx` (pré-remplissage, saisie à la main, widget,
 fiche, tableau de bord).
+
+## Stations de l'agriculteur : Weenat et Sencrop (lot W, 2026-11-10)
+
+Intégrations du thème Météo (page Intégrations). Références : plugins
+Ekylibre `ekylibre-weenat` et `ekylibre-sencrop`.
+
+| | Weenat | Sencrop |
+|---|---|---|
+| Accès | e-mail (réglage) + mot de passe (secret chiffré) de l'application Weenat | identifiant d'application (réglage) + secret d'application (secret chiffré) |
+| Jeton | `POST api-prod.weenat.com/api/api-token-auth/` → JWT (`Authorization: JWT …`), gardé pour la synchro | `POST api.sencrop.com/v1/oauth2/token` (Basic, client credentials) → Bearer ~1 h, renouvelé 1 min avant |
+| Stations | `GET /v2/access/plots/` (parcelles Weenat : id, nom, lat, lon) | `GET /v1/me` puis `/users/{id}/devices` (`devicesStatuses[id].contents`) |
+| Mesures horaires | `GET /v2/access/plots/{id}/measures/?start&end` (s), fenêtres de 30 j ; RR, T, U, FF, FXY | `GET …/devices/{id}/data/hourly?beforeDate&days&measures`, fenêtres de 7 j ; RAIN_FALL, TEMPERATURE(_MIN/_MAX), RELATIVE_HUMIDITY, WIND_SPEED, WIND_GUST, WIND_DIRECTION, LEAF_WETNESS |
+
+- **Modèle** (migration 0028) : `weather_stations` (fournisseur, identifiant
+  externe, nom, position) et `weather_measures` (une ligne par station et par
+  heure, valeurs typées et `raw`), RLS par ferme.
+- **Synchro** (worker, toutes les heures — `fourmy_due_integrations`) :
+  30 jours d'historique à la première, puis depuis la dernière mesure avec
+  2 h de recouvrement ; idempotente. Reprise sur 429 et 5xx ; 401/403 :
+  intégration en erreur avec un message lisible.
+- **Usage** : la météo d'une intervention **passée** prend d'abord les
+  mesures de la station active la plus proche des parcelles (moins de 5 km,
+  au moins 80 % des heures couvertes) ; la source (« station Weenat
+  « nom » à x km, observée ») est enregistrée. Sinon : Open-Meteo
+  (historique), comme avant. Les prévisions restent aux fournisseurs de
+  prévision (meteoblue, OpenWeather, Open-Meteo).
+- **Écran** : page Intégrations › Météo : formulaires Weenat et Sencrop,
+  « Tester » liste les stations du compte ; tableau des stations de la ferme
+  (dernière mesure, nombre de mesures). API : `GET /weather/stations`.
+- **Non vérifié sur un vrai compte** (pas d'identifiants de test) : les
+  clients suivent les plugins Ekylibre et sont testés sur des réponses
+  simulées. À valider : horodatage Weenat (début ou fin de l'heure), unités
+  du vent, nombre de jours maximal par appel Sencrop.

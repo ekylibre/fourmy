@@ -227,3 +227,13 @@ Rappel des questions :
   Pilotes : mêmes lignes que le registre existant, année par année ; seul
   manque systématique, le SIRET. D6 tranchée : pas d'appel EPPO en ligne
   (codes OEPP du référentiel ministériel).
+- **W** (2026-11-10) : `WeenatClient` et `SencropClient` (`@fourmy/weather`,
+  réponses simulées d'après les plugins Ekylibre) ; migration 0028
+  (`weather_stations`, `weather_measures`, fournisseurs weenat/sencrop,
+  synchro horaire) ; `syncStations` (30 j puis incrémental, idempotent) ;
+  météo d'une intervention passée par la station la plus proche (< 5 km,
+  ≥ 80 % des heures), source et distance enregistrées ; page Intégrations :
+  formulaires et tableau des stations ; `GET /weather/stations`. À valider
+  avec de vrais identifiants Weenat et Sencrop.
+
+Tous les lots du plan (S, T, U, V, X, W) sont réalisés.

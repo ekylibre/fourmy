@@ -17,12 +17,15 @@ export const SOURCES: Record<string, string> = {
   open_meteo: "Open-Meteo",
   openweather: "OpenWeather",
   meteoblue: "meteoblue",
+  weenat: "station Weenat",
+  sencrop: "station Sencrop",
   manual: "saisie",
 };
 
-export function weatherSourceLabel(w: Pick<InterventionWeather, "source" | "kind">): string {
+export function weatherSourceLabel(w: Pick<InterventionWeather, "source" | "kind"> & { station?: InterventionWeather["station"] }): string {
   if (w.source === "manual" || w.kind === "manual") return "saisie à la main";
-  return `${SOURCES[w.source] ?? w.source}, ${w.kind === "forecast" ? "prévision" : "observée"}`;
+  const station = w.station ? ` « ${w.station.name} » à ${(w.station.distanceM / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} km` : "";
+  return `${SOURCES[w.source] ?? w.source}${station}, ${w.kind === "forecast" ? "prévision" : "observée"}`;
 }
 
 const fmt = (n: number | null | undefined, digits = 1) => (n === null || n === undefined ? "—" : n.toLocaleString("fr-FR", { maximumFractionDigits: digits }));

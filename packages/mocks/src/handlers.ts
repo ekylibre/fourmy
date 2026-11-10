@@ -98,6 +98,11 @@ export const handlers = [
   http.post(`*${base}/weather/intervention`, () =>
     HttpResponse.json({ weather: { source: "open_meteo", kind: "observed", temperatureC: 14.2, humidityPct: 82, windKmh: 6.5, windMaxKmh: 11, precipitationMm: 0, fetchedAt: "2026-06-10T09:00:00.000Z" } }),
   ),
+  http.get(`*${base}/weather/stations`, () =>
+    HttpResponse.json({
+      items: [{ id: "00000000-0000-7000-8000-00000000c001", provider: "sencrop", name: "Sencrop vigne", lat: 44.8, lon: 0.5, lastMeasureAt: "2026-06-10T12:00:00Z", measures: 744 }],
+    }),
+  ),
   http.get(`*${base}/weather/spraying`, () =>
     HttpResponse.json({
       source: "open_meteo",

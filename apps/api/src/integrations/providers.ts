@@ -1,6 +1,8 @@
 import { TraccarClient, matchDevices, syncTraccar } from "@fourmy/connector-traccar";
 import type { IntegrationProvider } from "@fourmy/contracts";
-import { meteoblueTest, openWeatherTest } from "@fourmy/weather";
+import { meteoblueTest, openWeatherTest, SencropClient, WeenatClient, type StationClient } from "@fourmy/weather";
+import { db } from "../db.js";
+import { syncStations } from "../repos/weather-stations.js";
 import { BadRequest } from "../routes/helpers.js";
 
 /**
@@ -107,4 +109,29 @@ const meteoblue: ProviderAdapter = {
   },
 };
 
-export const PROVIDERS: Record<IntegrationProvider, ProviderAdapter> = { traccar, openweather, meteoblue };
+// Stations météo (lot W) : le test liste les stations du compte ; la synchro
+// recopie stations et mesures horaires (repos/weather-stations.ts).
+function stationsAdapter(provider: "weenat" | "sencrop", client: (settings: Record<string, string>, secret: string) => StationClient): ProviderAdapter {
+  return {
+    async test({ settings, secret }) {
+      const stations = await client(settings, secret).stations();
+      return {
+        stations: stations.length,
+        names: stations.map((s) => s.name),
+        withoutLocation: stations.filter((s) => s.lat === null || s.lon === null).map((s) => s.name),
+      };
+    },
+    async sync({ farmId, settings, secret }) {
+      const report = await syncStations(db(), farmId, provider, client(settings, secret));
+      return { measures: report.measures, stations: report.stations.map((s) => ({ station: s.name, inserted: s.inserted })) };
+    },
+  };
+}
+const required = (v: string | undefined, label: string) => {
+  if (!v?.trim()) throw new BadRequest(`${label} manquant.`);
+  return v.trim();
+};
+const weenat = stationsAdapter("weenat", (settings, secret) => new WeenatClient(required(settings.email, "E-mail Weenat"), secret));
+const sencrop = stationsAdapter("sencrop", (settings, secret) => new SencropClient(required(settings.applicationId, "Identifiant d'application Sencrop"), secret));
+
+export const PROVIDERS: Record<IntegrationProvider, ProviderAdapter> = { traccar, openweather, meteoblue, weenat, sencrop };

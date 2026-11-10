@@ -8,7 +8,7 @@ import { isoDateTime, uuid } from "./primitives.js";
  * fournisseur. Un champ `secret` est chiffré côté serveur et jamais renvoyé.
  */
 
-export const integrationProvider = z.enum(["traccar", "openweather", "meteoblue"]);
+export const integrationProvider = z.enum(["traccar", "openweather", "meteoblue", "weenat", "sencrop"]);
 export type IntegrationProvider = z.infer<typeof integrationProvider>;
 
 export interface IntegrationField {
@@ -84,6 +84,34 @@ export const INTEGRATION_PROVIDERS: IntegrationProviderDefinition[] = [
         kind: "secret",
         required: true,
         help: "Sur my.meteoblue.com : clé donnant accès au paquet basic-1h_agro-1h.",
+      },
+    ],
+  },
+  {
+    provider: "weenat",
+    category: "weather",
+    label: "Weenat — stations météo",
+    description:
+      "Mesures horaires de vos stations Weenat (pluie, température, humidité, vent). La météo d'une intervention passée prend d'abord la station la plus proche des parcelles (moins de 5 km). Synchronisation toutes les heures ; 30 jours d'historique à la première.",
+    fields: [
+      { key: "email", label: "E-mail du compte Weenat", kind: "text", required: true, placeholder: "vous@exemple.fr" },
+      { key: "password", label: "Mot de passe Weenat", kind: "secret", required: true, help: "Celui de l'application Weenat (app.weenat.com)." },
+    ],
+  },
+  {
+    provider: "sencrop",
+    category: "weather",
+    label: "Sencrop — stations météo",
+    description:
+      "Mesures horaires de vos stations Sencrop (pluie, température, humidité, vent, humectation). La météo d'une intervention passée prend d'abord la station la plus proche des parcelles (moins de 5 km). Synchronisation toutes les heures ; 30 jours d'historique à la première.",
+    fields: [
+      { key: "applicationId", label: "Identifiant d'application", kind: "text", required: true },
+      {
+        key: "applicationSecret",
+        label: "Secret d'application",
+        kind: "secret",
+        required: true,
+        help: "Créés dans votre compte Sencrop (accès API / applications).",
       },
     ],
   },

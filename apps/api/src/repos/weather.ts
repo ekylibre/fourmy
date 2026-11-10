@@ -11,6 +11,7 @@ import {
   type WeatherProviderName,
 } from "@fourmy/weather";
 import { decryptSecret } from "../secrets.js";
+import { stationHours } from "./weather-stations.js";
 
 /**
  * Météo des interventions (lot 3) côté serveur : les clés des fournisseurs
@@ -105,11 +106,20 @@ export async function interventionWeather(db: Database, farmId: string, req: Wea
   const to = new Date(Math.max(...periods.map((p) => new Date(p.stoppedAt).getTime())));
   // Au-delà de la portée des prévisions : rien à proposer.
   if (from.getTime() > Date.now() + 15 * 86_400_000) return null;
-  const { point, providers } = await withFarm(db, farmId, async (tx) => ({
-    point: await weatherPoint(tx, req.targets ?? [], to.toISOString()),
-    providers: await keyedProviders(tx),
-  }));
+  const { point, providers, measured } = await withFarm(db, farmId, async (tx) => {
+    const point = await weatherPoint(tx, req.targets ?? [], to.toISOString());
+    return {
+      point,
+      providers: await keyedProviders(tx),
+      // Passé : les mesures de la station de l'agriculteur la plus proche (lot W).
+      measured: point && to.getTime() <= Date.now() ? await stationHours(tx, point, from, to) : null,
+    };
+  });
   if (!point) return null;
+  if (measured) {
+    const m = summarize(measured.hours, periods, measured.source);
+    if (m) return { ...m, station: measured.station, fetchedAt: new Date().toISOString() };
+  }
   const { source, hours } = await hoursFor(providers, point.lat, point.lon, from, to, fetchImpl);
   const s = summarize(hours, periods, source);
   return s ? { ...s, fetchedAt: new Date().toISOString() } : null;
