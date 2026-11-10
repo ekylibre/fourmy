@@ -311,8 +311,64 @@ Objectifs :
    corriger avant la recette : vérifier les droits du compte Traccar sur
    ces appareils, ou utiliser le bon jeton.
 
-## 8. Suite
+## 8. Bilan de réalisation (2026-11-10)
 
-`/sc:design` : modèle (attelages, périodes d'attelage, attelages types,
-rattachement des parcours), contrats et API, algorithme de découpage,
-écrans. Ensuite `/sc:workflow` pour le plan de lots.
+Réalisé en six lots, sur la branche `feat/parcours-attelages`. Plan et
+détails : `claudedocs/workflow_parcours_attelages.md`.
+
+| Lot | Contenu | Migration |
+|---|---|---|
+| N | Attelages dans l'intervention : modèle, règles, API, saisie web | 0022 |
+| O | Parcours : découpage, worker, API, onglet Parcours, réglages | 0023 |
+| P | Parcours → intervention (création, ajout, rattachement) | 0024 |
+| Q | Attelages types | 0025 |
+| R | Applicateur du registre phyto, reprise Ekylibre, synchro mobile | 0026 |
+
+Légende : ✅ fait, 🟡 en partie, ⏳ à faire.
+
+| Exigences | État | Remarques |
+|---|---|---|
+| FR-GPS-10, 12, 13 | ✅ | Onglet visible s'il existe un parcours sur 400 jours ; colonnes, filtres (période, type, parcelle, état), pagination. |
+| FR-GPS-11 | ✅ | Seul le signal `working` du boîtier compte comme travail (arbitrage du 2026-11-09). Une journée sans `working` ne donne que des déplacements. |
+| FR-GPS-14 | 🟡 | Mini-carte de la sélection (trace, couverture, parcelles) ✅. Le lien vers le rejeu sur la période reste à faire. |
+| FR-GPS-15 | ✅ | Parcours rattaché figé ; la dérive recalculée s'affiche (« trace modifiée ») sur l'onglet et la fiche. |
+| FR-GPS-16 | ✅ | Réglages par ferme sur la page Entretien ; seuls les parcours libres sont recalculés. |
+| FR-GPS-17 | ✅ | Outil résolu : attelage déclaré, puis `tool` Traccar relié à la main (`external_ids.traccarTool`), puis seul outil d'une intervention libre. Un nom approchant n'est qu'un indice. |
+| FR-GPS-20 à 23 | ✅ | Sélection, brouillon (attelage, conducteur habituel, périodes fusionnées, parcelles et zones, procédures suggérées, indices), rien n'est enregistré avant validation, rattachement à l'enregistrement (409 si déjà pris). |
+| FR-GPS-24 | ✅ | Ajout à une intervention du même jour, correction tracée si elle est réalisée. |
+| FR-GPS-25 | ⏳ | Plusieurs matériels suivis dans une même sélection : hors v1. |
+| FR-ATT-1 à 5 | ✅ | Modes libre et attelages, périodes par attelage, cohérence (`crewRules` et garde SQL), passage d'un mode à l'autre avec la liste des pertes, durées « chantier » et « temps de travail ». |
+| FR-ATT-6 | ✅ | Matériels › Attelages types ; reprise en un clic, « Enregistrer comme attelage type ». |
+| FR-ATT-7 | 🟡 | Rejeu 3D, trace de la fiche, calendrier et recherche suivent les attelages ✅. Les heures d'usage viennent des positions Traccar (non concernées). Relevé de fin de chantier : pas encore dans le formulaire (FR-MAT-60). |
+| FR-ATT-8 | 🟡 | API ✅ : le pull transporte `staffing`, `crews` et la forme aplatie ; le push accepte les attelages ; une version sans attelages qui réalise une intervention à attelages est refusée dans `failed`. zero-mobile (branche `fourmy-backend`) doit suivre ce contrat : hors de ce dépôt. |
+| FR-ATT-9 | ✅ | Aucune conversion automatique des interventions saisies dans Fourmy. |
+| FR-ATT-10 | ✅ | Voir ci-dessous. |
+| FR-ATT-11 | ✅ | Mode et attelages comparés dans l'historique (avant → après). |
+| FR-ATT-12 | ✅ | `applicatorsOf` et sa réplique SQL, testées sur les mêmes cas ; colonne Applicateur à l'écran, en JSON et en CSV ; feu orange « applicateur non renseigné ». Aucun matériel migré n'a une nature de pulvérisateur : en pratique, la règle de l'attelage unique s'applique. |
+
+**Reprise Ekylibre (FR-ATT-10), rejouée le 2026-11-10 sur les deux bases
+locales** : registre phyto identique, année par année.
+
+| | Grandes cultures (Ekylibre 5.0) | Viticulture (Ekylibre 4.37) |
+|---|---|---|
+| Interventions | 588 | 151 |
+| En attelages (règle 2) | 436 | 67 |
+| En attelages (règle 1, participations) | 1 | 0 |
+| Ambiguës (laissées libres) | 0 | 0 |
+| Libres, sans matériel | 151 | 84 |
+
+L'estimation de 586 attelages comptait les interventions sans matériel ;
+un attelage a au moins un matériel, elles restent en mode libre. Sur les
+5 interventions avec participations, 4 ne concernent que des personnes et
+relèvent de la règle 2. Une intervention corrigée dans Fourmy n'est plus du
+tout réécrite par une nouvelle reprise. Les fixtures anonymisées portent les
+attelages (437 et 67).
+
+**Points de contrôle sur les traces réelles** : parcours et couverture
+concordent (+1,5 % au plus) ; un brouillon de journée sort en 32 ms. Les
+outils annoncés par les boîtiers (« Arion UF1201 », « Tigre ») restent à
+relier aux matériels par `external_ids.traccarTool`.
+
+**Reste à faire** : lien vers le rejeu (FR-GPS-14), plusieurs matériels par
+sélection (FR-GPS-25), zero-mobile, relevé de fin de chantier, sémantique du
+compteur `appliedArea` des boîtiers à confirmer.

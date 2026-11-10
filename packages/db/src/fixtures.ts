@@ -27,7 +27,8 @@ export interface FixtureFile {
  * qui ne viennent pas de la fixture (saisies des tests) ne sont pas touchées.
  */
 /** Tables filles réécrites avec leur intervention (identifiants propres à la fixture). */
-const CHILDREN_OF_INTERVENTIONS = ["intervention_periods", "intervention_parameters"] as const;
+// Attelages en dernier : leur suppression emporte les lignes qui leur restent rattachées.
+const CHILDREN_OF_INTERVENTIONS = ["intervention_periods", "intervention_parameters", "intervention_crews"] as const;
 
 export async function loadFixture(sql: Sql, fixture: FixtureFile): Promise<void> {
   await sql.begin(async (tx) => {

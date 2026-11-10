@@ -7,6 +7,8 @@ import {
   interventionTool,
   interventionDoer,
   workPeriod,
+  staffing,
+  interventionCrew,
 } from "./entities/interventions.js";
 import { treatmentPurpose } from "./procedures.js";
 
@@ -148,6 +150,13 @@ export const syncInterventionPushed = z.object({
   doers: z.array(interventionDoer).default([]),
   purposes: z.array(treatmentPurpose).default([]),
   notes: z.string().max(2000).optional(),
+  /**
+   * Attelages (FR-ATT-8), facultatifs : sans eux, le mode est libre. Une
+   * version mobile qui ne les connaît pas ne peut pas modifier une
+   * intervention en mode attelage (refus dans `failed`).
+   */
+  staffing: staffing.optional(),
+  crews: z.array(interventionCrew).optional(),
 });
 export type SyncInterventionPushed = z.infer<typeof syncInterventionPushed>;
 

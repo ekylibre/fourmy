@@ -135,6 +135,38 @@ Phases réalisées, sur la branche `feat/parcours-attelages` :
     React) jusqu'au formulaire d'intervention et l'enregistrait ;
     `stopPropagation` ;
   - tests : 5 intégration, 1 web, e2e `crew-templates.spec.ts` (US-ATT-C).
+- **R1** `e4fd3bb` : `applicatorsOf` et `isSprayer` (domaine), migration
+  0026 (`fourmy_input_applicators`, colonne `applicators` de
+  `phyto_register` : 2 676 lignes avant et après, 0,27 s pour tout le
+  registre local), colonne Applicateur (écran, JSON, CSV « non
+  renseigné »), indicateur `applicator` du contrôle (orange sans
+  intervenant, information si ambigu ; le formulaire envoie ses attelages
+  au contrôle en direct). Tests : 7 domaine, 2 intégration qui rejouent les
+  mêmes cas contre la vue.
+- **R2** `2157294` (agent en parallèle) : `participations(s)`, `crewsOf`
+  (règles 1 à 3), attelages à identifiants déterministes, compteurs
+  `crews`, `crews_rule_1/2`, `crews_ambiguous`. Écart au plan : 437
+  attelages chez Pierre et non 586 (151 interventions sans matériel restent
+  libres), règle 1 une seule fois (4 des 5 participations ne concernent que
+  des personnes), 0 ambiguë chez Frédéric. Une intervention `corrected`
+  n'est plus du tout réécrite (corrige une réécriture des moyens).
+  Registre phyto identique sur les deux bases, année par année.
+- **R3** : synchro (`staffing` et `crews` au pull et au push, refus dans
+  `failed` d'une version sans attelages sur une intervention à attelages ;
+  2 tests). Fixtures : la réexportation complète perdait une correction
+  volontaire de la fixture viticole (capacité de GV3) et 5 matériels, la
+  base source locale ayant changé ; les fixtures existantes ont donc été
+  complétées des seuls attelages (437 et 67), par identifiant. Le chargeur
+  supprime aussi les attelages disparus. Documentation : modèle
+  (`interventions.md` §4.1), `materiels.md` (Parcours GPS et attelages),
+  bilan (`parcours-attelages.md` §8), README.
+- **Contrôle final** : build, lint, typecheck ; tests domaine 141, API 155,
+  web 97, migrateur 18, db 14 ; e2e 10 sur 10.
+- **Note pour zero-mobile** (branche `fourmy-backend`, hors dépôt) : lire
+  `staffing` et `crews` dans `body_json` (afficher une intervention à
+  attelages en lecture seule tant que la saisie n'est pas prise en charge),
+  envoyer `staffing: "crews"` et `crews` pour en créer ; une intervention à
+  attelages réalisée sans `staffing` revient dans `failed`.
 
 Contrôle d'O1 sur l'Arion 430 le 28/10 (réglages par défaut) :
 - déplacement 10:37-11:06, puis coupure de 2 h à midi ;
