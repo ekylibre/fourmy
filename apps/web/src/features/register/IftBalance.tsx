@@ -2,7 +2,9 @@ import { Group, Paper, SimpleGrid, Stack, Table, Text, Title } from "@mantine/co
 import { useQuery } from "@tanstack/react-query";
 import { formatHa } from "@fourmy/ui-lyvre";
 import { api, farmPath } from "../../app/api";
+import { useColumns, type ColumnDef } from "../../app/columns";
 import { formatNumber } from "../../app/labels";
+import { ColumnPicker } from "../../components/ColumnPicker";
 
 interface Balance {
   campaign: number;
@@ -11,6 +13,12 @@ interface Balance {
   pendingInterventions: number;
   parcels: { id: string; name: string; areaM2: number; ift: number; segments: Record<string, number> }[];
 }
+
+const IFT_COLUMNS: ColumnDef[] = [
+  { key: "parcel", label: "Parcelle", required: true },
+  { key: "area", label: "Surface" },
+  { key: "ift", label: "IFT" },
+];
 
 /**
  * Bilan IFT d'une campagne (exigence IFT-1) : IFT de la ferme (moyenne
@@ -22,6 +30,7 @@ export function IftBalance({ farmId, campaign }: { farmId: string; campaign: num
     queryKey: ["ift-balance", farmId, campaign],
     queryFn: () => api.get<Balance>(farmPath(farmId, `/phyto/ift?campaign=${campaign}`)),
   });
+  const columns = useColumns("ift", IFT_COLUMNS);
   if (!q.data) return null;
   const b = q.data;
   const treated = b.parcels.filter((p) => p.ift > 0);
@@ -63,24 +72,33 @@ export function IftBalance({ farmId, campaign }: { farmId: string; campaign: num
         </Text>
       )}
       {treated.length > 0 && (
+        <Group justify="flex-end" mb={4}>
+          <ColumnPicker columns={columns} />
+        </Group>
+      )}
+      {treated.length > 0 && (
         <Table aria-label="IFT par parcelle" striped>
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Parcelle</Table.Th>
-              <Table.Th ta="right">Surface</Table.Th>
-              <Table.Th ta="right">IFT</Table.Th>
+              {columns.visible("area") && <Table.Th ta="right">Surface</Table.Th>}
+              {columns.visible("ift") && <Table.Th ta="right">IFT</Table.Th>}
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
             {treated.map((p) => (
               <Table.Tr key={p.id}>
                 <Table.Td>{p.name}</Table.Td>
-                <Table.Td ta="right" className="lv-num">
-                  {formatHa(p.areaM2)}
-                </Table.Td>
-                <Table.Td ta="right" className="lv-num">
-                  {formatNumber(p.ift, 2)}
-                </Table.Td>
+                {columns.visible("area") && (
+                  <Table.Td ta="right" className="lv-num">
+                    {formatHa(p.areaM2)}
+                  </Table.Td>
+                )}
+                {columns.visible("ift") && (
+                  <Table.Td ta="right" className="lv-num">
+                    {formatNumber(p.ift, 2)}
+                  </Table.Td>
+                )}
               </Table.Tr>
             ))}
           </Table.Tbody>

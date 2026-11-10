@@ -201,3 +201,11 @@ Rappel des questions :
   4 Météo, 5 Notes) ; périodes du mode libre, matériels et intervenants
   regroupés au bloc 2, synthèse des durées sous les attelages ; aucun
   changement de contrat. Test d'ordre dans `interventions.test.tsx`.
+- **U** (2026-11-10) : `useColumns(liste, défs)` (`app/columns.ts`, colonnes
+  masquées en localStorage `fourmy.columns.<liste>`, réinitialisables) et
+  bouton « Colonnes affichées » (`components/ColumnPicker.tsx`,
+  `pickColumns` pour mantine-datatable). Branché sur 12 listes :
+  interventions (+ Matériels et Notes, masquées par défaut), stocks,
+  registre phyto, bilan IFT, matériels, attelages types, équipe (membres,
+  personnes), produits phyto, entretien, pièces, parcours. Cuverie (cartes)
+  et Imports (rapport) n'ont pas de liste tabulaire : sans objet.

@@ -6,11 +6,21 @@ import { equipmentKindLabel, equipmentStateLabel, type EquipmentSummary } from "
 import { useFarm } from "../../app/farm";
 import { formatDate } from "../../app/labels";
 import { useEquipments } from "../../app/queries";
+import { useColumns, type ColumnDef } from "../../app/columns";
+import { ColumnPicker } from "../../components/ColumnPicker";
 import { ErrorAlert, Loading } from "../../components/states";
 import { EquipmentLogo } from "./EquipmentLogo";
 import { EquipmentFormModal, formatHours, ReadingModal } from "./EquipmentForms";
 
 const inService = (e: EquipmentSummary) => !e.state || e.state === "active";
+
+const EQUIPMENT_COLUMNS: ColumnDef[] = [
+  { key: "name", label: "Matériel", required: true },
+  { key: "kind", label: "Nature" },
+  { key: "brand", label: "Marque et modèle" },
+  { key: "reading", label: "Dernier relevé" },
+  { key: "actions", label: "Actions", required: true },
+];
 
 /**
  * Liste des matériels (FR-MAT-70) : nature, marque et modèle, état, dernier
@@ -27,6 +37,7 @@ export function EquipmentsPage() {
   const [search, setSearch] = useState("");
   const [reading, setReading] = useState<EquipmentSummary | null>(null);
   const [creating, setCreating] = useState(false);
+  const columns = useColumns("equipments", EQUIPMENT_COLUMNS);
 
   const items = useMemo(() => q.data?.items ?? [], [q.data]);
   const kinds = useMemo(() => [...new Set(items.map((e) => e.kind))].map((k) => ({ value: k, label: equipmentKindLabel(k) })), [items]);
@@ -69,15 +80,18 @@ export function EquipmentsPage() {
         />
         <Select placeholder="Toutes natures" data={kinds} value={kind} onChange={setKind} clearable aria-label="Nature" w={200} />
         <TextInput placeholder="Nom, marque, n° de série…" leftSection={<Search size={14} />} value={search} onChange={(e) => setSearch(e.currentTarget.value)} aria-label="Rechercher" w={260} />
+        <Group ml="auto">
+          <ColumnPicker columns={columns} />
+        </Group>
       </Group>
       <Paper withBorder>
         <Table highlightOnHover verticalSpacing="xs" aria-label="Matériels">
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Matériel</Table.Th>
-              <Table.Th>Nature</Table.Th>
-              <Table.Th>Marque et modèle</Table.Th>
-              <Table.Th>Dernier relevé</Table.Th>
+              {columns.visible("kind") && <Table.Th>Nature</Table.Th>}
+              {columns.visible("brand") && <Table.Th>Marque et modèle</Table.Th>}
+              {columns.visible("reading") && <Table.Th>Dernier relevé</Table.Th>}
               <Table.Th />
             </Table.Tr>
           </Table.Thead>
@@ -116,37 +130,41 @@ export function EquipmentsPage() {
                     </Stack>
                   </Group>
                 </Table.Td>
-                <Table.Td>{equipmentKindLabel(e.kind)}</Table.Td>
-                <Table.Td>
-                  <Text size="sm">{[e.brand, e.model].filter(Boolean).join(" · ") || "—"}</Text>
-                  {e.serialNumber && (
-                    <Text size="xs" c="dimmed">
-                      n° {e.serialNumber}
-                    </Text>
-                  )}
-                </Table.Td>
-                <Table.Td>
-                  {e.meterUnit ? (
-                    e.lastReading ? (
-                      <Stack gap={0}>
-                        <Text size="sm" className="lv-num" fw={500}>
-                          {formatHours(e.lastReading.value)}
+                {columns.visible("kind") && <Table.Td>{equipmentKindLabel(e.kind)}</Table.Td>}
+                {columns.visible("brand") && (
+                  <Table.Td>
+                    <Text size="sm">{[e.brand, e.model].filter(Boolean).join(" · ") || "—"}</Text>
+                    {e.serialNumber && (
+                      <Text size="xs" c="dimmed">
+                        n° {e.serialNumber}
+                      </Text>
+                    )}
+                  </Table.Td>
+                )}
+                {columns.visible("reading") && (
+                  <Table.Td>
+                    {e.meterUnit ? (
+                      e.lastReading ? (
+                        <Stack gap={0}>
+                          <Text size="sm" className="lv-num" fw={500}>
+                            {formatHours(e.lastReading.value)}
+                          </Text>
+                          <Text size="xs" c="dimmed">
+                            le {formatDate(e.lastReading.readAt)}
+                          </Text>
+                        </Stack>
+                      ) : (
+                        <Text size="sm" c="dimmed">
+                          Aucun relevé
                         </Text>
-                        <Text size="xs" c="dimmed">
-                          le {formatDate(e.lastReading.readAt)}
-                        </Text>
-                      </Stack>
+                      )
                     ) : (
                       <Text size="sm" c="dimmed">
-                        Aucun relevé
+                        Sans compteur
                       </Text>
-                    )
-                  ) : (
-                    <Text size="sm" c="dimmed">
-                      Sans compteur
-                    </Text>
-                  )}
-                </Table.Td>
+                    )}
+                  </Table.Td>
+                )}
                 <Table.Td>
                   {e.meterUnit && inService(e) && (
                     <Button size="compact-sm" variant="light" leftSection={<Gauge size={14} />} onClick={() => setReading(e)} aria-label={`Relevé de ${e.name}`}>
@@ -158,7 +176,7 @@ export function EquipmentsPage() {
             ))}
             {shown.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={5}>
+                <Table.Td colSpan={columns.count}>
                   <Text size="sm" c="dimmed" ta="center" py="md">
                     Aucun matériel.
                   </Text>

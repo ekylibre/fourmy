@@ -7,7 +7,21 @@ import { api, ApiError, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { useMembers, usePeople } from "../../app/queries";
 import { useSession } from "../../app/session";
+import { useColumns, type ColumnDef } from "../../app/columns";
+import { ColumnPicker } from "../../components/ColumnPicker";
 import { ErrorAlert, Loading } from "../../components/states";
+
+const MEMBER_COLUMNS: ColumnDef[] = [
+  { key: "account", label: "Compte", required: true },
+  { key: "role", label: "Rôle" },
+  { key: "person", label: "Personne" },
+  { key: "actions", label: "Actions", required: true },
+];
+const PEOPLE_COLUMNS: ColumnDef[] = [
+  { key: "name", label: "Nom", required: true },
+  { key: "account", label: "Compte" },
+  { key: "active", label: "Active" },
+];
 
 const ROLES = [
   { value: "owner", label: "Responsable" },
@@ -47,6 +61,9 @@ export function TeamPage() {
   const addPerson = useAction(() => api.post(farmPath(farm.id, "/people"), { name: personName }), "Personne ajoutée.");
   const patchPerson = useAction((p: { id: string; body: Partial<Pick<Person, "active" | "userId">> }) => api.patch(farmPath(farm.id, `/people/${p.id}`), p.body), "Personne mise à jour.");
 
+  const memberColumns = useColumns("team-members", MEMBER_COLUMNS);
+  const peopleColumns = useColumns("team-people", PEOPLE_COLUMNS);
+
   if (members.isLoading || people.isLoading) return <Loading />;
   if (members.error) return <ErrorAlert error={members.error} />;
   const memberList: FarmMember[] = members.data?.items ?? [];
@@ -65,7 +82,10 @@ export function TeamPage() {
 
       <Paper p="md">
         <Stack>
-          <Title order={2}>Membres</Title>
+          <Group justify="space-between">
+            <Title order={2}>Membres</Title>
+            <ColumnPicker columns={memberColumns} />
+          </Group>
           <Text size="sm" c="dimmed">
             Comptes ayant accès à la ferme. Un compte est créé par l'administrateur de Fourmy ; ajoutez-le ici par son e-mail.
           </Text>
@@ -73,8 +93,8 @@ export function TeamPage() {
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>Compte</Table.Th>
-                <Table.Th>Rôle</Table.Th>
-                <Table.Th>Personne</Table.Th>
+                {memberColumns.visible("role") && <Table.Th>Rôle</Table.Th>}
+                {memberColumns.visible("person") && <Table.Th>Personne</Table.Th>}
                 <Table.Th />
               </Table.Tr>
             </Table.Thead>
@@ -89,18 +109,20 @@ export function TeamPage() {
                       </Text>
                     )}
                   </Table.Td>
-                  <Table.Td>
-                    <Select
-                      aria-label={`Rôle de ${m.email}`}
-                      size="xs"
-                      w={150}
-                      data={ROLES}
-                      value={m.role}
-                      allowDeselect={false}
-                      onChange={(r) => r && r !== m.role && setMemberRole.mutate({ userId: m.userId, role: r })}
-                    />
-                  </Table.Td>
-                  <Table.Td>{personList.find((p) => p.id === m.personId)?.name ?? <Text c="dimmed">—</Text>}</Table.Td>
+                  {memberColumns.visible("role") && (
+                    <Table.Td>
+                      <Select
+                        aria-label={`Rôle de ${m.email}`}
+                        size="xs"
+                        w={150}
+                        data={ROLES}
+                        value={m.role}
+                        allowDeselect={false}
+                        onChange={(r) => r && r !== m.role && setMemberRole.mutate({ userId: m.userId, role: r })}
+                      />
+                    </Table.Td>
+                  )}
+                  {memberColumns.visible("person") && <Table.Td>{personList.find((p) => p.id === m.personId)?.name ?? <Text c="dimmed">—</Text>}</Table.Td>}
                   <Table.Td ta="right">
                     {m.userId !== me.data?.id && (
                       <Button size="xs" variant="subtle" color="brique" onClick={() => removeMember.mutate(m.userId)}>
@@ -131,7 +153,10 @@ export function TeamPage() {
 
       <Paper p="md">
         <Stack>
-          <Title order={2}>Personnes</Title>
+          <Group justify="space-between">
+            <Title order={2}>Personnes</Title>
+            <ColumnPicker columns={peopleColumns} />
+          </Group>
           <Text size="sm" c="dimmed">
             Intervenants proposés dans les interventions. Rattachez une personne à son compte pour relier ses saisies mobiles.
           </Text>
@@ -139,8 +164,8 @@ export function TeamPage() {
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>Nom</Table.Th>
-                <Table.Th>Compte</Table.Th>
-                <Table.Th>Active</Table.Th>
+                {peopleColumns.visible("account") && <Table.Th>Compte</Table.Th>}
+                {peopleColumns.visible("active") && <Table.Th>Active</Table.Th>}
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -149,26 +174,30 @@ export function TeamPage() {
                   <Table.Td>
                     {p.name} {p.role && <Badge color="gray" variant="light">{p.role}</Badge>}
                   </Table.Td>
-                  <Table.Td>
-                    <Select
-                      aria-label={`Compte de ${p.name}`}
-                      size="xs"
-                      w={260}
-                      placeholder="Sans compte"
-                      data={linkable(p)}
-                      value={p.userId}
-                      // Détacher n'est pas proposé ici : retirer le membre détache sa personne.
-                      allowDeselect={false}
-                      onChange={(userId) => userId && patchPerson.mutate({ id: p.id, body: { userId } })}
-                    />
-                  </Table.Td>
-                  <Table.Td>
-                    <Switch
-                      aria-label={`${p.name} active`}
-                      checked={p.active}
-                      onChange={(e) => patchPerson.mutate({ id: p.id, body: { active: e.currentTarget.checked } })}
-                    />
-                  </Table.Td>
+                  {peopleColumns.visible("account") && (
+                    <Table.Td>
+                      <Select
+                        aria-label={`Compte de ${p.name}`}
+                        size="xs"
+                        w={260}
+                        placeholder="Sans compte"
+                        data={linkable(p)}
+                        value={p.userId}
+                        // Détacher n'est pas proposé ici : retirer le membre détache sa personne.
+                        allowDeselect={false}
+                        onChange={(userId) => userId && patchPerson.mutate({ id: p.id, body: { userId } })}
+                      />
+                    </Table.Td>
+                  )}
+                  {peopleColumns.visible("active") && (
+                    <Table.Td>
+                      <Switch
+                        aria-label={`${p.name} active`}
+                        checked={p.active}
+                        onChange={(e) => patchPerson.mutate({ id: p.id, body: { active: e.currentTarget.checked } })}
+                      />
+                    </Table.Td>
+                  )}
                 </Table.Tr>
               ))}
             </Table.Tbody>

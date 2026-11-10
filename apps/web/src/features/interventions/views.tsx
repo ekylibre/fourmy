@@ -6,6 +6,8 @@ import type { Intervention, InterventionDisplayStatus } from "@fourmy/contracts"
 import { displayStatus } from "@fourmy/domain";
 import { formatDate, procedureLabel } from "../../app/labels";
 import { ProcedureIcon } from "../../components/ProcedureIcon";
+import { useColumns, type ColumnDef } from "../../app/columns";
+import { ColumnPicker, pickColumns } from "../../components/ColumnPicker";
 import { interventionDay, quantityText, short, STATUS, targetName, type Names } from "./presenters";
 import { slots, type Week } from "./week";
 
@@ -115,13 +117,30 @@ function Card({ i, names, actions, now, draggable }: { i: Intervention; names: N
 
 type SortKey = "date" | "procedure" | "status";
 
+const LIST_COLUMNS: ColumnDef[] = [
+  { key: "date", label: "Date", required: true },
+  { key: "procedure", label: "Intervention", required: true },
+  { key: "targets", label: "Cibles" },
+  { key: "inputs", label: "Intrants et sorties" },
+  { key: "doers", label: "Intervenants" },
+  { key: "tools", label: "Matériels", defaultHidden: true },
+  { key: "notes", label: "Notes", defaultHidden: true },
+  { key: "status", label: "Statut" },
+  { key: "actions", label: "Actions", required: true },
+];
+
 export function ListView({ items, names, actions, now }: { items: Intervention[]; names: Names; actions: ViewActions; now: string }) {
   const [sort, setSort] = useState<DataTableSortStatus<Intervention>>({ columnAccessor: "date", direction: "desc" });
   const key = sort.columnAccessor as SortKey;
   const value = (i: Intervention) =>
     key === "procedure" ? procedureLabel(i.procedure) : key === "status" ? STATUS[displayStatus(i, now)].label : interventionDay(i);
   const rows = [...items].sort((a, b) => value(a).localeCompare(value(b), "fr") * (sort.direction === "asc" ? 1 : -1));
+  const columns = useColumns("interventions", LIST_COLUMNS);
   return (
+    <Stack gap="xs">
+    <Group justify="flex-end">
+      <ColumnPicker columns={columns} />
+    </Group>
     <DataTable
       withTableBorder
       striped
@@ -133,7 +152,7 @@ export function ListView({ items, names, actions, now }: { items: Intervention[]
       onSortStatusChange={setSort}
       rowStyle={(i) => (i.status === "cancelled" ? { opacity: 0.55, cursor: "pointer" } : { cursor: "pointer" })}
       onRowClick={({ record }) => actions.open(record)}
-      columns={[
+      columns={pickColumns<Intervention>([
         { accessor: "date", title: "Date", sortable: true, render: (i) => <span className="lv-num">{formatDate(interventionDay(i))}</span> },
         {
           accessor: "procedure",
@@ -154,6 +173,8 @@ export function ListView({ items, names, actions, now }: { items: Intervention[]
           render: (i) => [...i.inputs, ...i.outputs].map((q) => quantityText(names, q)).join(" · "),
         },
         { accessor: "doers", title: "Intervenants", render: (i) => short(i.doers.map((d) => names.person.get(d.personId) ?? "?")) },
+        { accessor: "tools", title: "Matériels", render: (i) => short(i.tools.map((t) => names.equipment.get(t.equipmentId) ?? "?")) },
+        { accessor: "notes", title: "Notes", render: (i) => i.notes ?? "" },
         {
           accessor: "status",
           title: "Statut",
@@ -179,8 +200,9 @@ export function ListView({ items, names, actions, now }: { items: Intervention[]
             </Group>
           ),
         },
-      ]}
+      ], columns)}
     />
+    </Stack>
   );
 }
 
