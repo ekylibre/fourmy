@@ -149,6 +149,7 @@ function toIntervention(r: Record<string, unknown>): Intervention {
     doers: of("doer").filter((p) => p.ref_type === "person").map((p) => ({ personId: p.ref_id! })),
     purposes: (r.purposes as TreatmentPurpose[]) ?? [],
     notes: (r.notes as string | null) ?? null,
+    bbch: r.bbch ? { code: r.bbch as string, label: (r.bbch_label as string | null) ?? (r.bbch as string) } : null,
     origin: r.origin as Intervention["origin"],
     clientId: (r.client_id as string | null) ?? null,
     compliance: (r.compliance as Intervention["compliance"]) ?? null,
@@ -196,7 +197,7 @@ async function readInterventions(tx: Tx, where: SQL, limit = 1000): Promise<Inte
     tx,
     sql`
       SELECT i.id, i.farm_id, i.procedure, i.status, i.started_at, i.stopped_at, i.origin, i.client_id, i.staffing,
-             i.purposes, i.notes, i.compliance, i.ift, i.weather, i.maintenance, i.created_at, i.updated_at,
+             i.purposes, i.notes, i.bbch, (SELECT st.label FROM ref_bbch_stages st WHERE st.code = i.bbch) AS bbch_label, i.compliance, i.ift, i.weather, i.maintenance, i.created_at, i.updated_at,
              (SELECT coalesce(json_agg(json_build_object('equipment_id', m.equipment_id, 'value', m.value, 'correction', m.correction,
                                                          'correction_reason', m.correction_reason)), '[]')
                 FROM meter_readings m WHERE m.intervention_id = i.id) AS meters,
@@ -304,6 +305,10 @@ const TABLE_OF: Record<TargetKind, "land_parcels" | "equipments" | "places" | "c
 async function validate(tx: Tx, procedureCode: string, raw: Body, mode: "plan" | "complete") {
   const crewErrors = crewRules(raw, await crewNames(tx, raw));
   if (crewErrors.length) throw new DomainError(crewErrors.join(" "));
+  if (raw.bbch) {
+    const [st] = await rows<{ n: number }>(tx, sql`SELECT count(*)::int AS n FROM ref_bbch_stages WHERE code = ${raw.bbch}`);
+    if (!st!.n) throw new DomainError("Stade BBCH inconnu du référentiel.");
+  }
   const body = flat(raw);
   const articles = await loadArticles(tx, [...body.inputs.map((i) => i.articleId), ...body.outputs.map((o) => o.articleId)]);
   const errors = validateIntervention(getProcedure(procedureCode), body, mode, {
@@ -544,10 +549,10 @@ export async function planInTx(
   const body = flat(input);
   const bounds = periodBounds(body.periods);
   await tx.execute(sql`
-    INSERT INTO interventions (id, farm_id, procedure, status, started_at, stopped_at, origin, client_id, purposes, notes, staffing)
+    INSERT INTO interventions (id, farm_id, procedure, status, started_at, stopped_at, origin, client_id, purposes, notes, staffing, bbch)
     VALUES (${id}, ${farmId}, ${input.procedure}, 'planned', ${bounds.startedAt ?? input.plannedAt ?? null}, ${bounds.stoppedAt},
             ${ctx.origin}, ${clientId}, ${sql`ARRAY[${sql.join(input.purposes.map((p) => sql`${p}`), sql`, `)}]::text[]`}, ${input.notes ?? null},
-            ${input.staffing ?? "free"})`);
+            ${input.staffing ?? "free"}, ${input.bbch ?? null})`);
   await writeBody(tx, id, input, articles);
   await writeMaintenance(tx, farmId, ctx, id, body, false, null);
   await recordCompliance(tx, ctx, id, body, "plan");
@@ -738,7 +743,7 @@ async function applyCompletion(
     UPDATE interventions SET status = 'done', procedure = ${procedure},
       started_at = ${startedAt}::timestamptz, stopped_at = ${stoppedAt}::timestamptz,
       purposes = ${sql`ARRAY[${sql.join(input.purposes.map((p) => sql`${p}`), sql`, `)}]::text[]`},
-      notes = ${input.notes ?? null}, updated_at = now()
+      notes = ${input.notes ?? null}, bbch = ${input.bbch === undefined ? sql`bbch` : input.bbch}, updated_at = now()
     WHERE id = ${interventionId}`);
   return { plan, areaHa, warnings };
 }
@@ -838,7 +843,7 @@ export async function updateIntervention(
         UPDATE interventions SET procedure = ${input.procedure},
           started_at = ${bounds.startedAt ?? input.plannedAt ?? before.startedAt}, stopped_at = ${bounds.stoppedAt},
           purposes = ${sql`ARRAY[${sql.join(input.purposes.map((p) => sql`${p}`), sql`, `)}]::text[]`},
-          notes = ${input.notes ?? null}, updated_at = now()
+          notes = ${input.notes ?? null}, bbch = ${input.bbch === undefined ? sql`bbch` : input.bbch}, updated_at = now()
         WHERE id = ${interventionId}`);
       warnings.push(...(await crewOverlapWarnings(tx, interventionId, input)));
       await auditAs(tx, farmId, ctx, auditId, interventionId, "updated", { changes, reason, warnings });
@@ -962,6 +967,7 @@ function writeOf(i: Intervention): InterventionUpdateWrite {
     outputs: i.outputs,
     purposes: i.purposes,
     ...(i.notes ? { notes: i.notes } : {}),
+    ...(i.bbch ? { bbch: i.bbch.code } : {}),
     ...(i.compliance
       ? {
           compliance: {

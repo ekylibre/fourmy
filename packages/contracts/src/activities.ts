@@ -51,6 +51,12 @@ export const activity = z.object({
   cultivationLabel: z.string().nullable(),
   color: z.string().nullable(),
   suspended: z.boolean(),
+  /**
+   * Culture du registre phyto réglementaire (référentiel du ministère) :
+   * `cropCode` choisi, sinon proposé d'après la référence ou le nom
+   * (`cropProposed`). Null : à choisir (anomalie au registre).
+   */
+  crop: z.object({ code: z.string(), label: z.string(), oepp: z.string().nullable(), proposed: z.boolean() }).nullable(),
   /** Image Lexicon (variété, sinon famille) ; null si aucune. */
   pictureUrl: z.string().nullable(),
   /** Campagne demandée : parcelles et surface. */
@@ -66,6 +72,8 @@ export const activityWrite = z.object({
   cultivation: z.string().trim().regex(/^[a-z_]+$/).max(120).nullable().optional(),
   color: color.nullable().optional(),
   suspended: z.boolean().optional(),
+  /** Code culture du référentiel du ministère ; null : proposition automatique. */
+  cropCode: z.string().trim().max(20).nullable().optional(),
 });
 export type ActivityWrite = z.infer<typeof activityWrite>;
 

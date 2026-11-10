@@ -215,3 +215,15 @@ Rappel des questions :
   l'onglet Parcours filtré (paramètres `tracksFrom/To/Kind/State`).
   Vérifié sur Pierre, semaine du 2 au 8/10 : Arion 430, 2 parcours de
   travail (2 h 21, 17,3 ha couverts, 1 libre), 5 déplacements (21,4 km).
+- **X** (2026-11-10) : migration 0027 (référentiels du ministère : 375
+  cultures avec code OEPP, 2 368 stades BBCH ; `farms.siret/pacage` ;
+  `activities.crop_code` choisi ou proposé par `fourmy_activity_crop` ;
+  `interventions.bbch`) ; `officialRegisterLine` (domaine) et
+  `GET /registers/phyto/official` (json, csv aux intitulés standard, export
+  JSON complet) ; `GET|PUT /settings/identity` ; référentiels
+  `/reference/phyto-crops`, `/reference/bbch`. Écrans : onglet « Format
+  réglementaire » du registre (détenteur, anomalies, exports), culture du
+  registre sur les activités, stade BBCH au formulaire et sur la fiche.
+  Pilotes : mêmes lignes que le registre existant, année par année ; seul
+  manque systématique, le SIRET. D6 tranchée : pas d'appel EPPO en ligne
+  (codes OEPP du référentiel ministériel).

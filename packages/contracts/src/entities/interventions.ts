@@ -157,6 +157,8 @@ const interventionBody = z.object({
   doers: z.array(interventionDoer).default([]),
   purposes: z.array(treatmentPurpose).default([]),
   notes: z.string().trim().max(2000).optional(),
+  /** Stade BBCH (référentiel du ministère, ex. SP_55501_15) ; absent : inchangé, null : effacé. */
+  bbch: z.string().trim().max(20).nullable().optional(),
   /** Contrôle réglementaire : cible choisie par produit, motif d'un passage outre un feu rouge. */
   compliance: complianceWrite.optional(),
   /** Météo pendant l'intervention (pré-remplie depuis le fournisseur, modifiable). */
@@ -240,6 +242,8 @@ export const intervention = z
     workDurationS: z.number().nullable().optional(),
     purposes: z.array(treatmentPurpose),
     notes: z.string().nullable(),
+    /** Stade BBCH du traitement (registre réglementaire) et son libellé. */
+    bbch: z.object({ code: z.string(), label: z.string() }).nullable().optional(),
     origin: interventionOrigin,
     clientId: z.string().nullable(),
     /** Contrôle réglementaire enregistré (traitements saisis dans Fourmy). */

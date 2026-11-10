@@ -77,6 +77,7 @@ export const demoActivities: Activity[] = [
     cultivationLabel: "Vigne",
     color: null,
     suspended: false,
+    crop: { code: "27001", label: "Vigne", oepp: "VITVI", proposed: true },
     pictureUrl: null,
     parcelIds: ["00000000-0000-7000-8000-0000000000a0"],
     areaM2: 12_000,

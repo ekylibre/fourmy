@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Group, Select, Stack, Text, Title } from "@mantine/core";
+import { Button, Group, Select, Stack, Tabs, Text, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { Download } from "lucide-react";
 import type { PhytoRegisterEntry } from "@fourmy/contracts";
@@ -13,6 +13,7 @@ import { useColumns, type ColumnDef } from "../../app/columns";
 import { ColumnPicker, pickColumns } from "../../components/ColumnPicker";
 import { ErrorAlert, Loading } from "../../components/states";
 import { IftBalance } from "./IftBalance";
+import { OfficialRegister } from "./OfficialRegister";
 
 const REGISTER_COLUMNS: ColumnDef[] = [
   { key: "doneOn", label: "Date", required: true },
@@ -32,6 +33,7 @@ export function RegisterPage() {
   const [campaign, setCampaign] = useState(Number(day.slice(0, 4)));
   const register = usePhytoRegister(farm.id, campaign);
   const columns = useColumns("register-phyto", REGISTER_COLUMNS);
+  const [tab, setTab] = useState<"register" | "official">("register");
   const thisYear = new Date().getFullYear();
   const years = Array.from({ length: thisYear - 2014 }, (_, i) => String(thisYear - i));
 
@@ -62,61 +64,76 @@ export function RegisterPage() {
             w={120}
             allowDeselect={false}
           />
-          <ColumnPicker columns={columns} />
-          <Button leftSection={<Download size={16} />} onClick={exportCsv} disabled={!register.data?.items.length}>
-            Exporter en CSV
-          </Button>
         </Group>
       </Group>
-      <IftBalance farmId={farm.id} campaign={campaign} />
-      {register.isLoading && <Loading />}
-      {register.error && <ErrorAlert error={register.error} />}
-      {register.data && (
-        <>
-          <Text c="dimmed" size="sm">
-            {register.data.items.length} application(s) en {campaign}.
-          </Text>
-          <DataTable
-            withTableBorder
-            striped
-            highlightOnHover
-            minHeight={150}
-            noRecordsText="Aucun traitement phytosanitaire sur cette campagne"
-            records={register.data.items.map((e, i) => ({ ...e, key: `${e.interventionId}-${i}` }))}
-            idAccessor="key"
-            columns={pickColumns<PhytoRegisterEntry & { key: string }>([
-              { accessor: "doneOn", title: "Date", render: (r) => <span className="lv-num">{formatDate(r.doneOn)}</span> },
-              { accessor: "parcelName", title: "Parcelle" },
-              { accessor: "areaM2", title: "Surface", textAlign: "right", render: (r) => <span className="lv-num">{formatNumber(r.areaM2 / 10_000)} ha</span> },
-              { accessor: "crop", title: "Culture" },
-              { accessor: "productName", title: "Produit" },
-              { accessor: "amm", title: "N° AMM", render: (r) => <span className="lv-num">{r.amm}</span> },
-              {
-                accessor: "quantity",
-                title: "Dose",
-                textAlign: "right",
-                render: (r) => (
-                  <span className="lv-num">
-                    {formatNumber(r.quantity, 3)} {unitLabel(r.unit)}
-                  </span>
-                ),
-              },
-              {
-                accessor: "applicators",
-                title: "Applicateur",
-                render: (r) =>
-                  r.applicators.length ? (
-                    r.applicators.join(", ")
-                  ) : (
-                    <Text span size="sm" c="paille.8">
-                      non renseigné
-                    </Text>
-                  ),
-              },
-            ], columns)}
-          />
-        </>
-      )}
+      <Tabs value={tab} onChange={(v) => setTab((v as "register" | "official") ?? "register")} keepMounted={false}>
+        <Tabs.List>
+          <Tabs.Tab value="register">Registre et IFT</Tabs.Tab>
+          <Tabs.Tab value="official">Format réglementaire</Tabs.Tab>
+        </Tabs.List>
+        <Tabs.Panel value="official" pt="md">
+          <OfficialRegister campaign={campaign} />
+        </Tabs.Panel>
+        <Tabs.Panel value="register" pt="md">
+          <Stack>
+            <IftBalance farmId={farm.id} campaign={campaign} />
+            <Group justify="flex-end" gap="xs">
+              <ColumnPicker columns={columns} />
+              <Button leftSection={<Download size={16} />} onClick={exportCsv} disabled={!register.data?.items.length}>
+                Exporter en CSV
+              </Button>
+            </Group>
+            {register.isLoading && <Loading />}
+            {register.error && <ErrorAlert error={register.error} />}
+            {register.data && (
+              <>
+                <Text c="dimmed" size="sm">
+                  {register.data.items.length} application(s) en {campaign}.
+                </Text>
+                <DataTable
+                  withTableBorder
+                  striped
+                  highlightOnHover
+                  minHeight={150}
+                  noRecordsText="Aucun traitement phytosanitaire sur cette campagne"
+                  records={register.data.items.map((e, i) => ({ ...e, key: `${e.interventionId}-${i}` }))}
+                  idAccessor="key"
+                  columns={pickColumns<PhytoRegisterEntry & { key: string }>([
+                    { accessor: "doneOn", title: "Date", render: (r) => <span className="lv-num">{formatDate(r.doneOn)}</span> },
+                    { accessor: "parcelName", title: "Parcelle" },
+                    { accessor: "areaM2", title: "Surface", textAlign: "right", render: (r) => <span className="lv-num">{formatNumber(r.areaM2 / 10_000)} ha</span> },
+                    { accessor: "crop", title: "Culture" },
+                    { accessor: "productName", title: "Produit" },
+                    { accessor: "amm", title: "N° AMM", render: (r) => <span className="lv-num">{r.amm}</span> },
+                    {
+                      accessor: "quantity",
+                      title: "Dose",
+                      textAlign: "right",
+                      render: (r) => (
+                        <span className="lv-num">
+                          {formatNumber(r.quantity, 3)} {unitLabel(r.unit)}
+                        </span>
+                      ),
+                    },
+                    {
+                      accessor: "applicators",
+                      title: "Applicateur",
+                      render: (r) =>
+                        r.applicators.length ? (
+                          r.applicators.join(", ")
+                        ) : (
+                          <Text span size="sm" c="paille.8">
+                            non renseigné
+                          </Text>
+                        ),
+                    },
+                  ], columns)}
+                />
+              </>
+            )}
+          </Stack>
+        </Tabs.Panel>
+      </Tabs>
     </Stack>
   );
 }

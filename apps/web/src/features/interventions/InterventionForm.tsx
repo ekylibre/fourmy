@@ -50,6 +50,7 @@ import { MapBoundary } from "../../components/MapBoundary";
 import { ProcedureIcon } from "../../components/ProcedureIcon";
 import { treatedAreaM2 } from "./zones";
 import { withStart } from "./periods";
+import { bbchOptionLabel, useBbchStages } from "../reference/phyto-reference";
 import { CrewsEditor, CrewsSummary, PeriodsEditor, crewRowsOf, crewsBody, newCrew, toLocal, type CrewRow } from "./Crews";
 import { ComplianceSummary, TreatmentCheckView, useComplianceCheck, type ComplianceDraft } from "./CompliancePanel";
 import type { Activity, InterventionWeather } from "@fourmy/contracts";
@@ -247,6 +248,8 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
     : periods;
   const [purposes, setPurposes] = useState<TreatmentPurpose[]>(planned?.purposes ?? []);
   const [notes, setNotes] = useState(planned?.notes ?? "");
+  // Stade BBCH (registre phyto réglementaire, lot X) : stades de la culture des parcelles choisies.
+  const [bbch, setBbch] = useState<string | null>(planned?.bbch?.code ?? null);
   const [error, setError] = useState<string | null>(null);
 
   // Échéances lues au jour de l'intervention.
@@ -346,6 +349,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       crews: inCrews ? crewsBody(crews) : [],
       purposes,
       ...(notes.trim() ? { notes: notes.trim() } : {}),
+      ...(shape === "treatment" ? { bbch } : {}),
       compliance: { usages: usageChoices, ...(overrideReason.trim() ? { reason: overrideReason.trim() } : {}) },
       ...(weather ? { weather } : {}),
       ...(fromTracks ? { trackSessionIds: fromTracks.body.trackSessionIds } : {}),
@@ -874,6 +878,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
                 onChange={(v) => setPurposes(v as TreatmentPurpose[])}
               />
             )}
+            {shape === "treatment" && <BbchField farmId={farmId} activities={parcelActivities.map((p) => p.activity)} value={bbch} onChange={setBbch} />}
 
 
             {procedure && shape !== "maintenance" && (
@@ -1014,5 +1019,33 @@ function TrackDraftBanner({
         ))}
       </Stack>
     </Alert>
+  );
+}
+
+/**
+ * Stade BBCH du traitement (facultatif, registre réglementaire) : stades du
+ * référentiel pour la culture de la première activité des parcelles qui en a
+ * une ; plusieurs cultures : on le signale.
+ */
+function BbchField({ farmId, activities, value, onChange }: { farmId: string; activities: Activity[]; value: string | null; onChange: (v: string | null) => void }) {
+  const crops = [...new Map(activities.filter((a) => a.crop).map((a) => [a.crop!.code, a.crop!])).values()];
+  const crop = crops[0] ?? null;
+  const stages = useBbchStages(farmId, crop?.code ?? null);
+  const items = stages.data?.items ?? [];
+  const data = items.map((s) => ({ value: s.code, label: bbchOptionLabel(s) }));
+  if (value && !items.some((s) => s.code === value)) data.unshift({ value, label: value });
+  return (
+    <Select
+      label="Stade BBCH (facultatif)"
+      description={crops.length > 1 ? `Stades de : ${crop!.label}` : undefined}
+      placeholder={crop ? "Stade de la culture au traitement" : "Culture des parcelles inconnue"}
+      disabled={!crop}
+      searchable
+      clearable
+      data={data}
+      value={value}
+      onChange={onChange}
+      nothingFoundMessage="Aucun stade"
+    />
   );
 }

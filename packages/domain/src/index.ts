@@ -21,3 +21,4 @@ export * from "./phyto-mixture.js";
 export * from "./meter.js";
 export * from "./maintenance.js";
 export * from "./tracks.js";
+export * from "./register.js";

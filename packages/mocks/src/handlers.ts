@@ -119,6 +119,28 @@ export const handlers = [
   http.get(`*${base}/phyto/ift`, () => HttpResponse.json({ campaign: 2026, total: 0, segments: {}, pendingInterventions: 0, parcels: [] })),
   http.get(`*${base}/phyto/parcels/:id/delays`, () => HttpResponse.json({ reentry: null, harvest: null })),
   http.get(`*${base}/activities`, () => HttpResponse.json({ items: demoActivities })),
+  // Référentiels du ministère (registre phyto réglementaire, lot X).
+  http.get(`*${base}/reference/phyto-crops`, () =>
+    HttpResponse.json({
+      items: [
+        { code: "27001", label: "Vigne", oepp: "VITVI", bbchRef: "Vigne" },
+        { code: "55501", label: "Maïs", oepp: "ZEAMX", bbchRef: "Maïs" },
+        { code: "53001", label: "Ray Grass", oepp: "LOLPE", bbchRef: "Graminées" },
+      ],
+    }),
+  ),
+  http.get(`*${base}/reference/bbch`, ({ request }) =>
+    HttpResponse.json({
+      items:
+        new URL(request.url).searchParams.get("crop") === "27001"
+          ? [
+              { code: "SP_27001_53", label: "BBCH 53", description: "les inflorescences sont clairement visibles" },
+              { code: "SP_27001_57", label: "BBCH 57", description: "les inflorescences sont développées ; les fleurs se séparent" },
+              { code: "SP_27001_65", label: "BBCH 65", description: "pleine floraison : 50 % des capuchons tombés" },
+            ]
+          : [],
+    }),
+  ),
   http.get(`*${base}/certifications`, () =>
     HttpResponse.json({
       items: [
