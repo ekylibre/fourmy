@@ -369,6 +369,10 @@ concordent (+1,5 % au plus) ; un brouillon de journée sort en 32 ms. Les
 outils annoncés par les boîtiers (« Arion UF1201 », « Tigre ») restent à
 relier aux matériels par `external_ids.traccarTool`.
 
+**Depuis** (retours du 10/11/2026) : le tableau de bord résume les parcours
+du jour ou de la semaine par matériel et signale les parcours de travail
+libres, avec un lien vers l'onglet Parcours filtré (`docs/materiels.md`).
+
 **Reste à faire** : lien vers le rejeu (FR-GPS-14), plusieurs matériels par
 sélection (FR-GPS-25), zero-mobile, relevé de fin de chantier, sémantique du
 compteur `appliedArea` des boîtiers à confirmer.

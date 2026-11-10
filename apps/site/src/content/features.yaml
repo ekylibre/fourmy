@@ -51,7 +51,8 @@ features:
     text: >-
       Les interventions de la semaine en liste, en kanban (planifiées, en cours, réalisées)
       ou en calendrier ; une recherche rapide retrouve un produit, une parcelle ou un
-      matériel sur toute la campagne.
+      matériel sur toute la campagne. Chaque liste de Fourmy se règle : vous choisissez
+      les colonnes affichées.
     status: disponible
     capture: interventions-semaine
     since: 0.31.0
@@ -106,6 +107,16 @@ features:
     status: disponible
     capture: registre
     since: 0.7.0
+  - id: registre-reglementaire
+    title: Registre phyto au format réglementaire 2027
+    text: >-
+      Le registre électronique tel que l'attend l'arrêté du 24 décembre 2025 : une ligne
+      par produit et par parcelle, culture en code OEPP, stade BBCH, applicateur, mode de
+      conduite bio, SIRET du détenteur. Les champs manquants sont signalés ligne par
+      ligne ; export CSV aux intitulés officiels et JSON complet pour les enquêtes.
+    status: disponible
+    capture: registre-reglementaire
+    since: 0.66.0
   - id: traces
     title: Traces GPS des tracteurs
     text: >-
@@ -114,6 +125,26 @@ features:
     status: disponible
     capture: integrations
     since: 0.22.0
+  - id: parcours
+    title: Parcours GPS transformés en interventions
+    text: >-
+      Chaque matériel suivi a son onglet Parcours : les chantiers et les déplacements de
+      la trace, avec parcelles, surface couverte et carte. Cochez les parcours d'une
+      journée : l'intervention se pré-remplit avec l'attelage, les horaires et les
+      parcelles travaillées. Le tableau de bord résume les parcours du jour ou de la
+      semaine et signale ceux qui restent à saisir.
+    status: disponible
+    capture: parcours
+    since: 0.57.0
+  - id: attelages
+    title: Attelages tracteur, outils et conducteur
+    text: >-
+      Déclarez une intervention par attelages : chaque tracteur avec ses outils, son
+      conducteur et ses propres heures, deux chantiers en même temps compris. Vos
+      attelages habituels se reprennent en un clic, et le registre phyto indique
+      l'applicateur : le conducteur de l'attelage qui porte le pulvérisateur.
+    status: disponible
+    since: 0.54.0
   - id: materiels
     title: Matériels et relevés d'heures
     text: >-
@@ -162,9 +193,17 @@ features:
       phytosanitaire reste identique à l'original.
     status: disponible
     since: 0.9.0
-  - id: capteurs
-    title: Stations, sondes et pièges connectés
+  - id: stations-meteo
+    title: Vos stations météo Weenat et Sencrop
     text: >-
-      Stations météo, sondes et pièges reliés comme les traceurs GPS, relevés rattachés
-      aux parcelles.
+      Reliez votre compte Weenat ou Sencrop : les mesures de vos stations arrivent toutes
+      les heures, et la météo d'une intervention passée vient de la station la plus
+      proche des parcelles plutôt que d'un modèle.
+    status: en-test
+    since: 0.67.0
+  - id: capteurs
+    title: Sondes et pièges connectés
+    text: >-
+      Sondes et pièges reliés comme les traceurs GPS et les stations météo, relevés
+      rattachés aux parcelles.
     status: a-venir

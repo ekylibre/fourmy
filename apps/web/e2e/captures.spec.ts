@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
+import postgres from "postgres";
 import { login, navTo } from "./shared";
 
 /**
@@ -46,6 +47,16 @@ test("tableau de bord (pleine saison), cuverie, stocks, registre (fin 2021)", as
   await navTo(page, "Registre phyto", "Réglementaire");
   await expect(page.getByText(/application\(s\) en 2021/)).toBeVisible();
   await snap(page, "registre");
+  // Détenteur fictif le temps de la capture (ferme d'essai anonymisée), puis effacé.
+  const identity = `/api/v1/farms/a3803fc8-5e47-589c-8d8b-266d5930080f/settings/identity`;
+  expect((await page.request.put(identity, { data: { siret: "12345678900011", pacage: "033000000" } })).ok()).toBe(true);
+  try {
+    await page.getByRole("tab", { name: "Format réglementaire" }).click();
+    await expect(page.getByText(/ligne\(s\) en 2021/)).toBeVisible();
+    await snap(page, "registre-reglementaire");
+  } finally {
+    await page.request.put(identity, { data: { siret: null, pacage: null } });
+  }
 });
 
 test("carte et parcellaire", async ({ page }) => {
@@ -172,4 +183,44 @@ test("matériels et avatar 3D d'un tracteur", async ({ page }) => {
   await expect(page.getByLabel("Aperçu 3D").locator("canvas")).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(6000);
   await snap(page, "avatar-3d");
+});
+
+test("parcours GPS d'un tracteur (trace d'essai, effacée ensuite)", async ({ page }) => {
+  const FARM = "a3803fc8-5e47-589c-8d8b-266d5930080f";
+  const sql = postgres(process.env.DATABASE_URL!, { max: 1, onnotice: () => {} });
+  const binding = crypto.randomUUID();
+  try {
+    const [tractor] = await sql<{ id: string }[]>`SELECT id FROM equipments WHERE farm_id = ${FARM} AND name = 'Tractor 4'`;
+    const [spot] = await sql<{ lon: number; lat: number }[]>`
+      SELECT ST_X(ST_PointOnSurface(v.shape)) AS lon, ST_Y(ST_PointOnSurface(v.shape)) AS lat
+      FROM land_parcel_versions v JOIN land_parcels p ON p.id = v.land_parcel_id
+      WHERE p.farm_id = ${FARM} AND v.valid @> now() AND v.area_m2 > 5000 ORDER BY v.area_m2 DESC LIMIT 1`;
+    await sql`INSERT INTO tracker_bindings (id, farm_id, equipment_id, device_id, valid)
+              VALUES (${binding}, ${FARM}, ${tractor!.id}, 'captures-parcours', tstzrange(now() - interval '10 days', NULL))`;
+    const M_LAT = 1 / 111_320;
+    const M_LON = M_LAT / Math.cos((spot!.lat * Math.PI) / 180);
+    // Deux journées : un passage au travail (aller-retours) puis la route du retour.
+    for (const daysAgo of [3, 2]) {
+      const day = new Date(Date.now() - daysAgo * 86_400_000);
+      day.setUTCHours(daysAgo === 3 ? 7 : 13, 0, 0, 0);
+      const point = (s: number, dx: number, dy: number, working: boolean) =>
+        sql`INSERT INTO positions (farm_id, binding_id, time, point, speed, attrs)
+            VALUES (${FARM}, ${binding}, ${new Date(day.getTime() + s * 1000).toISOString()},
+                    ST_SetSRID(ST_MakePoint(${spot!.lon + dx * M_LON}, ${spot!.lat + dy * M_LAT}), 4326), ${working ? 6 : 15},
+                    ${sql.json({ working, widthM: 3, tool: "Intercep" })})`;
+      for (let i = 0; i <= 120; i++) await point(i * 5, ((i % 12) - 6) * 4, Math.floor(i / 12) * 3 - 15, true);
+      for (let i = 1; i <= 60; i++) await point(600 + i * 5, 0, 20 + i * 20, false);
+    }
+    expect((await page.request.post(`/api/v1/farms/${FARM}/track-sessions/recompute`)).ok()).toBe(true);
+    await page.goto(`/f/${FARM}/equipments/${tractor!.id}?tab=tracks`);
+    const table = page.getByRole("table", { name: "Parcours" });
+    await expect(table.getByRole("row")).toHaveCount(5);
+    // Un parcours de travail (avec ses parcelles) : trace et couverture sur la carte.
+    await table.getByRole("row").filter({ hasText: " ha" }).first().getByRole("checkbox", { name: "Sélectionner le parcours" }).click();
+    await page.waitForTimeout(8000); // carte de la sélection : cadrage et tuiles
+    await snap(page, "parcours");
+  } finally {
+    await sql`DELETE FROM tracker_bindings WHERE id = ${binding}`;
+    await sql.end();
+  }
 });

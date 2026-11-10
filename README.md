@@ -22,7 +22,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | [`docs/deploiement.md`](docs/deploiement.md) | Déploiement Docker / Dokploy : services, variables, premier démarrage (dev puis production Eyona) |
 | [`docs/interventions.md`](docs/interventions.md) | Interventions et procédures simplifiées (validé ; étapes 1 à 3 réalisées) : 6 formes, catalogue, modèle, correspondance Ekylibre, impacts Fourmy et zero-mobile |
 | [`docs/workflow.md`](docs/workflow.md) | Plan d'implémentation de la première tranche : jour 1 des fondations, tâches des 7 agents, recette |
-| [`docs/phyto.md`](docs/phyto.md) · [`docs/meteo.md`](docs/meteo.md) | Contrôle réglementaire des traitements (E-Phy, ZNT, IFT, mélanges) ; météo des interventions |
+| [`docs/phyto.md`](docs/phyto.md) · [`docs/meteo.md`](docs/meteo.md) | Contrôle réglementaire des traitements (E-Phy, ZNT, IFT, mélanges), registre au format réglementaire 2027 ; météo des interventions, stations Weenat et Sencrop |
 | [`docs/activites.md`](docs/activites.md) · [`docs/parcelles.md`](docs/parcelles.md) · [`docs/carto.md`](docs/carto.md) | Activités et productions ; création de parcelles (PAC, cadastre) et fiche ; outils de cartographie |
 | [`docs/materiels.md`](docs/materiels.md) | Matériels : fiche, compteur et relevés, plan d'entretien et échéances, interventions d'entretien, pièces à commander, alertes, avatar 3D (mode d'emploi et API) |
 | [`docs/parcours-attelages.md`](docs/parcours-attelages.md) · [`docs/parcours-attelages-design.md`](docs/parcours-attelages-design.md) | Parcours GPS d'un matériel, intervention tirée des parcours, attelages dans l'intervention : exigences et design |
@@ -51,6 +51,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | Retours de test des pilotes (interventions, phyto, activités, parcelles) | ✅ lots A à H : saisie pleine page, contrôle réglementaire, précautions et mélanges, activités, certifications, parcelles depuis la carte (PAC, cadastre) |
 | Matériels et entretien (lots I à M) | ✅ fiche et relevés d'heures, plan d'entretien et échéances, import de la base matériel, interventions d'entretien, heures estimées par Traccar, pièces à commander, alertes, avatar 3D et rejeu dans le plan 3D (`docs/materiels.md`) |
 | Parcours GPS et attelages (lots N à R) | ✅ attelages dans l'intervention (mode libre conservé), parcours GPS par matériel, intervention tirée des parcours, attelages types, applicateur au registre phyto, reprise Ekylibre et synchro mobile (`docs/parcours-attelages.md` §8) |
+| Retours de test du 10/11/2026 (lots S à X) | ✅ menus en sections, intégrations par thème, formulaire d'intervention réordonné, choix des colonnes des listes, widget Parcours GPS du tableau de bord, registre phyto au format réglementaire (OEPP, BBCH, SIRET), stations Weenat et Sencrop (`claudedocs/workflow_retours_10112026.md`) |
 | Jours 6-7 — migration réelle + recette | ⏳ à faire |
 
 ### À reprendre
@@ -67,6 +68,13 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
    (pull et push), lien des parcours vers le rejeu, relier les outils
    annoncés par les boîtiers (`external_ids.traccarTool`) ; bilan :
    `docs/parcours-attelages.md` §8.
+6. Registre phyto : SIRET des fermes et culture des activités non
+   reconnues à saisir chez les pilotes ; cas B à D de l'arrêté (espaces
+   fermés, semences), prestation de service, délai de rentrée
+   (`docs/phyto.md`, registre au format réglementaire).
+7. Stations météo : valider Weenat et Sencrop sur de vrais comptes
+   (horodatage Weenat, unités du vent, jours par appel Sencrop ;
+   `docs/meteo.md`).
 
 ### Démarrage local
 

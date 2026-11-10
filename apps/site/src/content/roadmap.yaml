@@ -8,7 +8,9 @@ roadmap:
     status: en-cours
     horizon: Fin 2026
   - title: Application mobile sur le terrain
-    text: Essais sur téléphone, cartes hors ligne, puis diffusion aux pilotes.
+    text: >-
+      Essais sur téléphone, cartes hors ligne, interventions en attelages, puis diffusion
+      aux pilotes.
     status: en-cours
     horizon: Fin 2026
   - title: Mise en production
@@ -24,8 +26,16 @@ roadmap:
   - title: Heures des matériels par d'autres boîtiers
     text: Karnott, télématique des constructeurs, en plus de Traccar.
     status: plus-tard
+  - title: Stations météo chez les pilotes
+    text: Weenat et Sencrop validés sur de vrais comptes, en conditions réelles.
+    status: prochainement
+  - title: Registre phyto complet
+    text: >-
+      Serres fermées et locaux de stockage, semences traitées, prestations de service et
+      délai de rentrée : les cas restants de l'arrêté de décembre 2025.
+    status: prochainement
   - title: Sondes et pièges connectés
-    text: De nouvelles intégrations sur le modèle des traceurs GPS.
+    text: De nouvelles intégrations sur le modèle des traceurs GPS et des stations météo.
     status: plus-tard
   - title: API documentée et ouverte
     text: >-

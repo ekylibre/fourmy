@@ -140,6 +140,8 @@ Intervention {
   tools[]            // { equipmentId } — mode libre ; en attelages, leur réunion
   doers[]            // { personId }    — idem
   purposes[]         // traitement : herbicide, fongicide, insecticide… (facultatif)
+  bbch?              // traitement : stade BBCH (référentiel du ministère, ex.
+                     //   SP_27001_57) pour le registre réglementaire (2026-11-10)
   notes
   origin             // web | mobile | migration | plugin
 }

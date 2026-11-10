@@ -178,6 +178,10 @@ erDiagram
 | `audit_log` | `actor`, `origin`, `entity`, `entity_id`, `action`, `diff jsonb`, `at` | FR-TIME-3 |
 | `outbox_events` | `type`, `payload jsonb`, `occurred_at`, `published_at` | ADR-6 |
 | `import_runs` | `source`, `started_at`, `report jsonb` | Rapport de migration (FR-MIG-3) |
+| `track_sessions` | `equipment_id`, `kind ∈ {work, transit}`, bornes, distance, couverture, `parcels jsonb`, `intervention_id`, `crew_id` | Parcours GPS calculés depuis `positions` (lots O à P) |
+| `intervention_crews`, `crew_templates` | rang, libellé, matériels, intervenants, périodes | Attelages d'une intervention ; attelages types de la ferme (lots N à Q) |
+| `ref_phyto_crops`, `ref_bbch_stages` | code culture, dénomination, code OEPP ; stades BBCH | Référentiels du ministère pour le registre réglementaire (lot X) ; `farms.siret/pacage`, `activities.crop_code`, `interventions.bbch` |
+| `weather_stations`, `weather_measures` | fournisseur, identifiant externe, position ; mesures horaires | Stations Weenat et Sencrop de l'agriculteur (lot W) |
 
 ### 4.4 Règles de domaine (dans `packages/domain`)
 
@@ -251,7 +255,16 @@ testée avant d'être enregistrée ; l'adresse d'un service externe doit être
 publique et en HTTPS (pas d'appel du serveur vers ses services internes). Un
 worker (même image que l'API) synchronise chaque minute, sous verrou en base.
 Ajouter un fournisseur : sa description (`INTEGRATION_PROVIDERS`, l'interface
-en déduit le formulaire) et son adaptateur (`apps/api/src/integrations`).
+en déduit le formulaire ; `category` le range dans un thème : Météo, Suivi
+GPS – Matériels, OAD) et son adaptateur (`apps/api/src/integrations`).
+Fournisseurs (2026-11-10) : Traccar ; OpenWeather et meteoblue (prévisions,
+à la demande) ; Weenat et Sencrop (stations de l'agriculteur, synchronisées
+toutes les heures).
+
+**Registre phyto réglementaire** (2026-11-10) : `GET
+/registers/phyto/official` (JSON avec champs manquants, CSV aux intitulés
+standard de la notice ministérielle, JSON complet), mise en forme pure dans
+`@fourmy/domain` (`officialRegisterLine`) ; détail dans `docs/phyto.md`.
 
 **Interventions** : la réalisation transforme les paramètres en mouvements
 de stock selon des règles pures du domaine (dose par hectare × surface

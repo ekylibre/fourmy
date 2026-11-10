@@ -22,7 +22,7 @@ demandera d'abord de les retirer. Dokploy y accède par l'application GitHub
 |---|---|---|
 | `db` | `timescale/timescaledb-ha:pg17` | PostgreSQL + PostGIS + TimescaleDB, volume `fourmy_pgdata` |
 | `api` | `Dockerfile`, cible `api` | API Hono ; applique les migrations au démarrage |
-| `worker` | même image, `node apps/api/dist/worker.js` | synchronise les intégrations des fermes (Traccar : chaque minute), le référentiel phyto Lexicon (chaque jour), l'eau autour des fermes (BD TOPO, tous les 30 jours), l'IFT et la météo des interventions réalisées, les heures estimées des matériels depuis Traccar (toutes les 15 minutes) et les alertes d'entretien par e-mail (au plus une fois par heure) |
+| `worker` | même image, `node apps/api/dist/worker.js` | synchronise les intégrations des fermes (Traccar : chaque minute ; stations Weenat et Sencrop : chaque heure), les parcours GPS (toutes les 5 minutes), le référentiel phyto Lexicon (chaque jour), l'eau autour des fermes (BD TOPO, tous les 30 jours), l'IFT et la météo des interventions réalisées, les heures estimées des matériels depuis Traccar (toutes les 15 minutes) et les alertes d'entretien par e-mail (au plus une fois par heure) |
 | `web` | `Dockerfile`, cible `web` (nginx) | application React + relais `/api` → `api` |
 | `site` | `ghcr.io/ekylibre/fourmy-site:main`, construite par la CI depuis `docker/site.Dockerfile` (nginx) | site public fourmy.org ; relaie seulement `/api/public/` (formulaire de contact) ; `www` → apex |
 
