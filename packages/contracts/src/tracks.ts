@@ -32,3 +32,45 @@ export const DEFAULT_TRACK_SETTINGS: TrackSettings = {
 
 export const trackSessionKind = z.enum(["work", "transit"]);
 export type TrackSessionKind = z.infer<typeof trackSessionKind>;
+
+/** Un parcours tel que listé (FR-GPS-12). */
+export const trackSession = z.object({
+  id: z.string().uuid(),
+  /** Matériel suivi (porteur du boîtier). */
+  equipmentId: z.string().uuid(),
+  kind: trackSessionKind,
+  startedAt: z.string(),
+  stoppedAt: z.string(),
+  durationS: z.number(),
+  distanceM: z.number(),
+  /** Travail seulement. */
+  coveredAreaM2: z.number().nullable(),
+  /** Parcelles travaillées à la date, avec la surface couverte dans chacune. */
+  parcels: z.array(z.object({ landParcelId: z.string().uuid(), name: z.string(), areaM2: z.number(), share: z.number() })),
+  /** Attribut `tool` de Traccar le plus fréquent. */
+  toolHint: z.string().nullable(),
+  /** Outil résolu (attelage déclaré, lien Traccar, intervention). */
+  tool: z.object({ id: z.string().uuid(), name: z.string() }).nullable(),
+  /** Onglet d'un outil (FR-GPS-17) : le matériel tracteur. */
+  tracker: z.object({ id: z.string().uuid(), name: z.string() }).nullable(),
+  /** Rattaché : l'intervention (figé) ; libre sinon. */
+  intervention: z.object({ id: z.string().uuid(), procedure: z.string(), status: z.string() }).nullable(),
+  /** FR-GPS-15 : bornes recalculées si la trace a changé depuis le rattachement. */
+  drift: z.object({ startedAt: z.string(), stoppedAt: z.string() }).nullable(),
+});
+export type TrackSession = z.infer<typeof trackSession>;
+
+export interface TrackSessionList {
+  items: TrackSession[];
+  /** Page suivante (plus anciens), null à la fin. */
+  nextCursor: string | null;
+}
+
+/** Détail d'un parcours : trace simplifiée [instant, lon, lat, au travail] et couverture (GeoJSON). */
+export interface TrackSessionDetail extends TrackSession {
+  samples: [string, number, number, boolean | null][];
+  coverage: unknown | null;
+}
+
+export const trackSessionState = z.enum(["free", "linked"]);
+export type TrackSessionState = z.infer<typeof trackSessionState>;

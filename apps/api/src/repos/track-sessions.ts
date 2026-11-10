@@ -1,8 +1,17 @@
 import { sql, type SQL } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
-import { DEFAULT_TRACK_SETTINGS, trackSettings, type TrackSettings } from "@fourmy/contracts";
+import {
+  DEFAULT_TRACK_SETTINGS,
+  trackSettings,
+  type TrackSession,
+  type TrackSessionDetail,
+  type TrackSessionList,
+  type TrackSettings,
+} from "@fourmy/contracts";
 import { segmentSessions, settingsHash, type SessionSpan, type TrackPosition } from "@fourmy/domain";
 import { uuidv5 } from "@fourmy/migrator-ekylibre";
+import { BadRequest, NotFound } from "../routes/helpers.js";
+import { trackReplay } from "./tracks.js";
 
 /**
  * Parcours GPS matérialisés (lot O, docs/parcours-attelages-design.md §2.3
@@ -292,4 +301,139 @@ async function insertSession(
                      FROM kept WHERE share >= ${settings.parcelMinShare} OR area >= ${settings.parcelMinAreaM2}), '[]'::jsonb),
            ${span.toolHint}, (SELECT id FROM tool), ${a.hash}
     FROM cov`);
+}
+
+// ---------------------------------------------------------------------------
+// Lecture (lot O3) : liste d'un matériel, détail, réglages
+// ---------------------------------------------------------------------------
+
+export interface TrackSessionQuery {
+  equipmentId: string;
+  from: string;
+  to: string;
+  kind?: "work" | "transit";
+  parcelId?: string;
+  state?: "free" | "linked";
+  cursor?: string;
+  limit: number;
+}
+
+type SessionRow = {
+  id: string;
+  equipment_id: string;
+  kind: "work" | "transit";
+  started_at: string | Date;
+  stopped_at: string | Date;
+  distance_m: string;
+  covered_area_m2: string | null;
+  parcels: TrackSession["parcels"];
+  tool_hint: string | null;
+  tool_id: string | null;
+  tool_name: string | null;
+  tracker_name: string;
+  intervention_id: string | null;
+  procedure: string | null;
+  status: string | null;
+  drift: TrackSession["drift"];
+};
+
+const SESSION_COLUMNS = sql`
+  s.id, s.equipment_id, s.kind, s.started_at, s.stopped_at, s.distance_m, s.covered_area_m2, s.parcels, s.tool_hint,
+  t.id AS tool_id, t.name AS tool_name, e.name AS tracker_name,
+  i.id AS intervention_id, i.procedure, i.status, s.drift`;
+const SESSION_JOINS = sql`
+  JOIN equipments e ON e.id = s.equipment_id
+  LEFT JOIN equipments t ON t.id = s.tool_equipment_id
+  LEFT JOIN interventions i ON i.id = s.intervention_id`;
+
+function toSession(r: SessionRow, viewer: string): TrackSession {
+  return {
+    id: r.id,
+    equipmentId: r.equipment_id,
+    kind: r.kind,
+    startedAt: iso(r.started_at),
+    stoppedAt: iso(r.stopped_at),
+    durationS: Math.round((ms(r.stopped_at) - ms(r.started_at)) / 1000),
+    distanceM: Number(r.distance_m),
+    coveredAreaM2: r.covered_area_m2 === null ? null : Number(r.covered_area_m2),
+    parcels: r.parcels ?? [],
+    toolHint: r.tool_hint,
+    tool: r.tool_id ? { id: r.tool_id, name: r.tool_name! } : null,
+    tracker: r.equipment_id === viewer ? null : { id: r.equipment_id, name: r.tracker_name },
+    intervention: r.intervention_id ? { id: r.intervention_id, procedure: r.procedure!, status: r.status! } : null,
+    drift: r.drift,
+  };
+}
+
+/**
+ * Parcours d'un matériel, du plus récent au plus ancien (FR-GPS-12, 13, 17) :
+ * les siens s'il porte un boîtier ; pour un outil, ceux des matériels suivis
+ * où il était attelé (outil résolu, ou attelage de l'intervention rattachée).
+ * Curseur : « début|id » de la dernière ligne.
+ */
+export async function listTrackSessions(db: Database, farmId: string, q: TrackSessionQuery): Promise<TrackSessionList> {
+  return withFarm(db, farmId, async (tx) => {
+    let after = sql``;
+    if (q.cursor) {
+      const [at, id] = q.cursor.split("|");
+      if (!at || !id || Number.isNaN(Date.parse(at))) throw new BadRequest("Curseur invalide.");
+      after = sql`AND (s.started_at, s.id) < (${at}::timestamptz, ${id}::uuid)`;
+    }
+    const list = await rows<SessionRow>(
+      tx,
+      sql`SELECT ${SESSION_COLUMNS}
+          FROM track_sessions s ${SESSION_JOINS}
+          WHERE (s.equipment_id = ${q.equipmentId}
+                 OR s.tool_equipment_id = ${q.equipmentId}
+                 OR (s.crew_id IS NOT NULL AND EXISTS (SELECT 1 FROM intervention_parameters p
+                       WHERE p.crew_id = s.crew_id AND p.role = 'tool' AND p.ref_id = ${q.equipmentId})))
+            AND s.started_at < ${q.to}::timestamptz AND s.stopped_at > ${q.from}::timestamptz
+            ${q.kind ? sql`AND s.kind = ${q.kind}` : sql``}
+            ${q.state === "free" ? sql`AND s.intervention_id IS NULL` : q.state === "linked" ? sql`AND s.intervention_id IS NOT NULL` : sql``}
+            ${q.parcelId ? sql`AND s.parcels @> ${JSON.stringify([{ landParcelId: q.parcelId }])}::jsonb` : sql``}
+            ${after}
+          ORDER BY s.started_at DESC, s.id DESC
+          LIMIT ${q.limit + 1}`,
+    );
+    const page = list.slice(0, q.limit);
+    const last = page.at(-1);
+    return {
+      items: page.map((r) => toSession(r, q.equipmentId)),
+      nextCursor: list.length > q.limit && last ? `${iso(last.started_at)}|${last.id}` : null,
+    };
+  });
+}
+
+/** Un parcours, sa trace simplifiée et sa couverture. */
+export async function getTrackSession(db: Database, farmId: string, id: string, viewer?: string): Promise<TrackSessionDetail> {
+  const detail = await withFarm(db, farmId, async (tx) => {
+    const [r] = await rows<SessionRow & { coverage: unknown }>(
+      tx,
+      sql`SELECT ${SESSION_COLUMNS}, ST_AsGeoJSON(s.coverage)::json AS coverage
+          FROM track_sessions s ${SESSION_JOINS} WHERE s.id = ${id}`,
+    );
+    if (!r) throw new NotFound("Parcours introuvable.");
+    return { session: toSession(r, viewer ?? r.equipment_id), coverage: r.coverage ?? null };
+  });
+  const s = detail.session;
+  const track = await trackReplay(db, farmId, { equipmentId: s.equipmentId, from: s.startedAt, to: new Date(ms(s.stoppedAt) + 1000).toISOString(), toleranceM: 2 });
+  return { ...s, samples: track.samples, coverage: detail.coverage };
+}
+
+export async function getTrackSettings(db: Database, farmId: string): Promise<TrackSettings> {
+  return withFarm(db, farmId, trackSettingsTx);
+}
+
+/**
+ * Réglages de la ferme (FR-GPS-16). Le changement de hash rend les parcours
+ * libres « à recalculer » : le worker (ou `recompute`) les refait, les
+ * parcours rattachés gardent leur étendue.
+ */
+export async function putTrackSettings(db: Database, farmId: string, body: TrackSettings): Promise<TrackSettings> {
+  return withFarm(db, farmId, async (tx) => {
+    await tx.execute(sql`
+      INSERT INTO farm_settings (farm_id, tracks) VALUES (${farmId}, ${JSON.stringify(body)}::jsonb)
+      ON CONFLICT (farm_id) DO UPDATE SET tracks = excluded.tracks, updated_at = now()`);
+    return trackSettingsTx(tx);
+  });
 }

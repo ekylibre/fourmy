@@ -1,9 +1,20 @@
 import { Hono } from "hono";
-import type { Env } from "../context.js";
+import { trackSessionKind, trackSessionState, trackSettings } from "@fourmy/contracts";
+import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import { trackReplay, trackCoverage, toCzml } from "../repos/tracks.js";
 import { hitches, latestPositions } from "../repos/avatar.js";
-import { atOrNow, uuidParam, window } from "./helpers.js";
+import { computeTrackSessions, getTrackSession, getTrackSettings, listTrackSessions, putTrackSettings } from "../repos/track-sessions.js";
+import { atOrNow, BadRequest, problem, uuidParam, window } from "./helpers.js";
+
+const DAY = 86_400_000;
+/** Option de requête validée par un schéma (absente : undefined). */
+const optional = <T>(value: string | undefined, schema: { safeParse: (v: unknown) => { success: boolean; data?: T } }, name: string): T | undefined => {
+  if (value === undefined || value === "") return undefined;
+  const r = schema.safeParse(value);
+  if (!r.success) throw new BadRequest(`${name} invalide`);
+  return r.data;
+};
 
 /** Traces GPS : rejeu (JSON / CZML) et couverture par parcelle (US-1, US-3). */
 export const trackRoutes = new Hono<Env>()
@@ -28,4 +39,39 @@ export const trackRoutes = new Hono<Env>()
         maxGapS: Number(c.req.query("maxGap") ?? 30),
       }),
     );
+  })
+  // Parcours GPS (lot O3, FR-GPS-10 à 17).
+  .get("/equipments/:id/track-sessions", async (c) => {
+    // Période : les 30 derniers jours par défaut (FR-GPS-13), au plus 400 jours.
+    const t = Date.parse(c.req.query("to") ?? new Date().toISOString());
+    const f = c.req.query("from") ? Date.parse(c.req.query("from")!) : t - 30 * DAY;
+    if (Number.isNaN(f) || Number.isNaN(t) || t <= f) throw new BadRequest("from/to : dates ISO, from < to");
+    if (t - f > 400 * DAY) throw new BadRequest("fenêtre limitée à 400 jours");
+    const range = { from: new Date(f).toISOString(), to: new Date(t).toISOString() };
+    const parcel = c.req.query("parcel");
+    if (parcel) uuidParam(c, "parcel", "query");
+    const limit = Number(c.req.query("limit") ?? 50);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 200) throw new BadRequest("limit : entier de 1 à 200");
+    return c.json(
+      await listTrackSessions(db(), c.get("farmId"), {
+        equipmentId: uuidParam(c, "id"),
+        ...range,
+        kind: optional(c.req.query("kind"), trackSessionKind, "kind"),
+        state: optional(c.req.query("state"), trackSessionState, "state"),
+        parcelId: parcel || undefined,
+        cursor: c.req.query("cursor") || undefined,
+        limit,
+      }),
+    );
+  })
+  .get("/track-sessions/:id", async (c) => {
+    const viewer = c.req.query("equipment");
+    return c.json(await getTrackSession(db(), c.get("farmId"), uuidParam(c, "id"), viewer ? uuidParam(c, "equipment", "query") : undefined));
+  })
+  .post("/track-sessions/recompute", requireOwner, async (c) => c.json(await computeTrackSessions(db(), c.get("farmId"))))
+  .get("/settings/tracks", async (c) => c.json(await getTrackSettings(db(), c.get("farmId"))))
+  .put("/settings/tracks", requireOwner, async (c) => {
+    const parsed = trackSettings.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.issues.map((i) => `${i.path.join(".")} : ${i.message}`).join(" ; "));
+    return c.json(await putTrackSettings(db(), c.get("farmId"), parsed.data));
   });
