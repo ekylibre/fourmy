@@ -35,7 +35,7 @@ export interface WeatherHourBrief {
   windKmh: number | null;
 }
 
-export type WeatherProviderName = "open_meteo" | "openweather" | "meteoblue";
+export type WeatherProviderName = "open_meteo" | "openweather" | "meteoblue" | "weenat" | "sencrop";
 
 export interface WeatherSummary {
   source: WeatherProviderName;
@@ -304,3 +304,4 @@ export function sprayCondition(h: WeatherHour): SprayCondition {
   }
   return { at: h.at, level, reasons, hour: h };
 }
+export * from "./stations.js";

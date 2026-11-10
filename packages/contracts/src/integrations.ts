@@ -8,7 +8,7 @@ import { isoDateTime, uuid } from "./primitives.js";
  * fournisseur. Un champ `secret` est chiffré côté serveur et jamais renvoyé.
  */
 
-export const integrationProvider = z.enum(["traccar", "openweather", "meteoblue"]);
+export const integrationProvider = z.enum(["traccar", "openweather", "meteoblue", "weenat", "sencrop"]);
 export type IntegrationProvider = z.infer<typeof integrationProvider>;
 
 export interface IntegrationField {
@@ -20,8 +20,18 @@ export interface IntegrationField {
   help?: string;
 }
 
+/** Thème d'une intégration : regroupe les fournisseurs à l'écran. */
+export type IntegrationCategory = "weather" | "gps_equipment" | "decision_support";
+
+export const INTEGRATION_CATEGORIES: { category: IntegrationCategory; label: string; description: string }[] = [
+  { category: "weather", label: "Météo", description: "Prévisions et mesures pour la météo des interventions et les conditions de pulvérisation." },
+  { category: "gps_equipment", label: "Suivi GPS – Matériels", description: "Positions et parcours des matériels." },
+  { category: "decision_support", label: "OAD", description: "Outils d'aide à la décision (modèles de risque, préconisations)." },
+];
+
 export interface IntegrationProviderDefinition {
   provider: IntegrationProvider;
+  category: IntegrationCategory;
   label: string;
   description: string;
   fields: IntegrationField[];
@@ -30,6 +40,7 @@ export interface IntegrationProviderDefinition {
 export const INTEGRATION_PROVIDERS: IntegrationProviderDefinition[] = [
   {
     provider: "traccar",
+    category: "gps_equipment",
     label: "Traccar — traceurs GPS",
     description:
       "Positions des boîtiers GPS des matériels (travail au champ, transport). Chaque boîtier est rattaché au matériel de même nom.",
@@ -46,6 +57,7 @@ export const INTEGRATION_PROVIDERS: IntegrationProviderDefinition[] = [
   },
   {
     provider: "openweather",
+    category: "weather",
     label: "OpenWeather — météo",
     description:
       "Prévisions à 5 jours pour la météo des interventions et les conditions de pulvérisation. Sans intégration météo, Open-Meteo (gratuit, sans clé) est utilisé ; l'historique vient toujours d'Open-Meteo.",
@@ -61,6 +73,7 @@ export const INTEGRATION_PROVIDERS: IntegrationProviderDefinition[] = [
   },
   {
     provider: "meteoblue",
+    category: "weather",
     label: "meteoblue — météo agricole",
     description:
       "Prévisions horaires du paquet agro de meteoblue pour la météo des interventions et les conditions de pulvérisation. Prioritaire sur OpenWeather et Open-Meteo quand il est actif.",
@@ -71,6 +84,34 @@ export const INTEGRATION_PROVIDERS: IntegrationProviderDefinition[] = [
         kind: "secret",
         required: true,
         help: "Sur my.meteoblue.com : clé donnant accès au paquet basic-1h_agro-1h.",
+      },
+    ],
+  },
+  {
+    provider: "weenat",
+    category: "weather",
+    label: "Weenat — stations météo",
+    description:
+      "Mesures horaires de vos stations Weenat (pluie, température, humidité, vent). La météo d'une intervention passée prend d'abord la station la plus proche des parcelles (moins de 5 km). Synchronisation toutes les heures ; 30 jours d'historique à la première.",
+    fields: [
+      { key: "email", label: "E-mail du compte Weenat", kind: "text", required: true, placeholder: "vous@exemple.fr" },
+      { key: "password", label: "Mot de passe Weenat", kind: "secret", required: true, help: "Celui de l'application Weenat (app.weenat.com)." },
+    ],
+  },
+  {
+    provider: "sencrop",
+    category: "weather",
+    label: "Sencrop — stations météo",
+    description:
+      "Mesures horaires de vos stations Sencrop (pluie, température, humidité, vent, humectation). La météo d'une intervention passée prend d'abord la station la plus proche des parcelles (moins de 5 km). Synchronisation toutes les heures ; 30 jours d'historique à la première.",
+    fields: [
+      { key: "applicationId", label: "Identifiant d'application", kind: "text", required: true },
+      {
+        key: "applicationSecret",
+        label: "Secret d'application",
+        kind: "secret",
+        required: true,
+        help: "Créés dans votre compte Sencrop (accès API / applications).",
       },
     ],
   },

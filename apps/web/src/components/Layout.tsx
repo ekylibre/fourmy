@@ -1,24 +1,62 @@
 import { AppShell, Badge, Burger, Button, Group, NavLink, Stack, Text } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { Box, Boxes, ClipboardList, Database, FileText, LayoutDashboard, Map, Plug, Users, Wine, FlaskConical, Sprout, Tractor } from "lucide-react";
+import { useState } from "react";
+import { Box, Boxes, ClipboardList, Database, FileText, LayoutDashboard, Map, Plug, Scale, Users, Wine, FlaskConical, Sprout, Tractor, type LucideIcon } from "lucide-react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { Wordmark } from "@fourmy/ui-lyvre";
 import { useFarm } from "../app/farm";
 import { useSession, useSignOut } from "../app/session";
 import { Timeline } from "./Timeline";
 
-const SECTIONS = [
+type NavItem = { path: string; label: string; icon: LucideIcon; ownerOnly?: boolean };
+type NavGroup = { label: string; icon: LucideIcon; ownerOnly?: boolean; children: NavItem[] };
+type NavEntry = NavItem | NavGroup;
+
+/**
+ * Menu (retours du 10/11/2026) : sections et sous-menus. Les routes ne
+ * changent pas ; Entretien et Attelages types restent sous Matériels.
+ */
+export const NAVIGATION: NavEntry[] = [
   { path: "", label: "Tableau de bord", icon: LayoutDashboard },
-  { path: "/map", label: "Carte", icon: Map },
-  { path: "/3d-plan", label: "Plan 3D", icon: Box },
+  {
+    label: "Cartes",
+    icon: Map,
+    children: [
+      { path: "/map", label: "Plan 2D", icon: Map },
+      { path: "/3d-plan", label: "Plan 3D", icon: Box },
+    ],
+  },
   { path: "/activities", label: "Activités", icon: Sprout },
-  { path: "/equipments", label: "Matériels", icon: Tractor },
   { path: "/interventions", label: "Interventions", icon: ClipboardList },
-  { path: "/stocks", label: "Stocks", icon: Boxes },
-  { path: "/cellar", label: "Cuverie", icon: Wine },
-  { path: "/register", label: "Registre phyto", icon: FileText },
-  { path: "/phyto", label: "Produits phyto", icon: FlaskConical },
-] as const;
+  { path: "/equipments", label: "Matériels", icon: Tractor },
+  { path: "/team", label: "Équipe", icon: Users, ownerOnly: true },
+  {
+    label: "Stocks",
+    icon: Boxes,
+    children: [
+      { path: "/stocks", label: "État des stocks", icon: Boxes },
+      { path: "/phyto", label: "Produits phyto", icon: FlaskConical },
+      { path: "/cellar", label: "Cuverie", icon: Wine },
+    ],
+  },
+  { label: "Réglementaire", icon: Scale, children: [{ path: "/register", label: "Registre phyto", icon: FileText }] },
+  {
+    label: "Interopérabilité",
+    icon: Plug,
+    ownerOnly: true,
+    children: [
+      { path: "/integrations", label: "Intégrations", icon: Plug },
+      { path: "/imports", label: "Imports", icon: Database },
+    ],
+  },
+];
+
+const isGroup = (e: NavEntry): e is NavGroup => "children" in e;
+
+/** Entrée active : égalité pour le tableau de bord, préfixe de segment sinon. */
+export function isActivePath(current: string, path: string): boolean {
+  return path === "" ? current === "" || current === "/" : current === path || current.startsWith(`${path}/`);
+}
 
 /** Coquille : en-tête, navigation (night), frise temporelle, contenu. */
 export function Layout() {
@@ -31,6 +69,19 @@ export function Layout() {
   const base = `/f/${farm.id}`;
   const current = location.pathname.slice(base.length);
   const linkTo = (path: string) => `${base}${path}${location.search}`; // garde ?at=
+  // Sous-menus : ouverts sur la section active, sinon au clic.
+  const [toggled, setToggled] = useState<Record<string, boolean>>({});
+  const item = ({ path, label, icon: Icon }: NavItem) => (
+    <NavLink
+      key={path}
+      component={Link}
+      to={linkTo(path)}
+      label={label}
+      leftSection={<Icon size={18} />}
+      active={isActivePath(current, path)}
+      onClick={close}
+    />
+  );
 
   return (
     <AppShell header={{ height: 56 }} navbar={{ width: 240, breakpoint: "sm", collapsed: { mobile: !opened } }} padding={0}>
@@ -67,48 +118,28 @@ export function Layout() {
       </AppShell.Header>
 
       <AppShell.Navbar className="lv-nav" p="sm">
-        <Stack gap={4}>
-          {SECTIONS.map(({ path, label, icon: Icon }) => (
-            <NavLink
-              key={path}
-              component={Link}
-              to={linkTo(path)}
-              label={label}
-              leftSection={<Icon size={18} />}
-              active={current === path || (path !== "" && current.startsWith(path))}
-              onClick={close}
-            />
-          ))}
-          {farm.role === "owner" && (
-            <NavLink
-              component={Link}
-              to={linkTo("/team")}
-              label="Équipe"
-              leftSection={<Users size={18} />}
-              active={current.startsWith("/team")}
-              onClick={close}
-            />
-          )}
-          {farm.role === "owner" && (
-            <NavLink
-              component={Link}
-              to={linkTo("/integrations")}
-              label="Intégrations"
-              leftSection={<Plug size={18} />}
-              active={current.startsWith("/integrations")}
-              onClick={close}
-            />
-          )}
-          {farm.role === "owner" && (
-            <NavLink
-              component={Link}
-              to={linkTo("/imports")}
-              label="Imports"
-              leftSection={<Database size={18} />}
-              active={current.startsWith("/imports")}
-              onClick={close}
-            />
-          )}
+        <Stack gap={4} component="nav" aria-label="Menu principal">
+          {NAVIGATION.filter((e) => !e.ownerOnly || farm.role === "owner").map((entry) => {
+            if (!isGroup(entry)) return item(entry);
+            const active = entry.children.some((c) => isActivePath(current, c.path));
+            const Icon = entry.icon;
+            return (
+              <NavLink
+                key={entry.label}
+                component="button"
+                type="button"
+                aria-expanded={toggled[entry.label] ?? active}
+                label={entry.label}
+                leftSection={<Icon size={18} />}
+                active={active && !(toggled[entry.label] ?? active)}
+                opened={toggled[entry.label] ?? active}
+                onChange={(o) => setToggled((t) => ({ ...t, [entry.label]: o }))}
+                childrenOffset={18}
+              >
+                {entry.children.filter((c) => !c.ownerOnly || farm.role === "owner").map(item)}
+              </NavLink>
+            );
+          })}
         </Stack>
         <Text className="lv-nav-foot" mt="auto" pt="md">
           FOURMY · JUMEAU NUMÉRIQUE

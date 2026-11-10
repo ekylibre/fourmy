@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
-import { login } from "./shared";
+import { login, navTo } from "./shared";
 
 /**
  * Captures des fonctionnalités pour le site fourmy.org (docs/site-public-
@@ -32,25 +32,25 @@ test("tableau de bord (pleine saison), cuverie, stocks, registre (fin 2021)", as
   await snap(page, "tableau-de-bord");
   await page.getByLabel("Date de la frise").fill("2021-12-31");
 
-  await page.getByRole("link", { name: "Cuverie" }).click();
+  await navTo(page, "Cuverie", "Stocks");
   await expect(page.getByRole("meter")).toHaveCount(6);
   await page.getByRole("button", { name: "Contenu de Cuve 1" }).click();
   await expect(page.getByRole("dialog").getByText("30 hL", { exact: true })).toBeVisible();
   await snap(page, "cuverie");
   await page.keyboard.press("Escape");
 
-  await page.getByRole("link", { name: "Stocks" }).click();
+  await navTo(page, "État des stocks", "Stocks");
   await expect(page.locator("table").first()).toBeVisible();
   await snap(page, "stocks");
 
-  await page.getByRole("link", { name: "Registre phyto" }).click();
+  await navTo(page, "Registre phyto", "Réglementaire");
   await expect(page.getByText(/application\(s\) en 2021/)).toBeVisible();
   await snap(page, "registre");
 });
 
 test("carte et parcellaire", async ({ page }) => {
   await page.getByLabel("Date de la frise").fill("2023-06-15");
-  await page.getByRole("link", { name: "Carte" }).click();
+  await navTo(page, "Plan 2D", "Cartes");
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
   await expect(page.getByText(/9 parcelles/)).toBeVisible();
   // Tuiles IGN : laisser la photo aérienne se charger.
@@ -145,7 +145,7 @@ test("équipe et intégrations", async ({ page }) => {
   await page.getByRole("link", { name: "Équipe" }).click();
   await expect(page.getByRole("heading", { name: "Personnes" })).toBeVisible();
   await snap(page, "equipe");
-  await page.getByRole("link", { name: "Intégrations" }).click();
+  await navTo(page, "Intégrations", "Interopérabilité");
   await expect(page.getByRole("heading", { name: /Traccar/ })).toBeVisible();
   await snap(page, "integrations");
 });
@@ -153,7 +153,7 @@ test("équipe et intégrations", async ({ page }) => {
 test("plan 3D (relief et photo IGN, cuverie)", async ({ page }) => {
   test.setTimeout(120_000);
   await page.getByLabel("Date de la frise").fill("2021-12-31");
-  await page.getByRole("link", { name: "Plan 3D" }).click();
+  await navTo(page, "Plan 3D", "Cartes");
   await expect(page.locator(".cesium-widget canvas")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/cuve\(s\) placée\(s\)/)).toBeVisible({ timeout: 60_000 });
   await page.waitForTimeout(6000);

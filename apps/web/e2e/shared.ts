@@ -12,3 +12,14 @@ export async function login(page: import("@playwright/test").Page) {
   await page.getByLabel(/^Mot de passe/).fill(E2E_PASSWORD);
   await page.getByRole("button", { name: "Se connecter" }).click();
 }
+
+/**
+ * Navigue par le menu principal ; ouvre le sous-menu `group` si l'entrée
+ * n'est pas visible (sous-menus repliés hors de la section active).
+ */
+export async function navTo(page: import("@playwright/test").Page, item: string, group?: string): Promise<void> {
+  const nav = page.getByRole("navigation", { name: "Menu principal" });
+  const link = nav.getByRole("link", { name: item, exact: true });
+  if (group && !(await link.isVisible())) await nav.getByRole("button", { name: group, exact: true }).click();
+  await link.click();
+}

@@ -11,10 +11,19 @@ import { useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
 import { formatDate } from "../../app/labels";
 import { useEquipments, useFarmDues, useMembers } from "../../app/queries";
+import { useColumns, type ColumnDef } from "../../app/columns";
+import { ColumnPicker } from "../../components/ColumnPicker";
 import { ErrorAlert, Loading } from "../../components/states";
 import { EquipmentLogo } from "../equipments/EquipmentLogo";
 import { DueBadge } from "./Maintenance";
 import { TrackSettingsPanel } from "../equipments/TrackSettingsPanel";
+
+const DUE_COLUMNS: ColumnDef[] = [
+  { key: "status", label: "État" },
+  { key: "equipment", label: "Matériel", required: true },
+  { key: "operation", label: "Opération" },
+  { key: "due", label: "Échéance" },
+];
 
 /**
  * Tableau de bord de l'entretien (FR-MAT-24) : opérations en retard ou à
@@ -26,6 +35,7 @@ export function MaintenancePage() {
   const { at, isToday } = useAt();
   const q = useFarmDues(farm.id, at);
   const equipments = useEquipments(farm.id);
+  const columns = useColumns("maintenance", DUE_COLUMNS);
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorAlert error={q.error} />;
   const { items, byEquipment } = q.data!;
@@ -44,18 +54,21 @@ export function MaintenancePage() {
       </Button>
       <Group justify="space-between">
         <Title order={1}>Entretien{isToday ? "" : ` au ${formatDate(at)}`}</Title>
-        <Button component={Link} to={`/f/${farm.id}/maintenance/parts${location.search}`} variant="light" leftSection={<Package size={16} />}>
-          Pièces à commander
-        </Button>
+        <Group gap="xs">
+          <Button component={Link} to={`/f/${farm.id}/maintenance/parts${location.search}`} variant="light" leftSection={<Package size={16} />}>
+            Pièces à commander
+          </Button>
+          <ColumnPicker columns={columns} />
+        </Group>
       </Group>
       <Paper withBorder>
         <Table aria-label="Échéances d'entretien" verticalSpacing="xs" highlightOnHover>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>État</Table.Th>
+              {columns.visible("status") && <Table.Th>État</Table.Th>}
               <Table.Th>Matériel</Table.Th>
-              <Table.Th>Opération</Table.Th>
-              <Table.Th>Échéance</Table.Th>
+              {columns.visible("operation") && <Table.Th>Opération</Table.Th>}
+              {columns.visible("due") && <Table.Th>Échéance</Table.Th>}
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -63,33 +76,39 @@ export function MaintenancePage() {
               const e = logo(i.equipmentId);
               return (
                 <Table.Tr key={i.operationId}>
-                  <Table.Td>
-                    <DueBadge status={i.due.status} />
-                  </Table.Td>
+                  {columns.visible("status") && (
+                    <Table.Td>
+                      <DueBadge status={i.due.status} />
+                    </Table.Td>
+                  )}
                   <Table.Td>
                     <Group gap="xs" wrap="nowrap">
                       <EquipmentLogo farmId={farm.id} assetId={e?.logoAssetId ?? null} kind={i.equipmentKind} size={24} />
                       <Link to={link(i.equipmentId)}>{i.equipmentName}</Link>
                     </Group>
                   </Table.Td>
-                  <Table.Td>
-                    <Text size="sm">{i.label}</Text>
-                    <Text size="xs" c="dimmed">
-                      {OPERATION_KIND_LABELS[i.kind]}
-                      {i.performer === "workshop" ? ` · ${PERFORMER_LABELS.workshop}` : ""}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm" c={i.due.status === "overdue" ? "brique" : undefined}>
-                      {dueLabel(i.due)}
-                    </Text>
-                  </Table.Td>
+                  {columns.visible("operation") && (
+                    <Table.Td>
+                      <Text size="sm">{i.label}</Text>
+                      <Text size="xs" c="dimmed">
+                        {OPERATION_KIND_LABELS[i.kind]}
+                        {i.performer === "workshop" ? ` · ${PERFORMER_LABELS.workshop}` : ""}
+                      </Text>
+                    </Table.Td>
+                  )}
+                  {columns.visible("due") && (
+                    <Table.Td>
+                      <Text size="sm" c={i.due.status === "overdue" ? "brique" : undefined}>
+                        {dueLabel(i.due)}
+                      </Text>
+                    </Table.Td>
+                  )}
                 </Table.Tr>
               );
             })}
             {items.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={4}>
+                <Table.Td colSpan={columns.count}>
                   <Text size="sm" c="dimmed" ta="center" py="md">
                     Aucune opération en retard ni à venir.
                   </Text>

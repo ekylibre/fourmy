@@ -59,6 +59,11 @@ export const handlers = [
     signedIn = false;
     return HttpResponse.json({ success: true });
   }),
+  // Synthèse des parcours (tableau de bord) : Traccar inactif dans la démo.
+  http.get(`*${base}/tracks/summary`, ({ request }) => {
+    const u = new URL(request.url);
+    return HttpResponse.json({ enabled: false, from: u.searchParams.get("from"), to: u.searchParams.get("to"), items: [] });
+  }),
   http.get(`*${base}/integrations`, () => HttpResponse.json({ providers: INTEGRATION_PROVIDERS, items: [] })),
   http.get(`*${base}/members`, () =>
     page([{ userId: DEMO_USER_ID, email: demoUser.email, name: demoUser.name, role: "owner", personId: null }]),
@@ -93,6 +98,11 @@ export const handlers = [
   http.post(`*${base}/weather/intervention`, () =>
     HttpResponse.json({ weather: { source: "open_meteo", kind: "observed", temperatureC: 14.2, humidityPct: 82, windKmh: 6.5, windMaxKmh: 11, precipitationMm: 0, fetchedAt: "2026-06-10T09:00:00.000Z" } }),
   ),
+  http.get(`*${base}/weather/stations`, () =>
+    HttpResponse.json({
+      items: [{ id: "00000000-0000-7000-8000-00000000c001", provider: "sencrop", name: "Sencrop vigne", lat: 44.8, lon: 0.5, lastMeasureAt: "2026-06-10T12:00:00Z", measures: 744 }],
+    }),
+  ),
   http.get(`*${base}/weather/spraying`, () =>
     HttpResponse.json({
       source: "open_meteo",
@@ -114,6 +124,28 @@ export const handlers = [
   http.get(`*${base}/phyto/ift`, () => HttpResponse.json({ campaign: 2026, total: 0, segments: {}, pendingInterventions: 0, parcels: [] })),
   http.get(`*${base}/phyto/parcels/:id/delays`, () => HttpResponse.json({ reentry: null, harvest: null })),
   http.get(`*${base}/activities`, () => HttpResponse.json({ items: demoActivities })),
+  // Référentiels du ministère (registre phyto réglementaire, lot X).
+  http.get(`*${base}/reference/phyto-crops`, () =>
+    HttpResponse.json({
+      items: [
+        { code: "27001", label: "Vigne", oepp: "VITVI", bbchRef: "Vigne" },
+        { code: "55501", label: "Maïs", oepp: "ZEAMX", bbchRef: "Maïs" },
+        { code: "53001", label: "Ray Grass", oepp: "LOLPE", bbchRef: "Graminées" },
+      ],
+    }),
+  ),
+  http.get(`*${base}/reference/bbch`, ({ request }) =>
+    HttpResponse.json({
+      items:
+        new URL(request.url).searchParams.get("crop") === "27001"
+          ? [
+              { code: "SP_27001_53", label: "BBCH 53", description: "les inflorescences sont clairement visibles" },
+              { code: "SP_27001_57", label: "BBCH 57", description: "les inflorescences sont développées ; les fleurs se séparent" },
+              { code: "SP_27001_65", label: "BBCH 65", description: "pleine floraison : 50 % des capuchons tombés" },
+            ]
+          : [],
+    }),
+  ),
   http.get(`*${base}/certifications`, () =>
     HttpResponse.json({
       items: [

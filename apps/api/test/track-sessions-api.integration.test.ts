@@ -87,6 +87,29 @@ describe.skipIf(!url)("parcours : API (intégration)", () => {
     expect((await list(tractors[1]!, `${range(0, 2)}&kind=flight`)).status).toBe(400);
   });
 
+  it("synthèse de la ferme (tableau de bord) : par matériel, travail, déplacements, libres, parcelles", async () => {
+    const day = `from=${new Date(T0 - 3_600_000).toISOString()}&to=${new Date(T0 + DAY - 3_600_000).toISOString()}`;
+    const res = await app.request(`${base}/tracks/summary?${day}`, { headers: worker.headers });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.enabled).toBe(false);
+    expect(body.items).toHaveLength(3);
+    expect(body.items[0]).toMatchObject({
+      work: { count: 5, durationS: 9000, distanceM: 15_000, coveredAreaM2: 60_000 },
+      transit: { count: 5, durationS: 9000, distanceM: 15_000 },
+      freeWork: 5,
+      parcels: [{ landParcelId: parcel, name: "La Plaine", areaM2: 45_000 }],
+    });
+    expect(body.items.map((i: { equipment: { name: string } }) => i.equipment.name).sort()).toEqual(["Tracteur 1", "Tracteur 2", "Tracteur 3"]);
+    // Intégration Traccar active : le tableau de bord affiche le widget.
+    await sql`INSERT INTO integrations (id, farm_id, provider, enabled) VALUES (${crypto.randomUUID()}, ${farmId}, 'traccar', true)`;
+    expect((await (await app.request(`${base}/tracks/summary?${day}`, { headers: worker.headers })).json()).enabled).toBe(true);
+    // Semaine : 7 jours.
+    const week = `from=${new Date(T0 - 3_600_000).toISOString()}&to=${new Date(T0 + 7 * DAY - 3_600_000).toISOString()}`;
+    expect((await (await app.request(`${base}/tracks/summary?${week}`, { headers: worker.headers })).json()).items[0].work.count).toBe(35);
+    expect((await app.request(`${base}/tracks/summary?from=2026-01-01&to=2026-03-01`, { headers: worker.headers })).status).toBe(400);
+  });
+
   it("pagination : curseur jusqu'à la fin, sans doublon", async () => {
     const seen = new Set<string>();
     let cursor: string | null = "";

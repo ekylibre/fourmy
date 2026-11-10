@@ -2,7 +2,7 @@ import { sql, type SQL } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
 import { DomainError } from "@fourmy/domain";
 import type { Activity, ActivityFamily, ActivityParcelsWrite, ActivityWrite, ReferenceProduction } from "@fourmy/contracts";
-import { Conflict, NotFound } from "../routes/helpers.js";
+import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
 
 /**
  * Activités de la ferme (lot C des retours du 08/11/2026) : liste avec les
@@ -33,6 +33,10 @@ type Row = {
   cultivation_label: string | null;
   color: string | null;
   suspended: boolean;
+  crop_code: string | null;
+  crop_label: string | null;
+  crop_oepp: string | null;
+  crop_chosen: boolean;
   picture: string | null;
   parcel_ids: string[] | null;
   area_m2: number | null;
@@ -48,6 +52,7 @@ const toActivity = (r: Row): Activity => ({
   cultivationLabel: r.cultivation_label,
   color: r.color,
   suspended: r.suspended,
+  crop: r.crop_code ? { code: r.crop_code, label: (r.crop_label ?? "").trim(), oepp: r.crop_oepp, proposed: !r.crop_chosen } : null,
   pictureUrl: pictureUrl(r.picture),
   parcelIds: r.parcel_ids ?? [],
   areaM2: r.area_m2 ?? 0,
@@ -62,9 +67,11 @@ async function select(tx: Tx, year: number, id?: string): Promise<Activity[]> {
                -- Couleur : celle de l'activité, sinon celle de sa variété (nomenclature d'Ekylibre), sinon de la référence.
                coalesce(a.color, fourmy_variety_color(coalesce(a.cultivation, lx.specie)), lx.color) AS color, a.suspended,
                fourmy_activity_picture(coalesce(a.cultivation, lx.specie), a.family) AS picture,
+               crop.code AS crop_code, crop.label AS crop_label, crop.oepp AS crop_oepp, a.crop_code IS NOT NULL AS crop_chosen,
                prod.parcel_ids, prod.area_m2
         FROM activities a
         LEFT JOIN lexicon_productions lx ON lx.reference_name = a.reference
+        LEFT JOIN ref_phyto_crops crop ON crop.code = fourmy_activity_crop(a.id)
         LEFT JOIN LATERAL (
           SELECT array_agg(DISTINCT p.land_parcel_id) AS parcel_ids,
                  -- Surface de la parcelle pendant la campagne (sa dernière version qui la recouvre).
@@ -81,6 +88,12 @@ async function select(tx: Tx, year: number, id?: string): Promise<Activity[]> {
 
 export async function listActivities(db: Database, farmId: string, year: number): Promise<Activity[]> {
   return withFarm(db, farmId, (tx) => select(tx, year));
+}
+
+async function checkCrop(tx: Tx, body: ActivityWrite) {
+  if (!body.cropCode) return;
+  const [c] = await rows<{ n: number }>(tx, sql`SELECT count(*)::int AS n FROM ref_phyto_crops WHERE code = ${body.cropCode}`);
+  if (!c!.n) throw new BadRequest("Culture inconnue du référentiel du ministère.");
 }
 
 async function checkReference(tx: Tx, body: ActivityWrite) {
@@ -106,12 +119,13 @@ async function uniqueName(tx: Tx, name: string, self: string | null) {
 export async function createActivity(db: Database, farmId: string, body: ActivityWrite, year: number): Promise<Activity> {
   return withFarm(db, farmId, async (tx) => {
     await checkReference(tx, body);
+    await checkCrop(tx, body);
     await uniqueName(tx, body.name, null);
     const id = crypto.randomUUID();
     await tx.execute(sql`
-      INSERT INTO activities (id, farm_id, name, family, reference, cultivation, color, suspended)
+      INSERT INTO activities (id, farm_id, name, family, reference, cultivation, color, suspended, crop_code)
       VALUES (${id}, ${farmId}, ${body.name}, ${body.family}, ${body.reference ?? null}, ${body.cultivation ?? null},
-              ${body.color ?? null}, ${body.suspended ?? false})`);
+              ${body.color ?? null}, ${body.suspended ?? false}, ${body.cropCode ?? null})`);
     return (await select(tx, year, id))[0]!;
   });
 }
@@ -121,6 +135,7 @@ export async function updateActivity(db: Database, farmId: string, id: string, b
     const [current] = await rows<{ family: string }>(tx, sql`SELECT family FROM activities WHERE id = ${id}`);
     if (!current) throw new NotFound("Activité introuvable");
     await checkReference(tx, body);
+    await checkCrop(tx, body);
     await uniqueName(tx, body.name, id);
     const nature = natureOf(body.family);
     if (!nature) {
@@ -130,7 +145,8 @@ export async function updateActivity(db: Database, farmId: string, id: string, b
     await tx.execute(sql`
       UPDATE activities SET name = ${body.name}, family = ${body.family}, reference = ${body.reference ?? null},
              cultivation = ${body.cultivation ?? null}, color = ${body.color ?? null},
-             suspended = ${body.suspended ?? false}, deduced = false, updated_at = now()
+             suspended = ${body.suspended ?? false},
+             crop_code = ${body.cropCode === undefined ? sql`crop_code` : body.cropCode}, deduced = false, updated_at = now()
       WHERE id = ${id}`);
     // Les productions suivent la famille (nature) ; la culture vient désormais de l'activité.
     if (nature) await tx.execute(sql`UPDATE productions SET nature = ${nature}, updated_at = now() WHERE activity_id = ${id} AND nature <> ${nature}`);

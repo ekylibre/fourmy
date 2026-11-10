@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { login } from "./shared";
+import { login, navTo } from "./shared";
 
 /**
  * Parcours de la tranche (docs/workflow.md, agent E) sur la ferme pilote
@@ -20,7 +20,7 @@ test("connexion, cuverie dans le temps, carte, intervention jusqu'au registre", 
 
   // La frise ramène à fin 2021 : 6 cuves, Cuve 1 à 30 hL de Cabernet-Sauvignon.
   await page.getByLabel("Date de la frise").fill("2021-12-31");
-  await page.getByRole("link", { name: "Cuverie" }).click();
+  await navTo(page, "Cuverie", "Stocks");
   await expect(page).toHaveURL(/cellar\?at=2021-12-31/);
   await expect(page.getByRole("meter")).toHaveCount(6);
   await page.getByRole("button", { name: "Contenu de Cuve 1" }).click();
@@ -30,13 +30,13 @@ test("connexion, cuverie dans le temps, carte, intervention jusqu'au registre", 
   await page.keyboard.press("Escape");
 
   // Carte : MapLibre se charge (worker compris), parcelles affichées.
-  await page.getByRole("link", { name: "Carte" }).click();
+  await navTo(page, "Plan 2D", "Cartes");
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
   await expect(page.getByText(/9 parcelles/)).toBeVisible();
 
   // Saisie d'un traitement réalisé le 15 juin 2023, puis registre de 2023.
   await page.getByLabel("Date de la frise").fill("2023-06-15");
-  await page.getByRole("link", { name: "Registre phyto" }).click();
+  await navTo(page, "Registre phyto", "Réglementaire");
   const before = Number((await page.getByText(/application\(s\) en 2023/).textContent())!.match(/\d+/)![0]);
 
   await page.getByRole("link", { name: "Interventions" }).click();
@@ -54,7 +54,7 @@ test("connexion, cuverie dans le temps, carte, intervention jusqu'au registre", 
   await form.getByRole("button", { name: "Enregistrer" }).click();
   await expect(page.getByText("Intervention enregistrée.")).toBeVisible();
 
-  await page.getByRole("link", { name: "Registre phyto" }).click();
+  await navTo(page, "Registre phyto", "Réglementaire");
   await expect(page.getByText(`${before + 1} application(s) en 2023.`)).toBeVisible();
 
   // Saisie erronée : on l'annule avec un motif, elle sort du registre.
@@ -71,7 +71,7 @@ test("connexion, cuverie dans le temps, carte, intervention jusqu'au registre", 
   await modal.getByRole("textbox", { name: "Motif" }).fill("essai de bout en bout");
   await modal.getByRole("button", { name: "Annuler l'intervention" }).click();
   await expect(page.getByText("Intervention annulée.")).toBeVisible();
-  await page.getByRole("link", { name: "Registre phyto" }).click();
+  await navTo(page, "Registre phyto", "Réglementaire");
   await expect(page.getByText(`${before} application(s) en 2023.`)).toBeVisible();
 
   expect(errors, `erreurs navigateur : ${errors.join(" | ")}`).toEqual([]);

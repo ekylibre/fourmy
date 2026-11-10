@@ -8,6 +8,8 @@ import { api, farmPath } from "../../app/api";
 import { useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
 import { formatDate } from "../../app/labels";
+import { useColumns, type ColumnDef } from "../../app/columns";
+import { ColumnPicker } from "../../components/ColumnPicker";
 import { ErrorAlert, Loading } from "../../components/states";
 
 const HORIZONS: Record<string, { label: string; query: string }> = {
@@ -17,6 +19,15 @@ const HORIZONS: Record<string, { label: string; query: string }> = {
   m6: { label: "6 mois", query: "months=6" },
   m12: { label: "12 mois", query: "months=12" },
 };
+
+const PART_COLUMNS: ColumnDef[] = [
+  { key: "reference", label: "Référence" },
+  { key: "name", label: "Désignation", required: true },
+  { key: "needed", label: "Besoin" },
+  { key: "inStock", label: "En stock" },
+  { key: "toOrder", label: "À commander" },
+  { key: "for", label: "Pour" },
+];
 
 const qty = (v: number) => v.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
 
@@ -31,6 +42,7 @@ export function PartsPage() {
   const location = useLocation();
   const { at } = useAt();
   const [horizon, setHorizon] = useState("h200");
+  const columns = useColumns("parts", PART_COLUMNS);
   const q = useQuery({
     queryKey: ["parts-to-order", farm.id, at, horizon],
     queryFn: () => api.get<PartsToOrder>(farmPath(farm.id, `/maintenance/parts?${HORIZONS[horizon]!.query}&at=${encodeURIComponent(at)}`)),
@@ -56,9 +68,12 @@ export function PartsPage() {
       </Button>
       <Group justify="space-between">
         <Title order={1}>Pièces à commander</Title>
-        <Button variant="default" leftSection={<Download size={16} />} onClick={exportCsv} disabled={!items.length}>
-          Exporter (CSV)
-        </Button>
+        <Group gap="xs">
+          <Button variant="default" leftSection={<Download size={16} />} onClick={exportCsv} disabled={!items.length}>
+            Exporter (CSV)
+          </Button>
+          <ColumnPicker columns={columns} />
+        </Group>
       </Group>
       <Group>
         <Text size="sm">Pour les</Text>
@@ -74,20 +89,22 @@ export function PartsPage() {
           <Table aria-label="Pièces à commander" verticalSpacing="xs" highlightOnHover>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Référence</Table.Th>
+                {columns.visible("reference") && <Table.Th>Référence</Table.Th>}
                 <Table.Th>Désignation</Table.Th>
-                <Table.Th ta="right">Besoin</Table.Th>
-                <Table.Th ta="right">En stock</Table.Th>
-                <Table.Th ta="right">À commander</Table.Th>
-                <Table.Th>Pour</Table.Th>
+                {columns.visible("needed") && <Table.Th ta="right">Besoin</Table.Th>}
+                {columns.visible("inStock") && <Table.Th ta="right">En stock</Table.Th>}
+                {columns.visible("toOrder") && <Table.Th ta="right">À commander</Table.Th>}
+                {columns.visible("for") && <Table.Th>Pour</Table.Th>}
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
               {items.map((i) => (
                 <Table.Tr key={i.articleId}>
-                  <Table.Td className="lv-num" style={{ whiteSpace: "nowrap" }}>
-                    {i.reference ?? "—"}
-                  </Table.Td>
+                  {columns.visible("reference") && (
+                    <Table.Td className="lv-num" style={{ whiteSpace: "nowrap" }}>
+                      {i.reference ?? "—"}
+                    </Table.Td>
+                  )}
                   <Table.Td>
                     <Text size="sm">{i.name}</Text>
                     {i.family && (
@@ -96,26 +113,34 @@ export function PartsPage() {
                       </Text>
                     )}
                   </Table.Td>
-                  <Table.Td ta="right" className="lv-num">
-                    {qty(i.needed)}
-                  </Table.Td>
-                  <Table.Td ta="right" className="lv-num">
-                    {qty(i.inStock)}
-                  </Table.Td>
-                  <Table.Td ta="right">
-                    {i.toOrder > 0 ? <Badge color="paille">{qty(i.toOrder)}</Badge> : <Badge color="lichen" variant="light">0</Badge>}
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="xs">{i.equipments.join(", ")}</Text>
-                    <Text size="xs" c="dimmed" lineClamp={2}>
-                      {i.operations.join(" ; ")}
-                    </Text>
-                  </Table.Td>
+                  {columns.visible("needed") && (
+                    <Table.Td ta="right" className="lv-num">
+                      {qty(i.needed)}
+                    </Table.Td>
+                  )}
+                  {columns.visible("inStock") && (
+                    <Table.Td ta="right" className="lv-num">
+                      {qty(i.inStock)}
+                    </Table.Td>
+                  )}
+                  {columns.visible("toOrder") && (
+                    <Table.Td ta="right">
+                      {i.toOrder > 0 ? <Badge color="paille">{qty(i.toOrder)}</Badge> : <Badge color="lichen" variant="light">0</Badge>}
+                    </Table.Td>
+                  )}
+                  {columns.visible("for") && (
+                    <Table.Td>
+                      <Text size="xs">{i.equipments.join(", ")}</Text>
+                      <Text size="xs" c="dimmed" lineClamp={2}>
+                        {i.operations.join(" ; ")}
+                      </Text>
+                    </Table.Td>
+                  )}
                 </Table.Tr>
               ))}
               {!items.length && (
                 <Table.Tr>
-                  <Table.Td colSpan={6}>
+                  <Table.Td colSpan={columns.count}>
                     <Text size="sm" c="dimmed" ta="center" py="md">
                       Aucune pièce à prévoir sur cet horizon. Les opérations « à renseigner » comptent dès qu'elles ont une dernière réalisation.
                     </Text>

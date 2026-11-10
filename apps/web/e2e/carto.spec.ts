@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { login } from "./shared";
+import { login, navTo } from "./shared";
 
 /**
  * Outils carto communs (exigence CARTO-1) sur la ferme pilote viticole :
@@ -20,7 +20,7 @@ test("outils carto : découper, fusionner, annuler, dessiner, mesurer", async ({
   await login(page);
   await page.getByRole("link", { name: /Ferme pilote — viticulture/ }).click();
   await page.getByLabel("Date de la frise").fill("2023-06-15");
-  await page.getByRole("link", { name: "Carte" }).click();
+  await navTo(page, "Plan 2D", "Cartes");
   await page.getByRole("link", { name: /Outils de dessin/ }).click();
   await expect(surfaces(page)).toHaveText("Surfaces (9)", { timeout: 30_000 });
 

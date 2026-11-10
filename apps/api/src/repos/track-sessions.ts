@@ -8,6 +8,7 @@ import {
   type TrackSessionDetail,
   type TrackSessionList,
   type TrackSettings,
+  type TrackSummary,
 } from "@fourmy/contracts";
 import { draftFromSessions, segmentSessions, settingsHash, type DraftContext, type SessionSpan, type TrackPosition } from "@fourmy/domain";
 import { uuidv5 } from "@fourmy/migrator-ekylibre";
@@ -617,4 +618,75 @@ export async function linkTrackSessions(tx: Tx, interventionId: string, sessionI
         RETURNING s.id`,
   );
   if (done.length < ids.length) throw new Conflict("Parcours GPS introuvable ou déjà rattaché à une autre intervention.");
+}
+
+/**
+ * Synthèse des parcours de la ferme sur [from, to[ (tableau de bord) : par
+ * matériel suivi, travail et déplacements, parcours libres, parcelles.
+ * `enabled` : intégration Traccar active (lisible par tous les membres, sans
+ * rien révéler de sa configuration).
+ */
+export async function trackSummary(db: Database, farmId: string, from: string, to: string): Promise<TrackSummary> {
+  return withFarm(db, farmId, async (tx) => {
+    const [flag] = await rows<{ enabled: boolean }>(
+      tx,
+      sql`SELECT EXISTS (SELECT 1 FROM integrations WHERE farm_id = ${farmId} AND provider = 'traccar' AND enabled) AS enabled`,
+    );
+    const list = await rows<{
+      id: string;
+      name: string;
+      work_count: number;
+      work_s: number;
+      work_m: number;
+      work_area: number;
+      transit_count: number;
+      transit_s: number;
+      transit_m: number;
+      free_work: number;
+      parcels: { landParcelId: string; name: string; areaM2: number }[] | null;
+      first_at: Date | string;
+      last_at: Date | string;
+    }>(
+      tx,
+      sql`WITH s AS (
+            SELECT * FROM track_sessions
+            WHERE farm_id = ${farmId} AND started_at < ${to}::timestamptz AND stopped_at > ${from}::timestamptz
+          ),
+          p AS (
+            SELECT s.equipment_id, e->>'landParcelId' AS id, max(e->>'name') AS name, sum((e->>'areaM2')::numeric) AS area
+            FROM s, jsonb_array_elements(s.parcels) e
+            WHERE s.kind = 'work'
+            GROUP BY 1, 2
+          )
+          SELECT eq.id, eq.name,
+                 count(*) FILTER (WHERE s.kind = 'work')::int AS work_count,
+                 coalesce(sum(extract(epoch FROM s.stopped_at - s.started_at)) FILTER (WHERE s.kind = 'work'), 0)::float AS work_s,
+                 coalesce(sum(s.distance_m) FILTER (WHERE s.kind = 'work'), 0)::float AS work_m,
+                 coalesce(sum(s.covered_area_m2) FILTER (WHERE s.kind = 'work'), 0)::float AS work_area,
+                 count(*) FILTER (WHERE s.kind = 'transit')::int AS transit_count,
+                 coalesce(sum(extract(epoch FROM s.stopped_at - s.started_at)) FILTER (WHERE s.kind = 'transit'), 0)::float AS transit_s,
+                 coalesce(sum(s.distance_m) FILTER (WHERE s.kind = 'transit'), 0)::float AS transit_m,
+                 count(*) FILTER (WHERE s.kind = 'work' AND s.intervention_id IS NULL)::int AS free_work,
+                 (SELECT jsonb_agg(jsonb_build_object('landParcelId', p.id, 'name', p.name, 'areaM2', round(p.area)) ORDER BY p.area DESC)
+                    FROM p WHERE p.equipment_id = eq.id) AS parcels,
+                 min(s.started_at) AS first_at, max(s.stopped_at) AS last_at
+          FROM s JOIN equipments eq ON eq.id = s.equipment_id
+          GROUP BY eq.id, eq.name
+          ORDER BY work_s DESC, eq.name`,
+    );
+    return {
+      enabled: flag?.enabled ?? false,
+      from,
+      to,
+      items: list.map((r) => ({
+        equipment: { id: r.id, name: r.name },
+        work: { count: r.work_count, durationS: Math.round(r.work_s), distanceM: Math.round(r.work_m), coveredAreaM2: Math.round(r.work_area) },
+        transit: { count: r.transit_count, durationS: Math.round(r.transit_s), distanceM: Math.round(r.transit_m) },
+        freeWork: r.free_work,
+        parcels: (r.parcels ?? []).map((x) => ({ ...x, areaM2: Number(x.areaM2) })),
+        firstAt: iso(r.first_at),
+        lastAt: iso(r.last_at),
+      })),
+    };
+  });
 }

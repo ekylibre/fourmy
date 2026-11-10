@@ -135,3 +135,76 @@ worker ; API indisponible → « en attente », nouvel essai une heure plus tard
   écoulement intermittent traverse Lespourcy Maïs 2025 sur 110 m.
 - 36 productions de Pierre n'ont qu'une culture générique dans Ekylibre :
   autorisation « non vérifiable » (orange) sur ces parcelles.
+
+## Registre au format réglementaire (lot X, 2026-11-10)
+
+**Textes** : règlement d'exécution (UE) 2023/564 modifié par 2025/2203
+(électronique obligatoire au 1/01/2027) ; arrêté du 24/12/2025
+(JORFTEXT000053228465) ; notice ministérielle du 22/09/2026 (intitulés
+standard des champs, référentiels des cultures et des stades BBCH). Pas de
+format de fichier imposé : « lisible par machine », un champ = une
+information ; JSON complet pour les enquêtes statistiques (SAIO). Pas de
+télétransmission ; conservation 5 ans ; remise sans tarder au contrôle.
+
+**Périmètre v1** : cas A (traitement de surfaces : plein champ, vigne,
+tunnels). Hors v1 : cas B (espaces fermés : serres permanentes, stockage),
+C (traitement de semences) et D (semis de semences traitées), prestation de
+service (`siretBeneficiaire`), délai de rentrée anticipée, volume de
+bouillie.
+
+**Modèle** (migration 0027) :
+- `ref_phyto_crops` (375 cultures/situations : code, dénomination, code
+  OEPP, référence BBCH) et `ref_bbch_stages` (2 368 stades), chargés depuis
+  les tableurs du ministère (agriculture.gouv.fr/telecharger/156212 et
+  156203) ;
+- `farms.siret` (14 chiffres) et `farms.pacage` (9 chiffres) : détenteur ;
+- `activities.crop_code` : culture réglementaire choisie ; sans choix,
+  `fourmy_activity_crop` la **propose** d'après le libellé Lexicon de la
+  production de référence, puis le nom de l'activité (dénomination la plus
+  longue qui commence le libellé : « Maïs grain » → Maïs `ZEAMX`). Les
+  variétés saisies comme espèce (DKC5196…) ne gênent pas : la culture vient
+  de l'activité ;
+- `interventions.bbch` : stade BBCH du traitement (facultatif).
+
+**Une ligne** = un produit phyto × une parcelle traitée d'une intervention
+réalisée (`officialRegisterLine`, `@fourmy/domain`) :
+
+| Champ | Source |
+|---|---|
+| `idTraitement`, `idIntervention` | paramètre intrant : paramètre cible ; intervention (regroupe un mélange) |
+| `siretApplicateur` | SIRET de la ferme |
+| `nomProduit`, `numeroAMMProduit` | article (AMM à 7 chiffres, sinon vide) |
+| `dateIntervention`, `heureDebut`, `heureFin` | première et dernière période, heure de Paris |
+| `doseProduitValeur`, `doseProduitUnite` | quantité par hectare, ou totale ramenée à la surface traitée de l'intervention ; kg/ha, L/ha, unité/ha ; 4 décimales |
+| `usageCible` | cible de l'usage E-Phy retenu par le contrôle |
+| `modeApplication` | libellé de la procédure |
+| `surfaceTraitee` | zone travaillée, sinon surface de la parcelle à la date (ha) |
+| `coordonneesGps` | point de la parcelle, « lat ; lon » (WGS84) — pas de référence RPG de l'exploitant (le RPG de l'IGN est anonyme) |
+| `cultureOepp` | culture de l'activité de la production de la parcelle |
+| `codeBbch` | stade de l'intervention (« BBCH 57 ») |
+| `modeDeConduite` | « Oui » si la parcelle est certifiée bio à la date |
+
+`anomalies` liste les champs obligatoires manquants (non exportée en CSV).
+
+**API** : `GET /registers/phyto/official?campaign=AAAA` (JSON avec
+anomalies), `&format=csv` (intitulés standard, « ; », UTF-8 avec BOM),
+`&format=export` (JSON complet : détenteur, campagne, champs d'enquête
+`campagne`, `pacage`, `surfaceParcelle`, `partSurfaceTraitee`) ;
+`GET|PUT /settings/identity` (SIRET, PACAGE ; écriture responsable) ;
+`GET /reference/phyto-crops`, `GET /reference/bbch?crop=CODE`.
+
+**Écrans** : Registre phyto › onglet « Format réglementaire » (détenteur,
+lignes, champs à compléter, exports) ; Activités : culture du registre
+(proposée ou choisie) ; formulaire d'un traitement : stade BBCH (stades de
+la culture des parcelles) ; fiche : stade.
+
+**Points laissés ouverts** (textes divergents) : dose en kg/hL ou L/hL
+acceptée par la notice mais pas par l'arrêté (on exporte une dose à
+l'hectare) ; séparateur des coordonnées (« ; » du tableur annexe) ; BBCH
+exporté sous le libellé du référentiel (« BBCH 57 », « Stade 1 »).
+
+**Fermes pilotes** (2026-11-10) : mêmes lignes que le registre existant,
+année par année (Pierre 2015-2026, Frédéric 2020-2023). Seul manque
+systématique : le SIRET, à saisir. Restent 33 doses sans unité (2020) chez
+Frédéric, 1 chez Pierre (2021), et 2 lignes de 2024 sans culture chez
+Pierre ; « Prairie temporaire » n'a pas de culture proposée (à choisir).

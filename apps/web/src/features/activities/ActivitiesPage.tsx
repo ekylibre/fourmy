@@ -13,6 +13,7 @@ import { useFarm } from "../../app/farm";
 import { useActivities, useCertifications, useSnapshot } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
 import { ActivityPicture } from "./ActivityBadge";
+import { usePhytoCrops } from "../reference/phyto-reference";
 import { activeDuring, CertificationBadges, CertificationRecap, ParcelCertificationsModal } from "../certifications/Certifications";
 
 /**
@@ -71,6 +72,19 @@ export function ActivitiesPage() {
                         {a.referenceLabel ? `Référence : ${a.referenceLabel}` : "Sans production de référence"}
                         {a.cultivationLabel ? ` · culture : ${a.cultivationLabel}` : ""}
                       </Text>
+                      {a.crop ? (
+                        <Text size="xs" c="dimmed">
+                          Registre phyto : {a.crop.label}
+                          {a.crop.oepp ? ` (${a.crop.oepp})` : ""}
+                          {a.crop.proposed ? " · proposée" : ""}
+                        </Text>
+                      ) : (
+                        (a.family === "plant_farming" || a.family === "vine_farming") && (
+                          <Badge size="xs" color="paille" variant="light" w="fit-content">
+                            Culture à préciser (registre)
+                          </Badge>
+                        )
+                      )}
                       {PARCEL_FAMILIES.includes(a.family) && (
                         <Text size="sm" className="lv-num">
                           {a.parcelIds.length} parcelle(s){a.areaM2 ? ` · ${formatHa(a.areaM2)}` : ""}
@@ -136,6 +150,10 @@ function ActivityForm({ activity, year, onDone }: { activity: Activity | null; y
   const [cultivation, setCultivation] = useState<string | null>(activity?.cultivation ?? null);
   const [color, setColor] = useState(activity?.color ?? "");
   const [suspended, setSuspended] = useState(activity?.suspended ?? false);
+  // Culture du registre phyto : envoyée seulement si l'utilisateur la change
+  // (undefined : inchangée ; null : revenir à la proposition).
+  const [cropCode, setCropCode] = useState<string | null | undefined>(undefined);
+  const crops = usePhytoCrops(farm.id);
   const [search, setSearch] = useState("");
   const [q] = useDebouncedValue(search, 250);
   const refs = useQuery({
@@ -146,7 +164,7 @@ function ActivityForm({ activity, year, onDone }: { activity: Activity | null; y
   const options = refs.data?.items ?? [];
   const save = useSave(
     () => {
-      const body = { name: name.trim(), family, reference, cultivation, color: color || null, suspended };
+      const body = { name: name.trim(), family, reference, cultivation, color: color || null, suspended, ...(cropCode !== undefined ? { cropCode } : {}) };
       return activity
         ? api.put(farmPath(farm.id, `/activities/${activity.id}?year=${year}`), body)
         : api.post(farmPath(farm.id, `/activities?year=${year}`), body);
@@ -202,6 +220,21 @@ function ActivityForm({ activity, year, onDone }: { activity: Activity | null; y
           description="Reprise de la référence ; à préciser au besoin (zea_mays, vitis…)."
           value={cultivation ?? ""}
           onChange={(e) => setCultivation(e.currentTarget.value.trim().toLowerCase() || null)}
+        />
+        <Select
+          label="Culture (registre phyto)"
+          description={
+            cropCode === undefined && activity?.crop?.proposed
+              ? "Proposée d'après la production de référence."
+              : "Code OEPP du référentiel du ministère, exporté au registre réglementaire."
+          }
+          placeholder={cropCode === null ? "Proposition automatique" : "Choisir une culture"}
+          searchable
+          clearable
+          data={(crops.data?.items ?? []).map((c) => ({ value: c.code, label: c.oepp ? `${c.label} (${c.oepp})` : c.label }))}
+          value={cropCode === undefined ? (activity?.crop?.code ?? null) : cropCode}
+          onChange={(v) => setCropCode(v)}
+          nothingFoundMessage="Aucune culture"
         />
         <ColorInput label="Couleur" value={color} onChange={setColor} format="hex" />
         <Switch label="En sommeil (plus proposée)" checked={suspended} onChange={(e) => setSuspended(e.currentTarget.checked)} />

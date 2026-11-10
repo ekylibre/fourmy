@@ -16,7 +16,8 @@ describe("frise temporelle", () => {
     fireEvent.change(date, { target: { value: "2020-06-15" } });
     expect(router.state.location.search).toBe("?at=2020-06-15");
 
-    await user.click(screen.getByRole("link", { name: "Cuverie" }));
+    await user.click(screen.getByRole("button", { name: "Stocks" }));
+    await user.click(await screen.findByRole("link", { name: "Cuverie" }));
     expect(router.state.location.pathname).toBe(`/f/${FARM}/cellar`);
     expect(router.state.location.search).toBe("?at=2020-06-15");
   });

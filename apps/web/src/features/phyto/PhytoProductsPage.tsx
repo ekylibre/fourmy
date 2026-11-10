@@ -8,7 +8,16 @@ import type { PhytoProduct, PhytoStatus } from "@fourmy/contracts";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { formatDate, formatDateTime } from "../../app/labels";
+import { useColumns, type ColumnDef } from "../../app/columns";
+import { ColumnPicker } from "../../components/ColumnPicker";
 import { ErrorAlert, Loading } from "../../components/states";
+
+const PHYTO_COLUMNS: ColumnDef[] = [
+  { key: "name", label: "Produit", required: true },
+  { key: "amm", label: "N° AMM" },
+  { key: "referential", label: "Référentiel" },
+  { key: "actions", label: "Actions", required: true },
+];
 
 interface FarmPhytoArticle {
   id: string;
@@ -40,6 +49,7 @@ export function PhytoProductsPage() {
   });
   const [linking, setLinking] = useState<FarmPhytoArticle | null>(null);
   const [adding, setAdding] = useState(false);
+  const columns = useColumns("phyto-products", PHYTO_COLUMNS);
   const refresh = () => {
     for (const key of ["phyto-status", "phyto-articles", "articles", "phyto-check", "intervention-compliance"]) void queryClient.invalidateQueries({ queryKey: [key] });
   };
@@ -112,12 +122,15 @@ export function PhytoProductsPage() {
         </Paper>
       </SimpleGrid>
 
+      <Group justify="flex-end">
+        <ColumnPicker columns={columns} />
+      </Group>
       <Table striped withTableBorder aria-label="Produits phyto de la ferme">
         <Table.Thead>
           <Table.Tr>
             <Table.Th>Produit</Table.Th>
-            <Table.Th>N° AMM</Table.Th>
-            <Table.Th>Référentiel</Table.Th>
+            {columns.visible("amm") && <Table.Th>N° AMM</Table.Th>}
+            {columns.visible("referential") && <Table.Th>Référentiel</Table.Th>}
             <Table.Th />
           </Table.Tr>
         </Table.Thead>
@@ -125,26 +138,28 @@ export function PhytoProductsPage() {
           {list.data!.items.map((a) => (
             <Table.Tr key={a.id}>
               <Table.Td>{a.name}</Table.Td>
-              <Table.Td className="lv-num">{a.amm ?? "—"}</Table.Td>
-              <Table.Td>
-                {a.product ? (
-                  <Group gap={6}>
-                    <Badge color={STATE[a.product.state]?.color ?? "gray"} variant="light">
-                      {STATE[a.product.state]?.label ?? a.product.state}
-                      {a.product.stoppedOn ? ` le ${formatDate(a.product.stoppedOn)}` : ""}
+              {columns.visible("amm") && <Table.Td className="lv-num">{a.amm ?? "—"}</Table.Td>}
+              {columns.visible("referential") && (
+                <Table.Td>
+                  {a.product ? (
+                    <Group gap={6}>
+                      <Badge color={STATE[a.product.state]?.color ?? "gray"} variant="light">
+                        {STATE[a.product.state]?.label ?? a.product.state}
+                        {a.product.stoppedOn ? ` le ${formatDate(a.product.stoppedOn)}` : ""}
+                      </Badge>
+                      {a.product.name.toLowerCase() !== a.name.toLowerCase() && (
+                        <Text size="xs" c="dimmed">
+                          {a.product.name}
+                        </Text>
+                      )}
+                    </Group>
+                  ) : (
+                    <Badge color="paille" variant="light">
+                      {a.amm ? "N° AMM inconnu" : "Non rattaché"}
                     </Badge>
-                    {a.product.name.toLowerCase() !== a.name.toLowerCase() && (
-                      <Text size="xs" c="dimmed">
-                        {a.product.name}
-                      </Text>
-                    )}
-                  </Group>
-                ) : (
-                  <Badge color="paille" variant="light">
-                    {a.amm ? "N° AMM inconnu" : "Non rattaché"}
-                  </Badge>
-                )}
-              </Table.Td>
+                  )}
+                </Table.Td>
+              )}
               <Table.Td ta="right">
                 {owner && !a.product && (
                   <Button size="xs" variant="light" onClick={() => setLinking(a)}>

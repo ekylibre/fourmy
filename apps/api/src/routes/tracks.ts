@@ -12,6 +12,7 @@ import {
   interventionTrackSessions,
   listTrackSessions,
   putTrackSettings,
+  trackSummary,
 } from "../repos/track-sessions.js";
 import { attachTrackSessions } from "../repos/interventions.js";
 import { atOrNow, BadRequest, domainCtx, problem, uuidParam, window } from "./helpers.js";
@@ -48,6 +49,15 @@ export const trackRoutes = new Hono<Env>()
         maxGapS: Number(c.req.query("maxGap") ?? 30),
       }),
     );
+  })
+  // Synthèse des parcours de la ferme (tableau de bord, retours du 10/11/2026) :
+  // [from, to[, au plus 31 jours ; un parcours à cheval compte entier.
+  .get("/tracks/summary", async (c) => {
+    const f = Date.parse(c.req.query("from") ?? "");
+    const t = Date.parse(c.req.query("to") ?? "");
+    if (Number.isNaN(f) || Number.isNaN(t) || t <= f) throw new BadRequest("from/to : dates ISO, from < to");
+    if (t - f > 31 * DAY) throw new BadRequest("fenêtre limitée à 31 jours");
+    return c.json(await trackSummary(db(), c.get("farmId"), new Date(f).toISOString(), new Date(t).toISOString()));
   })
   // Parcours GPS (lot O3, FR-GPS-10 à 17).
   .get("/equipments/:id/track-sessions", async (c) => {

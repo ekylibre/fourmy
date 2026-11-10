@@ -9,6 +9,7 @@ import { bufferAround, checkComplianceFor, farmWater, interventionWater, parcelD
 import { readIntervention } from "../repos/interventions.js";
 import { computeInterventionIft, iftBalance } from "../repos/ift.js";
 import { interventionWeather, sprayingForecast } from "../repos/weather.js";
+import { listStations } from "../repos/weather-stations.js";
 import { workPeriod, interventionTarget } from "@fourmy/contracts";
 import { BadRequest, NotFound, problem, uuidParam } from "./helpers.js";
 
@@ -96,6 +97,20 @@ export const phytoRoutes = new Hono<Env>()
       return problem(c, 502, "Météo indisponible", e instanceof Error ? e.message : String(e));
     }
   })
+  // Stations météo de la ferme (Weenat, Sencrop) et leur dernière mesure (lot W).
+  .get("/weather/stations", async (c) =>
+    c.json({
+      items: (await listStations(db(), c.get("farmId"))).map((s) => ({
+        id: s.id,
+        provider: s.provider,
+        name: s.name,
+        lat: s.lat,
+        lon: s.lon,
+        lastMeasureAt: s.last_measure_at ? new Date(s.last_measure_at).toISOString() : null,
+        measures: s.measures,
+      })),
+    }),
+  )
   .get("/weather/spraying", async (c) => {
     const days = Math.min(Math.max(Number(c.req.query("days") ?? 3) || 3, 1), 5);
     const from = c.req.query("from") ? new Date(c.req.query("from")!) : undefined;

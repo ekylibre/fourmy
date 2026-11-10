@@ -50,6 +50,7 @@ import { MapBoundary } from "../../components/MapBoundary";
 import { ProcedureIcon } from "../../components/ProcedureIcon";
 import { treatedAreaM2 } from "./zones";
 import { withStart } from "./periods";
+import { bbchOptionLabel, useBbchStages } from "../reference/phyto-reference";
 import { CrewsEditor, CrewsSummary, PeriodsEditor, crewRowsOf, crewsBody, newCrew, toLocal, type CrewRow } from "./Crews";
 import { ComplianceSummary, TreatmentCheckView, useComplianceCheck, type ComplianceDraft } from "./CompliancePanel";
 import type { Activity, InterventionWeather } from "@fourmy/contracts";
@@ -247,6 +248,8 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
     : periods;
   const [purposes, setPurposes] = useState<TreatmentPurpose[]>(planned?.purposes ?? []);
   const [notes, setNotes] = useState(planned?.notes ?? "");
+  // Stade BBCH (registre phyto réglementaire, lot X) : stades de la culture des parcelles choisies.
+  const [bbch, setBbch] = useState<string | null>(planned?.bbch?.code ?? null);
   const [error, setError] = useState<string | null>(null);
 
   // Échéances lues au jour de l'intervention.
@@ -346,6 +349,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       crews: inCrews ? crewsBody(crews) : [],
       purposes,
       ...(notes.trim() ? { notes: notes.trim() } : {}),
+      ...(shape === "treatment" ? { bbch } : {}),
       compliance: { usages: usageChoices, ...(overrideReason.trim() ? { reason: overrideReason.trim() } : {}) },
       ...(weather ? { weather } : {}),
       ...(fromTracks ? { trackSessionIds: fromTracks.body.trackSessionIds } : {}),
@@ -665,6 +669,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       <Grid>
         <Grid.Col span={{ base: 12, lg: 7 }}>
           <Stack>
+            <Divider label="1 · Intervention" labelPosition="left" />
             <Select
               label="Intervention"
               data={procedureOptions}
@@ -688,6 +693,8 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
                 L'historique garde la version d'avant.
               </Alert>
             )}
+
+            <Divider label="2 · Réalisation et moyens" labelPosition="left" />
             {!planned && (
               <Stack gap={2}>
                 <SegmentedControl
@@ -705,32 +712,73 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               </Stack>
             )}
 
-            {inCrews ? (
-              <Paper withBorder p="xs">
-                <Text size="sm" c="dimmed">
-                  Périodes de travail : dans chaque attelage (Moyens, plus bas).
+            {procedure && shape !== "maintenance" && (
+              <Stack gap={2}>
+                <SegmentedControl
+                  aria-label="Déclaration des moyens"
+                  value={inCrews ? "crews" : "free"}
+                  onChange={(v) => (v === "crews" ? switchToCrews() : switchToFree(false))}
+                  data={[
+                    { value: "free", label: "Libre" },
+                    { value: "crews", label: "Attelages" },
+                  ]}
+                />
+                <Text size="xs" c="dimmed">
+                  {inCrews
+                    ? "Chaque attelage : ses matériels, ses intervenants et ses propres périodes (deux tracteurs en même temps, par exemple)."
+                    : "Matériels, intervenants et périodes indépendants."}
                 </Text>
-                {crewSummary}
-              </Paper>
-            ) : completing ? (
-              <>
+              </Stack>
+            )}
+            {!inCrews &&
+              (completing ? (
                 <PeriodsEditor periods={periods} onChange={setPeriods} onFirstStart={followStart} />
+              ) : (
+                <TextInput
+                  type="datetime-local"
+                  label="Date prévue"
+                  aria-label="Date prévue"
+                  value={periods[0]!.startedAt}
+                  onChange={(e) => {
+                    const v = e.currentTarget.value;
+                    setPeriods([withStart(periods[0]!, v)]);
+                    followStart(v);
+                  }}
+                  required
+                />
+              ))}
+            {procedure && (
+              <>
+                {inCrews ? (
+                  <>
+                    <CrewsEditor
+                      crews={crews}
+                      onChange={setCrews}
+                      equipmentOptions={equipmentOptions}
+                      peopleOptions={peopleOptions}
+                      defaultDay={defaultDay}
+                      errors={crewErrors}
+                      templates={{ farmId, items: crewTemplates.data?.items ?? [], canWrite: farmRole === "owner" }}
+                    />
+                    {crewSummary}
+                  </>
+                ) : (
+                  <>
+                    {shape !== "maintenance" && <MultiSelect label="Matériels" searchable data={equipmentOptions} value={tools} onChange={setTools} />}
+                    <MultiSelect
+                      label="Intervenants"
+                      searchable
+                      data={peopleOptions}
+                      value={doers}
+                      onChange={setDoers}
+                      nothingFoundMessage="Aucune personne — à ajouter dans Équipe"
+                    />
+                  </>
+                )}
               </>
-            ) : (
-              <TextInput
-                type="datetime-local"
-                label="Date prévue"
-                aria-label="Date prévue"
-                value={periods[0]!.startedAt}
-                onChange={(e) => {
-                  const v = e.currentTarget.value;
-                  setPeriods([withStart(periods[0]!, v)]);
-                  followStart(v);
-                }}
-                required
-              />
             )}
 
+            {procedure && <Divider label={shape === "maintenance" ? "3 · Matériel entretenu" : "3 · Parcelles et produits"} labelPosition="left" />}
             {procedure &&
               (shape === "maintenance" ? (
                 <MaintenanceFields
@@ -830,56 +878,18 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
                 onChange={(v) => setPurposes(v as TreatmentPurpose[])}
               />
             )}
+            {shape === "treatment" && <BbchField farmId={farmId} activities={parcelActivities.map((p) => p.activity)} value={bbch} onChange={setBbch} />}
 
-            {procedure && shape !== "maintenance" && <WeatherFields farmId={farmId} request={weatherRequest} value={weather} onChange={setWeather} />}
 
-            {procedure && (
+            {procedure && shape !== "maintenance" && (
               <>
-                <Divider label="Moyens" labelPosition="left" />
-                {shape !== "maintenance" && (
-                  <Stack gap={2}>
-                    <SegmentedControl
-                      aria-label="Déclaration des moyens"
-                      value={inCrews ? "crews" : "free"}
-                      onChange={(v) => (v === "crews" ? switchToCrews() : switchToFree(false))}
-                      data={[
-                        { value: "free", label: "Libre" },
-                        { value: "crews", label: "Attelages" },
-                      ]}
-                    />
-                    <Text size="xs" c="dimmed">
-                      {inCrews
-                        ? "Chaque attelage : ses matériels, ses intervenants et ses propres périodes (deux tracteurs en même temps, par exemple)."
-                        : "Matériels, intervenants et périodes indépendants."}
-                    </Text>
-                  </Stack>
-                )}
-                {inCrews ? (
-                  <CrewsEditor
-                    crews={crews}
-                    onChange={setCrews}
-                    equipmentOptions={equipmentOptions}
-                    peopleOptions={peopleOptions}
-                    defaultDay={defaultDay}
-                    errors={crewErrors}
-                    templates={{ farmId, items: crewTemplates.data?.items ?? [], canWrite: farmRole === "owner" }}
-                  />
-                ) : (
-                  <>
-                    {shape !== "maintenance" && <MultiSelect label="Matériels" searchable data={equipmentOptions} value={tools} onChange={setTools} />}
-                    <MultiSelect
-                      label="Intervenants"
-                      searchable
-                      data={peopleOptions}
-                      value={doers}
-                      onChange={setDoers}
-                      nothingFoundMessage="Aucune personne — à ajouter dans Équipe"
-                    />
-                  </>
-                )}
-                <Textarea label="Notes" autosize minRows={2} maxLength={2000} value={notes} onChange={(e) => setNotes(e.currentTarget.value)} />
+                <Divider label="4 · Météo" labelPosition="left" />
+                <WeatherFields farmId={farmId} request={weatherRequest} value={weather} onChange={setWeather} />
               </>
             )}
+
+            <Divider label={shape === "maintenance" ? "4 · Notes" : "5 · Notes"} labelPosition="left" />
+            <Textarea label="Notes" autosize minRows={2} maxLength={2000} value={notes} onChange={(e) => setNotes(e.currentTarget.value)} />
 
             {error && (
               <Alert color="brique" title="Enregistrement refusé">
@@ -1009,5 +1019,33 @@ function TrackDraftBanner({
         ))}
       </Stack>
     </Alert>
+  );
+}
+
+/**
+ * Stade BBCH du traitement (facultatif, registre réglementaire) : stades du
+ * référentiel pour la culture de la première activité des parcelles qui en a
+ * une ; plusieurs cultures : on le signale.
+ */
+function BbchField({ farmId, activities, value, onChange }: { farmId: string; activities: Activity[]; value: string | null; onChange: (v: string | null) => void }) {
+  const crops = [...new Map(activities.filter((a) => a.crop).map((a) => [a.crop!.code, a.crop!])).values()];
+  const crop = crops[0] ?? null;
+  const stages = useBbchStages(farmId, crop?.code ?? null);
+  const items = stages.data?.items ?? [];
+  const data = items.map((s) => ({ value: s.code, label: bbchOptionLabel(s) }));
+  if (value && !items.some((s) => s.code === value)) data.unshift({ value, label: value });
+  return (
+    <Select
+      label="Stade BBCH (facultatif)"
+      description={crops.length > 1 ? `Stades de : ${crop!.label}` : undefined}
+      placeholder={crop ? "Stade de la culture au traitement" : "Culture des parcelles inconnue"}
+      disabled={!crop}
+      searchable
+      clearable
+      data={data}
+      value={value}
+      onChange={onChange}
+      nothingFoundMessage="Aucun stade"
+    />
   );
 }

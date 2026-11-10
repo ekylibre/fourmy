@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { Alert, Badge, Button, Checkbox, Grid, Group, Modal, Paper, SegmentedControl, Select, Stack, Table, Text, TextInput, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -7,8 +7,10 @@ import type { Intervention, TrackDraft, TrackSession, TrackSessionDetail, TrackS
 import { formatHa } from "@fourmy/ui-lyvre";
 import type { FeatureCollection, Geometry } from "geojson";
 import { api, ApiError, farmPath } from "../../app/api";
+import { useColumns, type ColumnDef } from "../../app/columns";
 import { procedureLabel } from "../../app/labels";
 import { invalidateAfterIntervention, useSnapshot } from "../../app/queries";
+import { ColumnPicker } from "../../components/ColumnPicker";
 import { MapBoundary } from "../../components/MapBoundary";
 import { ErrorAlert, Loading } from "../../components/states";
 import { ParcelMap } from "../map/ParcelMap";
@@ -45,15 +47,19 @@ export function useHasTrackSessions(farmId: string, equipmentId: string) {
 
 type Filters = { from: string; to: string; kind: "" | "work" | "transit"; state: "" | "free" | "linked"; parcel: string | null };
 
+const isDay = (v: string | null): v is string => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
 export function TrackSessionsTab({ farmId, equipmentId }: { farmId: string; equipmentId: string }) {
   const today = new Date();
-  const [filters, setFilters] = useState<Filters>({
-    from: dayOf(new Date(today.getTime() - 30 * DAY)),
-    to: dayOf(today),
-    kind: "",
-    state: "",
+  // Filtres initiaux depuis l'adresse (lien du tableau de bord) : tracksFrom, tracksTo, tracksKind, tracksState.
+  const [params] = useSearchParams();
+  const [filters, setFilters] = useState<Filters>(() => ({
+    from: isDay(params.get("tracksFrom")) ? params.get("tracksFrom")! : dayOf(new Date(today.getTime() - 30 * DAY)),
+    to: isDay(params.get("tracksTo")) ? params.get("tracksTo")! : dayOf(today),
+    kind: (["work", "transit"] as const).find((k) => k === params.get("tracksKind")) ?? "",
+    state: (["free", "linked"] as const).find((k) => k === params.get("tracksState")) ?? "",
     parcel: null,
-  });
+  }));
   const [selected, setSelected] = useState<string[]>([]);
   const set = (patch: Partial<Filters>) => {
     setFilters((f) => ({ ...f, ...patch }));
@@ -82,6 +88,8 @@ export function TrackSessionsTab({ farmId, equipmentId }: { farmId: string; equi
   });
   const items = useMemo(() => list.data?.pages.flatMap((p) => p.items) ?? [], [list.data]);
   const onTool = items.some((s) => s.tracker);
+  const columnDefs = useMemo(() => SESSION_COLUMNS.filter((c) => c.key !== "tracker" || onTool), [onTool]);
+  const columns = useColumns("track-sessions", columnDefs);
 
   // Parcelles proposées au filtre : celles des parcours affichés (et celle déjà choisie).
   const parcelOptions = useMemo(() => {
@@ -146,24 +154,27 @@ export function TrackSessionsTab({ farmId, equipmentId }: { farmId: string; equi
             </Text>
           ) : (
             <Stack gap="xs">
+              <Group justify="flex-end">
+                <ColumnPicker columns={columns} />
+              </Group>
               <Table striped highlightOnHover aria-label="Parcours">
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th w={32} />
                     <Table.Th>Date</Table.Th>
-                    <Table.Th>Horaires</Table.Th>
-                    <Table.Th>Type</Table.Th>
-                    <Table.Th>Parcelles</Table.Th>
-                    <Table.Th ta="right">Surface</Table.Th>
-                    <Table.Th ta="right">Distance</Table.Th>
-                    <Table.Th>Outil</Table.Th>
-                    {onTool && <Table.Th>Tracteur</Table.Th>}
-                    <Table.Th>État</Table.Th>
+                    {columns.visible("hours") && <Table.Th>Horaires</Table.Th>}
+                    {columns.visible("kind") && <Table.Th>Type</Table.Th>}
+                    {columns.visible("parcels") && <Table.Th>Parcelles</Table.Th>}
+                    {columns.visible("area") && <Table.Th ta="right">Surface</Table.Th>}
+                    {columns.visible("distance") && <Table.Th ta="right">Distance</Table.Th>}
+                    {columns.visible("tool") && <Table.Th>Outil</Table.Th>}
+                    {onTool && columns.visible("tracker") && <Table.Th>Tracteur</Table.Th>}
+                    {columns.visible("state") && <Table.Th>État</Table.Th>}
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
                   {items.map((s) => (
-                    <SessionRow key={s.id} s={s} farmId={farmId} onTool={onTool} checked={selected.includes(s.id)} onToggle={() => toggle(s.id)} />
+                    <SessionRow key={s.id} s={s} farmId={farmId} onTool={onTool} show={columns.visible} checked={selected.includes(s.id)} onToggle={() => toggle(s.id)} />
                   ))}
                 </Table.Tbody>
               </Table>
@@ -188,41 +199,65 @@ export function TrackSessionsTab({ farmId, equipmentId }: { farmId: string; equi
   );
 }
 
-function SessionRow({ s, farmId, onTool, checked, onToggle }: { s: TrackSession; farmId: string; onTool: boolean; checked: boolean; onToggle: () => void }) {
+const SESSION_COLUMNS: ColumnDef[] = [
+  { key: "select", label: "Sélection", required: true },
+  { key: "date", label: "Date", required: true },
+  { key: "hours", label: "Horaires" },
+  { key: "kind", label: "Type" },
+  { key: "parcels", label: "Parcelles" },
+  { key: "area", label: "Surface" },
+  { key: "distance", label: "Distance" },
+  { key: "tool", label: "Outil" },
+  { key: "tracker", label: "Tracteur" },
+  { key: "state", label: "État" },
+];
+
+function SessionRow({ s, farmId, onTool, show, checked, onToggle }: { s: TrackSession; farmId: string; onTool: boolean; show: (key: string) => boolean; checked: boolean; onToggle: () => void }) {
   return (
     <Table.Tr aria-label={`Parcours du ${date(s.startedAt)} ${hhmm(s.startedAt)}`}>
       <Table.Td>
         <Checkbox aria-label="Sélectionner le parcours" checked={checked} onChange={onToggle} disabled={!!s.intervention} title={s.intervention ? "Parcours déjà rattaché" : undefined} />
       </Table.Td>
       <Table.Td style={{ whiteSpace: "nowrap" }}>{date(s.startedAt)}</Table.Td>
-      <Table.Td className="lv-num" style={{ whiteSpace: "nowrap" }}>
-        {hhmm(s.startedAt)}–{hhmm(s.stoppedAt)}{" "}
-        <Text span size="xs" c="dimmed">
-          ({formatDuration(Math.round(s.durationS / 60))})
-        </Text>
-      </Table.Td>
-      <Table.Td>
-        <Badge variant="light" color={s.kind === "work" ? "lichen" : "ardoise"}>
-          {s.kind === "work" ? "Travail" : "Déplacement"}
-        </Badge>
-      </Table.Td>
-      <Table.Td>
-        <Group gap={4}>
-          {s.parcels.map((p) => (
-            <Badge key={p.landParcelId} variant="outline" color="gray" tt="none" fw={500}>
-              {p.name} · {formatHa(p.areaM2)}
-            </Badge>
-          ))}
-        </Group>
-      </Table.Td>
-      <Table.Td ta="right" className="lv-num">
-        {s.coveredAreaM2 === null ? "—" : formatHa(s.coveredAreaM2)}
-      </Table.Td>
-      <Table.Td ta="right" className="lv-num">
-        {km(s.distanceM)}
-      </Table.Td>
-      <Table.Td>{s.tool?.name ?? (s.toolHint ? <Text span c="dimmed" size="sm" title="Outil annoncé par le boîtier, non relié à un matériel">{s.toolHint}</Text> : "—")}</Table.Td>
-      {onTool && <Table.Td>{s.tracker?.name ?? "—"}</Table.Td>}
+      {show("hours") && (
+        <Table.Td className="lv-num" style={{ whiteSpace: "nowrap" }}>
+          {hhmm(s.startedAt)}–{hhmm(s.stoppedAt)}{" "}
+          <Text span size="xs" c="dimmed">
+            ({formatDuration(Math.round(s.durationS / 60))})
+          </Text>
+        </Table.Td>
+      )}
+      {show("kind") && (
+        <Table.Td>
+          <Badge variant="light" color={s.kind === "work" ? "lichen" : "ardoise"}>
+            {s.kind === "work" ? "Travail" : "Déplacement"}
+          </Badge>
+        </Table.Td>
+      )}
+      {show("parcels") && (
+        <Table.Td>
+          <Group gap={4}>
+            {s.parcels.map((p) => (
+              <Badge key={p.landParcelId} variant="outline" color="gray" tt="none" fw={500}>
+                {p.name} · {formatHa(p.areaM2)}
+              </Badge>
+            ))}
+          </Group>
+        </Table.Td>
+      )}
+      {show("area") && (
+        <Table.Td ta="right" className="lv-num">
+          {s.coveredAreaM2 === null ? "—" : formatHa(s.coveredAreaM2)}
+        </Table.Td>
+      )}
+      {show("distance") && (
+        <Table.Td ta="right" className="lv-num">
+          {km(s.distanceM)}
+        </Table.Td>
+      )}
+      {show("tool") && <Table.Td>{s.tool?.name ?? (s.toolHint ? <Text span c="dimmed" size="sm" title="Outil annoncé par le boîtier, non relié à un matériel">{s.toolHint}</Text> : "—")}</Table.Td>}
+      {onTool && show("tracker") && <Table.Td>{s.tracker?.name ?? "—"}</Table.Td>}
+      {show("state") && (
       <Table.Td>
         <Group gap={4} wrap="nowrap">
           {s.intervention ? (
@@ -241,6 +276,7 @@ function SessionRow({ s, farmId, onTool, checked, onToggle }: { s: TrackSession;
           )}
         </Group>
       </Table.Td>
+      )}
     </Table.Tr>
   );
 }

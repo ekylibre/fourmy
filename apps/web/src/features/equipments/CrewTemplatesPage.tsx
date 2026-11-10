@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { Alert, Badge, Button, Group, Modal, MultiSelect, Paper, Stack, Switch, Table, Text, TextInput, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
@@ -8,6 +8,8 @@ import type { CrewTemplate, CrewTemplateWrite } from "@fourmy/contracts";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { useCrewTemplates, useEquipments, usePeople } from "../../app/queries";
+import { useColumns, type ColumnDef } from "../../app/columns";
+import { ColumnPicker } from "../../components/ColumnPicker";
 import { ErrorAlert, Loading } from "../../components/states";
 
 /**
@@ -24,6 +26,16 @@ export function CrewTemplatesPage() {
   const people = usePeople(farm.id);
   const [editing, setEditing] = useState<CrewTemplate | "new" | null>(null);
   const owner = farm.role === "owner";
+  const defs = useMemo<ColumnDef[]>(
+    () => [
+      { key: "name", label: "Nom", required: true },
+      { key: "equipments", label: "Matériels" },
+      { key: "people", label: "Intervenants" },
+      ...(owner ? [{ key: "actions", label: "Actions", required: true }] : []),
+    ],
+    [owner],
+  );
+  const columns = useColumns("crew-templates", defs);
 
   if (q.isLoading || equipments.isLoading || people.isLoading) return <Loading />;
   if (q.error) return <ErrorAlert error={q.error} />;
@@ -40,11 +52,14 @@ export function CrewTemplatesPage() {
           </Button>
           <Title order={1}>Attelages types</Title>
         </Group>
-        {owner && (
-          <Button leftSection={<Plus size={16} />} onClick={() => setEditing("new")}>
-            Nouvel attelage type
-          </Button>
-        )}
+        <Group>
+          <ColumnPicker columns={columns} />
+          {owner && (
+            <Button leftSection={<Plus size={16} />} onClick={() => setEditing("new")}>
+              Nouvel attelage type
+            </Button>
+          )}
+        </Group>
       </Group>
       <Text size="sm" c="dimmed">
         Vos compositions habituelles : à la saisie d'une intervention en attelages, un clic remplit les matériels et les intervenants ; il ne reste que les périodes.
@@ -54,8 +69,8 @@ export function CrewTemplatesPage() {
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Nom</Table.Th>
-              <Table.Th>Matériels</Table.Th>
-              <Table.Th>Intervenants</Table.Th>
+              {columns.visible("equipments") && <Table.Th>Matériels</Table.Th>}
+              {columns.visible("people") && <Table.Th>Intervenants</Table.Th>}
               {owner && <Table.Th />}
             </Table.Tr>
           </Table.Thead>
@@ -74,14 +89,18 @@ export function CrewTemplatesPage() {
                     )}
                   </Group>
                 </Table.Td>
-                <Table.Td>
-                  <Text size="sm">{t.equipmentIds.map((id) => equipmentName.get(id) ?? "?").join(" + ")}</Text>
-                </Table.Td>
-                <Table.Td>
-                  <Text size="sm" c={t.personIds.length ? undefined : "dimmed"}>
-                    {t.personIds.map((id) => personName.get(id) ?? "?").join(", ") || "Conducteur au choix"}
-                  </Text>
-                </Table.Td>
+                {columns.visible("equipments") && (
+                  <Table.Td>
+                    <Text size="sm">{t.equipmentIds.map((id) => equipmentName.get(id) ?? "?").join(" + ")}</Text>
+                  </Table.Td>
+                )}
+                {columns.visible("people") && (
+                  <Table.Td>
+                    <Text size="sm" c={t.personIds.length ? undefined : "dimmed"}>
+                      {t.personIds.map((id) => personName.get(id) ?? "?").join(", ") || "Conducteur au choix"}
+                    </Text>
+                  </Table.Td>
+                )}
                 {owner && (
                   <Table.Td ta="right">
                     <Button size="compact-sm" variant="light" onClick={() => setEditing(t)} aria-label={`Modifier ${t.name}`}>
@@ -93,7 +112,7 @@ export function CrewTemplatesPage() {
             ))}
             {items.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={owner ? 4 : 3}>
+                <Table.Td colSpan={columns.count}>
                   <Text size="sm" c="dimmed" ta="center" py="md">
                     Aucun attelage type. {owner ? "Créez-en un ici, ou depuis un attelage saisi dans une intervention." : ""}
                   </Text>

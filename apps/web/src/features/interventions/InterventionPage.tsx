@@ -341,6 +341,11 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
                     <strong>Motifs :</strong> {i.purposes.map((p) => TREATMENT_PURPOSE_LABELS[p]).join(", ")}
                   </Text>
                 )}
+                {i.bbch && (
+                  <Text size="sm">
+                    <strong>Stade :</strong> {i.bbch.label}
+                  </Text>
+                )}
                 {i.notes && (
                   <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
                     <strong>Notes :</strong> {i.notes}

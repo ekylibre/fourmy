@@ -23,3 +23,4 @@ export * from "./parcels.js";
 export * from "./equipments.js";
 export * from "./maintenance.js";
 export * from "./tracks.js";
+export * from "./register.js";
