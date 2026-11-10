@@ -3,14 +3,15 @@ import { withFarm, type Database, type Tx } from "@fourmy/db";
 import {
   DEFAULT_TRACK_SETTINGS,
   trackSettings,
+  type TrackDraft,
   type TrackSession,
   type TrackSessionDetail,
   type TrackSessionList,
   type TrackSettings,
 } from "@fourmy/contracts";
-import { segmentSessions, settingsHash, type SessionSpan, type TrackPosition } from "@fourmy/domain";
+import { draftFromSessions, segmentSessions, settingsHash, type DraftContext, type SessionSpan, type TrackPosition } from "@fourmy/domain";
 import { uuidv5 } from "@fourmy/migrator-ekylibre";
-import { BadRequest, NotFound } from "../routes/helpers.js";
+import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
 import { trackReplay } from "./tracks.js";
 
 /**
@@ -436,4 +437,184 @@ export async function putTrackSettings(db: Database, farmId: string, body: Track
       ON CONFLICT (farm_id) DO UPDATE SET tracks = excluded.tracks, updated_at = now()`);
     return trackSettingsTx(tx);
   });
+}
+
+// ---------------------------------------------------------------------------
+// Parcours → intervention (lot P, FR-GPS-20 à 24)
+// ---------------------------------------------------------------------------
+
+const uuidList = (ids: readonly string[]) => sql.join(ids.map((i) => sql`${i}::uuid`), sql`, `);
+
+/**
+ * Brouillon d'intervention depuis des parcours libres d'un même matériel
+ * (design §4.3). Rien n'est écrit. 404 si un parcours est inconnu ; 409 s'il
+ * est déjà rattaché, ou si les parcours sont de plusieurs matériels
+ * (FR-GPS-25 hors v1).
+ *  - outil : l'outil résolu des parcours (le plus long en durée), sinon le
+ *    plus souvent attelé au matériel dans les interventions réalisées des
+ *    12 mois précédents ;
+ *  - conducteur : l'intervenant le plus fréquent avec ce matériel (12 mois) ;
+ *  - procédures : les plus fréquentes avec l'outil (ou le matériel), 3 ans ;
+ *  - zones : union des couvertures, découpée par parcelle (PostGIS).
+ */
+export async function buildTrackDraft(tx: Tx, sessionIds: readonly string[]): Promise<TrackDraft> {
+  const ids = [...new Set(sessionIds)];
+  const list = await rows<{
+    id: string;
+    equipment_id: string;
+    kind: "work" | "transit";
+    started_at: string | Date;
+    stopped_at: string | Date;
+    covered_area_m2: string | null;
+    parcels: TrackSession["parcels"];
+    tool_hint: string | null;
+    tool_equipment_id: string | null;
+    tool_name: string | null;
+    intervention_id: string | null;
+  }>(
+    tx,
+    sql`SELECT s.id, s.equipment_id, s.kind, s.started_at, s.stopped_at, s.covered_area_m2, s.parcels, s.tool_hint,
+               s.tool_equipment_id, t.name AS tool_name, s.intervention_id
+        FROM track_sessions s LEFT JOIN equipments t ON t.id = s.tool_equipment_id
+        WHERE s.id IN (${uuidList(ids)})`,
+  );
+  if (list.length < ids.length) throw new NotFound("Parcours introuvable.");
+  if (list.some((s) => s.intervention_id)) throw new Conflict("Parcours déjà rattaché à une intervention : il n'est plus sélectionnable.");
+  const trackers = new Set(list.map((s) => s.equipment_id));
+  if (trackers.size > 1) throw new Conflict("Parcours de plusieurs matériels : créez l'intervention depuis un matériel, puis ajoutez l'autre attelage à la main.");
+  const tracker = list[0]!.equipment_id;
+  const settings = await trackSettingsTx(tx);
+  const start = iso(list.reduce((a, s) => (ms(s.started_at) < ms(a) ? s.started_at : a), list[0]!.started_at));
+
+  // Outil résolu des parcours, pondéré par la durée.
+  const weight = new Map<string, { name: string; d: number }>();
+  for (const s of list) {
+    if (!s.tool_equipment_id) continue;
+    const cur = weight.get(s.tool_equipment_id) ?? { name: s.tool_name!, d: 0 };
+    weight.set(s.tool_equipment_id, { name: cur.name, d: cur.d + ms(s.stopped_at) - ms(s.started_at) });
+  }
+  const resolved = [...weight].sort((a, b) => b[1].d - a[1].d || a[0].localeCompare(b[0]))[0];
+  let tool: DraftContext["tool"] = resolved ? { id: resolved[0], name: resolved[1].name, source: "traccar" } : null;
+  let unlinkedToolHint: DraftContext["unlinkedToolHint"] = null;
+  if (!tool) {
+    const hint = mostFrequent(list.map((s) => s.tool_hint));
+    if (hint) {
+      const [look] = await rows<{ name: string }>(
+        tx,
+        sql`SELECT name FROM equipments
+            WHERE id <> ${tracker} AND kind NOT IN ('tractor', 'self_propelled_equipment')
+              AND strpos(lower(name), lower(trim(${hint}::text))) > 0
+            ORDER BY length(name), name LIMIT 1`,
+      );
+      unlinkedToolHint = { hint, lookalike: look?.name ?? null };
+    }
+    {
+      const [habit] = await rows<{ id: string; name: string }>(
+        tx,
+        sql`SELECT o.ref_id AS id, e.name
+            FROM intervention_parameters me
+            JOIN interventions i ON i.id = me.intervention_id AND i.status = 'done'
+             AND coalesce(i.stopped_at, i.created_at) BETWEEN ${start}::timestamptz - interval '12 months' AND ${start}::timestamptz
+            JOIN intervention_parameters o ON o.intervention_id = i.id AND o.role = 'tool' AND o.ref_type = 'equipment'
+             AND o.ref_id <> me.ref_id AND (me.crew_id IS NULL OR o.crew_id = me.crew_id)
+            JOIN equipments e ON e.id = o.ref_id AND e.kind NOT IN ('tractor', 'self_propelled_equipment')
+            WHERE me.role = 'tool' AND me.ref_id = ${tracker}
+            GROUP BY o.ref_id, e.name ORDER BY count(*) DESC, e.name LIMIT 1`,
+      );
+      if (habit) tool = { id: habit.id, name: habit.name, source: "habit" };
+    }
+  }
+  const [driver] = await rows<{ id: string; name: string }>(
+    tx,
+    sql`SELECT d.ref_id AS id, pe.name
+        FROM intervention_parameters me
+        JOIN interventions i ON i.id = me.intervention_id AND i.status = 'done'
+         AND coalesce(i.stopped_at, i.created_at) BETWEEN ${start}::timestamptz - interval '12 months' AND ${start}::timestamptz + interval '1 day'
+        JOIN intervention_parameters d ON d.intervention_id = i.id AND d.role = 'doer' AND d.ref_type = 'person'
+         AND (me.crew_id IS NULL OR d.crew_id = me.crew_id)
+        JOIN people pe ON pe.id = d.ref_id AND pe.active
+        WHERE me.role = 'tool' AND me.ref_id = ${tracker}
+        GROUP BY d.ref_id, pe.name ORDER BY count(*) DESC, pe.name LIMIT 1`,
+  );
+  const procedures = await rows<{ procedure: string }>(
+    tx,
+    sql`SELECT i.procedure FROM interventions i
+        JOIN intervention_parameters p ON p.intervention_id = i.id AND p.role = 'tool' AND p.ref_id = ${tool?.id ?? tracker}
+        WHERE i.status = 'done' AND coalesce(i.stopped_at, i.created_at) > ${start}::timestamptz - interval '3 years'
+        GROUP BY i.procedure ORDER BY count(*) DESC, i.procedure LIMIT 5`,
+  );
+  const work = list.filter((s) => s.kind === "work").map((s) => s.id);
+  const parcelIds = [...new Set(list.filter((s) => s.kind === "work").flatMap((s) => (s.parcels ?? []).map((p) => p.landParcelId)))];
+  const zones: Record<string, { areaM2: number; geometry: unknown }> = {};
+  if (work.length && parcelIds.length) {
+    const z = await rows<{ id: string; area: number; geometry: unknown }>(
+      tx,
+      sql`WITH u AS (SELECT ST_Union(coverage) AS g FROM track_sessions WHERE id IN (${uuidList(work)}) AND coverage IS NOT NULL),
+               cut AS (
+                 SELECT v.land_parcel_id AS id, ST_CollectionExtract(ST_Intersection(v.shape, u.g), 3) AS g
+                 FROM u JOIN land_parcel_versions v ON v.valid @> ${start}::timestamptz AND ST_Intersects(v.shape, u.g)
+                 WHERE u.g IS NOT NULL AND v.land_parcel_id IN (${uuidList(parcelIds)}))
+          SELECT id, ST_Area(g::geography)::float8 AS area, ST_AsGeoJSON(ST_Multi(g), 7)::json AS geometry
+          FROM cut WHERE NOT ST_IsEmpty(g)`,
+    );
+    for (const r of z) zones[r.id] = { areaM2: Number(r.area), geometry: r.geometry };
+  }
+  return draftFromSessions(
+    list.map((s) => ({
+      id: s.id,
+      equipmentId: s.equipment_id,
+      kind: s.kind,
+      startedAt: iso(s.started_at),
+      stoppedAt: iso(s.stopped_at),
+      coveredAreaM2: s.covered_area_m2 === null ? null : Number(s.covered_area_m2),
+      parcels: s.parcels ?? [],
+    })),
+    { settings, tool, driver: driver ?? null, unlinkedToolHint, zones, procedureSuggestions: procedures.map((p) => p.procedure) },
+  );
+}
+
+const mostFrequent = (values: (string | null)[]) => {
+  const n = new Map<string, number>();
+  for (const v of values) if (v) n.set(v, (n.get(v) ?? 0) + 1);
+  return [...n].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? null;
+};
+
+export async function draftTrackSessions(db: Database, farmId: string, sessionIds: readonly string[]): Promise<TrackDraft> {
+  return withFarm(db, farmId, (tx) => buildTrackDraft(tx, sessionIds));
+}
+
+/** Parcours rattachés à une intervention (fiche, FR-GPS-23), dans l'ordre chronologique. */
+export async function interventionTrackSessions(db: Database, farmId: string, interventionId: string): Promise<TrackSession[]> {
+  return withFarm(db, farmId, async (tx) => {
+    const list = await rows<SessionRow>(
+      tx,
+      sql`SELECT ${SESSION_COLUMNS} FROM track_sessions s ${SESSION_JOINS}
+          WHERE s.intervention_id = ${interventionId} ORDER BY s.started_at, s.id`,
+    );
+    return list.map((r) => toSession(r, r.equipment_id));
+  });
+}
+
+/**
+ * Rattache des parcours à une intervention, dans sa transaction d'écriture
+ * (design §5) : étendue figée, attelage qui contient le matériel suivi.
+ * 409 si l'un d'eux est inconnu ou rattaché à une autre intervention.
+ */
+export async function linkTrackSessions(tx: Tx, interventionId: string, sessionIds: readonly string[]) {
+  const ids = [...new Set(sessionIds)];
+  if (!ids.length) return;
+  const done = await rows<{ id: string }>(
+    tx,
+    sql`UPDATE track_sessions s
+        SET intervention_id = ${interventionId},
+            linked_extent = coalesce(s.linked_extent, tstzrange(s.started_at, s.stopped_at)),
+            crew_id = (SELECT c.id FROM intervention_crews c
+                       WHERE c.intervention_id = ${interventionId}
+                         AND EXISTS (SELECT 1 FROM intervention_parameters p
+                                     WHERE p.crew_id = c.id AND p.role = 'tool' AND p.ref_id = s.equipment_id)
+                       ORDER BY c.rank LIMIT 1)
+        WHERE s.id IN (${uuidList(ids)}) AND (s.intervention_id IS NULL OR s.intervention_id = ${interventionId})
+        RETURNING s.id`,
+  );
+  if (done.length < ids.length) throw new Conflict("Parcours GPS introuvable ou déjà rattaché à une autre intervention.");
 }

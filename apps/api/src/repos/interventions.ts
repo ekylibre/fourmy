@@ -21,6 +21,7 @@ import {
   crewRules,
   flattenCrews,
   crewDurations,
+  mergePeriods,
 } from "@fourmy/domain";
 import {
   getProcedure,
@@ -31,6 +32,7 @@ import {
   type InterventionHistoryEntry,
   type InterventionUpdateWrite,
   type InterventionPlanWrite,
+  interventionUpdateWrite,
   type StockMovement,
   type TargetKind,
   type TreatmentPurpose,
@@ -38,6 +40,7 @@ import {
 import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
 import { checkCompliance, type CheckableBody } from "./phyto.js";
 import { addReadingInTx } from "./equipments.js";
+import { buildTrackDraft, linkTrackSessions } from "./track-sessions.js";
 
 /**
  * Interventions (docs/interventions.md). L'API parle la forme structurée
@@ -383,6 +386,7 @@ async function writeBody(tx: Tx, interventionId: string, body: Body, articles: M
     for (const t of body.tools) await insert("tool", "equipment", t.equipmentId, null, null, null);
     for (const d of body.doers) await insert("doer", "person", d.personId, null, null, null);
     for (const p of body.periods) await period(p);
+    await linkTrackSessions(tx, interventionId, body.trackSessionIds ?? []);
     return;
   }
   // Attelages : id client conservé (stable entre deux modifications).
@@ -414,6 +418,7 @@ async function writeBody(tx: Tx, interventionId: string, body: Body, articles: M
         ORDER BY (c.id = ${l.crew_id}) DESC, c.rank LIMIT 1)
       WHERE s.id = ${l.id}`);
   }
+  await linkTrackSessions(tx, interventionId, body.trackSessionIds ?? []);
 }
 
 /**
@@ -927,4 +932,94 @@ export async function cancelIntervention(
     await audit(tx, farmId, ctx, interventionId, "cancelled", { reason, previousStatus: current.status });
     return readIntervention(tx, interventionId);
   });
+}
+
+// ---------------------------------------------------------------------------
+// Parcours GPS ajoutés à une intervention existante (FR-GPS-24)
+// ---------------------------------------------------------------------------
+
+/** Corps de modification équivalent à une intervention lue (les champs de lecture sont retirés). */
+function writeOf(i: Intervention): InterventionUpdateWrite {
+  const crews = i.staffing === "crews";
+  return interventionUpdateWrite.parse({
+    procedure: i.procedure,
+    staffing: i.staffing,
+    crews: i.crews.map((c) => ({
+      id: c.id,
+      ...(c.label ? { label: c.label } : {}),
+      ...(c.templateId ? { templateId: c.templateId } : {}),
+      tools: c.tools,
+      doers: c.doers,
+      periods: c.periods,
+    })),
+    periods: crews ? [] : i.periods,
+    tools: crews ? [] : i.tools,
+    doers: crews ? [] : i.doers,
+    targets: i.targets,
+    inputs: i.inputs,
+    outputs: i.outputs,
+    purposes: i.purposes,
+    ...(i.notes ? { notes: i.notes } : {}),
+    ...(i.compliance
+      ? {
+          compliance: {
+            usages: Object.fromEntries(i.compliance.checks.filter((c) => c.usageId).map((c) => [c.articleId, c.usageId!])),
+            ...(i.compliance.reason ? { reason: i.compliance.reason } : {}),
+          },
+        }
+      : {}),
+    ...(i.weather ? { weather: i.weather } : {}),
+    ...(i.maintenance ? { maintenance: i.maintenance } : {}),
+  });
+}
+
+/**
+ * Ajoute des parcours libres à une intervention (FR-GPS-24) : leurs périodes
+ * vont à l'attelage du matériel suivi (`crewId`, sinon le premier attelage
+ * qui le contient, sinon un nouvel attelage du brouillon), les parcelles
+ * manquantes deviennent des cibles. Une intervention en mode libre passe en
+ * attelages (un attelage reprend ses moyens). Passe par la modification
+ * habituelle : correction tracée si elle est réalisée.
+ */
+export async function attachTrackSessions(
+  db: Database,
+  farmId: string,
+  ctx: DomainCtx,
+  interventionId: string,
+  sessionIds: string[],
+  crewId?: string,
+): Promise<{ intervention: Intervention; warnings: string[] }> {
+  const { write } = await withFarm(db, farmId, async (tx) => {
+    const current = await readIntervention(tx, interventionId);
+    if (current.status === "cancelled") throw new Conflict("Intervention annulée : elle ne se modifie plus.");
+    const draft = await buildTrackDraft(tx, sessionIds);
+    const write = writeOf(current);
+    if (write.staffing !== "crews") {
+      const crew = { tools: write.tools, doers: write.doers, periods: write.periods };
+      write.staffing = "crews";
+      write.crews = crew.tools.length && crew.periods.length ? [crew] : [];
+      write.tools = [];
+      write.doers = [];
+      write.periods = [];
+    }
+    const proposed = draft.body.crews[0]!;
+    const tracker = proposed.tools[0]!.equipmentId;
+    const k = crewId ? write.crews.findIndex((c) => c.id === crewId) : write.crews.findIndex((c) => c.tools.some((t) => t.equipmentId === tracker));
+    if (crewId && k < 0) throw new BadRequest("Attelage inconnu dans cette intervention.");
+    if (k < 0) {
+      write.crews.push({ tools: proposed.tools, doers: proposed.doers, periods: proposed.periods });
+    } else {
+      const crew = write.crews[k]!;
+      if (!crew.tools.some((t) => t.equipmentId === tracker)) crew.tools.push({ equipmentId: tracker });
+      crew.periods = mergePeriods([...crew.periods, ...proposed.periods]);
+    }
+    const known = new Set(write.targets.map((t) => t.id));
+    for (const t of draft.body.targets) {
+      if (!known.has(t.id)) write.targets.push(t as (typeof write.targets)[number]);
+    }
+    write.trackSessionIds = draft.body.trackSessionIds;
+    write.reason = "Parcours GPS ajoutés";
+    return { write };
+  });
+  return updateIntervention(db, farmId, ctx, interventionId, write);
 }

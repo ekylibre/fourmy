@@ -87,7 +87,7 @@ export function useParcelNames(farmId: string) {
 
 /** Après une écriture sur les interventions : tout ce qui en dépend est relu. */
 export function invalidateAfterIntervention(queryClient: QueryClient) {
-  for (const key of ["interventions", "intervention", "stock", "register", "snapshot", "contents", "procedures"]) {
+  for (const key of ["interventions", "intervention", "stock", "register", "snapshot", "contents", "procedures", "track-sessions", "intervention-track-sessions"]) {
     void queryClient.invalidateQueries({ queryKey: [key] });
   }
 }

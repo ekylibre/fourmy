@@ -163,6 +163,11 @@ const interventionBody = z.object({
   weather: interventionWeather.optional(),
   /** Forme `maintenance` : nature, problème, atelier, opérations du plan. */
   maintenance: maintenanceBlock.optional(),
+  /**
+   * Parcours GPS à rattacher à l'enregistrement (FR-GPS-23), en plus de ceux
+   * déjà rattachés : absent ou vide, les rattachements existants restent.
+   */
+  trackSessionIds: z.array(uuid).max(50).optional(),
 });
 
 /** Planification (POST /interventions). `id` client → idempotent. */

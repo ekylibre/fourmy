@@ -88,6 +88,37 @@ Phases réalisées, sur la branche `feat/parcours-attelages` :
     double. Sa valeur de 15,79 ha (16:57) fait 9,03 ha côté parcours sur
     16:24-17:46. À trancher avec la sémantique exacte du compteur osfarm.
 
+- **P1-P3** (lot P, parcours → intervention) :
+  - domaine : `draftFromSessions` (attelage matériel suivi + outil +
+    conducteur, une période par parcours fusionnées sous `stopMin`, parcelles
+    au-delà du seuil en cumul, indices) ;
+  - API : `POST /track-sessions/draft` (outil résolu des parcours, sinon
+    habitude sur 12 mois ; conducteur habituel ; procédures de l'outil ;
+    zone par parcelle = union des couvertures découpée en SQL ; 404/409),
+    `trackSessionIds` dans le corps (rattachement dans `writeBody`, 409 si
+    déjà rattaché, additif : modifier ne détache rien),
+    `GET`/`POST /interventions/:id/track-sessions` (ajout : période dans
+    l'attelage du matériel ou nouvel attelage, parcelles manquantes,
+    correction tracée « Parcours GPS ajoutés ») ;
+  - migration **0024** : déclencheur qui libère les parcours avant la
+    suppression d'une intervention (la clé `ON DELETE SET NULL` seule
+    violait le CHECK de l'étendue figée). Attelages types → 0025,
+    applicateurs → 0026 ;
+  - web : actions « Créer l'intervention » et « Ajouter à une
+    intervention » (interventions du jour) sur l'onglet ; un parcours
+    rattaché n'est plus cochable ; bandeau « N parcours GPS seront
+    rattachés », procédures suggérées et indices dans le formulaire ; bloc
+    « Parcours GPS rattachés » sur la fiche ;
+  - tests : 5 domaine, 7 intégration, e2e `track-draft.spec.ts` (US-GPS-B,
+    3,6 s).
+- **Point de contrôle P** (Arion 430 de Pierre, lecture seule) : le 05/10
+  donne un attelage Arion 430 + outil + Pierre, deux périodes
+  (14:00-15:19, 16:21-17:46) et 8 parcelles de maïs pour 16,1 ha (contre
+  16,8 ha couverts, le reste hors parcelles), en 32 ms. Limite constatée : le
+  boîtier annonce « Arion UF1201 », non relié ; le brouillon prend l'outil
+  d'habitude (semoir Monosem) et propose des semis. L'indice le signale ;
+  renseigner `external_ids.traccarTool` sur l'Amazone UF1201 corrige.
+
 Contrôle d'O1 sur l'Arion 430 le 28/10 (réglages par défaut) :
 - déplacement 10:37-11:06, puis coupure de 2 h à midi ;
 - déplacement 13:13-13:20 ;
@@ -153,7 +184,7 @@ Points qui touchent le design :
 
 Prochaine migration : `0022`. Le design prévoit une seule migration
 `0022_tracks_crews.sql` ; elle est **découpée par lot** (0022 attelages,
-0023 parcours, 0024 attelages types, 0025 applicateurs) pour que chaque lot
+0023 parcours, 0024 libération des parcours, 0025 attelages types, 0026 applicateurs) pour que chaque lot
 se livre seul.
 
 ## 1. Ordre et dépendances
@@ -352,7 +383,7 @@ O1 ─ O2 ─ O3 ─ O4 ─┴─ P1 ─ P2 ─ P3
 ## 5. Lot Q : attelages types
 
 ### Q1 Modèle et API
-- Migration `0024_crew_templates.sql` (design §2.2).
+- Migration `0025_crew_templates.sql` (design §2.2).
 - `GET` et `POST /crew-templates`, `PUT` et `DELETE /crew-templates/:id`
   (owner pour l'écriture), avec leurs tests.
 
@@ -367,7 +398,7 @@ O1 ─ O2 ─ O3 ─ O4 ─┴─ P1 ─ P2 ─ P3
 
 ### R1 Applicateurs (FR-ATT-12)
 - Domaine : `applicatorsOf` (design §4.4) et ses tests.
-- Migration `0025_phyto_applicators.sql` :
+- Migration `0026_phyto_applicators.sql` :
   - fonction `fourmy_input_applicators` ;
   - vue `phyto_register` + `applicators` ;
   - un test SQL et un test TS sur les mêmes cas.

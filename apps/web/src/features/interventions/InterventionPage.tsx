@@ -1,14 +1,14 @@
 import { MaintenanceSummary } from "../maintenance/MaintenanceFields";
 import { useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
-import { Badge, Box, Button, Grid, Group, Paper, Stack, Table, Text, Timeline, Title } from "@mantine/core";
+import { Badge, Box, Button, Grid, Group, Paper, Stack, Table, Text, Timeline, Title, Tooltip } from "@mantine/core";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, CalendarClock, Pencil, Timer, User, Users } from "lucide-react";
 import { formatDuration } from "./periods";
 import { CrewsSummary } from "./Crews";
 import { crewLabel } from "./week";
 import type { FeatureCollection, Geometry } from "geojson";
-import type { ComplianceResult, Intervention, InterventionDetail, InterventionWaterMap, Snapshot, TrackReplay } from "@fourmy/contracts";
+import type { ComplianceResult, Intervention, InterventionDetail, InterventionWaterMap, Snapshot, TrackReplay, TrackSession } from "@fourmy/contracts";
 import { TREATMENT_PURPOSE_LABELS } from "@fourmy/contracts";
 import { displayStatus } from "@fourmy/domain";
 import { formatHa } from "@fourmy/ui-lyvre";
@@ -226,6 +226,8 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
                 </Group>
               )}
             </Paper>
+
+            <LinkedTrackSessions farmId={farm.id} interventionId={i.id} names={names.equipment} />
 
             <Paper p="md" withBorder>
               <Title order={4} mb="xs">
@@ -483,5 +485,55 @@ function CrewsView({ i, names }: { i: Intervention; names: { equipment: Map<stri
       ))}
       <CrewsSummary crews={i.crews} />
     </Stack>
+  );
+}
+
+/** Parcours GPS rattachés (FR-GPS-23), avec la trace recalculée si elle a changé depuis (FR-GPS-15). */
+function LinkedTrackSessions({ farmId, interventionId, names }: { farmId: string; interventionId: string; names: Map<string, string> }) {
+  const list = useQuery({
+    queryKey: ["intervention-track-sessions", farmId, interventionId],
+    queryFn: () => api.get<{ items: TrackSession[] }>(farmPath(farmId, `/interventions/${interventionId}/track-sessions`)),
+  });
+  const items = list.data?.items ?? [];
+  if (items.length === 0) return null;
+  const hm = (iso: string) => new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  return (
+    <Paper p="md" withBorder>
+      <Title order={4} mb="xs">
+        Parcours GPS rattachés ({items.length})
+      </Title>
+      <Table aria-label="Parcours GPS rattachés">
+        <Table.Tbody>
+          {items.map((s) => (
+            <Table.Tr key={s.id}>
+              <Table.Td>
+                <Link to={`/f/${farmId}/equipments/${s.equipmentId}?tab=tracks`}>{names.get(s.equipmentId) ?? "Matériel"}</Link>
+              </Table.Td>
+              <Table.Td className="lv-num" style={{ whiteSpace: "nowrap" }}>
+                {new Date(s.startedAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} {hm(s.startedAt)}–{hm(s.stoppedAt)}
+              </Table.Td>
+              <Table.Td>
+                <Badge variant="light" color={s.kind === "work" ? "lichen" : "ardoise"}>
+                  {s.kind === "work" ? "Travail" : "Déplacement"}
+                </Badge>
+              </Table.Td>
+              <Table.Td>{s.parcels.map((p) => p.name).join(", ") || "—"}</Table.Td>
+              <Table.Td ta="right" className="lv-num">
+                {s.coveredAreaM2 === null ? "—" : formatHa(s.coveredAreaM2)}
+              </Table.Td>
+              <Table.Td>
+                {s.drift && (
+                  <Tooltip label={`Trace recalculée : ${hm(s.drift.startedAt)}–${hm(s.drift.stoppedAt)}`}>
+                    <Badge color="paille" variant="light">
+                      trace modifiée
+                    </Badge>
+                  </Tooltip>
+                )}
+              </Table.Td>
+            </Table.Tr>
+          ))}
+        </Table.Tbody>
+      </Table>
+    </Paper>
   );
 }

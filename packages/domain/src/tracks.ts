@@ -1,4 +1,4 @@
-import type { TrackSessionKind, TrackSettings } from "@fourmy/contracts";
+import type { TrackDraft, TrackSessionKind, TrackSettings } from "@fourmy/contracts";
 
 /**
  * Découpage d'une trace GPS en parcours (docs/parcours-attelages-design.md
@@ -297,4 +297,123 @@ export function sha256Hex(text: string): string {
     h[7] = h[7]! + hh;
   }
   return Array.from(h, (x) => x.toString(16).padStart(8, "0")).join("");
+}
+
+// ---------------------------------------------------------------------------
+// Brouillon d'intervention depuis des parcours (design §4.3, FR-GPS-20, 21)
+// ---------------------------------------------------------------------------
+
+/** Parcours retenu pour un brouillon (forme lue en base). */
+export interface DraftSession {
+  id: string;
+  equipmentId: string;
+  kind: TrackSessionKind;
+  startedAt: string;
+  stoppedAt: string;
+  coveredAreaM2: number | null;
+  parcels: readonly { landParcelId: string; name: string; areaM2: number; share: number }[];
+}
+
+export interface DraftContext {
+  settings: Pick<TrackSettings, "stopMin" | "parcelMinShare" | "parcelMinAreaM2">;
+  /** Outil retenu et d'où il vient : `traccar` (attribut `tool` relié), `habit` (le plus souvent attelé). */
+  tool?: { id: string; name: string; source: "traccar" | "habit" } | null;
+  /** Conducteur habituel du matériel suivi (12 derniers mois). */
+  driver?: { id: string; name: string } | null;
+  /** Attribut `tool` du boîtier non relié à un matériel, et le matériel dont le nom le contient (suggestion seulement). */
+  unlinkedToolHint?: { hint: string; lookalike: string | null } | null;
+  /** Zone couverte par parcelle (union des couvertures découpée par la parcelle, calculée en SQL). */
+  zones?: Readonly<Record<string, { areaM2: number; geometry: unknown }>>;
+  procedureSuggestions?: readonly string[];
+}
+
+const msOf = (iso: string) => new Date(iso).getTime();
+
+/**
+ * Brouillon : un attelage (matériel suivi + outil, conducteur habituel ou
+ * personne), une période par parcours (fusionnées si l'écart est inférieur à
+ * `stopMin`), les parcelles des parcours de travail au-delà du seuil (part
+ * cumulée ≥ `parcelMinShare` ou surface cumulée ≥ `parcelMinAreaM2`), avec
+ * leur surface couverte et leur zone de travail. Les parcours doivent être
+ * d'un seul matériel (FR-GPS-25 hors v1) : l'appelant le vérifie.
+ */
+export function draftFromSessions(sessions: readonly DraftSession[], ctx: DraftContext): TrackDraft {
+  if (sessions.length === 0) throw new Error("Aucun parcours.");
+  const sorted = [...sessions].sort((a, b) => msOf(a.startedAt) - msOf(b.startedAt) || a.id.localeCompare(b.id));
+  const tracker = sorted[0]!.equipmentId;
+  const gap = ctx.settings.stopMin * 60_000;
+
+  const periods: { startedAt: string; stoppedAt: string }[] = [];
+  for (const s of sorted) {
+    const last = periods.at(-1);
+    if (last && msOf(s.startedAt) - msOf(last.stoppedAt) < gap) {
+      if (msOf(s.stoppedAt) > msOf(last.stoppedAt)) last.stoppedAt = s.stoppedAt;
+    } else {
+      periods.push({ startedAt: s.startedAt, stoppedAt: s.stoppedAt });
+    }
+  }
+
+  const byParcel = new Map<string, { name: string; areaM2: number; share: number }>();
+  for (const s of sorted.filter((x) => x.kind === "work")) {
+    for (const p of s.parcels) {
+      const cur = byParcel.get(p.landParcelId) ?? { name: p.name, areaM2: 0, share: 0 };
+      byParcel.set(p.landParcelId, { name: cur.name, areaM2: cur.areaM2 + p.areaM2, share: cur.share + p.share });
+    }
+  }
+  const kept = [...byParcel]
+    .filter(([, p]) => p.share >= ctx.settings.parcelMinShare || p.areaM2 >= ctx.settings.parcelMinAreaM2)
+    .sort((a, b) => b[1].areaM2 - a[1].areaM2 || a[0].localeCompare(b[0]));
+  const targets = kept.map(([id, p]) => {
+    const zone = ctx.zones?.[id];
+    const area = Math.round(zone?.areaM2 ?? p.areaM2);
+    return {
+      kind: "land_parcel" as const,
+      id,
+      ...(area > 0 ? { workedAreaM2: area } : {}),
+      ...(zone?.geometry ? { workingZone: zone.geometry } : {}),
+    };
+  });
+
+  const hints: string[] = [];
+  const work = sorted.some((s) => s.kind === "work");
+  if (!work) hints.push("Déplacements seuls : aucune parcelle cible, procédure de transport à choisir.");
+  else if (targets.length === 0) hints.push("Aucune parcelle travaillée au-delà du seuil : cibles à choisir.");
+  const tool = ctx.tool && ctx.tool.id !== tracker ? ctx.tool : null;
+  if (tool?.source === "habit") hints.push(`Outil déduit de l'habitude : ${tool.name}.`);
+  const u = ctx.unlinkedToolHint;
+  if (!tool || tool.source === "habit") {
+    if (u) {
+      hints.push(
+        `Le boîtier annonce l'outil « ${u.hint} », relié à aucun matériel${u.lookalike ? ` (peut-être ${u.lookalike} : renseignez le lien Traccar sur sa fiche)` : ""}.`,
+      );
+    } else if (!tool) {
+      hints.push("Aucun outil détecté : à ajouter si besoin.");
+    }
+  }
+  if (!ctx.driver) hints.push("Aucun conducteur connu : attelage sans intervenant, à compléter si besoin.");
+  if (work && (ctx.procedureSuggestions?.length ?? 0) === 0) hints.push("Procédure à choisir.");
+
+  return {
+    body: {
+      staffing: "crews",
+      crews: [
+        {
+          tools: [{ equipmentId: tracker }, ...(tool ? [{ equipmentId: tool.id }] : [])],
+          doers: ctx.driver ? [{ personId: ctx.driver.id }] : [],
+          periods,
+        },
+      ],
+      periods: [],
+      tools: [],
+      doers: [],
+      targets,
+      inputs: [],
+      outputs: [],
+      purposes: [],
+      trackSessionIds: sorted.map((s) => s.id),
+    },
+    procedureSuggestions: [...(ctx.procedureSuggestions ?? [])],
+    hints,
+    parcelNames: Object.fromEntries(kept.map(([id, p]) => [id, p.name])),
+  };
 }

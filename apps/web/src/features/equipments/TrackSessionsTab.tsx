@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router";
-import { Badge, Button, Checkbox, Grid, Group, Paper, SegmentedControl, Select, Stack, Table, Text, TextInput, Tooltip } from "@mantine/core";
-import { useInfiniteQuery, useQueries, useQuery } from "@tanstack/react-query";
-import type { TrackSession, TrackSessionDetail, TrackSessionList } from "@fourmy/contracts";
+import { Link, useNavigate } from "react-router";
+import { Alert, Badge, Button, Checkbox, Grid, Group, Modal, Paper, SegmentedControl, Select, Stack, Table, Text, TextInput, Tooltip } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
+import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Intervention, TrackDraft, TrackSession, TrackSessionDetail, TrackSessionList } from "@fourmy/contracts";
 import { formatHa } from "@fourmy/ui-lyvre";
 import type { FeatureCollection, Geometry } from "geojson";
-import { api, farmPath } from "../../app/api";
+import { api, ApiError, farmPath } from "../../app/api";
 import { procedureLabel } from "../../app/labels";
-import { useSnapshot } from "../../app/queries";
+import { invalidateAfterIntervention, useSnapshot } from "../../app/queries";
 import { MapBoundary } from "../../components/MapBoundary";
 import { ErrorAlert, Loading } from "../../components/states";
 import { ParcelMap } from "../map/ParcelMap";
@@ -130,6 +131,9 @@ export function TrackSessionsTab({ farmId, equipmentId }: { farmId: string; equi
         />
       </Group>
 
+      {selected.length > 0 && (
+        <SelectionActions farmId={farmId} sessions={items.filter((s) => selected.includes(s.id))} onDone={() => setSelected([])} />
+      )}
       <Grid>
         <Grid.Col span={{ base: 12, lg: selected.length ? 7 : 12 }}>
           {list.isLoading ? (
@@ -169,7 +173,7 @@ export function TrackSessionsTab({ farmId, equipmentId }: { farmId: string; equi
                 </Button>
               )}
               <Text size="xs" c="dimmed">
-                Parcours calculés depuis les traces GPS (toutes les 5 minutes). Cochez des parcours pour les voir sur la carte.
+                Parcours calculés depuis les traces GPS (toutes les 5 minutes). Cochez des parcours libres pour les voir sur la carte et en faire une intervention.
               </Text>
             </Stack>
           )}
@@ -188,7 +192,7 @@ function SessionRow({ s, farmId, onTool, checked, onToggle }: { s: TrackSession;
   return (
     <Table.Tr aria-label={`Parcours du ${date(s.startedAt)} ${hhmm(s.startedAt)}`}>
       <Table.Td>
-        <Checkbox aria-label="Sélectionner le parcours" checked={checked} onChange={onToggle} />
+        <Checkbox aria-label="Sélectionner le parcours" checked={checked} onChange={onToggle} disabled={!!s.intervention} title={s.intervention ? "Parcours déjà rattaché" : undefined} />
       </Table.Td>
       <Table.Td style={{ whiteSpace: "nowrap" }}>{date(s.startedAt)}</Table.Td>
       <Table.Td className="lv-num" style={{ whiteSpace: "nowrap" }}>
@@ -286,6 +290,117 @@ function SelectionMap({ farmId, ids, viewer }: { farmId: string; ids: string[]; 
       <Text size="xs" c="dimmed" className="lv-num">
         {ids.length} parcours · {formatHa(area)} couverts{ids.length > 10 ? " (10 premiers sur la carte)" : ""}. Orange : travail ; pointillés : déplacement.
       </Text>
+    </Stack>
+  );
+}
+
+/**
+ * Actions sur les parcours cochés (lot P, FR-GPS-20, 24) : créer
+ * l'intervention (brouillon ouvert dans le formulaire, rien n'est enregistré
+ * avant validation), ou les ajouter à une intervention du même jour.
+ */
+function SelectionActions({ farmId, sessions, onDone }: { farmId: string; sessions: TrackSession[]; onDone: () => void }) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [picking, setPicking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const ids = sessions.map((s) => s.id);
+  const trackers = new Set(sessions.map((s) => s.equipmentId));
+  const blocked = trackers.size > 1 ? "Parcours de plusieurs tracteurs : une intervention par tracteur." : null;
+  const first = sessions.reduce<TrackSession | null>((a, s) => (!a || s.startedAt < a.startedAt ? s : a), null);
+  const day = first ? dayOf(new Date(first.startedAt)) : dayOf(new Date());
+
+  const create = useMutation({
+    mutationFn: () => api.post<TrackDraft>(farmPath(farmId, "/track-sessions/draft"), { sessionIds: ids }),
+    onSuccess: (draft) => navigate(`/f/${farmId}/interventions/new?at=${day}`, { state: { trackDraft: draft } }),
+    onError: (e) => setError(e instanceof ApiError ? e.message : String(e)),
+  });
+  const attach = useMutation({
+    mutationFn: (interventionId: string) =>
+      api.post<{ intervention: Intervention; warnings: string[] }>(farmPath(farmId, `/interventions/${interventionId}/track-sessions`), { sessionIds: ids }),
+    onSuccess: (r) => {
+      for (const w of r.warnings) notifications.show({ color: "paille", title: "À vérifier", message: w, autoClose: 10_000 });
+      notifications.show({ color: "lichen", message: `${ids.length} parcours ajouté${ids.length > 1 ? "s" : ""} à l'intervention.` });
+      invalidateAfterIntervention(queryClient);
+      void queryClient.invalidateQueries({ queryKey: ["track-sessions"] });
+      setPicking(false);
+      onDone();
+    },
+    onError: (e) => setError(e instanceof ApiError ? e.message : String(e)),
+  });
+
+  return (
+    <Paper withBorder p="xs">
+      <Group gap="sm">
+        <Text size="sm">
+          {ids.length} parcours sélectionné{ids.length > 1 ? "s" : ""}
+        </Text>
+        <Button size="xs" onClick={() => create.mutate()} loading={create.isPending} disabled={!!blocked}>
+          Créer l'intervention
+        </Button>
+        <Button size="xs" variant="light" onClick={() => setPicking(true)} disabled={!!blocked}>
+          Ajouter à une intervention
+        </Button>
+        {blocked && (
+          <Text size="xs" c="dimmed">
+            {blocked}
+          </Text>
+        )}
+      </Group>
+      {error && (
+        <Alert color="brique" variant="light" mt="xs" withCloseButton onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+      <Modal opened={picking} onClose={() => setPicking(false)} title={`Interventions du ${date(`${day}T12:00:00`)}`} size="lg">
+        {picking && <SameDayInterventions farmId={farmId} day={day} onPick={(id) => attach.mutate(id)} pending={attach.isPending} />}
+      </Modal>
+    </Paper>
+  );
+}
+
+function SameDayInterventions({ farmId, day, onPick, pending }: { farmId: string; day: string; onPick: (id: string) => void; pending: boolean }) {
+  const from = new Date(`${day}T00:00:00`);
+  const list = useQuery({
+    queryKey: ["interventions-day", farmId, day],
+    queryFn: () =>
+      api.get<{ items: Intervention[] }>(
+        farmPath(farmId, `/interventions?from=${from.toISOString()}&to=${new Date(from.getTime() + DAY).toISOString()}`),
+      ),
+  });
+  if (list.isLoading) return <Loading />;
+  if (list.error) return <ErrorAlert error={list.error} />;
+  const items = (list.data?.items ?? []).filter((i) => i.status !== "cancelled");
+  if (items.length === 0) return <Text size="sm" c="dimmed">Aucune intervention ce jour-là : créez-en une depuis les parcours.</Text>;
+  return (
+    <Stack gap="xs">
+      <Text size="sm" c="dimmed">
+        Les périodes des parcours vont à l'attelage du tracteur (créé au besoin), les parcelles manquantes deviennent des cibles. Une intervention
+        réalisée est corrigée (correction tracée).
+      </Text>
+      <Table aria-label="Interventions du jour">
+        <Table.Tbody>
+          {items.map((i) => (
+            <Table.Tr key={i.id}>
+              <Table.Td>{procedureLabel(i.procedure)}</Table.Td>
+              <Table.Td className="lv-num">
+                {i.startedAt ? hhmm(i.startedAt) : "—"}
+                {i.stoppedAt ? `–${hhmm(i.stoppedAt)}` : ""}
+              </Table.Td>
+              <Table.Td>
+                <Badge variant="light" color={i.status === "done" ? "lichen" : "ardoise"}>
+                  {i.status === "done" ? "Réalisée" : "Planifiée"}
+                </Badge>
+              </Table.Td>
+              <Table.Td ta="right">
+                <Button size="compact-xs" onClick={() => onPick(i.id)} loading={pending}>
+                  Ajouter ici
+                </Button>
+              </Table.Td>
+            </Table.Tr>
+          ))}
+        </Table.Tbody>
+      </Table>
     </Stack>
   );
 }

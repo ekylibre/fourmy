@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { Button, Group, Paper, Stack, Title } from "@mantine/core";
 import { ArrowLeft } from "lucide-react";
-import type { InterventionDetail } from "@fourmy/contracts";
+import type { InterventionDetail, TrackDraft } from "@fourmy/contracts";
 import { useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
 import { procedureLabel } from "../../app/labels";
@@ -29,6 +29,13 @@ function initialFromParams(p: URLSearchParams): FormInitial | undefined {
   };
 }
 import { interventionDay } from "./presenters";
+
+/** Pré-remplissage : paramètres d'URL (entretien), ou brouillon de parcours GPS passé par la navigation (lot P). */
+function initialOf(p: URLSearchParams, state: unknown): FormInitial | undefined {
+  const trackDraft = (state as { trackDraft?: TrackDraft } | null)?.trackDraft;
+  const fromParams = initialFromParams(p);
+  return trackDraft ? { ...fromParams, trackDraft } : fromParams;
+}
 
 type FormMode = "new" | "complete" | "edit";
 
@@ -103,7 +110,7 @@ function FormLayout({ mode, intervention: i, back }: { mode: FormMode; intervent
           planned={mode === "complete" ? i : undefined}
           editing={mode === "edit" ? i : undefined}
           defaultDay={day.slice(0, 10)}
-          initial={mode === "new" ? initialFromParams(new URLSearchParams(location.search)) : undefined}
+          initial={mode === "new" ? initialOf(new URLSearchParams(location.search), location.state) : undefined}
           onDone={(id) => {
             // Après l'enregistrement : la fiche de l'intervention.
             const target = id ?? i?.id;

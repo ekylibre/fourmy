@@ -74,3 +74,34 @@ export interface TrackSessionDetail extends TrackSession {
 
 export const trackSessionState = z.enum(["free", "linked"]);
 export type TrackSessionState = z.infer<typeof trackSessionState>;
+
+/** Brouillon d'intervention depuis des parcours (FR-GPS-20, 21) : POST /track-sessions/draft. */
+export const trackDraftRequest = z.object({ sessionIds: z.array(z.string().uuid()).min(1).max(50) });
+export type TrackDraftRequest = z.infer<typeof trackDraftRequest>;
+
+/** Ajout de parcours à une intervention existante (FR-GPS-24). */
+export const trackAttachRequest = trackDraftRequest.extend({ crewId: z.string().uuid().optional() });
+export type TrackAttachRequest = z.infer<typeof trackAttachRequest>;
+
+/** Brouillon : un corps d'intervention réalisée en attelages, jamais enregistré tel quel (FR-GPS-22). */
+export interface TrackDraft {
+  /** Corps de réalisation (sans procédure) : un attelage, ses périodes, les cibles, `trackSessionIds`. */
+  body: {
+    staffing: "crews";
+    crews: { tools: { equipmentId: string }[]; doers: { personId: string }[]; periods: { startedAt: string; stoppedAt: string }[] }[];
+    periods: never[];
+    tools: never[];
+    doers: never[];
+    targets: { kind: "land_parcel"; id: string; workedAreaM2?: number; workingZone?: unknown }[];
+    inputs: never[];
+    outputs: never[];
+    purposes: never[];
+    trackSessionIds: string[];
+  };
+  /** Procédures suggérées d'après l'outil (ou le matériel suivi), les plus fréquentes d'abord. */
+  procedureSuggestions: string[];
+  /** Ce qui a été déduit ou manque : « outil déduit de l'habitude », « aucun conducteur connu »… */
+  hints: string[];
+  /** Noms des parcelles des cibles (affichage). */
+  parcelNames: Record<string, string>;
+}

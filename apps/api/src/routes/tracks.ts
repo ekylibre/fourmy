@@ -1,11 +1,20 @@
 import { Hono } from "hono";
-import { trackSessionKind, trackSessionState, trackSettings } from "@fourmy/contracts";
+import { trackAttachRequest, trackDraftRequest, trackSessionKind, trackSessionState, trackSettings } from "@fourmy/contracts";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import { trackReplay, trackCoverage, toCzml } from "../repos/tracks.js";
 import { hitches, latestPositions } from "../repos/avatar.js";
-import { computeTrackSessions, getTrackSession, getTrackSettings, listTrackSessions, putTrackSettings } from "../repos/track-sessions.js";
-import { atOrNow, BadRequest, problem, uuidParam, window } from "./helpers.js";
+import {
+  computeTrackSessions,
+  draftTrackSessions,
+  getTrackSession,
+  getTrackSettings,
+  interventionTrackSessions,
+  listTrackSessions,
+  putTrackSettings,
+} from "../repos/track-sessions.js";
+import { attachTrackSessions } from "../repos/interventions.js";
+import { atOrNow, BadRequest, domainCtx, problem, uuidParam, window } from "./helpers.js";
 
 const DAY = 86_400_000;
 /** Option de requête validée par un schéma (absente : undefined). */
@@ -67,6 +76,22 @@ export const trackRoutes = new Hono<Env>()
   .get("/track-sessions/:id", async (c) => {
     const viewer = c.req.query("equipment");
     return c.json(await getTrackSession(db(), c.get("farmId"), uuidParam(c, "id"), viewer ? uuidParam(c, "equipment", "query") : undefined));
+  })
+  // Parcours → intervention (lot P, FR-GPS-20 à 24).
+  .post("/track-sessions/draft", async (c) => {
+    const parsed = trackDraftRequest.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", "sessionIds : 1 à 50 identifiants de parcours");
+    return c.json(await draftTrackSessions(db(), c.get("farmId"), parsed.data.sessionIds));
+  })
+  .get("/interventions/:id/track-sessions", async (c) =>
+    c.json({ items: await interventionTrackSessions(db(), c.get("farmId"), uuidParam(c, "id")) }),
+  )
+  .post("/interventions/:id/track-sessions", async (c) => {
+    const parsed = trackAttachRequest.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", "sessionIds : 1 à 50 identifiants de parcours ; crewId facultatif");
+    return c.json(
+      await attachTrackSessions(db(), c.get("farmId"), domainCtx(c), uuidParam(c, "id"), parsed.data.sessionIds, parsed.data.crewId),
+    );
   })
   .post("/track-sessions/recompute", requireOwner, async (c) => c.json(await computeTrackSessions(db(), c.get("farmId"))))
   .get("/settings/tracks", async (c) => c.json(await getTrackSettings(db(), c.get("farmId"))))
