@@ -38,12 +38,14 @@ Lot Y, réalisé le 2026-11-10 : FR-TWIN-1, FR-TWIN-2 et FR-TWIN-5
 | Valeur ancienne | > 20 jours | `STALE_AFTER_DAYS` |
 | Acquisition retenue pour les images | ≥ 30 % des parcelles visibles | `SCENE_MIN_VALID_RATIO` |
 | Palette NDVI (image, légende, parcelles) | rouge → vert, domaine 0 à 0,9 | `NDVI_PALETTE` |
+| Échelle NDRE | palette du NDVI étirée, domaine 0 à 0,8 | `INDEX_SCALES.ndre` |
+| Échelle NDMI | brun → bleu-vert, domaine −0,4 à 0,6 | `INDEX_SCALES.ndmi` |
 
 - **Pas de valeur inventée** : une date nuageuse est conservée avec ses
   pixels valides et marquée non exploitable. Un échec de Copernicus n'écrit
   rien.
-- **Indices stockés** : NDVI, NDRE et NDMI. L'interface n'affiche que le NDVI
-  pour l'instant (décision du 2026-11-10).
+- **Indices** : NDVI, NDRE et NDMI sont stockés et affichables (choix
+  ajouté le 2026-11-11, voir « Choix de l'indice » ci-dessous).
 - **Piège de l'API Statistical** : `sampleCount` compte le rectangle
   englobant. La part valide se rapporte donc à la surface de la parcelle,
   jamais à `sampleCount`.
@@ -66,6 +68,39 @@ Lot Y, réalisé le 2026-11-10 : FR-TWIN-1, FR-TWIN-2 et FR-TWIN-5
    renvoie une estimation (requêtes, PU), puis avec `confirm: true` lance le
    chargement. Il n'y a pas encore de bouton dans l'interface.
 
+## Choix de l'indice (NDVI, NDRE, NDMI)
+
+Ajouté le 2026-11-11. Le NDVI reste l'indice par défaut.
+
+| Indice | Bandes Sentinel-2 | Ce qu'il dit à l'agriculteur |
+|---|---|---|
+| NDVI | B08 / B04 | Couvert vert : quantité de feuillage. Sature quand le couvert est dense. |
+| NDRE | B8A / B05 (red edge) | Chlorophylle : reste sensible quand le NDVI sature ; suit l'état azoté d'un couvert dense. |
+| NDMI | B08 / B11 (infrarouge moyen) | Eau dans les feuilles : baisse quand la culture manque d'eau ou sèche ; négatif sur sol nu ou couvert sec. |
+
+- **Où** :
+  - onglet *Végétation* de la fiche parcelle : courbe, légende et aide de
+    l'indice choisi ;
+  - encadré *Satellite* de la carte et du plan 3D, couche *Par parcelle* :
+    les parcelles prennent la couleur de l'indice choisi.
+- **Ce qui reste au NDVI** :
+  - l'image drapée (seule l'image NDVI est rendue par Copernicus ; une image
+    par indice doublerait les PU et le stockage) ;
+  - les récoltes probables (lot Z), dont les seuils portent sur le NDVI :
+    leurs zones ne sont tracées que sur sa courbe, le bandeau reste affiché ;
+  - la végétation du plan 3D (lot AA).
+- **Mémorisation** : l'indice choisi est dans l'URL (`?idx=ndre`), partagé
+  par la carte, le plan 3D et la fiche, comme la couche satellite (`?sat=`).
+- **Domaines** : fixés d'après les valeurs mesurées chez Pierre en 2025-2026
+  (p2 à p98) : NDVI 0,14 à 0,87, NDRE 0,09 à 0,71, NDMI −0,31 à 0,44. Axe
+  des courbes au pas de 0,2 (NDMI de −0,4 à 0,6).
+- **Ferme de Pierre, maïs 2026** : NDMI vers −0,1 au printemps (sol nu),
+  0,4 à 0,45 fin juin et début juillet, sous 0 dès la mi-août (maïs qui
+  sèche), −0,35 en octobre.
+- **Vérification visuelle** faite le 2026-11-11 sur la ferme de Pierre
+  (onglet Végétation pour les trois indices, carte en NDMI par parcelle) :
+  aucune erreur de console.
+
 ## Coût mesuré (ferme de Pierre, 11 parcelles, 37 ha)
 
 - **Activation** : historique du 1er janvier 2025 au 10 novembre 2026.
@@ -85,14 +120,14 @@ Lot Y, réalisé le 2026-11-10 : FR-TWIN-1, FR-TWIN-2 et FR-TWIN-5
 |---|---|
 | `packages/sentinel` | Client CDSE : jeton OAuth en cache, catalogue, Statistical et Process API, réessais sur 401, 429 et 5xx, plafond de PU par minute, budget avant chaque requête. Evalscripts versionnés |
 | `packages/domain/src/remote-sensing.ts` | Zone UTM, lissage de Whittaker (Cholesky en bande), référence multi-annuelle, statut d'une parcelle, taille d'image |
-| `packages/contracts/src/remote-sensing.ts` | Types, seuils, palette, mention Copernicus |
+| `packages/contracts/src/remote-sensing.ts` | Types, seuils, palettes et échelles des indices (`INDEX_SCALES`, `indexColor`), mention Copernicus |
 | `packages/db/migrations/0030_remote_sensing_dismissals.sql` | Signalements écartés (lot Z) |
 | `apps/web/src/features/remote-sensing/CoverLossAlerts.tsx` | Widget du tableau de bord, bandeau, saisie pré-remplie (lot Z) |
 | `packages/db/migrations/0029_remote_sensing.sql` | `satellite_scenes`, `satellite_images`, `parcel_indices`, `parcel_index_cursors`, `remote_sensing_usage` (RLS), synchro `copernicus` toutes les 6 h |
 | `apps/api/src/repos/remote-sensing.ts` | Synchro (curseur par version de parcelle) et lectures |
 | `apps/api/src/routes/remote-sensing.ts` | Routes (§7 de la conception) |
-| `apps/web/src/features/remote-sensing/` | Onglet Végétation (`@mantine/charts`, chargé avec l'onglet), encadré Satellite, légende |
-| `apps/web/src/3d/FarmScene.ts` | `setSatellite` (image drapée), `setParcelStyle` (teinte NDVI) |
+| `apps/web/src/features/remote-sensing/` | Onglet Végétation (`@mantine/charts`, chargé avec l'onglet), encadré Satellite, choix de l'indice (`IndexPicker`, `useVegetationIndex`), légende |
+| `apps/web/src/3d/FarmScene.ts` | `setSatellite` (image drapée), `setParcelStyle` (teinte de l'indice choisi) |
 
 ## Tests
 
@@ -102,9 +137,11 @@ Lot Y, réalisé le 2026-11-10 : FR-TWIN-1, FR-TWIN-2 et FR-TWIN-5
   client (économie de requêtes, parcelle trop petite, géométrie modifiée),
   lectures, image et ETag, isolation entre fermes.
 - `apps/web/test/vegetation.test.tsx` : onglet Végétation (graphique,
-  parcelle trop petite, intégration absente).
+  parcelle trop petite, intégration absente), choix de l'indice (série
+  rechargée, carte par parcelle et URL), échelles et valeurs négatives.
 - **Données de démonstration** (`@fourmy/mocks`) : saison synthétique
-  (aucune image), pour développer sans compte Copernicus.
+  (aucune image), NDRE et NDMI déduits du NDVI, pour développer sans compte
+  Copernicus.
 
 ## Récoltes probables non saisies (lot Z)
 
