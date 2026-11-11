@@ -284,7 +284,8 @@ DoD · US couvertes**.
 
 ## 9. Hors de cette tranche (rappel)
 
-Synchro Lyvre, MCP/Aiffel, système de plugins, élevage N1, PAC, fertilisation,
+Synchro Lyvre, MCP/Aiffel, système de plugins, élevage N1, PAC, fertilisation
+(réalisée depuis, lots AE à AQ : [`fertilisation.md`](fertilisation.md)),
 capteurs, planification, déclaration de récolte, registre de cave, et les
 méthodes du service Python `services/agro`. Points d'entrée prévus en
 architecture §8.

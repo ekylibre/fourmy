@@ -713,6 +713,27 @@ Une fois tout saisi, l'encadré se réduit à une ligne.
 
 Sur la ferme de Pierre, il listera les 11 types de sol, l'analyse de terre, 6 fertilisants (le 14-48 liquide sans type ; Magnolac, trois produits au zinc et Zintrac 850 sans composition), les 11 plans et 8 broyages de cannes.
 
+### 5.13 Recette dans Chrome et corrections (2026-11-11)
+
+Essai de chaque écran sur la copie locale de la ferme pilote, avec un compte de recette local supprimé ensuite. Plan et résultats : `claudedocs/recette_fertilisation_chrome.md` (hors suivi). Guide utilisateur : [`fertilisation.md`](fertilisation.md).
+
+**Première série** (`fix/recette-fertilisation`) :
+- **Carte de modulation d'un apport du plan** : la dose maximale de la machine par défaut (400 kg/ha) bornait sans le dire un apport de 643 kg/ha, et la carte sortait à 400 en moyenne. Depuis le plan, les bornes valent maintenant la moitié et une fois et demie de la dose, et un avertissement apparaît si la moyenne s'écarte de plus de 2 % de la dose du plan.
+- **Cahier et CSV** : unités en clair (`kg/ha`, `L/ha`, `t`, `m³`) au lieu des codes (`kilogram/ha`).
+- **Détails du bilan** : nombres avec une virgule décimale (objectif, b, CAU, APL, pesées du colza, date du reliquat).
+- **Analyses de sol** : virgule décimale et CEC affichée.
+
+**Seconde série** (`fix/recette-fertilisation-2`) :
+- **Redites** : le bandeau des obligations ne dit plus que l'obligation. Le bandeau d'analyse annuelle est remplacé par l'étape de l'encadré « À compléter », qui donne la période et, une fois faite, l'analyse retenue. Le suivi de campagne ne répète plus la couverture des sols ni les apports sans composition.
+- **Starter du maïs** : l'azote minéral réalisé du semis à 30 jours après (`context.starter`) remplit l'azote avant 4 feuilles, sauf saisie. Le terme passe alors en « calculé », avec la période. La proposition de fractionnement en tient compte.
+- **Image de la carte de modulation** : un apport du plan avec une date prévue (`on`) propose l'image qui la précède de plus près.
+- **Confirmation** (`useConfirm`, `apps/web/src/components/confirm.tsx`) avant de retirer un justificatif, un couvert, une mesure de pilotage, une analyse de sol ou de produit, ou de supprimer un point d'eau.
+- **Météo des plans** :
+  - Constat : côté serveur, les 11 plans se chargeaient déjà en 0,3 s, même avec un cache périmé. Les 8 s observées dans Chrome venaient d'un premier chargement après redémarrage de l'API.
+  - Garde-fous ajoutés : un seul rafraîchissement du cache par ferme à la fois (`farmDailyWeather`, partagé entre requêtes simultanées), et la pluie lue une fois pour tous les plans d'une liste.
+  - Les plans imprimables s'affichent en 0,7 s.
+- Test de synchronisation « attelages » : l'heure de départ vient de la base (`clock_timestamp()`), pas de Node ; quelques millisecondes d'écart le rendaient instable.
+
 ## 6. Contrats (`@fourmy/contracts`, `fertilization.ts`)
 
 - `FertilizerComposition`, `ArticleFertilizerWrite` : zod, unités explicites.
@@ -809,6 +830,7 @@ Les termes encore **manquants** sont listés (« à compléter ») sur le tablea
 | **AO — Organiques et colza** | Keq de l'annexe 5 dans Xa et l'APL, apports organiques prévus, colza (annexe 2.4) | FR-FERT-10, 11 |
 | **AP — Démarrage** | Liste des saisies qui manquent, avec un lien vers chacune | — |
 | **AQ — Plan d'un couvert exporté** | Plan séparé, dose par défaut du tableau 4, dose d'un bilan reprise par le contrôle | PAR 7 NA |
+| **Recette** | Essais dans Chrome sur la copie locale de la ferme pilote, deux séries de corrections (§5.13) | — |
 | AR — ensuite | Rôle conseiller, mobile, autres régions, bilan d'un couvert calculé par Fourmy | FR-FERT-40 ; NFR-FERT-7 |
 
 ## 11. Tests

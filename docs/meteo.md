@@ -56,6 +56,12 @@ lucide colorées), sans image chargée chez un tiers.
   minute ; une panne est réessayée au tour suivant, une requête refusée marque
   l'intervention « sans données ».
 
+## Météo journalière de la ferme (`daily_weather`)
+
+Cache des journées Open-Meteo au centre de la ferme. Il sert au modèle de croissance ([`modele-croissance.md`](modele-croissance.md)), à la pluie des plans de fumure et à la grille d'efficacité des apports d'azote ([`fertilisation.md`](fertilisation.md)).
+- **Contenu** : températures minimale et maximale, pluie, ETP FAO-56 et, depuis le lot AL (migration 0041), le vent maximal du jour. La dernière année d'archive est rechargée une fois pour obtenir le vent (`with_wind`).
+- **Rafraîchissement** : l'archive est complétée et la prévision rechargée quand elle est périmée. Un seul rafraîchissement à la fois par ferme : les requêtes simultanées (plans imprimés, liste des plans) l'attendent au lieu de le relancer.
+
 ## Conditions de pulvérisation (MET-3)
 
 Widget sur le **tableau de bord** (frise sur aujourd'hui) et, toujours, dans

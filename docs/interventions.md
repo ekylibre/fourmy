@@ -73,7 +73,7 @@ distingue « labour » de « hersage », c'est le **nom**, pas la structure.
 |---|---|---|---|---|
 | `work` — travail | parcelles (≥ 1) | facultatifs (consommables) | — | aucun mouvement obligatoire |
 | `treatment` — traitement | parcelles (≥ 1) | **phytos ≥ 1**, dose par ha ou totale | — | **registre phyto** ; motif facultatif (herbicide, fongicide…) |
-| `fertilization` — fertilisation | parcelles (≥ 1) | **fertilisants ≥ 1** | — | plan de fumure (après la tranche) |
+| `fertilization` — fertilisation | parcelles (≥ 1) | **fertilisants ≥ 1** | — | **contrôle nitrates** (calendrier, plan de fumure, couverts, APLSH, conditions et efficacité de l'apport ; interdiction bloquante sans motif) et **cahier d'enregistrement** : voir [`fertilisation.md`](fertilisation.md) |
 | `sowing` — semis, plantation | parcelles (≥ 1) | **semences / plants ≥ 1** (kg/ha, milliers/ha…) | — | démarre la **production** de la campagne (espèce, variété) |
 | `harvest` — récolte | parcelles (≥ 1) | — | **récolte ≥ 1**, totale ou rendement/ha | **destination obligatoire** (lieu ou cuve) |
 | `maintenance` — entretien | matériel ou bâtiment (≥ 1), relevé de compteur par matériel | pièces, fluides, fournitures (rattachés au matériel) | — | pas de parcelle ; bloc `maintenance` : nature (préventif / curatif, problème exigé en curatif), atelier, opérations du plan réalisées, qui remettent à zéro les échéances (voir [`materiels.md`](materiels.md)) |
