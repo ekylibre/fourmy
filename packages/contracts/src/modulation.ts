@@ -98,6 +98,8 @@ export const prescriptionWrite = zoningRequest.extend({
   widthM: z.number().min(1).max(60),
   /** Doses saisies zone par zone (sinon calculées) : une par zone, de la zone 1 à la dernière. */
   rates: z.array(z.number().min(0).max(10_000_000)).optional(),
+  /** Apport du plan de fumure (lot AN) : la moyenne pondérée des doses est ramenée à targetRate. */
+  planLink: z.object({ planId: z.string().uuid(), stage: z.string().trim().max(120), targetRate: z.number().positive().max(10_000_000) }).optional(),
 });
 export type PrescriptionWrite = z.infer<typeof prescriptionWrite>;
 
@@ -143,6 +145,8 @@ export interface Prescription {
   widthM: number;
   /** Quantité totale à prévoir (unité de la dose × ha : kg, L ou grains). */
   totalQuantity: number;
+  /** Apport du plan de fumure dont la carte est partie, et dose visée (moyenne pondérée). */
+  plan: { planId: string; stage: string | null; targetRate: number } | null;
   createdAt: string;
   zones: PrescriptionZone[];
   sends: PrescriptionSend[];

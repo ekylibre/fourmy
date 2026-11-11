@@ -142,3 +142,40 @@ export function modulationRates(p: {
 
 /** Quantité totale (kg, L ou grains) : dose × surface. */
 export const prescriptionTotal = (zones: { rate: number; areaM2: number }[]) => zones.reduce((s, z) => s + (z.rate * z.areaM2) / 10_000, 0);
+
+/**
+ * Doses d'une carte dont la moyenne pondérée par la surface des zones égale
+ * une dose cible, celle d'un apport du plan de fumure (lot AN, FR-FERT-18).
+ * Les doses de la stratégie sont décalées d'une même quantité (cherchée par
+ * dichotomie), bornées par les doses minimale et maximale, puis arrondies au
+ * pas de l'unité ; la moyenne obtenue est rendue avec l'écart dû aux bornes
+ * et aux arrondis.
+ */
+export function conserveMean(
+  rates: number[],
+  areasM2: number[],
+  target: number,
+  bounds: { minRate: number; maxRate: number; unit: PrescriptionUnit },
+): { rates: number[]; mean: number } {
+  const step = PRESCRIPTION_UNIT_STEP[bounds.unit];
+  const total = areasM2.reduce((s, a) => s + a, 0);
+  const clamp = (v: number) => Math.min(bounds.maxRate, Math.max(bounds.minRate, v));
+  const meanOf = (rs: number[]) => (total > 0 ? rs.reduce((s, r, k) => s + r * (areasM2[k] ?? 0), 0) / total : 0);
+  if (!(total > 0) || !rates.length) return { rates: rates.map(() => clamp(target)), mean: clamp(target) };
+  let lo = bounds.minRate - Math.max(...rates);
+  let hi = bounds.maxRate - Math.min(...rates);
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    if (meanOf(rates.map((r) => clamp(r + mid))) < target) lo = mid;
+    else hi = mid;
+  }
+  const shifted = rates.map((r) => clamp(r + (lo + hi) / 2));
+  let rounded = shifted.map((r) => clamp(Math.round(r / step) * step));
+  // Arrondi : on corrige la plus grande zone d'un pas si cela rapproche la moyenne de la cible.
+  const biggest = areasM2.indexOf(Math.max(...areasM2));
+  for (const delta of [step, -step]) {
+    const trial = rounded.map((r, k) => (k === biggest ? clamp(r + delta) : r));
+    if (Math.abs(meanOf(trial) - target) < Math.abs(meanOf(rounded) - target)) rounded = trial;
+  }
+  return { rates: rounded, mean: Math.round(meanOf(rounded) * 10) / 10 };
+}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
-import { Alert, Anchor, Button, Group, NumberInput, Paper, SegmentedControl, Select, SimpleGrid, Stack, Table, Text, TextInput, Title } from "@mantine/core";
+import { Alert, Anchor, Button, Checkbox, Group, NumberInput, Paper, SegmentedControl, Select, SimpleGrid, Stack, Table, Text, TextInput, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -15,7 +15,7 @@ import {
   type VegetationIndex,
   type Zoning,
 } from "@fourmy/contracts";
-import { modulationRates, prescriptionTotal } from "@fourmy/domain";
+import { conserveMean, modulationRates, prescriptionTotal } from "@fourmy/domain";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { formatDate } from "../../app/labels";
@@ -53,11 +53,17 @@ export function PrescriptionNewPage() {
   const dates = useModulationDates(farm.id, parcelId, index);
   const [zoning, setZoning] = useState<Zoning | null>(null);
 
-  const [name, setName] = useState("");
-  const [product, setProduct] = useState("");
-  const [unit, setUnit] = useState<PrescriptionUnit>("kg_ha");
+  // Carte partie d'un apport du plan de fumure (lot AN) : dose visée en moyenne pondérée.
+  const fromPlan = useMemo(
+    () => (params.get("plan") && Number(params.get("rate")) > 0 ? { planId: params.get("plan")!, stage: params.get("stage") ?? "", targetRate: Number(params.get("rate")) } : null),
+    [params],
+  );
+  const [keepMean, setKeepMean] = useState(!!fromPlan);
+  const [name, setName] = useState(fromPlan ? `Azote ${fromPlan.stage}`.trim() : "");
+  const [product, setProduct] = useState(params.get("product") ?? "");
+  const [unit, setUnit] = useState<PrescriptionUnit>((params.get("unit") as PrescriptionUnit | null) ?? "kg_ha");
   const [strategy, setStrategy] = useState<ModulationStrategy>("compensate");
-  const [baseRate, setBaseRate] = useState<number>(DEFAULTS.kg_ha.base);
+  const [baseRate, setBaseRate] = useState<number>(fromPlan?.targetRate ?? DEFAULTS.kg_ha.base);
   const [modulationPct, setModulationPct] = useState<number>(20);
   const [minRate, setMinRate] = useState<number>(DEFAULTS.kg_ha.min);
   const [maxRate, setMaxRate] = useState<number>(DEFAULTS.kg_ha.max);
@@ -84,7 +90,12 @@ export function PrescriptionNewPage() {
     () => modulationRates({ zoneCount, strategy, baseRate: baseRate || 0, modulationPct: modulationPct || 0, minRate: minRate || 0, maxRate: maxRate || 0, unit }),
     [zoneCount, strategy, baseRate, modulationPct, minRate, maxRate, unit],
   );
-  const rates = computed.map((r, k) => edited[k] ?? r);
+  const conserved = useMemo(() => {
+    if (!fromPlan || !keepMean || !zoning) return null;
+    const areas = computed.map((_, k) => zoning.zones.find((z) => z.code === k + 1)?.areaM2 ?? 0);
+    return conserveMean(computed, areas, fromPlan.targetRate, { minRate: minRate || 0, maxRate: maxRate || 0, unit });
+  }, [fromPlan, keepMean, zoning, computed, minRate, maxRate, unit]);
+  const rates = (conserved?.rates ?? computed).map((r, k) => edited[k] ?? r);
   const zones = (zoning?.zones ?? []).map((z) => ({ ...z, rate: rates[z.code - 1] ?? 0 }));
   const total = prescriptionTotal(zones);
   const area = zones.reduce((s, z) => s + z.areaM2, 0);
@@ -95,6 +106,7 @@ export function PrescriptionNewPage() {
       api.post<Prescription>(farmPath(farm.id, "/prescriptions"), {
         parcelId, date, index, zoneCount, name, product, unit, strategy, baseRate, modulationPct, minRate, maxRate, widthM,
         rates: edited.some((e) => e !== null) ? rates : undefined,
+        ...(fromPlan && keepMean ? { planLink: fromPlan } : {}),
       }),
     onSuccess: (p) => {
       void queryClient.invalidateQueries({ queryKey: ["prescriptions", farm.id] });
@@ -115,6 +127,20 @@ export function PrescriptionNewPage() {
           ← Cartes de modulation
         </Anchor>
         <Title order={1}>Nouvelle carte de modulation</Title>
+        {fromPlan && (
+          <Alert color="lichen" variant="light" mt="xs" aria-label="Apport du plan de fumure">
+            <Stack gap={4}>
+              <Text size="sm">
+                Carte partie de l'apport « {fromPlan.stage || "sans stade"} » du plan de fumure : {qty(fromPlan.targetRate)} {PRESCRIPTION_UNIT_LABELS[unit]} de {product || "produit"}.
+              </Text>
+              <Checkbox
+                label="Garder la dose du plan en moyenne pondérée sur la parcelle (les doses des zones sont décalées d'autant)"
+                checked={keepMean}
+                onChange={(e) => setKeepMean(e.currentTarget.checked)}
+              />
+            </Stack>
+          </Alert>
+        )}
         <Text size="sm" c="dimmed">
           Zones de la parcelle d'après une image Sentinel-2 (10 m), dose par zone, puis export pour la console du tracteur.
         </Text>

@@ -319,7 +319,16 @@ export function PlanPage() {
 
       <ExternalDose farmId={farm.id} planId={planId} owner={owner} draft={draft} fourmyDose={r.dose} onChange={(external) => update({ external })} />
 
-      <Applications farmId={farm.id} owner={owner} dose={dose} applications={applications} proposed={!draft.applications?.length} onChange={(apps) => update({ applications: apps })} />
+      <Applications
+        farmId={farm.id}
+        owner={owner}
+        dose={dose}
+        applications={applications}
+        proposed={!draft.applications?.length}
+        onChange={(apps) => update({ applications: apps })}
+        modulate={{ planId, parcelId: p.parcel.id }}
+        prescriptions={p.prescriptions ?? []}
+      />
 
       {p.currentVersion && (
         <Steering
@@ -538,13 +547,46 @@ function ExternalDose({ farmId, planId, owner, draft, fourmyDose, onChange }: { 
   );
 }
 
-function Applications({ farmId, owner, dose, applications, proposed, onChange }: { farmId: string; owner: boolean; dose: number | null; applications: PlannedApplication[]; proposed: boolean; onChange: (a: PlannedApplication[]) => void }) {
+function Applications({
+  farmId,
+  owner,
+  dose,
+  applications,
+  proposed,
+  onChange,
+  modulate,
+  prescriptions,
+}: {
+  farmId: string;
+  owner: boolean;
+  dose: number | null;
+  applications: PlannedApplication[];
+  proposed: boolean;
+  onChange: (a: PlannedApplication[]) => void;
+  modulate: { planId: string; parcelId: string };
+  prescriptions: FertilizationPlan["prescriptions"];
+}) {
   const fertilizers = useFertilizers(farmId);
   const options = [...(fertilizers.data?.values() ?? [])].filter((f) => (f.composition ?? f.proposal)?.nTotal).map((f) => ({ value: f.id, label: f.name }));
   const [apps, setApps] = useState(applications);
   useEffect(() => setApps(applications), [applications]);
   const sum = apps.reduce((s, a) => s + a.nKgHa, 0);
   const set = (k: number, patch: Partial<PlannedApplication>) => setApps(apps.map((a, j) => (j === k ? { ...a, ...patch } : a)));
+  /** Dose de produit de l'apport, dans une unité de carte de modulation (kg/ha ou L/ha). */
+  const productRate = (a: PlannedApplication): { rate: number; unit: "kg_ha" | "l_ha"; name: string } | null => {
+    const f = a.articleId ? fertilizers.data?.get(a.articleId) : undefined;
+    const c = f?.composition ?? f?.proposal;
+    if (!f || !c || !c.nTotal || !(a.nKgHa > 0)) return null;
+    if (c.basis === "mass_percent") return { rate: Math.round((a.nKgHa * 100) / c.nTotal), unit: "kg_ha", name: f.name };
+    if (c.basis === "kg_per_m3") return { rate: Math.round((a.nKgHa / c.nTotal) * 1000), unit: "l_ha", name: f.name };
+    return { rate: Math.round((a.nKgHa / c.nTotal) * 1000), unit: "kg_ha", name: f.name };
+  };
+  const modulateLink = (a: PlannedApplication) => {
+    const r = productRate(a);
+    if (!r) return null;
+    const q = new URLSearchParams({ parcel: modulate.parcelId, plan: modulate.planId, stage: a.stage, product: r.name, rate: String(r.rate), unit: r.unit });
+    return `/f/${farmId}/prescriptions/new?${q}`;
+  };
   const productDose = (a: PlannedApplication) => {
     const f = a.articleId ? fertilizers.data?.get(a.articleId) : undefined;
     const c = f?.composition ?? f?.proposal;
@@ -598,15 +640,35 @@ function Applications({ farmId, owner, dose, applications, proposed, onChange }:
               <Table.Td className="lv-num">{productDose(a) ?? "—"}</Table.Td>
               <Table.Td>
                 {owner && (
-                  <ActionIcon variant="subtle" color="brique" aria-label="Retirer l'apport" onClick={() => setApps(apps.filter((_, j) => j !== k))}>
-                    <Trash2 size={14} />
-                  </ActionIcon>
+                  <Group gap={2} wrap="nowrap">
+                    {modulateLink(a) && (
+                      <Button size="compact-xs" variant="subtle" component={Link} to={modulateLink(a)!} aria-label={`Moduler l'apport ${a.stage}`}>
+                        Moduler
+                      </Button>
+                    )}
+                    <ActionIcon variant="subtle" color="brique" aria-label="Retirer l'apport" onClick={() => setApps(apps.filter((_, j) => j !== k))}>
+                      <Trash2 size={14} />
+                    </ActionIcon>
+                  </Group>
                 )}
               </Table.Td>
             </Table.Tr>
           ))}
         </Table.Tbody>
       </Table>
+      {prescriptions.length > 0 && (
+        <Stack gap={2} mt="xs" aria-label="Cartes de modulation du plan">
+          {prescriptions.map((m) => (
+            <Text key={m.id} size="sm">
+              Carte{" "}
+              <Anchor component={Link} to={`/f/${farmId}/prescriptions/${m.id}`}>
+                {m.name}
+              </Anchor>{" "}
+              ({m.stage ?? "apport"}, {m.product}) : moyenne {fmt(m.meanRate)} {m.unit === "l_ha" ? "L/ha" : "kg/ha"} pour {fmt(m.targetRate)} prévus.
+            </Text>
+          ))}
+        </Stack>
+      )}
       {owner && (
         <Group mt="xs">
           <Button size="xs" variant="subtle" leftSection={<Plus size={14} />} onClick={() => setApps([...apps, { stage: "", plannedOn: null, articleId: null, nKgHa: 0, reservedForSteering: false }])}>

@@ -179,6 +179,31 @@ describe.skipIf(!url)("cartes de modulation et agrirouter (intégration)", () =>
     expect(list.items[0]).toMatchObject({ name: "Azote 3e apport", parcelName: "Grand Champ", lastSentAt: null });
   });
 
+  it("carte partie d'un apport du plan de fumure : moyenne pondérée ramenée à la dose de l'apport (lot AN)", async () => {
+    const plan = crypto.randomUUID();
+    await sql`INSERT INTO fertilization_plans (id, farm_id, campaign, land_parcel_id) VALUES (${plan}, ${farmId}, 2026, ${parcel})`;
+    const body = {
+      parcelId: parcel, date: "2026-06-10", index: "ndvi", zoneCount: 3, name: "Azote du plan", product: "Ammonitrate 33,5",
+      unit: "kg_ha", strategy: "compensate", baseRate: 150, modulationPct: 20, minRate: 50, maxRate: 300, widthM: 24,
+      planLink: { planId: plan, stage: "6 feuilles", targetRate: 150 },
+    };
+    const res = await app.request(`${base()}/prescriptions`, { method: "POST", headers, body: JSON.stringify(body) });
+    expect(res.status).toBe(201);
+    const p = (await res.json()) as Prescription;
+    expect(p.plan).toEqual({ planId: plan, stage: "6 feuilles", targetRate: 150 });
+    const area = p.zones.reduce((s, z) => s + z.areaM2, 0);
+    const mean = p.zones.reduce((s, z) => s + z.rate * z.areaM2, 0) / area;
+    expect(Math.abs(mean - 150)).toBeLessThanOrEqual(1);
+    // L'écart entre zones voulu par la stratégie est gardé : 60 kg entre la zone faible et la forte.
+    expect(p.zones[0]!.rate - p.zones[2]!.rate).toBe(60);
+    const other = crypto.randomUUID();
+    await sql`INSERT INTO land_parcels (id, farm_id, name) VALUES (${other}, ${farmId}, 'Autre')`;
+    await sql`INSERT INTO fertilization_plans (id, farm_id, campaign, land_parcel_id) VALUES (${crypto.randomUUID()}, ${farmId}, 2026, ${other})`;
+    const [o] = await sql`SELECT id FROM fertilization_plans WHERE land_parcel_id = ${other}`;
+    expect((await app.request(`${base()}/prescriptions`, { method: "POST", headers, body: JSON.stringify({ ...body, planLink: { ...body.planLink, planId: o!.id } }) })).status).toBe(400);
+    await app.request(`${base()}/prescriptions/${p.id}`, { method: "DELETE", headers });
+  });
+
   it("exporte l'ISO-XML (grille de type 1) et le Shapefile", async () => {
     const iso = await app.request(`${base()}/prescriptions/${prescription.id}/files/isoxml`, { headers: worker.headers });
     expect(iso.status).toBe(200);

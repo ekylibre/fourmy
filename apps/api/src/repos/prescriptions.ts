@@ -15,7 +15,7 @@ import {
   type Zoning,
   type ZoningRequest,
 } from "@fourmy/contracts";
-import { classifyZones, isUsable, modulationRates, prescriptionTotal, utmEpsg } from "@fourmy/domain";
+import { classifyZones, conserveMean, isUsable, modulationRates, prescriptionTotal, utmEpsg } from "@fourmy/domain";
 import { INDEX_RASTER_METHOD, type Bbox, type PolygonGeometry } from "@fourmy/sentinel";
 import { shapefile, taskData, zip } from "@fourmy/isoxml";
 import { agrirouterClient, agrirouterRecipients, connectedAgrirouter, MESSAGE_TYPE_OF } from "../integrations/agrirouter.js";
@@ -245,6 +245,9 @@ interface PrescriptionRow {
   created_at: string | Date;
   total: number;
   last_sent_at: string | Date | null;
+  fertilization_plan_id: string | null;
+  plan_stage: string | null;
+  target_rate: number | null;
 }
 
 const iso = (v: string | Date) => new Date(v).toISOString();
@@ -268,6 +271,7 @@ function summary(r: PrescriptionRow): PrescriptionSummary {
     maxRate: r.max_rate,
     widthM: r.width_m,
     totalQuantity: Math.round(r.total * 10) / 10,
+    plan: r.fertilization_plan_id && r.target_rate ? { planId: r.fertilization_plan_id, stage: r.plan_stage, targetRate: r.target_rate } : null,
     createdAt: iso(r.created_at),
     lastSentAt: r.last_sent_at ? iso(r.last_sent_at) : null,
   };
@@ -277,7 +281,7 @@ const SELECT = sql`
   SELECT p.id, p.name, p.land_parcel_id, lp.name AS parcel_name,
          (SELECT coalesce(sum(z.area_m2), 0) FROM prescription_zones z WHERE z.prescription_id = p.id) AS parcel_area_m2,
          p.acquired_on::text, p.vegetation_index, p.zone_count, p.product, p.unit, p.strategy, p.base_rate, p.modulation_pct,
-         p.min_rate, p.max_rate, p.width_m, p.created_at,
+         p.min_rate, p.max_rate, p.width_m, p.created_at, p.fertilization_plan_id, p.plan_stage, p.target_rate,
          (SELECT coalesce(sum(z.rate * z.area_m2 / 10000), 0) FROM prescription_zones z WHERE z.prescription_id = p.id) AS total,
          (SELECT max(s.sent_at) FROM prescription_sends s WHERE s.prescription_id = p.id AND s.status = 'sent') AS last_sent_at
   FROM prescriptions p JOIN land_parcels lp ON lp.id = p.land_parcel_id`;
@@ -316,26 +320,38 @@ function checkRates(w: { minRate: number; maxRate: number }) {
   if (w.maxRate < w.minRate) throw new BadRequest("Dose maximale inférieure à la dose minimale.");
 }
 
-/** Doses d'une carte : saisies (une par code de zone, de 1 à n), sinon calculées par la stratégie. */
-function ratesFor(w: PrescriptionWrite): number[] {
+/**
+ * Doses d'une carte : saisies (une par code de zone, de 1 à n), sinon
+ * calculées par la stratégie ; partie d'un apport du plan, leur moyenne
+ * pondérée par la surface des zones est ramenée à la dose de l'apport.
+ */
+function ratesFor(w: PrescriptionWrite, zones: { code: number; areaM2: number }[]): number[] {
   if (w.rates) {
     if (w.rates.length !== w.zoneCount) throw new BadRequest(`Une dose par zone attendue (${w.zoneCount}).`);
     return w.rates;
   }
-  return modulationRates(w);
+  const rates = modulationRates(w);
+  if (!w.planLink) return rates;
+  const areas = rates.map((_, k) => zones.find((z) => z.code === k + 1)?.areaM2 ?? 0);
+  return conserveMean(rates, areas, w.planLink.targetRate, w).rates;
 }
 
 export async function createPrescription(db: Database, farmId: string, userId: string, w: PrescriptionWrite): Promise<Prescription> {
   checkRates(w);
   const z = await zoning(db, farmId, w);
-  const rates = ratesFor(w);
+  const rates = ratesFor(w, z.zones);
+  if (w.planLink) {
+    const [plan] = await withFarm(db, farmId, (tx) => rows(tx, sql`SELECT id FROM fertilization_plans WHERE id = ${w.planLink!.planId} AND land_parcel_id = ${w.parcelId}`));
+    if (!plan) throw new BadRequest("Plan de fumure introuvable pour cette parcelle.");
+  }
   const id = crypto.randomUUID();
   await withFarm(db, farmId, async (tx) => {
     await tx.execute(sql`
       INSERT INTO prescriptions (id, farm_id, land_parcel_id, name, acquired_on, vegetation_index, zone_count, product, unit, strategy,
-                                 base_rate, modulation_pct, min_rate, max_rate, width_m, created_by)
+                                 base_rate, modulation_pct, min_rate, max_rate, width_m, created_by, fertilization_plan_id, plan_stage, target_rate)
       VALUES (${id}, ${farmId}, ${w.parcelId}, ${w.name}, ${w.date}::date, ${w.index}, ${w.zoneCount}, ${w.product}, ${w.unit}, ${w.strategy},
-              ${w.baseRate}, ${w.modulationPct}, ${w.minRate}, ${w.maxRate}, ${w.widthM}, ${userId})`);
+              ${w.baseRate}, ${w.modulationPct}, ${w.minRate}, ${w.maxRate}, ${w.widthM}, ${userId},
+              ${w.planLink?.planId ?? null}, ${w.planLink?.stage ?? null}, ${w.planLink?.targetRate ?? null})`);
     for (const zone of z.zones) {
       await tx.execute(sql`
         INSERT INTO prescription_zones (prescription_id, farm_id, code, mean_index, min_index, max_index, area_m2, rate, shape)
