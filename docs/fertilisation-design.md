@@ -692,6 +692,25 @@ Six étapes, chacune avec sa raison et un lien vers chaque saisie :
 
 Une fois tout saisi, l'encadré se réduit à une ligne.
 
+### 5.12 Réalisation du lot AQ : plan d'un couvert exporté (2026-11-11)
+
+**Texte** : guide du PAR 7 NA, page 15 : « les îlots culturaux où un couvert d'interculture exporté est implanté font l'objet de 2 plans de fumure séparés ». Les apports sur le couvert restent consignés au cahier de la culture principale.
+
+**Plan** : `fertilization_plans.kind = 'cover_exported'`, sans migration (le type était prévu depuis le lot AG).
+- « Préparer les plans » crée un plan pour chaque couvert semé et exporté de la campagne.
+- La fiche ne montre ni bilan détaillé, ni couvert, ni pilotage. Elle montre le couvert, la dose, la dose d'un outil ou d'un conseiller, les produits organiques de la période du couvert, les apports prévus, l'établissement et les versions.
+
+**Dose** (`exportedCoverDefault`) :
+- Par défaut, le plafond du tableau 4 :
+  - 70 kg d'azote efficace, en cumulant organiques et minéraux ;
+  - en ZAR : 30 kg (interculture courte), 50 kg (exporté avant la fin de l'année) ou 70 kg ;
+  - 50 kg en zone ouest avant une culture d'automne.
+- L'annexe 4.3 prévoit un bilan « de type céréales à paille » (b = 2 kg N/q, au prorata des espèces non fixatrices) ou « de type prairie ». Fourmy ne le calcule pas : l'objectif de rendement d'un couvert n'est pas défini assez précisément. Ce bilan se saisit comme dose d'un outil ou d'un conseiller.
+
+**Contrôle d'un apport** : une fois le plan du couvert établi, sa dose remplace le plafond par défaut.
+- Organiques et minéraux cumulés, hors ZAR : jusqu'à 100 kg pour un couvert exporté l'année suivante.
+- En ZAR, ou pour les seuls organiques : jamais au-delà du plafond du tableau.
+
 Sur la ferme de Pierre, il listera les 11 types de sol, l'analyse de terre, 6 fertilisants (le 14-48 liquide sans type ; Magnolac, trois produits au zinc et Zintrac 850 sans composition), les 11 plans et 8 broyages de cannes.
 
 ## 6. Contrats (`@fourmy/contracts`, `fertilization.ts`)
@@ -789,7 +808,8 @@ Les termes encore **manquants** sont listés (« à compléter ») sur le tablea
 | **AN — Modulation d'un apport du plan** | Carte partie d'un apport, moyenne pondérée conservée, liens entre plan et cartes | FR-FERT-18 |
 | **AO — Organiques et colza** | Keq de l'annexe 5 dans Xa et l'APL, apports organiques prévus, colza (annexe 2.4) | FR-FERT-10, 11 |
 | **AP — Démarrage** | Liste des saisies qui manquent, avec un lien vers chacune | — |
-| AQ — ensuite | Plan de fumure d'un couvert exporté, rôle conseiller, mobile, autres régions | FR-FERT-35, 40 ; NFR-FERT-7 |
+| **AQ — Plan d'un couvert exporté** | Plan séparé, dose par défaut du tableau 4, dose d'un bilan reprise par le contrôle | PAR 7 NA |
+| AR — ensuite | Rôle conseiller, mobile, autres régions, bilan d'un couvert calculé par Fourmy | FR-FERT-40 ; NFR-FERT-7 |
 
 ## 11. Tests
 

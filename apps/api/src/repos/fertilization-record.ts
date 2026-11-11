@@ -247,6 +247,8 @@ interface CoverAt {
   harvest: string | null;
   /** Culture principale qui suit le couvert, si elle est saisie. */
   nextCrop: CropGroup | null;
+  /** Dose du plan établi du couvert exporté (lot AQ), s'il existe. */
+  planDose: number | null;
 }
 
 /**
@@ -266,6 +268,7 @@ async function coverAt(tx: Tx, parcelId: string, day: string, before: string, st
     harvest: string | null;
     reference: string | null;
     cultivation: string | null;
+    plan_dose: string | null;
   }>(
     tx,
     sql`WITH cur AS (SELECT shape FROM land_parcel_versions WHERE land_parcel_id = ${parcelId} AND valid @> ${day}::timestamptz LIMIT 1)
@@ -274,7 +277,10 @@ async function coverAt(tx: Tx, parcelId: string, day: string, before: string, st
                 JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_id = ${parcelId}
                 WHERE i.status = 'done' AND i.procedure = ANY(${arr(HARVEST)}::text[])
                   AND i.started_at <= ${before}::timestamptz AND i.started_at > ${before}::timestamptz - interval '1 year') AS harvest,
-               nx.reference, nx.cultivation
+               nx.reference, nx.cultivation,
+               (SELECT v.dose_efficient FROM fertilization_plans fp
+                JOIN fertilization_plan_versions v ON v.plan_id = fp.id AND v.version = fp.current_version
+                WHERE fp.land_parcel_id = cc.land_parcel_id AND fp.campaign = cc.campaign AND fp.kind = 'cover_exported') AS plan_dose
         FROM cover_crops cc
         JOIN land_parcel_versions v ON v.land_parcel_id = cc.land_parcel_id
         LEFT JOIN LATERAL (
@@ -297,6 +303,7 @@ async function coverAt(tx: Tx, parcelId: string, day: string, before: string, st
     destroyedOn: c.destroyed_on,
     harvest: c.harvest,
     nextCrop: c.reference || c.cultivation ? cropGroupOf({ reference: c.reference, cultivation: c.cultivation }) : null,
+    planDose: c.plan_dose !== null ? Number(c.plan_dose) : null,
   };
 }
 
@@ -353,7 +360,18 @@ async function coverSpreadingCheck(
     const r = coverSpreading({ ...base, type: c.composition.nitrateType });
     // Avant le couvert (sur chaume), l'interdiction est probable mais Fourmy ne sait pas si l'apport vise le couvert : orange.
     if (!r.allowed) out.push({ code: "fert_cover", level: day < addDays(cover.sownOn, -15) ? "warning" : "danger", message: `${c.product} : ${r.reason}` });
-    else ceilings.set(`${r.ceiling}|${r.cumulates}`, r);
+    else {
+      // Plan établi du couvert exporté (lot AQ) : sa dose remplace la valeur par défaut (100 kg au plus exporté l'an suivant, hors ZAR).
+      let ceiling = r.ceiling;
+      let label = r.label;
+      if (cover.planDose !== null && cover.exported) {
+        const nextYear = !(cover.destroyedOn && cover.destroyedOn.slice(0, 4) === cover.sownOn.slice(0, 4));
+        ceiling =
+          r.cumulates === "all" && !base.zar ? Math.min(cover.planDose, nextYear && interculture === "long" ? 100 : cover.planDose) : Math.min(r.ceiling, cover.planDose);
+        label = `plan du couvert : ${cover.planDose} kg d'azote efficace`;
+      }
+      ceilings.set(`${ceiling}|${r.cumulates}`, { ceiling, cumulates: r.cumulates, label });
+    }
   }
   if (!ceilings.size) return out;
   const from = addDays(cover.sownOn, -15);

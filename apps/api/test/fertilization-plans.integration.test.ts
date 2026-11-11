@@ -478,4 +478,39 @@ describe.skipIf(!url)("plans de fumure (intégration)", () => {
     expect(p.result.dose).toBe(142);
     expect(p.result.terms.M).toMatchObject({ value: 20, detail: "Mh + Mr forfaitaires, sol ≤ 80 cm" });
   });
+
+  it("couvert exporté : plan séparé, dose par défaut du tableau 4, puis dose d'un bilan établie (lot AQ)", async () => {
+    // Couvert exporté (seigle) du test AM : semé le 18/10/2025, récolté le 20/04/2026, avant le maïs 2026.
+    // « Préparer les plans » crée aussi le plan du couvert (déjà appelé par le test du colza).
+    await app.request(`${base()}/fertilization/plans/prepare?campaign=2026`, { method: "POST", headers });
+    const [n] = await sql`SELECT count(*)::int AS n FROM fertilization_plans WHERE land_parcel_id = ${p2026} AND campaign = 2026 AND kind = 'cover_exported'`;
+    expect(n!.n).toBe(1);
+    const list = (await (await app.request(`${base()}/fertilization/plans?campaign=2026`, { headers })).json()) as { items: FertilizationPlanSummary[] };
+    const summary = list.items.find((x) => x.kind === "cover_exported")!;
+    expect(summary).toMatchObject({ parcel: { id: p2026 }, cropLabel: "Couvert exporté : Seigle", dose: 70, doseOrigin: "fourmy", missing: 0 });
+    const get = async () => (await (await app.request(`${base()}/fertilization/plans/${summary.id}`, { headers })).json()) as FertilizationPlan;
+    const cp = await get();
+    expect(cp).toMatchObject({ kind: "cover_exported", proposedApplications: [], result: { dose: 70, ceiling: 100, annex: "PAR 7 NA, tableau 4" } });
+    expect(cp.result.warnings[0]).toMatch(/100 kg au plus/);
+    // Dose d'un bilan (conseiller) : 90 kg, établie.
+    await app.request(`${base()}/fertilization/plans/${summary.id}/draft`, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({ external: { doseKgNHa: 90, tool: "Bilan type céréales (b = 2)", advisor: "Chambre", computedOn: "2025-10-10" }, applications: [{ stage: "Semis", nKgHa: 90 }] }),
+    });
+    expect((await app.request(`${base()}/fertilization/plans/${summary.id}/establish`, { method: "POST", headers, body: JSON.stringify({ reason: null }) })).status).toBe(200);
+    // Contrôle d'un apport sur le couvert : le plafond devient la dose du plan.
+    const check = async (quantity: number) =>
+      (
+        (await (
+          await app.request(`${base()}/fertilization/check`, {
+            method: "POST",
+            headers: worker.headers,
+            body: JSON.stringify({ startedAt: "2025-11-05T09:00:00+01:00", parcelIds: [p2025], inputs: [{ articleId: urea, quantity, per: "hectare" }] }),
+          })
+        ).json()) as FertilizationCheck
+      ).indicators.filter((i) => i.code === "fert_cover");
+    expect((await check(180))[0]).toMatchObject({ level: "ok", message: expect.stringContaining("plan du couvert : 90 kg") });
+    expect((await check(220))[0]).toMatchObject({ level: "warning", message: expect.stringContaining("au-delà du plafond de 90 kg") });
+  });
 });

@@ -22,6 +22,7 @@ import {
   nitrogenOfInput,
   splitDose,
   steeringAllowance,
+  exportedCoverDefault,
   keqOf,
   keqTotal,
   type KeqApplication,
@@ -80,6 +81,7 @@ export const cropLabel = (g: CropGroup) => CROP_LABELS[g] ?? g;
 
 interface PlanRow {
   id: string;
+  kind: "main" | "cover_exported";
   campaign: number;
   land_parcel_id: string;
   parcel_name: string;
@@ -93,7 +95,7 @@ interface PlanRow {
 }
 
 const PLAN_SELECT = sql`
-  SELECT p.id, p.campaign, p.land_parcel_id, lp.name AS parcel_name, p.status, p.current_version, p.draft,
+  SELECT p.id, p.kind, p.campaign, p.land_parcel_id, lp.name AS parcel_name, p.status, p.current_version, p.draft,
          (SELECT v.area_m2 FROM land_parcel_versions v WHERE v.land_parcel_id = lp.id
           ORDER BY (v.valid @> make_date(p.campaign, 6, 1)::timestamptz) DESC, upper(v.valid) DESC NULLS FIRST LIMIT 1) AS area_m2,
          a.reference, coalesce(pr.cultivation, a.cultivation) AS cultivation, pr.species
@@ -422,9 +424,53 @@ async function plansData(db: Database, farmId: string, where: ReturnType<typeof 
   const out = [];
   for (const p of list) {
     const { context, input } = await contextOf(db, farmId, p, fertilizers, fetchImpl);
-    out.push({ row: p, context, result: resultOf(input, context) });
+    out.push(p.kind === "cover_exported" ? { row: p, ...(await coverPlanOf(db, farmId, p, context)) } : { row: p, context, result: resultOf(input, context) });
   }
   return out;
+}
+
+/**
+ * Plan d'un couvert d'interculture exporté (lot AQ) : le guide du PAR 7 NA
+ * demande deux plans séparés sur l'îlot. Dose : celle d'un bilan (outil ou
+ * conseiller, saisie comme dose externe), sinon le plafond du tableau 4.
+ */
+async function coverPlanOf(db: Database, farmId: string, row: PlanRow, main: PlanContext): Promise<{ context: PlanContext; result: PlanResult }> {
+  const { cover, zones, nextCrop } = await withFarm(db, farmId, async (tx) => {
+    const c = (await coversInTx(tx, [row.land_parcel_id], row.campaign)).get(row.land_parcel_id) ?? null;
+    const [z] = await rows<{ zones: string[] | null }>(tx, sql`SELECT zones FROM parcel_nitrate_zones WHERE land_parcel_id = ${row.land_parcel_id}`);
+    const [n] = await rows<{ reference: string | null; cultivation: string | null }>(
+      tx,
+      sql`SELECT a.reference, coalesce(pr.cultivation, a.cultivation) AS cultivation FROM productions pr
+          JOIN campaigns c ON c.id = pr.campaign_id AND c.year = ${row.campaign} LEFT JOIN activities a ON a.id = pr.activity_id
+          WHERE pr.land_parcel_id = ${row.land_parcel_id} ORDER BY pr.created_at LIMIT 1`,
+    );
+    return { cover: c, zones: z?.zones ?? [], nextCrop: n ? cropGroupOf(n) : null };
+  });
+  const context: PlanContext = {
+    ...main,
+    crop: "cover_crop",
+    cropLabel: cover ? `Couvert exporté : ${cover.species}` : "Couvert exporté",
+    variety: null,
+    previous: null,
+    yieldTarget: null,
+    organics: main.organics.filter((o) => !cover || (o.date >= cover.sownOn && (!cover.destroyedOn || o.date <= cover.destroyedOn))),
+  };
+  const base = { annex: "PAR 7 NA, tableau 4", terms: {}, floor30: false, negative: false };
+  if (!cover || !cover.exported || cover.kind !== "sown") {
+    return {
+      context,
+      result: { ...base, method: "ceiling", equation: "Couvert exporté", dose: null, ceiling: null, warnings: [], missing: ["couvert exporté : à saisir dans le plan de la culture principale"] },
+    };
+  }
+  const d = exportedCoverDefault({ sownOn: cover.sownOn, destroyedOn: cover.destroyedOn, interculture: nextCrop && !SPRING_CROPS.has(nextCrop) ? "short" : "long", zar: zones.includes("zar"), west: zones.includes("ouest") });
+  const warnings = [
+    `Dose par défaut du tableau 4 (${d.label}). Une dose prévisionnelle calculée par bilan (annexe 4.3 : bilan de type céréales à paille avec b = 2 kg N/q, ou de type prairie) peut être saisie comme dose d'un outil ou d'un conseiller${d.withBilanMax ? `, ${d.withBilanMax} kg au plus` : ""}.`,
+    "Les apports sur le couvert sont aussi consignés au cahier d'enregistrement de la culture principale.",
+  ];
+  return {
+    context,
+    result: { ...base, method: "ceiling", equation: "Dose prévisionnelle par bilan, sinon dose maximale du tableau 4 du PAR 7", dose: d.dose, ceiling: d.withBilanMax ?? null, warnings, missing: [] },
+  };
 }
 
 // --- Lecture --------------------------------------------------------------------------------
@@ -442,7 +488,16 @@ export async function preparePlans(db: Database, farmId: string, campaign: numbe
           ON CONFLICT (farm_id, campaign, land_parcel_id, kind) DO NOTHING
           RETURNING id`,
     );
-    return { created: created.length };
+    // Couverts exportés semés avant la culture de la campagne : un plan séparé (lot AQ).
+    const covers = await rows(
+      tx,
+      sql`INSERT INTO fertilization_plans (id, farm_id, campaign, land_parcel_id, kind)
+          SELECT gen_random_uuid(), ${farmId}, ${campaign}, cc.land_parcel_id, 'cover_exported'
+          FROM cover_crops cc WHERE cc.campaign = ${campaign} AND cc.exported AND cc.kind = 'sown'
+          ON CONFLICT (farm_id, campaign, land_parcel_id, kind) DO NOTHING
+          RETURNING id`,
+    );
+    return { created: created.length + covers.length };
   });
 }
 
@@ -460,6 +515,7 @@ export async function listPlans(db: Database, farmId: string, campaign: number, 
     const external = row.draft.external ?? null;
     return {
       id: row.id,
+      kind: row.kind,
       campaign: row.campaign,
       parcel: { id: row.land_parcel_id, name: row.parcel_name, areaM2: Math.round(Number(row.area_m2)) },
       cropLabel: context.cropLabel,
@@ -521,6 +577,7 @@ export async function getPlan(db: Database, farmId: string, planId: string, fetc
   const reserved = (current?.applications ?? []).filter((a) => a.reservedForSteering).reduce((sum, a) => sum + a.nKgHa, 0);
   return {
     id: row.id,
+    kind: row.kind,
     campaign: row.campaign,
     parcel: { id: row.land_parcel_id, name: row.parcel_name, areaM2: Math.round(Number(row.area_m2)) },
     status: row.status,
@@ -528,7 +585,7 @@ export async function getPlan(db: Database, farmId: string, planId: string, fetc
     draft: row.draft,
     context,
     result,
-    proposedApplications: dose !== null ? splitDose(dose, context.crop as CropGroup, { nBefore4Leaves: row.draft.nBefore4Leaves ?? 0 }) : [],
+    proposedApplications: dose !== null && row.kind === "main" ? splitDose(dose, context.crop as CropGroup, { nBefore4Leaves: row.draft.nBefore4Leaves ?? 0 }) : [],
     versions,
     prescriptions: prescriptions.map((x) => ({
       id: x.id,

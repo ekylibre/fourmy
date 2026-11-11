@@ -9,6 +9,7 @@ import { FARM, renderApp } from "./render";
 const PLAN = "00000000-0000-7000-8000-00000000c001";
 const plan = (patch: Partial<FertilizationPlan> = {}): FertilizationPlan => ({
   id: PLAN,
+  kind: "main",
   campaign: 2026,
   parcel: { id: "00000000-0000-7000-8000-0000000000a1", name: "Champ Maïs 2026", areaM2: 40000 },
   status: "draft",
@@ -63,7 +64,7 @@ const plan = (patch: Partial<FertilizationPlan> = {}): FertilizationPlan => ({
 
 describe("plan de fumure", () => {
   it("liste de la campagne sur la page Fertilisation azotée", async () => {
-    const summary: FertilizationPlanSummary = { id: PLAN, campaign: 2026, parcel: plan().parcel, cropLabel: "Maïs grain", zone: "in", status: "draft", currentVersion: null, dose: 223, doseOrigin: "fourmy", missing: 0, establishedAt: null };
+    const summary: FertilizationPlanSummary = { id: PLAN, kind: "main", campaign: 2026, parcel: plan().parcel, cropLabel: "Maïs grain", zone: "in", status: "draft", currentVersion: null, dose: 223, doseOrigin: "fourmy", missing: 0, establishedAt: null };
     server.use(
       http.get("*/fertilization/plans", () => HttpResponse.json({ items: [summary] })),
       http.get("*/fertilization/parcels", () => HttpResponse.json({ items: [] })),
@@ -208,6 +209,29 @@ describe("plan de fumure", () => {
     await user.type(within(section).getByLabelText("Quantité par hectare"), "30");
     await user.click(within(section).getByRole("button", { name: "Ajouter" }));
     await waitFor(() => expect(draft).toMatchObject({ organics: [{ articleId: SLURRY, quantity: 30 }] }));
+  });
+
+  it("plan d'un couvert exporté : couvert, dose par défaut, sans bilan détaillé (lot AQ)", async () => {
+    const cover = { id: "c1", parcelId: plan().parcel.id, campaign: 2026, kind: "sown" as const, family: "graminees_seigle_avoine" as const, species: "Seigle", sownOn: "2025-10-18", destroyedOn: "2026-04-20", exported: true, biomass: null, destructionMode: "harvest" as const, notes: null };
+    server.use(
+      http.get("*/fertilization/plans/:id", () =>
+        HttpResponse.json(
+          plan({
+            kind: "cover_exported",
+            context: { ...plan().context, crop: "cover_crop", cropLabel: "Couvert exporté : Seigle", cover },
+            result: { method: "ceiling", annex: "PAR 7 NA, tableau 4", equation: "Dose prévisionnelle par bilan, sinon dose maximale du tableau 4 du PAR 7", terms: {}, dose: 70, ceiling: 100, floor30: false, negative: false, warnings: ["Dose par défaut du tableau 4."], missing: [] },
+            proposedApplications: [],
+          }),
+        ),
+      ),
+      http.get("*/fertilizers", () => HttpResponse.json({ items: [] })),
+    );
+    renderApp(`/f/${FARM}/fertilization/plans/${PLAN}`);
+    expect(await screen.findByLabelText("Couvert exporté")).toHaveTextContent("Seigle (Graminées type seigle, avoine), semé le 18/10/2025, récolté ou détruit le 20/04/2026");
+    expect(screen.getByLabelText("Dose calculée")).toHaveTextContent("Dose plafond : 70 kg N/ha");
+    expect(screen.queryByLabelText("Données de la parcelle")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Couvert d'interculture")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Dose d'un outil ou d'un conseiller")).toBeInTheDocument();
   });
 
   it("ouverture du bilan, période d'implantation et couvert d'interculture", async () => {

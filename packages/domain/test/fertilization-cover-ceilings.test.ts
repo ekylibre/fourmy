@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { coverSpreading, type CoverSpreadingInput } from "../src/fertilization/index.js";
+import { coverSpreading, exportedCoverDefault, type CoverSpreadingInput } from "../src/fertilization/index.js";
 
 const base: CoverSpreadingInput = {
   date: "2025-09-10",
@@ -35,5 +35,15 @@ describe("épandage sur couvert d'interculture (PAR 7 NA, tableau 4)", () => {
     const next = { ...cie, cover: { ...cie.cover, destroyedOn: "2026-04-15" }, date: "2025-10-20" };
     expect(coverSpreading({ ...next, type: "III" })).toMatchObject({ allowed: true, ceiling: 70, cumulates: "all" });
     expect(coverSpreading({ ...next, type: "III", zar: true })).toMatchObject({ allowed: false });
+  });
+});
+
+describe("plan d'un couvert exporté : dose par défaut (tableau 4)", () => {
+  const cie = { sownOn: "2025-10-01", destroyedOn: "2026-04-20", interculture: "long" as const, zar: false, west: false };
+  it("70 kg ; 100 kg au plus avec un bilan si exporté l'année suivante ; ZAR et zone ouest", () => {
+    expect(exportedCoverDefault(cie)).toMatchObject({ dose: 70, withBilanMax: 100 });
+    expect(exportedCoverDefault({ ...cie, destroyedOn: "2025-12-10" })).toMatchObject({ dose: 70, withBilanMax: null });
+    expect(exportedCoverDefault({ ...cie, zar: true, interculture: "short" })).toMatchObject({ dose: 30, withBilanMax: 30 });
+    expect(exportedCoverDefault({ ...cie, interculture: "short", west: true })).toMatchObject({ dose: 50 });
   });
 });
