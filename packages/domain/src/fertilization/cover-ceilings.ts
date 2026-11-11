@@ -37,6 +37,23 @@ export type CoverSpreading =
       label: string;
     };
 
+/**
+ * Dose d'un couvert exporté sans calcul de dose prévisionnelle (lot AQ) : le
+ * plafond du tableau 4 en cumulant organiques et minéraux. Avec un bilan (outil
+ * ou conseiller), la dose calculée s'applique, jusqu'à 100 kg pour un couvert
+ * exporté l'année suivante hors ZAR.
+ */
+export function exportedCoverDefault(i: { sownOn: string; destroyedOn: string | null; interculture: "short" | "long"; zar: boolean; west: boolean }): { dose: number; label: string; withBilanMax: number | null } {
+  const sameYear = i.destroyedOn !== null && i.destroyedOn.slice(0, 4) === i.sownOn.slice(0, 4);
+  const westCap = i.west && i.interculture === "short" ? 50 : Infinity;
+  if (i.zar) {
+    const z = i.interculture === "short" ? 30 : sameYear ? 50 : 70;
+    return { dose: Math.min(z, westCap), label: `ZAR : ${z} kg d'azote efficace au plus`, withBilanMax: Math.min(z, westCap) };
+  }
+  if (i.interculture === "short" || sameYear) return { dose: Math.min(70, westCap), label: "sans dose calculée : 70 kg d'azote efficace en cumulant organiques et minéraux", withBilanMax: null };
+  return { dose: 70, label: "exporté l'année suivante, sans dose calculée : 70 kg (100 kg au plus avec un bilan)", withBilanMax: 100 };
+}
+
 const addDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 const fr = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 

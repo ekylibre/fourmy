@@ -380,6 +380,8 @@ export interface PlanVersion {
 
 export interface FertilizationPlan {
   id: string;
+  /** Plan de la culture principale, ou d'un couvert d'interculture exporté (lot AQ, PAR 7 NA p. 15). */
+  kind: "main" | "cover_exported";
   campaign: number;
   parcel: { id: string; name: string; areaM2: number };
   status: "draft" | "established" | "revised";
@@ -398,6 +400,7 @@ export interface FertilizationPlan {
 
 export interface FertilizationPlanSummary {
   id: string;
+  kind: "main" | "cover_exported";
   campaign: number;
   parcel: { id: string; name: string; areaM2: number };
   cropLabel: string;
