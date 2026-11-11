@@ -45,6 +45,7 @@ import {
   isNaSoilType,
   naRapeseedMha,
 } from "@fourmy/fertilization-refs";
+import { useConfirm } from "../../components/confirm";
 import { api, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { formatDate, formatDateTime } from "../../app/labels";
@@ -351,7 +352,12 @@ export function PlanPage() {
               {c.crop.startsWith("maize") && (
                 <NumberInput
                   label="Azote minéral avant 4 feuilles (kg N/ha)"
-                  description="Starter au semis : 50 kg au plus (PAR 7)"
+                  description={
+                    c.starter && draft.nBefore4Leaves == null
+                      ? `Apports réalisés du ${formatDate(c.starter.from)} au ${formatDate(c.starter.to)} : ${fmt(c.starter.kgNHa)} kg (50 kg au plus)`
+                      : "Starter au semis : 50 kg au plus (PAR 7)"
+                  }
+                  placeholder={c.starter ? fmt(c.starter.kgNHa) : undefined}
                   disabled={!owner}
                   min={0}
                   max={50}
@@ -997,6 +1003,8 @@ function Applications({
       product: r.name,
       rate: String(r.rate),
       unit: r.unit,
+      // Date prévue : la carte propose l'image qui la précède de plus près.
+      ...(a.plannedOn ? { on: a.plannedOn } : {}),
     });
     return `/f/${farmId}/prescriptions/new?${q}`;
   };
@@ -1274,6 +1282,8 @@ function CoverSection({
   onSaved: () => void;
 }) {
   const [form, setForm] = useState<CoverCropWrite | null>(null);
+  const { confirm, element: confirmEl } = useConfirm();
+
   const path = farmPath(farmId, `/land-parcels/${parcelId}/cover-crop`);
   const save = useMutation({
     mutationFn: (w: CoverCropWrite) => api.put<CoverCrop>(path, w),
@@ -1293,6 +1303,7 @@ function CoverSection({
   };
   return (
     <Paper withBorder p="md" aria-label="Couvert d'interculture">
+      {confirmEl}
       <Group justify="space-between">
         <div>
           <Title order={4}>Couvert d'interculture</Title>
@@ -1339,7 +1350,9 @@ function CoverSection({
                 size="sm"
                 ml="xs"
                 c="brique"
-                onClick={() => remove.mutate()}
+                onClick={async () =>
+                  (await confirm({ title: "Retirer le couvert", message: `Le couvert « ${cover.species} » et ses justificatifs seront supprimés.`, action: "Retirer" })) && remove.mutate()
+                }
               >
                 Retirer
               </Anchor>
@@ -1490,6 +1503,8 @@ function Steering({
     notes: null,
   };
   const [form, setForm] = useState<SteeringWrite | null>(null);
+  const { confirm, element: confirmEl } = useConfirm();
+
   const add = useMutation({
     mutationFn: (w: SteeringWrite) =>
       api.post<SteeringMeasurement>(
@@ -1508,6 +1523,7 @@ function Steering({
   });
   return (
     <Paper withBorder p="md" aria-label="Pilotage">
+      {confirmEl}
       <Group justify="space-between">
         <div>
           <Title order={4}>Pilotage en cours de saison</Title>
@@ -1559,7 +1575,9 @@ function Steering({
                       variant="subtle"
                       color="brique"
                       aria-label="Retirer la mesure"
-                      onClick={() => remove.mutate(m.id)}
+                      onClick={async () =>
+                        (await confirm({ title: "Retirer la mesure", message: `La mesure ${m.tool} du ${formatDate(m.measuredOn)} et son bulletin seront supprimés.`, action: "Retirer" })) && remove.mutate(m.id)
+                      }
                     >
                       <Trash2 size={14} />
                     </ActionIcon>

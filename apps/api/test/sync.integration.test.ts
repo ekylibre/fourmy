@@ -156,7 +156,9 @@ describe.skipIf(!url)("synchro mobile (intégration)", () => {
   it("attelages (FR-ATT-8) : poussés par une version récente, redescendus avec la forme aplatie", async () => {
     const tractor = crypto.randomUUID();
     await sql`INSERT INTO equipments (id, farm_id, name, kind) VALUES (${tractor}, ${farmId}, 'Tracteur mobile', 'tractor')`;
-    const since = new Date().toISOString();
+    // Heure de la base, pas celle de Node : updated_at vient de PostgreSQL (quelques ms d'écart rendaient le test instable).
+    const [{ n }] = await sql<{ n: Date }[]>`SELECT clock_timestamp() AS n`;
+    const since = n.toISOString();
     const id = crypto.randomUUID();
     const { periods, doers, ...rest } = done(id);
     const crews = [{ label: "Pulvé", tools: [{ equipmentId: tractor }], doers, periods }];

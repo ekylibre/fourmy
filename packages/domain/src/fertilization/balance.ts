@@ -112,6 +112,8 @@ export interface BalanceInput {
   irrigation?: { plannedMm: number; no3MgL: number | null; origin: "surface" | "groundwater" | null } | null;
   /** Maïs : azote minéral apporté avant 4 feuilles (kg N/ha), plafonné par le PAR. */
   nBefore4Leaves?: number;
+  /** Origine de l'azote avant 4 feuilles quand il vient des apports réalisés (starter), sinon saisi. */
+  nBefore4Source?: string | null;
   /** Céréales : CAU 0,8 en conditions défavorables, sur justificatif. */
   unfavourable?: boolean;
   /** Valeurs remplacées par la ferme ou le conseiller, avec leur motif. */
@@ -376,7 +378,12 @@ export function computeBalance(input: BalanceInput): BalanceResult {
     cauBefore = before?.cau ?? 0.6;
     set("CAU", { value: cauAfter, origin: "reference", source: ref(maizeCau), detail: `${fr(cauBefore)} avant 4 feuilles, ${fr(cauAfter)} ensuite` });
     const n4 = Math.max(0, input.nBefore4Leaves ?? 0);
-    set("Nbefore4", { value: n4, origin: "entered", source: "apports prévus", detail: n4 ? `${n4} kg N × CAU ${cauBefore} = ${round(n4 * cauBefore)} kg utiles` : "aucun apport avant 4 feuilles" });
+    set("Nbefore4", {
+      value: n4,
+      origin: input.nBefore4Source ? "computed" : "entered",
+      source: input.nBefore4Source ?? "apports prévus",
+      detail: n4 ? `${fr(n4)} kg N × CAU ${fr(cauBefore)} = ${round(n4 * cauBefore)} kg utiles` : "aucun apport avant 4 feuilles",
+    });
     if (n4 > 50) warnings.push("Premier apport sur maïs semé avant le 1er mai plafonné à 50 kg N (PAR 7 Nouvelle-Aquitaine).");
   } else {
     const row = cerealsCau.rows.find((r) => r.condition === (input.unfavourable ? "unfavourable" : "standard"))!;

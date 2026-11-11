@@ -3,6 +3,7 @@ import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileText, Paperclip, Trash2 } from "lucide-react";
 import { DOCUMENT_MAX_BYTES, type DocumentOwnerType, type RegulatoryDocument } from "@fourmy/contracts";
+import { useConfirm } from "../../components/confirm";
 import { api, farmPath } from "../../app/api";
 import { formatDate } from "../../app/labels";
 
@@ -32,6 +33,7 @@ const size = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 102
  */
 export function Documents({ farmId, ownerType, ownerId, owner, label = "Justificatifs" }: { farmId: string; ownerType: DocumentOwnerType; ownerId: string; owner: boolean; label?: string }) {
   const client = useQueryClient();
+  const { confirm, element: confirmEl } = useConfirm();
   const key = ["fertilization-documents", farmId, ownerType, ownerId];
   const q = useQuery({
     queryKey: key,
@@ -49,6 +51,7 @@ export function Documents({ farmId, ownerType, ownerId, owner, label = "Justific
   const items = q.data?.items ?? [];
   return (
     <Stack gap={4} aria-label={label}>
+      {confirmEl}
       <Group gap="xs">
         <Text size="sm" fw={500}>
           {label}
@@ -81,7 +84,7 @@ export function Documents({ farmId, ownerType, ownerId, owner, label = "Justific
             {size(d.size)} · {formatDate(d.uploadedAt.slice(0, 10))}
           </Text>
           {owner && (
-            <ActionIcon variant="subtle" size="sm" color="brique" aria-label={`Retirer ${d.name}`} onClick={() => remove.mutate(d.id)}>
+            <ActionIcon variant="subtle" size="sm" color="brique" aria-label={`Retirer ${d.name}`} onClick={async () => (await confirm({ title: "Retirer le justificatif", message: `« ${d.name} » sera supprimé ; le fichier ne pourra pas être récupéré.`, action: "Retirer" })) && remove.mutate(d.id)}>
               <Trash2 size={13} />
             </ActionIcon>
           )}

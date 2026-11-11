@@ -137,6 +137,9 @@ describe("fertilisation azotée", () => {
     expect(await within(screen.getByLabelText("Points d'eau d'irrigation")).findByText(/18 mg\/L \(bandelette/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Actualiser le zonage" })).toBeInTheDocument();
     // 6 ha en zone vulnérable : analyse annuelle ; le reliquat du 10/02/2026 compte pour la campagne 2026.
-    expect(await screen.findByLabelText("Analyse de sol annuelle")).toHaveTextContent("Analyse de sol de la campagne 2026 faite : reliquat sortie d'hiver le 10/02/2026 (Les Rouffiats).");
+    expect(await screen.findByLabelText("Analyse de terre de la campagne 2026")).toHaveTextContent("Analyse de terre de la campagne 2026 : reliquat sortie d'hiver le 10/02/2026 (Les Rouffiats)");
+    // Une seule mention de l'obligation : plus de bandeau d'analyse ni de type de sol répété (recette du 11/11).
+    expect(screen.queryByLabelText("Analyse de sol annuelle")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Obligations")).not.toHaveTextContent("sans type de sol");
   });
 });

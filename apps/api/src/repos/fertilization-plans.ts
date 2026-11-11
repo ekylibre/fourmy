@@ -18,6 +18,7 @@ import {
   computeBalance,
   cropGroupOf,
   effectiveComposition,
+  isMaizeOrSorghum,
   isStrawCereal,
   nitrogenOfInput,
   splitDose,
@@ -213,6 +214,8 @@ async function mineralNApplied(
 }
 
 /** Pluie du 1er octobre de l'année précédente à `toMd` (MM-JJ) : observée, puis normales pour les jours à venir. */
+const addDaysIso = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+
 async function rainSince(db: Database, farmId: string, campaign: number, toMd: string, fetchImpl: typeof fetch) {
   const from = `${campaign - 1}-10-01`;
   const to = `${campaign}-${toMd}`;
@@ -237,7 +240,14 @@ async function rainSince(db: Database, farmId: string, campaign: number, toMd: s
 
 // --- Contexte et calcul -------------------------------------------------------------------
 
-async function contextOf(db: Database, farmId: string, plan: PlanRow, fertilizers: Map<string, FertilizerArticle>, fetchImpl: typeof fetch): Promise<{ context: PlanContext; input: BalanceInput }> {
+async function contextOf(
+  db: Database,
+  farmId: string,
+  plan: PlanRow,
+  fertilizers: Map<string, FertilizerArticle>,
+  fetchImpl: typeof fetch,
+  rainMemo: Map<string, ReturnType<typeof rainSince>> = new Map(),
+): Promise<{ context: PlanContext; input: BalanceInput }> {
   const crop = cropGroupOf({ reference: plan.reference, cultivation: plan.cultivation });
   const variety = plan.species && plan.species !== plan.cultivation ? plan.species : null;
   const d = plan.draft;
@@ -279,9 +289,12 @@ async function contextOf(db: Database, farmId: string, plan: PlanRow, fertilizer
           JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_id = ${plan.land_parcel_id}
           WHERE i.status = 'done' AND i.procedure = ANY(${arr(SOWING)}::text[]) AND i.started_at >= make_date(${plan.campaign - 1}, 7, 1) AND i.started_at < make_date(${plan.campaign}, 8, 1)`,
     );
+    // Maïs : starter réalisé du semis à 30 jours après (azote avant 4 feuilles, recette du 11/11).
+    const starterTo = sown?.day ? new Date(Date.parse(`${sown.day}T00:00:00Z`) + 31 * 86_400_000).toISOString().slice(0, 10) : null;
+    const starter = sown?.day && starterTo ? { ...(await mineralNApplied(tx, plan.land_parcel_id, sown.day, starterTo, fertilizers)), from: sown.day, to: starterTo } : null;
     // Apports organiques réalisés sur la parcelle depuis l'été qui précède la campagne (lot AO).
     const campaignN = await mineralNApplied(tx, plan.land_parcel_id, `${plan.campaign - 1}-07-01`, `${plan.campaign}-08-01`, fertilizers);
-    return { soil, prev, yields, prods, prevN, prevIrrigation, rsh: rsh[0] ?? null, cover, sownOn: sown?.day ?? null, campaignOrganics: campaignN.organics };
+    return { soil, prev, yields, prods, prevN, prevIrrigation, rsh: rsh[0] ?? null, cover, sownOn: sown?.day ?? null, campaignOrganics: campaignN.organics, starter };
   });
   const { soil, prev, prevN } = gathered;
   const department = soil?.insee ? soil.insee.slice(0, 2) : null;
@@ -300,7 +313,10 @@ async function contextOf(db: Database, farmId: string, plan: PlanRow, fertilizer
     d.yieldTarget != null ? { value: d.yieldTarget, origin: "entered", detail: "saisi" } : "missing" in auto ? null : { value: auto.value, origin: auto.origin, detail: auto.detail };
 
   const spring = SPRING_CROPS.has(crop);
-  const rain = await rainSince(db, farmId, plan.campaign, spring ? "05-01" : "03-01", fetchImpl).catch(() => null);
+  // Pluie : lue une fois par campagne et date de fin pour tous les plans d'une même liste.
+  const rainKey = `${plan.campaign}|${spring ? "05-01" : "03-01"}`;
+  if (!rainMemo.has(rainKey)) rainMemo.set(rainKey, rainSince(db, farmId, plan.campaign, spring ? "05-01" : "03-01", fetchImpl).catch(() => null));
+  const rain = await rainMemo.get(rainKey)!;
   const rshKg = gathered.rsh?.horizons?.length ? rshTotal(gathered.rsh.horizons) : null;
   const irrigationMm: PlanContext["irrigationMm"] =
     d.irrigationMm != null
@@ -351,6 +367,7 @@ async function contextOf(db: Database, farmId: string, plan: PlanRow, fertilizer
     zone: soil?.status ?? null,
     opening,
     sowing: { period: d.sowingPeriod ?? null, sownOn: gathered.sownOn },
+    starter: isMaizeOrSorghum(crop) && gathered.starter?.total ? { kgNHa: gathered.starter.total, from: gathered.starter.from, to: addDaysIso(gathered.starter.to, -1) } : null,
     cover,
     organics: organicResults.map((r) => ({
       date: r.date,
@@ -401,7 +418,11 @@ async function contextOf(db: Database, farmId: string, plan: PlanRow, fertilizer
     rainMm: rain?.mm ?? null,
     valueA: d.valueA ?? null,
     irrigation: irrigated && irrigationMm ? { plannedMm: irrigationMm.value, no3MgL: context.water.no3MgL, origin: context.water.origin } : null,
-    nBefore4Leaves: d.nBefore4Leaves ?? 0,
+    nBefore4Leaves: d.nBefore4Leaves ?? (isMaizeOrSorghum(crop) && gathered.starter?.total ? gathered.starter.total : 0),
+    nBefore4Source:
+      d.nBefore4Leaves == null && isMaizeOrSorghum(crop) && gathered.starter?.total
+        ? `apports réalisés du ${gathered.starter.from.slice(8, 10)}/${gathered.starter.from.slice(5, 7)} au ${addDaysIso(gathered.starter.to, -1).slice(8, 10)}/${addDaysIso(gathered.starter.to, -1).slice(5, 7)} (semis + 30 jours)`
+        : null,
     unfavourable: d.unfavourable ?? false,
     overrides: d.overrides,
   };
@@ -422,8 +443,9 @@ async function plansData(db: Database, farmId: string, where: ReturnType<typeof 
   if (!list.length) return [];
   const fertilizers = new Map((await listFertilizers(db, farmId)).map((f) => [f.id, f]));
   const out = [];
+  const rainMemo = new Map<string, ReturnType<typeof rainSince>>();
   for (const p of list) {
-    const { context, input } = await contextOf(db, farmId, p, fertilizers, fetchImpl);
+    const { context, input } = await contextOf(db, farmId, p, fertilizers, fetchImpl, rainMemo);
     out.push(p.kind === "cover_exported" ? { row: p, ...(await coverPlanOf(db, farmId, p, context)) } : { row: p, context, result: resultOf(input, context) });
   }
   return out;
@@ -585,7 +607,7 @@ export async function getPlan(db: Database, farmId: string, planId: string, fetc
     draft: row.draft,
     context,
     result,
-    proposedApplications: dose !== null && row.kind === "main" ? splitDose(dose, context.crop as CropGroup, { nBefore4Leaves: row.draft.nBefore4Leaves ?? 0 }) : [],
+    proposedApplications: dose !== null && row.kind === "main" ? splitDose(dose, context.crop as CropGroup, { nBefore4Leaves: row.draft.nBefore4Leaves ?? context.starter?.kgNHa ?? 0 }) : [],
     versions,
     prescriptions: prescriptions.map((x) => ({
       id: x.id,

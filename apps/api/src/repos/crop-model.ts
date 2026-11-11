@@ -81,6 +81,9 @@ async function store(tx: Tx, farmId: string, days: WeatherDay[], source: "archiv
   }
 }
 
+/** Mises à jour du cache en cours, par ferme et période : partagées entre requêtes simultanées. */
+const refreshing = new Map<string, Promise<void>>();
+
 /**
  * Météo journalière de la ferme de `from` à aujourd'hui + 15 jours, et les
  * 5 années civiles qui précèdent `from` (normales). Ne télécharge que ce qui
@@ -108,28 +111,36 @@ export async function farmDailyWeather(
       )
     )[0],
   }));
-  if (point) {
-    const ranges: [string, string][] = [];
-    if (!span?.lo || !span.hi) ranges.push([histStart, archiveEnd]);
-    else {
-      if (span.lo > histStart) ranges.push([histStart, addDays(span.lo, -1)]);
-      if (span.hi < archiveEnd) ranges.push([addDays(span.hi, 1), archiveEnd]);
-      if (span.windless) ranges.push([span.windless, span.hi < archiveEnd ? span.hi : archiveEnd]);
-    }
-    // Téléchargements hors transaction ; chaque lot reçu est enregistré aussitôt.
-    try {
-      for (const [a, b] of ranges) {
-        if (a > b) continue;
-        const days = await openMeteoDays(point.lat, point.lon, { source: "archive", from: a, to: b }, fetchImpl);
-        await withFarm(db, farmId, (tx) => store(tx, farmId, days, "archive"));
+  // Une seule mise à jour à la fois par ferme : les requêtes simultanées (plans imprimés, liste) l'attendent au lieu de la relancer.
+  const key = `${farmId}|${histStart}`;
+  const running = refreshing.get(key);
+  if (running) await running;
+  else if (point) {
+    const job = (async () => {
+      const ranges: [string, string][] = [];
+      if (!span?.lo || !span.hi) ranges.push([histStart, archiveEnd]);
+      else {
+        if (span.lo > histStart) ranges.push([histStart, addDays(span.lo, -1)]);
+        if (span.hi < archiveEnd) ranges.push([addDays(span.hi, 1), archiveEnd]);
+        if (span.windless) ranges.push([span.windless, span.hi < archiveEnd ? span.hi : archiveEnd]);
       }
-      if (!span?.fresh || Date.now() - Date.parse(span.fresh) > FORECAST_TTL_MS) {
-        const days = await openMeteoDays(point.lat, point.lon, { source: "forecast" }, fetchImpl);
-        await withFarm(db, farmId, (tx) => store(tx, farmId, days, "forecast"));
+      // Téléchargements hors transaction ; chaque lot reçu est enregistré aussitôt.
+      try {
+        for (const [a, b] of ranges) {
+          if (a > b) continue;
+          const days = await openMeteoDays(point.lat, point.lon, { source: "archive", from: a, to: b }, fetchImpl);
+          await withFarm(db, farmId, (tx) => store(tx, farmId, days, "archive"));
+        }
+        if (!span?.fresh || Date.now() - Date.parse(span.fresh) > FORECAST_TTL_MS) {
+          const days = await openMeteoDays(point.lat, point.lon, { source: "forecast" }, fetchImpl);
+          await withFarm(db, farmId, (tx) => store(tx, farmId, days, "forecast"));
+        }
+      } catch (e) {
+        console.warn(`[modèle de croissance] Open-Meteo indisponible, cache seul : ${e instanceof Error ? e.message : e}`);
       }
-    } catch (e) {
-      console.warn(`[modèle de croissance] Open-Meteo indisponible, cache seul : ${e instanceof Error ? e.message : e}`);
-    }
+    })().finally(() => refreshing.delete(key));
+    refreshing.set(key, job);
+    await job;
   }
   const cached = await withFarm(db, farmId, (tx) =>
     rows<CachedDay>(
