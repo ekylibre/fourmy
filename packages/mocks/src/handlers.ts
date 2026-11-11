@@ -76,6 +76,9 @@ export const handlers = [
   http.get(`*${base}/integrations`, () => HttpResponse.json({ providers: INTEGRATION_PROVIDERS, items: [] })),
   // Fertilisants (lot AE) : aucun dans la démo.
   http.get(`*${base}/fertilizers`, () => HttpResponse.json({ items: [] })),
+  // Fertilisation azotée (lots AF, AI) : paramètres par défaut, aucun justificatif.
+  http.get(`*${base}/fertilization/settings`, () => HttpResponse.json({ region: "nouvelle-aquitaine", campaignStartMmdd: "09-01" })),
+  http.get(`*${base}/fertilization/documents`, () => HttpResponse.json({ items: [] })),
   // Cartes de modulation (lot AD) : aucune dans la démo, aucune image à zoner.
   http.get(`*${base}/prescriptions`, () => HttpResponse.json({ items: [] })),
   http.get(`*${base}/land-parcels/:id/modulation-dates`, () => HttpResponse.json({ items: [] })),

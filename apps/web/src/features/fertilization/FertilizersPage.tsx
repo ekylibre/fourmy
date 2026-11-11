@@ -15,6 +15,7 @@ import {
   type ProductAnalysisWrite,
 } from "@fourmy/contracts";
 import { api, farmPath } from "../../app/api";
+import { Documents } from "./Documents";
 import { useFarm } from "../../app/farm";
 import { formatDate } from "../../app/labels";
 import { ErrorAlert, Loading } from "../../components/states";
@@ -247,7 +248,10 @@ function Analyses({ farmId, article }: { farmId: string; article: FertilizerArti
                   {x.nNh4 !== null ? ` · NH4 ${x.nNh4.toLocaleString("fr-FR")}` : ""}
                   {x.cN !== null ? ` · C/N ${x.cN.toLocaleString("fr-FR")}` : ""}
                 </Table.Td>
-                <Table.Td>{x.lab ?? ""}</Table.Td>
+                <Table.Td>
+                  {x.lab ?? ""}
+                  <Documents farmId={farmId} ownerType="product_analysis" ownerId={x.id} owner label="Bulletin" />
+                </Table.Td>
                 <Table.Td>
                   <ActionIcon variant="subtle" color="brique" aria-label="Retirer l'analyse" onClick={() => remove.mutate(x.id)}>
                     <Trash2 size={14} />

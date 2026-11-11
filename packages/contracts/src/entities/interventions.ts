@@ -271,6 +271,8 @@ export const intervention = z
     clientId: z.string().nullable(),
     /** Contrôle réglementaire enregistré (traitements saisis dans Fourmy). */
     compliance: complianceResult.nullable().optional(),
+    /** Contrôle nitrates à l'enregistrement (lot AI) : calendrier, plan, premier apport ; motif d'un passage outre. */
+    nitrateCheck: z.custom<import("../fertilization.js").NitrateCheckRecord>().nullable().optional(),
     /** IFT (traitements réalisés). */
     ift: iftResult.nullable().optional(),
     /** Météo pendant l'intervention. */

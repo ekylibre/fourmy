@@ -14,8 +14,9 @@ import {
 import { checkCalendar, cropGroupOf, effectiveComposition, isMaizeOrSorghum, isStrawCereal, nitrogenOfInput } from "@fourmy/domain";
 import type { CropGroup } from "@fourmy/fertilization-refs";
 import { cropLabel } from "./fertilization-plans.js";
-import { getSettings } from "./fertilization-context.js";
-import { listFertilizers } from "./fertilizers.js";
+import { getSettings, settingsInTx } from "./fertilization-context.js";
+import { fertilizersInTx, listFertilizers } from "./fertilizers.js";
+import { coversInTx } from "./cover-crops.js";
 
 /**
  * Cahier d'enregistrement et contrôles à la saisie (lot AH,
@@ -133,12 +134,16 @@ const worst = (levels: FertilizationIndicator["level"][]) =>
  * est dit « non vérifié », jamais « conforme ».
  */
 export async function checkApplication(db: Database, farmId: string, req: FertilizationCheckRequest): Promise<FertilizationCheck> {
-  const fertilizers = new Map((await listFertilizers(db, farmId)).map((f) => [f.id, f]));
-  const settings = await getSettings(db, farmId);
+  return withFarm(db, farmId, (tx) => checkApplicationTx(tx, farmId, req));
+}
+
+export async function checkApplicationTx(tx: Tx, farmId: string, req: FertilizationCheckRequest): Promise<FertilizationCheck> {
+  const fertilizers = new Map((await fertilizersInTx(tx)).map((f) => [f.id, f]));
+  const settings = await settingsInTx(tx);
   const day = req.startedAt.slice(0, 10);
   const fert = req.inputs.filter((i) => fertilizers.has(i.articleId));
   if (!fert.length) return { level: "ok", nitrogen: null, indicators: [] };
-  return withFarm(db, farmId, async (tx) => {
+  {
     const parcels = await parcelCrops(tx, farmId, req.parcelIds, day, settings.campaignStartMmdd);
     const indicators: FertilizationIndicator[] = [];
     const areaHa = req.areaM2 ? req.areaM2 / 10_000 : null;
@@ -186,7 +191,7 @@ export async function checkApplication(db: Database, farmId: string, req: Fertil
       nitrogen: { totalKgHa: Math.round(total * 10) / 10, efficientKgHa: efficient === null ? null : Math.round(efficient * 10) / 10 },
       indicators,
     };
-  });
+  }
 }
 
 // --- Cahier d'enregistrement -------------------------------------------------------------------
@@ -233,6 +238,7 @@ export async function fertilizationRecord(db: Database, farmId: string, campaign
               ORDER BY i.started_at`,
         )
       : [];
+    const covers = await coversInTx(tx, ids, campaign);
     const out: RecordParcel[] = [];
     for (const p of parcels) {
       const crop = cropGroupOf({ reference: p.reference, cultivation: p.cultivation });
@@ -291,6 +297,7 @@ export async function fertilizationRecord(db: Database, farmId: string, campaign
         harvestedOn: harvests,
         yieldQHa: yields.length ? Math.round((yields.reduce((s, v) => s + v, 0) / yields.length) * 10) / 10 : null,
         interculture,
+        cover: covers.get(p.id) ?? null,
         // Trois campagnes de recul ne sont pas toutes chargées : « null » quand on ne peut pas conclure.
         noPlowing: plowed ? false : null,
         applications,

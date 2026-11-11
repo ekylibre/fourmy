@@ -16,6 +16,7 @@ import {
 } from "@fourmy/contracts";
 import { NA_SOIL_TYPE_LABELS, NA_SOIL_TYPES } from "@fourmy/fertilization-refs";
 import { api, farmPath } from "../../app/api";
+import { Documents } from "./Documents";
 import { formatDate } from "../../app/labels";
 import { ErrorAlert, Loading } from "../../components/states";
 
@@ -192,7 +193,10 @@ export function SoilTab({ farmId, parcelId, owner }: { farmId: string; parcelId:
                           .filter(Boolean)
                           .join(" · ")}
                   </Table.Td>
-                  <Table.Td>{a.lab ?? ""}</Table.Td>
+                  <Table.Td>
+                    {a.lab ?? ""}
+                    <Documents farmId={farmId} ownerType="soil_analysis" ownerId={a.id} owner={owner} label="Bulletin" />
+                  </Table.Td>
                   {owner && (
                     <Table.Td>
                       <ActionIcon variant="subtle" color="brique" aria-label="Retirer l'analyse" onClick={() => remove.mutate(a.id)}>

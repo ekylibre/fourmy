@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import postgres from "postgres";
-import type { FertilizationCheck, FertilizationPlan, FertilizationPlanSummary, FertilizationRecord } from "@fourmy/contracts";
+import type { CoverCrop, FertilizationCheck, FertilizationPlan, FertilizationPlanSummary, FertilizationRecord, RegulatoryDocument } from "@fourmy/contracts";
 import { createApp } from "../src/app.js";
 import { fertilizationDeps } from "../src/routes/fertilization.js";
 import { addMember, setupFarm, teardown } from "./helpers.js";
@@ -204,5 +204,75 @@ describe.skipIf(!url)("plans de fumure (intégration)", () => {
     expect(text.split("\r\n")[1]).toContain('"Champ Maïs 2026";"4";"Maïs grain";"DKC5432"');
     expect(text).toContain('"Urée 46";"46 % N";"III"');
   });
-});
 
+  it("réaliser un épandage en période d'interdiction : refusé sans motif, contrôle et motif enregistrés", async () => {
+    const post = (path: string, body: unknown) => app.request(`${base()}${path}`, { method: "POST", headers, body: JSON.stringify(body) });
+    const fertilizing = (day: string, extra: object = {}) => ({
+      procedure: "fertilizing",
+      periods: [{ startedAt: `${day}T09:00:00Z`, stoppedAt: `${day}T10:00:00Z` }],
+      targets: [{ kind: "land_parcel", id: p2026 }],
+      inputs: [{ articleId: urea, quantity: 100, per: "hectare" }],
+      ...extra,
+    });
+    const id = crypto.randomUUID();
+    expect((await post("/interventions", { id, procedure: "fertilizing" })).status).toBe(201);
+    const refused = await post(`/interventions/${id}/complete`, fertilizing("2026-01-12"));
+    expect(refused.status).toBe(422);
+    expect((await refused.json()).detail).toMatch(/Épandage interdit : Champ Maïs 2026 : Urée 46 : Période d'interdiction.*indiquez un motif/);
+    const ok = await post(`/interventions/${id}/complete`, fertilizing("2026-01-12", { compliance: { usages: {}, reason: "Dérogation préfectorale" } }));
+    expect(ok.status).toBe(200);
+    const saved = (await ok.json()).intervention;
+    expect(saved.nitrateCheck).toMatchObject({ level: "danger", reason: "Dérogation préfectorale", nitrogen: { totalKgHa: 46 } });
+    // Hors période : enregistré sans motif ; le contrôle reste joint à l'intervention.
+    const may = crypto.randomUUID();
+    await post("/interventions", { id: may, procedure: "fertilizing" });
+    const done = await post(`/interventions/${may}/complete`, fertilizing("2026-05-20"));
+    expect(done.status).toBe(200);
+    expect((await done.json()).intervention.nitrateCheck).toMatchObject({ reason: null, indicators: expect.arrayContaining([expect.objectContaining({ code: "fert_calendar", level: "ok" })]) });
+    await sql`DELETE FROM stock_movements WHERE intervention_id IN (${id}, ${may})`;
+    await sql`DELETE FROM interventions WHERE id IN (${id}, ${may})`;
+  });
+
+  it("date d'ouverture, période d'implantation et couvert d'interculture (MrCi) ; cahier", async () => {
+    const before = await plan();
+    expect(before.context.opening).toEqual({ on: "2026-04-01", origin: "default" });
+    const p = (await (await putDraft({ yieldTarget: 100, openingOn: "2026-03-15", sowingPeriod: "15 avril – 10 mai" })).json()) as FertilizationPlan;
+    expect(p.context.opening).toEqual({ on: "2026-03-15", origin: "entered" });
+    expect(p.context.sowing.period).toBe("15 avril – 10 mai");
+
+    const cover = { campaign: 2026, family: "cruciferes", species: "Moutarde blanche", sownOn: "2025-09-05", destroyedOn: "2025-12-10", biomass: "1_3", destructionMode: "mechanical" };
+    expect((await app.request(`${base()}/land-parcels/${p2026}/cover-crop`, { method: "PUT", headers: worker.headers, body: JSON.stringify(cover) })).status).toBe(403);
+    expect((await app.request(`${base()}/land-parcels/${p2026}/cover-crop`, { method: "PUT", headers, body: JSON.stringify({ ...cover, destroyedOn: "2025-08-01" }) })).status).toBe(400);
+    const saved = (await (await app.request(`${base()}/land-parcels/${p2026}/cover-crop`, { method: "PUT", headers, body: JSON.stringify(cover) })).json()) as CoverCrop;
+    expect(saved).toMatchObject({ parcelId: p2026, family: "cruciferes", destroyedOn: "2025-12-10", exported: false });
+    const withCover = await plan();
+    expect(withCover.context.cover).toMatchObject({ species: "Moutarde blanche" });
+    expect(withCover.result.terms.MrCi).toMatchObject({ value: expect.any(Number) });
+    const r = (await (await app.request(`${base()}/fertilization/record?campaign=2026`, { headers: worker.headers })).json()) as FertilizationRecord;
+    expect(r.parcels[0]!.cover).toMatchObject({ species: "Moutarde blanche", sownOn: "2025-09-05" });
+
+    // Justificatif joint au couvert, supprimé avec lui.
+    const form = new FormData();
+    form.set("ownerType", "cover_crop");
+    form.set("ownerId", saved.id);
+    form.set("file", new File([new TextEncoder().encode("%PDF-1.4\n%%EOF\n")], "photo couvert.pdf", { type: "application/pdf" }));
+    const auth = { authorization: headers.authorization! };
+    const up = await app.request(`${base()}/fertilization/documents`, { method: "POST", headers: auth, body: form });
+    expect(up.status).toBe(201);
+    const doc = (await up.json()) as RegulatoryDocument;
+    expect(doc).toMatchObject({ name: "photo couvert.pdf", contentType: "application/pdf", ownerType: "cover_crop" });
+    const fake = new FormData();
+    fake.set("ownerType", "cover_crop");
+    fake.set("ownerId", saved.id);
+    fake.set("file", new File(["<script>"], "x.pdf", { type: "application/pdf" }));
+    expect((await app.request(`${base()}/fertilization/documents`, { method: "POST", headers: auth, body: fake })).status).toBe(400);
+    const list = await (await app.request(`${base()}/fertilization/documents?ownerType=cover_crop&ownerId=${saved.id}`, { headers: worker.headers })).json();
+    expect(list.items).toHaveLength(1);
+    const dl = await app.request(`${base()}/fertilization/documents/${doc.id}`, { headers: worker.headers });
+    expect(dl.headers.get("content-type")).toBe("application/pdf");
+    expect((await dl.text()).startsWith("%PDF")).toBe(true);
+
+    expect((await app.request(`${base()}/land-parcels/${p2026}/cover-crop?campaign=2026`, { method: "DELETE", headers })).status).toBe(204);
+    expect((await app.request(`${base()}/fertilization/documents/${doc.id}`, { headers })).status).toBe(404);
+  });
+});

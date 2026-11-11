@@ -245,8 +245,6 @@ export const BALANCE_TERM_LABELS: Record<BalanceTerm, string> = {
   Nbefore4: "Azote minéral apporté avant 4 feuilles",
 };
 
-const coverFamily = z.enum(["cruciferes", "graminees_seigle_avoine", "graminees_ray_grass", "legumineuses", "hydrophyllacees", "melange_graminees_legumineuses", "melange_cruciferes_legumineuses"]);
-
 export const plannedApplication = z.object({
   stage: z.string().trim().min(1).max(80),
   plannedOn: isoDate.nullable().default(null),
@@ -266,7 +264,6 @@ export const planDraft = z.object({
   tillers: z.number().int().min(0).max(30).nullable().optional(),
   unfavourable: z.boolean().optional(),
   valueA: z.number().min(0).max(400).nullable().optional(),
-  cover: z.object({ family: coverFamily, biomass: z.enum(["le_1", "1_3", "ge_3"]), destruction: z.enum(["nov_dec", "after_january"]) }).nullable().optional(),
   overrides: z.record(z.enum(BALANCE_TERMS), z.object({ value: z.number().min(-500).max(1000), reason: z.string().trim().min(3).max(300) })).optional(),
   applications: z.array(plannedApplication).max(8).optional(),
   external: z
@@ -274,6 +271,10 @@ export const planDraft = z.object({
     .nullable()
     .optional(),
   note: z.string().trim().max(1000).nullable().optional(),
+  /** Date d'ouverture du bilan (date du reliquat) ; à défaut, le 1er avril (culture de printemps) ou le 1er février. */
+  openingOn: isoDate.nullable().optional(),
+  /** Période d'implantation envisagée, telle que l'écrit l'exploitant (« 10 au 20 avril »). */
+  sowingPeriod: z.string().trim().max(80).nullable().optional(),
 });
 export type PlanDraft = z.infer<typeof planDraft>;
 
@@ -319,6 +320,12 @@ export interface PlanContext {
   water: { origin: "surface" | "groundwater" | null; no3MgL: number | null; name: string | null };
   irrigationMm: { value: number; detail: string } | null;
   zone: string | null;
+  /** Date d'ouverture du bilan retenue et son origine. */
+  opening: { on: string; origin: "entered" | "rsh" | "default" };
+  /** Période d'implantation envisagée (saisie) et semis réalisé, s'il est saisi. */
+  sowing: { period: string | null; sownOn: string | null };
+  /** Couvert d'interculture qui précède la culture. */
+  cover: CoverCrop | null;
 }
 
 export interface PlanVersion {
@@ -426,6 +433,8 @@ export interface RecordParcel {
   yieldQHa: number | null;
   /** Gestion de l'interculture et des résidus d'après les interventions (broyage, labour…). */
   interculture: { date: string; label: string }[];
+  /** Couvert d'interculture saisi (espèces, dates, exporté ou non). */
+  cover: CoverCrop | null;
   /** Techniques culturales simplifiées : aucun labour sur la campagne et les deux précédentes. */
   noPlowing: boolean | null;
   applications: RecordApplication[];
@@ -444,3 +453,54 @@ export interface FertilizationRecord {
   toComplete: number;
   late: number;
 }
+
+// --- Lot AI : couverts d'interculture, justificatifs, contrôle enregistré ----------------
+
+export const COVER_FAMILY_LABELS = {
+  cruciferes: "Crucifères (moutarde, radis…)",
+  graminees_seigle_avoine: "Graminées type seigle, avoine",
+  graminees_ray_grass: "Graminées type ray-grass",
+  legumineuses: "Légumineuses",
+  hydrophyllacees: "Phacélie",
+  melange_graminees_legumineuses: "Mélange graminées-légumineuses",
+  melange_cruciferes_legumineuses: "Mélange crucifères-légumineuses",
+} as const;
+export type CoverFamilyKey = keyof typeof COVER_FAMILY_LABELS;
+
+export const coverCropWrite = z
+  .object({
+    campaign: z.number().int().min(2000).max(2100),
+    family: z.enum(Object.keys(COVER_FAMILY_LABELS) as [CoverFamilyKey, ...CoverFamilyKey[]]),
+    species: z.string().trim().min(1).max(200),
+    sownOn: isoDate,
+    destroyedOn: isoDate.nullable().default(null),
+    exported: z.boolean().default(false),
+    biomass: z.enum(["le_1", "1_3", "ge_3"]).nullable().default(null),
+    destructionMode: z.enum(["mechanical", "chemical", "frost", "harvest", "grazing"]).nullable().default(null),
+    notes: z.string().trim().max(1000).nullable().default(null),
+  })
+  .refine((c) => !c.destroyedOn || c.destroyedOn >= c.sownOn, { message: "La destruction suit le semis." });
+export type CoverCropWrite = z.infer<typeof coverCropWrite>;
+export type CoverCrop = CoverCropWrite & { id: string; parcelId: string };
+
+export const COVER_BIOMASS_LABELS = { le_1: "1 t MS/ha ou moins", "1_3": "1 à 3 t MS/ha", ge_3: "3 t MS/ha ou plus" } as const;
+export const DESTRUCTION_MODE_LABELS = { mechanical: "Mécanique (broyage, labour)", chemical: "Chimique", frost: "Gel", harvest: "Récolte ou fauche", grazing: "Pâturage" } as const;
+
+export const DOCUMENT_OWNER_TYPES = ["plan", "soil_analysis", "water_source", "product_analysis", "cover_crop"] as const;
+export type DocumentOwnerType = (typeof DOCUMENT_OWNER_TYPES)[number];
+export const DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
+export const DOCUMENT_TYPES = ["application/pdf", "image/jpeg", "image/png"] as const;
+
+export interface RegulatoryDocument {
+  id: string;
+  ownerType: DocumentOwnerType;
+  ownerId: string;
+  name: string;
+  contentType: string;
+  size: number;
+  uploadedAt: string;
+  uploadedBy: string | null;
+}
+
+/** Contrôle nitrates enregistré avec une intervention réalisée, et le motif d'un passage outre. */
+export type NitrateCheckRecord = FertilizationCheck & { reason: string | null; checkedAt: string };

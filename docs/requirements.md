@@ -218,10 +218,11 @@ conception : [`teledetection-design.md`](teledetection-design.md).
   d'enregistrement, notamment en zone vulnérable nitrates.
   Exigences détaillées (2026-11-11) :
   [`fertilisation-exigences.md`](fertilisation-exigences.md). *Réalisé (lots AE
-  à AH, [`fertilisation-design.md`](fertilisation-design.md)) pour la
+  à AI, [`fertilisation-design.md`](fertilisation-design.md)) pour la
   Nouvelle-Aquitaine : composition des fertilisants, zonage, référentiel
   régional, plan prévisionnel de fumure calculé et versionné, cahier
-  d'enregistrement, contrôles à la saisie, éditions.*
+  d'enregistrement, contrôles à la saisie, interdiction d'épandage bloquante
+  avec motif, couverts d'interculture, justificatifs joints, éditions.*
 - **FR-REG-4 (S)** Indicateurs HVE (repris de `ekylibre-hve`).
 
 ### 4.11 Migration depuis Ekylibre

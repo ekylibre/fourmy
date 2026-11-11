@@ -79,12 +79,14 @@ describe("fertilisation azotée", () => {
       http.get("*/fertilization/parcels", () => HttpResponse.json({ items: [context(), context({ parcelId: "p2", name: "Autre", areaM2: 20000, zone: null, analyses: [] })] })),
       http.get("*/water-sources", () => HttpResponse.json({ items: [water] })),
     );
-    renderApp(`/f/${FARM}/fertilization`);
+    renderApp(`/f/${FARM}/fertilization?at=2026-06-01`);
     expect(await screen.findByLabelText("Obligations")).toHaveTextContent("1 parcelle en zone vulnérable (6,00 ha)");
     const table = screen.getByRole("table", { name: "Parcelles et zonage" });
     expect(within(table).getByText("46 kg N/ha (10/02/2026)")).toBeInTheDocument();
     expect(within(table).getAllByText("à renseigner")).toHaveLength(2);
     expect(await within(screen.getByLabelText("Points d'eau d'irrigation")).findByText(/18 mg\/L \(bandelette/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Actualiser le zonage" })).toBeInTheDocument();
+    // 6 ha en zone vulnérable : analyse annuelle ; le reliquat du 10/02/2026 compte pour la campagne 2026.
+    expect(await screen.findByLabelText("Analyse de sol annuelle")).toHaveTextContent("Analyse de sol de la campagne 2026 faite : reliquat sortie d'hiver le 10/02/2026 (Les Rouffiats).");
   });
 });
