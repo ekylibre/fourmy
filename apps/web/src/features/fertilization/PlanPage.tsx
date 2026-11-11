@@ -40,7 +40,7 @@ import {
   type PlannedApplication,
   type PlanTermValue,
 } from "@fourmy/contracts";
-import { NA_SOIL_TYPE_LABELS, isNaSoilType } from "@fourmy/fertilization-refs";
+import { NA_SOIL_TYPE_LABELS, isNaSoilType, naRapeseedMha } from "@fourmy/fertilization-refs";
 import { api, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { formatDate, formatDateTime } from "../../app/labels";
@@ -258,6 +258,7 @@ export function PlanPage() {
               />
             )}
           </SimpleGrid>
+          {c.crop === "rapeseed_winter" && <RapeseedInputs owner={owner} value={draft.rapeseed} onChange={(rapeseed) => update({ rapeseed })} />}
           {["soft_wheat", "durum_wheat", "improver_wheat", "barley_winter", "rye", "triticale", "oat"].includes(c.crop) && (
             <Switch
               mt="sm"
@@ -307,6 +308,8 @@ export function PlanPage() {
         )}
         {r.floor30 && <Text size="sm" mt="xs">Dose inférieure à 30 kg : le forfait de 30 kg est possible si l'apport ne peut pas être plus précis (article 12).</Text>}
       </Paper>
+
+      <Organics farmId={farm.id} owner={owner} organics={c.organics ?? []} planned={draft.organics ?? []} onChange={(organics) => update({ organics })} />
 
       <CoverSection
         farmId={farm.id}
@@ -908,6 +911,179 @@ function Steering({
             </Button>
           </Group>
         </Stack>
+      )}
+    </Paper>
+  );
+}
+
+type RapeseedDraft = NonNullable<PlanDraft["rapeseed"]>;
+type Frequency = NonNullable<RapeseedDraft["organicHistory"]>["frequency"];
+const RAPESEED_BLANK: RapeseedDraft = { biomassEndWinterKgM2: null, biomassStartWinterKgM2: null, legumeCompanion: false, organicHistory: null };
+const FREQUENCIES = [
+  { value: "every_year", label: "Tous les ans" },
+  { value: "two_in_three", label: "2 années sur 3" },
+  { value: "every_two", label: "Tous les 2 ans" },
+  { value: "every_three_or_more", label: "Tous les 3 ans et plus" },
+];
+
+/** Colza (annexe 2.4) : pesées de matière verte, légumineuses associées, historique d'apports organiques. */
+function RapeseedInputs({ owner, value, onChange }: { owner: boolean; value: PlanDraft["rapeseed"]; onChange: (v: RapeseedDraft) => void }) {
+  const r = value ?? RAPESEED_BLANK;
+  const num = (v: string) => {
+    const x = v.replace(",", ".").replace(/[^\d.]/g, "");
+    return x ? Number(x) : null;
+  };
+  return (
+    <Stack gap="xs" mt="sm" aria-label="Colza">
+      <SimpleGrid cols={2}>
+        <NumberInput
+          label="Matière verte en sortie d'hiver (kg/m²)"
+          description="Pesée juste avant le premier apport (Pi)"
+          decimalSeparator=","
+          disabled={!owner}
+          min={0}
+          defaultValue={r.biomassEndWinterKgM2 ?? ""}
+          onBlur={(e) => onChange({ ...r, biomassEndWinterKgM2: num(e.currentTarget.value) })}
+        />
+        <NumberInput
+          label="Matière verte en entrée d'hiver (kg/m²)"
+          description="Si le gel est fréquent"
+          decimalSeparator=","
+          disabled={!owner}
+          min={0}
+          defaultValue={r.biomassStartWinterKgM2 ?? ""}
+          onBlur={(e) => onChange({ ...r, biomassStartWinterKgM2: num(e.currentTarget.value) })}
+        />
+        <Select
+          label="Historique d'apports organiques (Mha)"
+          data={naRapeseedMha.rows.map((x) => x.product)}
+          value={r.organicHistory?.product ?? null}
+          disabled={!owner}
+          clearable
+          onChange={(v) => onChange({ ...r, organicHistory: v ? { product: v, frequency: r.organicHistory?.frequency ?? "every_two" } : null })}
+        />
+        <Select
+          label="Fréquence"
+          data={FREQUENCIES}
+          value={r.organicHistory?.frequency ?? null}
+          disabled={!owner || !r.organicHistory}
+          allowDeselect={false}
+          onChange={(v) => r.organicHistory && v && onChange({ ...r, organicHistory: { ...r.organicHistory, frequency: v as Frequency } })}
+        />
+      </SimpleGrid>
+      <Switch
+        disabled={!owner}
+        label="Colza associé à des légumineuses levées et développées (Fass)"
+        checked={r.legumeCompanion}
+        onChange={(e) => onChange({ ...r, legumeCompanion: e.currentTarget.checked })}
+      />
+    </Stack>
+  );
+}
+
+/**
+ * Produits organiques de la campagne (lot AO) : apports réalisés (interventions)
+ * et prévus, avec leur équivalent minéral (annexe 5) compté dans Xa ou dans
+ * l'estimation du reliquat.
+ */
+function Organics({
+  farmId,
+  owner,
+  organics,
+  planned,
+  onChange,
+}: {
+  farmId: string;
+  owner: boolean;
+  organics: FertilizationPlan["context"]["organics"];
+  planned: NonNullable<PlanDraft["organics"]>;
+  onChange: (o: NonNullable<PlanDraft["organics"]>) => void;
+}) {
+  const fertilizers = useFertilizers(farmId);
+  const options = [...(fertilizers.data?.values() ?? [])]
+    .filter((f) => {
+      const c = f.composition ?? f.proposal;
+      return c && c.basis !== "mass_percent";
+    })
+    .map((f) => ({ value: f.id, label: `${f.name} (${(f.composition ?? f.proposal)?.basis === "kg_per_m3" ? "m³" : "t"} par ha)` }));
+  const [form, setForm] = useState<{ articleId: string | null; quantity: number | ""; plannedOn: string } | null>(null);
+  return (
+    <Paper withBorder p="md" aria-label="Produits organiques">
+      <Group justify="space-between">
+        <div>
+          <Title order={4}>Produits organiques</Title>
+          <Text size="sm" c="dimmed">
+            Apports réalisés et prévus sur la campagne. Leur équivalent engrais minéral (Keq de l'annexe 5) est déduit de la dose (Xa) ; un apport avant
+            l'ouverture compte aussi dans l'estimation du reliquat.
+          </Text>
+        </div>
+        {owner && !form && (
+          <Button size="compact-sm" variant="light" leftSection={<Plus size={14} />} onClick={() => setForm({ articleId: null, quantity: "", plannedOn: new Date().toISOString().slice(0, 10) })}>
+            Prévoir un apport
+          </Button>
+        )}
+      </Group>
+      {organics.length > 0 && (
+        <Table fz="sm" mt="xs">
+          <Table.Tbody>
+            {organics.map((o, k) => (
+              <Table.Tr key={k}>
+                <Table.Td className="lv-num">{formatDate(o.date)}</Table.Td>
+                <Table.Td>
+                  {o.product}
+                  {o.planned ? (
+                    <Badge size="xs" variant="light" ml={4}>
+                      prévu
+                    </Badge>
+                  ) : null}
+                </Table.Td>
+                <Table.Td className="lv-num">{fmt(o.nTotalKgHa)} kg N/ha</Table.Td>
+                <Table.Td>
+                  {o.missing ? (
+                    <Missing>{o.missing}</Missing>
+                  ) : (
+                    <Text span size="sm">
+                      {o.period} : Xa {fmt(o.xa)} kg{o.ri ? `, ${fmt(o.ri)} kg dans le reliquat` : ""}
+                      {o.notRecommended ? " · période déconseillée (lixiviation)" : ""}
+                    </Text>
+                  )}
+                </Table.Td>
+                <Table.Td>
+                  {owner && o.planned && (
+                    <ActionIcon
+                      variant="subtle"
+                      color="brique"
+                      aria-label={`Retirer l'apport prévu de ${o.product}`}
+                      onClick={() => onChange(planned.filter((p) => !(p.plannedOn === o.date && fertilizers.data?.get(p.articleId)?.name === o.product)))}
+                    >
+                      <Trash2 size={14} />
+                    </ActionIcon>
+                  )}
+                </Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      )}
+      {form && (
+        <Group mt="xs" align="flex-end">
+          <Select label="Produit" data={options} value={form.articleId} searchable onChange={(v) => setForm({ ...form, articleId: v })} w={280} />
+          <NumberInput label="Quantité par hectare" decimalSeparator="," min={0} value={form.quantity} onChange={(v) => setForm({ ...form, quantity: v === "" ? "" : Number(v) })} w={160} />
+          <TextInput label="Date prévue" type="date" value={form.plannedOn} onChange={(e) => setForm({ ...form, plannedOn: e.currentTarget.value })} />
+          <Button
+            size="xs"
+            disabled={!form.articleId || !(Number(form.quantity) > 0) || !form.plannedOn}
+            onClick={() => {
+              onChange([...planned, { articleId: form.articleId!, quantity: Number(form.quantity), plannedOn: form.plannedOn }]);
+              setForm(null);
+            }}
+          >
+            Ajouter
+          </Button>
+          <Button size="xs" variant="subtle" onClick={() => setForm(null)}>
+            Annuler
+          </Button>
+        </Group>
       )}
     </Paper>
   );

@@ -22,6 +22,9 @@ import {
   nitrogenOfInput,
   splitDose,
   steeringAllowance,
+  keqOf,
+  keqTotal,
+  type KeqApplication,
   SPRING_CROPS,
   yieldTarget as olympicYield,
   type BalanceInput,
@@ -168,7 +171,13 @@ export async function previousOf(tx: Tx, farmId: string, parcelId: string, campa
 }
 
 /** Azote minéral apporté (kg N/ha) sur une parcelle entre deux dates, d'après les compositions ; null si un apport est incalculable. */
-async function mineralNApplied(tx: Tx, parcelId: string, from: string, to: string, fertilizers: Map<string, FertilizerArticle>): Promise<{ total: number; uncounted: string[] }> {
+async function mineralNApplied(
+  tx: Tx,
+  parcelId: string,
+  from: string,
+  to: string,
+  fertilizers: Map<string, FertilizerArticle>,
+): Promise<{ total: number; uncounted: string[]; organics: KeqApplication[] }> {
   const inputs = await rows<{ day: string; article_id: string; quantity: string; unit: string | null; area_m2: string | null; worked: string | null }>(
     tx,
     sql`SELECT i.started_at::date::text AS day, p.ref_id AS article_id, p.quantity, p.unit,
@@ -181,6 +190,8 @@ async function mineralNApplied(tx: Tx, parcelId: string, from: string, to: strin
   );
   let total = 0;
   const uncounted = new Set<string>();
+  // Produits organiques (types 0 à II) : leur équivalent minéral se lit à l'annexe 5 (lot AO).
+  const organics: KeqApplication[] = [];
   for (const r of inputs) {
     const f = fertilizers.get(r.article_id);
     if (!f) continue;
@@ -193,9 +204,10 @@ async function mineralNApplied(tx: Tx, parcelId: string, from: string, to: strin
       continue;
     }
     if (eff!.composition.nitrateType === "III" || eff!.composition.nMineralShare === 1) total += n.totalKgHa;
+    else if (n.totalKgHa > 0 && eff!.composition.nitrateType) organics.push({ date: r.day, product: f.name, proKey: eff!.composition.proProduct ?? null, nTotalKgHa: n.totalKgHa });
     else if (n.totalKgHa > 0) uncounted.add(`${f.name} (type de fertilisant à préciser)`);
   }
-  return { total: Math.round(total), uncounted: [...uncounted] };
+  return { total: Math.round(total), uncounted: [...uncounted], organics };
 }
 
 /** Pluie du 1er octobre de l'année précédente à `toMd` (MM-JJ) : observée, puis normales pour les jours à venir. */
@@ -228,9 +240,9 @@ async function contextOf(db: Database, farmId: string, plan: PlanRow, fertilizer
   const variety = plan.species && plan.species !== plan.cultivation ? plan.species : null;
   const d = plan.draft;
   const gathered = await withFarm(db, farmId, async (tx) => {
-    const [soil] = await rows<{ soil_type: string | null; irrigated: boolean | null; origin: "surface" | "groundwater" | null; nitrate: string | null; wname: string | null; insee: string | null; status: string | null }>(
+    const [soil] = await rows<{ soil_type: string | null; irrigated: boolean | null; depth: number | null; origin: "surface" | "groundwater" | null; nitrate: string | null; wname: string | null; insee: string | null; status: string | null }>(
       tx,
-      sql`SELECT ps.soil_type, ps.irrigated, w.origin, w.nitrate_mg_l AS nitrate, w.name AS wname, z.insee, z.status
+      sql`SELECT ps.soil_type, ps.irrigated, ps.rooting_depth_cm AS depth, w.origin, w.nitrate_mg_l AS nitrate, w.name AS wname, z.insee, z.status
           FROM land_parcels lp
           LEFT JOIN parcel_soils ps ON ps.land_parcel_id = lp.id
           LEFT JOIN water_sources w ON w.id = ps.water_source_id
@@ -265,7 +277,9 @@ async function contextOf(db: Database, farmId: string, plan: PlanRow, fertilizer
           JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_id = ${plan.land_parcel_id}
           WHERE i.status = 'done' AND i.procedure = ANY(${arr(SOWING)}::text[]) AND i.started_at >= make_date(${plan.campaign - 1}, 7, 1) AND i.started_at < make_date(${plan.campaign}, 8, 1)`,
     );
-    return { soil, prev, yields, prods, prevN, prevIrrigation, rsh: rsh[0] ?? null, cover, sownOn: sown?.day ?? null };
+    // Apports organiques réalisés sur la parcelle depuis l'été qui précède la campagne (lot AO).
+    const campaignN = await mineralNApplied(tx, plan.land_parcel_id, `${plan.campaign - 1}-07-01`, `${plan.campaign}-08-01`, fertilizers);
+    return { soil, prev, yields, prods, prevN, prevIrrigation, rsh: rsh[0] ?? null, cover, sownOn: sown?.day ?? null, campaignOrganics: campaignN.organics };
   });
   const { soil, prev, prevN } = gathered;
   const department = soil?.insee ? soil.insee.slice(0, 2) : null;
@@ -303,6 +317,20 @@ async function contextOf(db: Database, farmId: string, plan: PlanRow, fertilizer
   const openingMd = opening.on.slice(5, 10);
   const openingClass = openingMd >= "04-01" && openingMd <= "09-30" ? "april" : "end_of_winter";
   const cover = gathered.cover;
+  // Équivalent minéral des organiques : réalisés et prévus sur la campagne (Xa, Keq Ri), et du précédent (Keq cycle).
+  const planned: KeqApplication[] = (d.organics ?? []).flatMap((o) => {
+    const f = fertilizers.get(o.articleId);
+    const eff = f ? effectiveComposition(f, o.plannedOn) : null;
+    if (!f || !eff) return [];
+    const n = nitrogenOfInput({ quantity: o.quantity, per: "hectare", unit: f.unit, areaHa: null, composition: eff.composition });
+    return "missing" in n ? [] : [{ date: o.plannedOn, product: f.name, proKey: eff.composition.proProduct ?? null, nTotalKgHa: n.totalKgHa }];
+  });
+  const organicResults = [
+    ...gathered.campaignOrganics.map((a) => ({ ...keqOf(a, crop, opening.on, "campaign"), planned: false })),
+    ...planned.map((a) => ({ ...keqOf(a, crop, opening.on, "campaign"), planned: true })),
+  ].sort((a, b) => a.date.localeCompare(b.date));
+  const organicTotal = keqTotal(organicResults);
+  const prevOrganics = prevCrop && prevN ? keqTotal(prevN.organics.map((a) => keqOf(a, prevCrop, null, "previous"))) : null;
   const destroyedMonth = cover?.destroyedOn ? Number(cover.destroyedOn.slice(5, 7)) : null;
 
   const context: PlanContext = {
@@ -322,7 +350,20 @@ async function contextOf(db: Database, farmId: string, plan: PlanRow, fertilizer
     opening,
     sowing: { period: d.sowingPeriod ?? null, sownOn: gathered.sownOn },
     cover,
+    organics: organicResults.map((r) => ({
+      date: r.date,
+      product: r.product,
+      planned: r.planned,
+      nTotalKgHa: Math.round(r.nTotalKgHa * 10) / 10,
+      period: r.period,
+      xa: Math.round(r.xa * 10) / 10,
+      ri: Math.round(r.ri * 10) / 10,
+      keq: r.keq,
+      missing: r.missing,
+      notRecommended: r.notRecommended,
+    })),
   };
+  if (context.previous && prevOrganics?.missing.length) context.previous.uncounted.push(...prevOrganics.missing);
   const input: BalanceInput = {
     campaign: plan.campaign,
     department: department ?? "",
@@ -333,7 +374,19 @@ async function contextOf(db: Database, farmId: string, plan: PlanRow, fertilizer
     yieldTarget: yieldTarget?.value ?? null,
     rshMeasured: context.rsh,
     tillers: d.tillers ?? null,
-    previous: prevCrop ? { crop: prevCrop, strawReturned: isStrawCereal(prevCrop) ? strawReturned : null, yieldRealized: prevYield, xMineral: prevN?.total ?? null } : null,
+    previous: prevCrop
+      ? { crop: prevCrop, strawReturned: isStrawCereal(prevCrop) ? strawReturned : null, yieldRealized: prevYield, xMineral: prevN?.total ?? null, xaCycle: prevOrganics?.xa ?? 0 }
+      : null,
+    xa: organicTotal.missing.length
+      ? { missing: `équivalent minéral des produits organiques : ${organicTotal.missing.join(" ; ")}` }
+      : organicResults.length
+        ? { value: organicTotal.xa, detail: organicTotal.detail }
+        : null,
+    xaBeforeOpening: organicTotal.ri,
+    // Colza (annexe 2.4) : profondeur du sol, précédent pois, pesées et historique organique.
+    rootingDepthCm: soil?.depth ?? null,
+    previousIsPea: !!prev && /pisum|\bpea\b|_pea|pois/i.test(`${prev.reference ?? ""} ${prev.cultivation ?? ""}`),
+    rapeseed: d.rapeseed ?? null,
     opening: openingClass,
     // Repousses : pas de référence MrCi, comptées nulles.
     cover: cover?.family

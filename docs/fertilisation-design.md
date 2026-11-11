@@ -645,6 +645,39 @@ La forme vient du nom ou du code Lexicon de l'engrais. Les NPK, le sulfate d'amm
 - Fiche de la carte : rappel de l'apport et de la dose moyenne réelle.
 - Plan : liste des cartes parties de ses apports, avec leur moyenne.
 
+### 5.10 Réalisation du lot AO : produits organiques et colza (2026-11-11)
+
+**Constat avant le lot** : le plan ne comptait aucun apport organique. Xa valait toujours 0, et l'APL du précédent ignorait ses effluents. Pour une ferme d'élevage, la dose était donc surestimée.
+
+**Keq** (`packages/domain/src/fertilization/keq.ts`, annexe 5) : Xa = Npro × Q × Keq, soit l'azote total apporté × Keq.
+- Un fertilisant organique se rattache à une ligne de l'annexe 5 dans sa fiche (`article_fertilizers.pro_product`, migration 0043). Npro est la teneur du produit, ou son analyse.
+- Après l'ouverture du bilan : Keq bilan (= Keq cycle), compté dans Xa.
+- Avant l'ouverture : Keq Ri dans l'APL (estimation du reliquat) et Keq bilan dans Xa. Pour le colza, seul le Keq bilan est imprimé.
+- Précédent : Keq cycle, ajouté à l'APL (`xaCycle`).
+- Colonne selon la culture : céréales à paille, colza, maïs-sorgho-tabac, prairies, autres cultures.
+- **Périodes, non datées par l'annexe** : « fin d'été » jusqu'au 15/09, « automne » ensuite jusqu'à l'ouverture, « printemps » (ou « après ouverture » pour le colza) après. Les prairies et autres cultures n'ont que « automne » et « printemps ».
+- Une case « nr » ou « dire d'expert », ou un produit sans ligne de l'annexe, rend Xa manquant et le nomme : la dose n'est pas calculée. « ng » vaut 0. Les cases surlignées de l'annexe (période déconseillée) sont signalées.
+
+**Apports pris en compte** :
+- réalisés sur la parcelle depuis le 1er juillet qui précède la campagne (types 0 à II) ;
+- prévus au brouillon du plan (`draft.organics` : produit, quantité par hectare, date) ;
+- pour le précédent, ceux de sa campagne.
+
+**Colza** (`computeRapeseed`, annexe 2.4, bilan additif) : X = (Pf + Rf) − (Pi + Ri + M + Fleg + Fass + Mha + Nirr + Xa).
+- Pf = 7 × objectif, 330 au plus.
+- Rf, Ri (forfait si le reliquat n'est pas mesuré) et M selon la profondeur d'enracinement du sol (80 cm ou moins, ou plus).
+- Pi d'après les pesées de matière verte : sortie d'hiver × 65, ou la formule de gel si la pesée d'entrée d'hiver × 50 est plus forte.
+- Fleg : 25 kg après un pois protéagineux.
+- Fass : 30 kg si le colza est associé à des légumineuses développées.
+- Mha : tableau 5 (produit et fréquence).
+- Nirr au-delà de 100 mm, et Xa.
+- X est plafonné à 250 kg. Sans pesée de sortie d'hiver ou sans profondeur, la dose n'est pas calculée, et le plan rappelle la méthode de pesée.
+
+**Écrans** :
+- Fiche d'un fertilisant organique : « Référence de l'annexe 5 (Keq) ».
+- Plan : section « Produits organiques » (réalisés et prévus, Xa et part dans le reliquat, « prévoir un apport ») ; saisies propres au colza.
+- Plan imprimé : liste des produits organiques avec leur Xa.
+
 ## 6. Contrats (`@fourmy/contracts`, `fertilization.ts`)
 
 - `FertilizerComposition`, `ArticleFertilizerWrite` : zod, unités explicites.
@@ -738,7 +771,8 @@ Les termes encore **manquants** sont listés (« à compléter ») sur le tablea
 | **AL — Efficacité des apports** | Grille du COMIFER 2022 à la saisie, sur la fiche et au cahier ; vent dans le cache météo | FR-FERT-29 |
 | **AM — Épandage sur les couverts** | Interdictions et plafonds d'azote efficace du tableau 4 du PAR 7 NA | FR-FERT-25 (PAR) |
 | **AN — Modulation d'un apport du plan** | Carte partie d'un apport, moyenne pondérée conservée, liens entre plan et cartes | FR-FERT-18 |
-| AO — ensuite | Colza et Keq, plan de fumure d'un couvert exporté, rôle conseiller, mobile | FR-FERT-35, 40 ; NFR-FERT-7 |
+| **AO — Organiques et colza** | Keq de l'annexe 5 dans Xa et l'APL, apports organiques prévus, colza (annexe 2.4) | FR-FERT-10, 11 |
+| AP — ensuite | Plan de fumure d'un couvert exporté, rôle conseiller, mobile, autres régions | FR-FERT-35, 40 ; NFR-FERT-7 |
 
 ## 11. Tests
 

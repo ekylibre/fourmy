@@ -97,6 +97,7 @@ export function effectiveComposition(
         foliar: false,
         cN: analysis.cN ?? base?.cN ?? null,
         aplshProduct: base?.aplshProduct ?? null,
+        proProduct: base?.proProduct ?? null,
       },
     };
   }

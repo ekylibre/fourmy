@@ -14,6 +14,12 @@ import {
   mrci as mrciTable,
   naMethods,
   naOtherCeilings,
+  naRapeseedEquation,
+  naRapeseedM,
+  naRapeseedMha,
+  naRapeseedPi,
+  naRapeseedRf,
+  naRapeseedRi,
   nirr as nirrTable,
   piTillers,
   precedentsApl,
@@ -48,7 +54,7 @@ import { aplKeyOf, isMaizeOrSorghum, isStrawCereal, mrKeyOf, SPRING_CROPS } from
  * incomplet : rien n'est supposé en silence.
  */
 
-export type Term = "Pf" | "Rf" | "Ri" | "Pi" | "Mh" | "Mhp" | "Mr" | "MrCi" | "Nirr" | "Xa" | "CAU" | "Nbefore4";
+export type Term = "Pf" | "Rf" | "Ri" | "Pi" | "Mh" | "Mhp" | "Mr" | "MrCi" | "M" | "Fleg" | "Fass" | "Mha" | "Nirr" | "Xa" | "CAU" | "Nbefore4";
 export type TermOrigin = "computed" | "measured" | "reference" | "entered" | "override";
 export interface TermValue {
   value: number;
@@ -102,7 +108,7 @@ export interface BalanceInput {
   /** Équivalent minéral des produits organiques apportés avant l'ouverture (Keq Ri, kg N/ha), pour l'APL. */
   xaBeforeOpening?: number;
   /** Produits organiques après l'ouverture : Xa (Keq bilan), kg N/ha. */
-  xa?: { value: number; detail: string } | null;
+  xa?: { value: number; detail: string } | { missing: string } | null;
   irrigation?: { plannedMm: number; no3MgL: number | null; origin: "surface" | "groundwater" | null } | null;
   /** Maïs : azote minéral apporté avant 4 feuilles (kg N/ha), plafonné par le PAR. */
   nBefore4Leaves?: number;
@@ -112,6 +118,17 @@ export interface BalanceInput {
   overrides?: Partial<Record<Term, { value: number; reason: string }>>;
   /** Campagne (année de récolte) : version des tables annuelles. */
   campaign: number;
+  /** Profondeur d'enracinement du sol (cm) : colza (Rf, Ri et M forfaitaires). */
+  rootingDepthCm?: number | null;
+  /** Précédent pois protéagineux (colza : Fleg). */
+  previousIsPea?: boolean;
+  /** Colza : pesées, légumineuses associées, historique organique. */
+  rapeseed?: {
+    biomassEndWinterKgM2: number | null;
+    biomassStartWinterKgM2: number | null;
+    legumeCompanion: boolean;
+    organicHistory: { product: string; frequency: "every_year" | "two_in_three" | "every_two" | "every_three_or_more" } | null;
+  } | null;
 }
 
 export interface BalanceResult {
@@ -193,6 +210,7 @@ export function computeBalance(input: BalanceInput): BalanceResult {
   const m = methodOf(input.crop, input.department);
   const maize = isMaizeOrSorghum(input.crop);
   const cereal = isStrawCereal(input.crop);
+  if (input.crop === "rapeseed_winter" && m?.method === "bilan_additive") return computeRapeseed(input, m.annex);
 
   // --- Méthodes sans bilan : dose plafond -------------------------------------
   if (!m || m.method === "ceiling" || (!maize && !cereal)) {
@@ -338,7 +356,14 @@ export function computeBalance(input: BalanceInput): BalanceResult {
   }
 
   // --- Xa, CAU ---------------------------------------------------------------------------
-  set("Xa", input.xa ? { value: round(input.xa.value), origin: "computed", source: "apports organiques", detail: input.xa.detail } : { value: 0, origin: "computed", source: "apports organiques", detail: "aucun produit organique après l'ouverture" });
+  set(
+    "Xa",
+    !input.xa
+      ? { value: 0, origin: "computed", source: "apports organiques", detail: "aucun produit organique" }
+      : "missing" in input.xa
+        ? { missing: input.xa.missing }
+        : { value: round(input.xa.value), origin: "computed", source: "Annexe 5 : Xa = Npro × Q × Keq", detail: input.xa.detail },
+  );
   let cauAfter: number;
   let cauBefore = 0;
   if (maize) {
@@ -447,4 +472,113 @@ export function yieldTarget(
   }
   if (fallback) return { value: fallback.value, origin: "reference", detail: `${recent.length} campagne(s) seulement sur la ferme : ${fallback.source}` };
   return { missing: "pas assez de récoltes sur la ferme, ni de référence départementale" };
+}
+
+/**
+ * Colza d'hiver (annexe 2.4, bilan additif, lot AO) :
+ * X = (Pf + Rf) − (Pi + Ri + M + Fleg + Fass + Mha + Nirr + Xa), plafonné à 250 kg.
+ * Pf = 7 × objectif (330 au plus) ; Rf, Ri (forfaitaire si non mesuré) et M
+ * selon la profondeur du sol (80 cm) ; Pi d'après les pesées de matière verte
+ * en sortie d'hiver (et en entrée d'hiver en cas de gel).
+ */
+export function computeRapeseed(input: BalanceInput, annex: string): BalanceResult {
+  const terms: Partial<Record<Term, TermResult>> = {};
+  const warnings: string[] = [];
+  const o = input.overrides ?? {};
+  const set = (t: Term, v: TermResult) => {
+    const ov = o[t];
+    terms[t] = ov ? { value: ov.value, origin: "override", source: "valeur de la ferme", detail: ov.reason } : v;
+  };
+  const eq = naRapeseedEquation;
+  const src = (t: { source: { ref?: string } }) => t.source.ref ?? "Annexe 2.4";
+  const y = input.yieldTarget;
+  if (y === null || !(y > 0)) set("Pf", { missing: "objectif de rendement" });
+  else {
+    const pf = Math.min(eq.bKgNPerQ * y, eq.pfMaxKgNHa);
+    set("Pf", { value: round(pf), origin: "reference", source: "Annexe 2.4 : Pf = b × y, b = 7 (Terres Inovia), 330 au plus", detail: `${round(y)} q × 7${eq.bKgNPerQ * y > eq.pfMaxKgNHa ? " plafonné à 330" : ""}` });
+  }
+  const depth = input.rootingDepthCm ?? null;
+  const byDepth = (t: { rows: { maxDepthCm: number | null; valueKgNHa: number; depth: string }[]; source: { ref?: string } }) =>
+    depth === null ? null : t.rows.find((r) => (r.maxDepthCm === null ? depth > 80 : depth <= r.maxDepthCm))!;
+  const noDepth = { missing: "profondeur d'enracinement du sol (onglet Sol de la parcelle)" };
+  const rf = byDepth(naRapeseedRf);
+  set("Rf", rf ? { value: rf.valueKgNHa, origin: "reference", source: src(naRapeseedRf), detail: `sol ${rf.depth}` } : noDepth);
+  if (input.rshMeasured) set("Ri", { value: round(input.rshMeasured.kgNHa), origin: "measured", source: "reliquat mesuré", detail: `prélevé le ${input.rshMeasured.sampledOn.slice(8, 10)}/${input.rshMeasured.sampledOn.slice(5, 7)}` });
+  else {
+    const ri = byDepth(naRapeseedRi);
+    set("Ri", ri ? { value: ri.valueKgNHa, origin: "reference", source: src(naRapeseedRi), detail: `forfait, sol ${ri.depth}` } : noDepth);
+  }
+  const mm = byDepth(naRapeseedM);
+  set("M", mm ? { value: mm.valueKgNHa, origin: "reference", source: src(naRapeseedM), detail: `Mh + Mr forfaitaires, sol ${mm.depth}` } : noDepth);
+  // Pi : pesées de matière verte (kg/m²).
+  const sh = input.rapeseed?.biomassEndWinterKgM2 ?? null;
+  const eh = input.rapeseed?.biomassStartWinterKgM2 ?? null;
+  if (sh === null) set("Pi", { missing: "pesée de matière verte en sortie d'hiver (kg/m²), ou estimation par satellite ou capteur" });
+  else {
+    const nSh = sh * naRapeseedPi.coeffSH;
+    const nEh = eh !== null ? eh * naRapeseedPi.coeffEH : null;
+    if (nEh !== null && nSh < nEh) {
+      const pi = nSh + (0.5 * (nEh - nSh)) / 1.35;
+      set("Pi", { value: round(pi), origin: "computed", source: "Annexe 2.4 §3 : gel hivernal", detail: `${sh} × 65 + 0,5 × (${eh} × 50 − ${sh} × 65) / 1,35` });
+    } else set("Pi", { value: round(nSh), origin: "computed", source: "Annexe 2.4 §3", detail: `${sh} kg/m² × 65` });
+  }
+  set("Fleg", { value: input.previousIsPea ? eq.flegPeaPreviousKgNHa : 0, origin: "reference", source: "Annexe 2.4 : précédent pois protéagineux", detail: input.previousIsPea ? "précédent pois" : "précédent autre que pois" });
+  set("Fass", {
+    value: input.rapeseed?.legumeCompanion ? eq.fassLegumeCompanionKgNHa : 0,
+    origin: "entered",
+    source: "Annexe 2.4 : légumineuses associées levées et développées (Terres Inovia)",
+    detail: input.rapeseed?.legumeCompanion ? "colza associé, croissance des légumineuses à décrire au cahier" : "pas de légumineuses associées",
+  });
+  const hist = input.rapeseed?.organicHistory ?? null;
+  const histRow = hist ? naRapeseedMha.rows.find((r) => r.product === hist.product) : null;
+  if (hist && !histRow) set("Mha", { missing: "produit de l'historique organique absent du tableau 5" });
+  else if (hist && histRow) {
+    const v = { every_year: histRow.everyYear, two_in_three: histRow.twoYearsInThree, every_two: histRow.everyTwoYears, every_three_or_more: histRow.everyThreeYearsOrMore }[hist.frequency];
+    const label = { every_year: "tous les ans", two_in_three: "2 années sur 3", every_two: "tous les 2 ans", every_three_or_more: "tous les 3 ans et plus" }[hist.frequency];
+    set("Mha", { value: v, origin: "reference", source: src(naRapeseedMha), detail: `${hist.product}, ${label}` });
+  } else set("Mha", { value: 0, origin: "entered", source: src(naRapeseedMha), detail: "pas d'historique d'apports organiques" });
+  // Nirr : au-delà de 100 mm prévus.
+  if (!input.irrigated) set("Nirr", { value: 0, origin: "computed", source: "parcelle en sec" });
+  else if (!input.irrigation) set("Nirr", { missing: "volume d'irrigation prévu" });
+  else {
+    const no3 = input.irrigation.no3MgL ?? (input.irrigation.origin === "surface" ? 25 : input.irrigation.origin === "groundwater" ? 40 : null);
+    if (no3 === null) set("Nirr", { missing: "origine de l'eau d'irrigation ou teneur en nitrates mesurée" });
+    else if (input.irrigation.plannedMm <= 100) set("Nirr", { value: 0, origin: "computed", source: "Annexe 2.4 §9", detail: `${round(input.irrigation.plannedMm)} mm, pas au-delà de 100 mm` });
+    else set("Nirr", { value: round((input.irrigation.plannedMm * no3) / 443), origin: "computed", source: "Annexe 2.4 §9 : Nirr = Q × NO3 / 443", detail: `${round(input.irrigation.plannedMm)} mm × ${no3} mg/L / 443` });
+  }
+  set(
+    "Xa",
+    !input.xa
+      ? { value: 0, origin: "computed", source: "apports organiques", detail: "aucun produit organique" }
+      : "missing" in input.xa
+        ? { missing: input.xa.missing }
+        : { value: round(input.xa.value), origin: "computed", source: "Annexe 5 : Xa = Npro × Q × Keq", detail: input.xa.detail },
+  );
+  const missing = (Object.entries(terms) as [Term, TermResult][]).filter(([, t]) => isMissing(t)).map(([k, t]) => `${k} : ${(t as TermMissing).missing}`);
+  const v = (t: Term) => {
+    const x = terms[t];
+    return x && !isMissing(x) ? x.value : 0;
+  };
+  let dose: number | null = null;
+  let negative = false;
+  if (!missing.length) {
+    const raw = v("Pf") + v("Rf") - (v("Pi") + v("Ri") + v("M") + v("Fleg") + v("Fass") + v("Mha") + v("Nirr") + v("Xa"));
+    negative = raw < 0;
+    dose = Math.max(0, Math.min(eq.xMaxKgNHa, round(raw)));
+    if (raw > eq.xMaxKgNHa) warnings.push(`Dose calculée de ${round(raw)} kg ramenée au plafond de ${eq.xMaxKgNHa} kg (annexe 2.4).`);
+    if (negative) warnings.push("Dose calculée négative : aucun apport de fertilisant de type II ou III n'est permis.");
+  }
+  if (sh === null) warnings.push("Colza : pesez la matière verte en sortie d'hiver juste avant le premier apport (2 placettes de 1 m², 4 si la parcelle est hétérogène), et en entrée d'hiver si le gel est fréquent.");
+  return {
+    method: "bilan_additive",
+    annex,
+    equation: eq.equation,
+    terms,
+    dose,
+    ceiling: eq.xMaxKgNHa,
+    floor30: dose !== null && dose > 0 && dose < 30,
+    negative,
+    warnings,
+    missing,
+  };
 }
