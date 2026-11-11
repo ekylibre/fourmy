@@ -16,7 +16,7 @@
 | # | Choix | Écarté | Pourquoi |
 |---|---|---|---|
 | D1 | **Calcul dans `packages/domain`** (`fertilization/`), en fonctions pures : un terme du bilan = une fonction qui rend `{ valeur, origine, détail }` | Service `services/agro` ; reprise du plugin Ekylibre | Mêmes raisons qu'ADR-17 : quelques centaines de lignes, testables et sans conteneur. Le plugin n'a ni tests ni sources sur ses valeurs, et couvre une région qui n'existe plus |
-| D2 | **Écritures et tables du référentiel régional**, pas les formules COMIFER complètes. En Pyrénées-Atlantiques, le maïs suit l'annexe 2.2.b : X = [(Pf + Rf) − (Ri + Mh + Mhp + Mr + MrCi + Nirr + N avant 4 feuilles) − Xa] / CAU, avec Mh lu dans une table (sol × sec ou irrigué) et Ri estimé à partir de l'APL et de la pluie | Mh = TNorg × Km × JN, et les abaques de lixiviation | Le référentiel est la règle opposable (art. 3) et il ne demande pas d'analyse de terre complète. Les formules COMIFER restent possibles pour une autre région (§3.4) |
+| D2 | **Écritures et tables du référentiel régional**, pas les formules COMIFER complètes. En Pyrénées-Atlantiques, le maïs suit l'annexe 2.2.b : X = [(Pf + Rf) − (Ri + Mh + Mhp + Mr + MrCi + Nirr + N avant 4 feuilles)] / CAU − Xa (Xa hors de la fraction, vérifié sur la page imprimée), avec Mh lu dans une table (sol × sec ou irrigué) et Ri estimé à partir de l'APL et de la pluie | Mh = TNorg × Km × JN, et les abaques de lixiviation | Le référentiel est la règle opposable (art. 3) et il ne demande pas d'analyse de terre complète. Les formules COMIFER restent possibles pour une autre région (§3.4) |
 | D3 | **Référentiels en données versionnées dans le dépôt** (`packages/fertilization-refs`, JSON typés). Chaque table porte sa source, son texte, sa date et sa licence. Le PPF établi garde l'identifiant de version utilisé | Tables en base, administrées à l'écran ; abaques CSV à la manière d'Ekylibre | Les références changent par texte (arrêté, classement annuel des variétés), donc par version publiée et revue. Elles sont testées avec le code. La ferme ne modifie que des **valeurs à elle** (D4) |
 | D4 | **Surcharges de la ferme en base** (`fertilization_overrides`) : une valeur, sa portée (ferme, parcelle ou produit), son motif et son justificatif. Exemples : Keq justifié, teneur de l'eau, référence locale de reliquat | Copier tout le référentiel par ferme | Le référentiel autorise ces adaptations (art. 6 et 8) à condition de les justifier. On garde la trace de qui, quand et pourquoi |
 | D5 | **Un PPF par parcelle Fourmy et par campagne**, rattaché à la production principale. L'îlot PAC est affiché quand on le connaît | Regroupement en îlots culturaux | Les parcelles Fourmy de Pierre (« Monassut Maïs 2026 ») sont déjà des îlots culturaux : une culture sur une surface. Un regroupement viendra si une ferme le demande (question ouverte 6 des exigences) |
@@ -24,7 +24,7 @@
 | D7 | **Cahier calculé, jamais stocké.** C'est une lecture des interventions réalisées, des productions, des récoltes et des couverts sur la campagne. Seules les données que Fourmy ne peut pas connaître sont saisies (couvert hors production, gestion des résidus) | Table « cahier » remplie à part | FR-FERT-19 : aucune double saisie. Une correction d'intervention (déjà tracée) corrige le cahier |
 | D8 | **Contrôles réglementaires dans le cadre des contrôles phyto** : même contrat de résultat (`level`, indicateurs, motif de passage outre), affichés dans la saisie et enregistrés avec l'intervention | Un circuit à part | La saisie, la fiche d'intervention et le motif de passage outre existent déjà (lot 2). Le salarié voit les mêmes feux |
 | D9 | **Éditions en pages HTML imprimables** (CSS d'impression, « Imprimer / PDF » du navigateur), plus des exports CSV | Génération PDF côté serveur (pdfkit, Chromium) | Aucune dépendance ni conteneur de plus, rendu identique à l'écran. Le registre phyto exporte déjà en CSV. Un PDF serveur reste possible si les contrôles l'exigent |
-| D10 | **Zonage nitrates par commune** : les communes et leur statut (totale, partielle), tirés de l'arrêté de bassin, sont un référentiel. La commune d'une parcelle vient de l'API Carto (`packages/geo-ign`, déjà utilisé pour le cadastre). Une commune « partielle » est à confirmer par le responsable | Couche WFS Sandre interrogée en direct | La couche Sandre est encore en millésime 2021, alors que le zonage Adour-Garonne date du 24/08/2026. Une liste de communes datée et sourcée est plus sûre. Les sections cadastrales des communes partielles viendront ensuite |
+| D10 | **Zonage nitrates par commune** : les communes et leur statut (totale, partielle), tirés de l'arrêté de bassin, sont un référentiel. La commune d'une parcelle vient de l'API Géo de l'État (geo.api.gouv.fr, `communeAt` dans `packages/geo-ign`) : le service cadastre de l'API Carto répondait 404 le 2026-11-11. Une commune « partielle » est à confirmer par le responsable | Couche WFS Sandre interrogée en direct | La couche Sandre est encore en millésime 2021, alors que le zonage Adour-Garonne date du 24/08/2026. Une liste de communes datée et sourcée est plus sûre. Les sections cadastrales des communes partielles viendront ensuite |
 
 ## 2. Vue d'ensemble
 
@@ -360,6 +360,34 @@ fertilization-refs/
 **Saisie des tables** : beaucoup de tables des annexes sont du texte extractible (`pdftotext`) ; certaines sont des images et seront saisies à la main. Un test de cohérence recalcule les **exemples** des annexes (par exemple Nirr : 160 mm à 40 mg/L donnent 14 kg).
 
 **Mentions** : COMIFER, INRA (AZOBIL), Arvalis, GREN Nouvelle-Aquitaine sur chaque table. La demande d'accord au COMIFER est une tâche du lot AF.
+
+### 5.1 Saisie des tables (lot AF, 2026-11-11)
+
+Les tables ont été recopiées des annexes, puis vérifiées sur les pages imprimées. Le paquet `@fourmy/fertilization-refs` passe 139 tests : effectifs, valeurs vérifiées une à une, sources, et les 30 exemples Nirr imprimés recalculés par `round(mm × NO3 / 443)`.
+
+**Contenu du paquet** :
+- maïs et céréales en bilan CAU : b, Rf, Pi, grilles Ri ou APL × pluie, Mh, Mhp, Mr, MrCi, CAU, Nirr, valeur A ;
+- colza, pivot du tournesol, plafonds (légumes, légumineuses, couverts, autres cultures, vigne) ;
+- produits organiques : 71 produits et 852 Keq ;
+- méthodes par culture et par département, types de sols, rendements de référence, préconisations des reliquats ;
+- fractionnement du PAR 7 ;
+- calendrier du PAN 7 pour la Nouvelle-Aquitaine (jeu data.gouv du 09/09/2025, 4 306 communes) ;
+- zonage Adour-Garonne 2026 (3 312 communes) ;
+- variétés de blé 2026.
+
+**Ce que la saisie a appris, et que le moteur du lot AG devra traiter** :
+- **Xa reste hors de la fraction** : X = [(Pf + Rf) − (…)] / CAU − Xa.
+- **Seuil Nirr** : 100 mm pour le maïs, 120 mm pour les céréales, au-delà strictement. Les tables d'exemple commencent pourtant à 100 mm.
+- **Premier apport sur maïs** : le texte dit à la fois « 50 kg d'azote efficace » et « dose < 50 kg ». Il faut retenir la lecture la plus prudente et l'afficher.
+- **Valeurs aux bords** : rien ne prévoit les valeurs hors des grilles APL × pluie (APL > 100 kg, pluie hors colonnes) ni les bornes ambiguës (MrCi à 1 et 3 t, prairie de 18 mois à 2 ans). Le moteur refuse et demande une mesure ; il n'extrapole pas.
+- **Sols sans estimation** : les sols de marais et sur granite n'ont pas d'estimation de Ri. Il faut une mesure.
+- **Keq** : un apport avant l'ouverture prend Keq cycle = Keq Ri + Keq bilan ; un apport après prend Keq bilan = Keq cycle. Les cases `nr`, `ng` et « dire d'expert » demandent une valeur justifiée par la ferme (surcharge).
+- **Incohérences des annexes**, recopiées telles quelles et signalées dans les notes des tables :
+  - maïs doux : b de 10 ou 12 inversés entre le tableau 1 et le tableau 7 ;
+  - avoine : 2,2 contre 2,5 ; blé dur : 3,7 contre 3,5 ;
+  - tourteaux de ricin : Keq de 0,7 sur maïs.
+- **Calendrier** : Monassut-Audiracq et Saint-Laurent-Bretagne sont en **zone ouest et zone sud** (jeu data.gouv). Pour les céréales d'automne et le type III, l'interdiction court du 01/09 au 15/01 en zone sud, et du **01/07 au 15/01 en zone ouest**, avec des exemptions en juillet-août.
+- **Statut ZV du jeu data.gouv** : il date d'avant l'arrêté de 2026 ; 85 communes de Nouvelle-Aquitaine y sont encore « hors ZV ». Le statut ZV vient donc de l'arrêté de bassin, et seuls les drapeaux de zone viennent du calendrier.
 
 ## 6. Contrats (`@fourmy/contracts`, `fertilization.ts`)
 

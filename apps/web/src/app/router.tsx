@@ -13,6 +13,7 @@ import { InterventionsPage } from "../features/interventions/InterventionsPage";
 import { InterventionCompletePage, InterventionEditPage, InterventionNewPage } from "../features/interventions/InterventionEditPage";
 import { PhytoProductsPage } from "../features/phyto/PhytoProductsPage";
 import { FertilizersPage } from "../features/fertilization/FertilizersPage";
+import { FertilizationPage } from "../features/fertilization/FertilizationPage";
 import { ActivitiesPage } from "../features/activities/ActivitiesPage";
 import { EquipmentsPage } from "../features/equipments/EquipmentsPage";
 import { EquipmentSheetPage } from "../features/equipments/EquipmentSheetPage";
@@ -140,6 +141,7 @@ export const routes = [
       { path: "register", element: <RegisterPage /> },
       { path: "phyto", element: <PhytoProductsPage /> },
       { path: "fertilizers", element: <FertilizersPage /> },
+      { path: "fertilization", element: <FertilizationPage /> },
       { path: "activities", element: <ActivitiesPage /> },
       { path: "equipments", element: <EquipmentsPage /> },
       { path: "equipments/crew-templates", element: <CrewTemplatesPage /> },

@@ -50,3 +50,11 @@ describe("contracts", () => {
     expect(r.success).toBe(true);
   });
 });
+
+describe("reliquat d'azote (lot AF)", () => {
+  it("nitrates sur toute la profondeur, ammonium sur 0-40 cm", async () => {
+    const { rshTotal } = await import("../src/index.js");
+    // 20 + 15 + 10 de nitrates ; ammonium : 9 (0-30) + 6 × 1/3 (30-40) ; rien sous 40 cm.
+    expect(rshTotal([{ fromCm: 0, toCm: 30, no3KgHa: 20, nh4KgHa: 9 }, { fromCm: 30, toCm: 60, no3KgHa: 15, nh4KgHa: 6 }, { fromCm: 60, toCm: 90, no3KgHa: 10, nh4KgHa: 3 }])).toBe(56);
+  });
+});

@@ -21,11 +21,12 @@ import { SprayingConditions } from "../weather/Weather";
 import { ParcelRows } from "./ParcelRows";
 
 /** Onglets ouvrables par l'URL (`?tab=vegetation` depuis une alerte satellite). */
-const TABS = ["general", "crops", "cadastre", "water", "vegetation", "weather", "interventions"];
+const TABS = ["general", "crops", "cadastre", "water", "vegetation", "soil", "weather", "interventions"];
 
 // Le graphique (recharts) n'est chargé qu'à l'ouverture de l'onglet.
 const VegetationTab = lazy(() => import("../remote-sensing/VegetationTab").then((m) => ({ default: m.VegetationTab })));
 const ParcelPrescriptions = lazy(() => import("../modulation/PrescriptionsPage").then((m) => ({ default: m.ParcelPrescriptions })));
+const SoilTab = lazy(() => import("../fertilization/SoilTab").then((m) => ({ default: m.SoilTab })));
 const CropModelPanel = lazy(() => import("../crop-model/CropModelPanel").then((m) => ({ default: m.CropModelPanel })));
 
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
@@ -113,6 +114,7 @@ function Sheet({ sheet: s }: { sheet: ParcelSheet }) {
           <Tabs.Tab value="cadastre">Cadastre ({significant.length})</Tabs.Tab>
           <Tabs.Tab value="water">Eau à proximité ({s.water.filter((w) => !w.ditch).length})</Tabs.Tab>
           <Tabs.Tab value="vegetation">Végétation</Tabs.Tab>
+          <Tabs.Tab value="soil">Sol</Tabs.Tab>
           <Tabs.Tab value="weather">Météo</Tabs.Tab>
           <Tabs.Tab value="interventions">Interventions ({s.interventions.length})</Tabs.Tab>
         </Tabs.List>
@@ -299,6 +301,12 @@ function Sheet({ sheet: s }: { sheet: ParcelSheet }) {
               <VegetationTab farmId={farm.id} parcelId={s.id} />
               <ParcelPrescriptions farmId={farm.id} parcelId={s.id} owner={owner} />
             </Stack>
+          </Suspense>
+        </Tabs.Panel>
+
+        <Tabs.Panel value="soil" pt="md">
+          <Suspense fallback={<Loading />}>
+            <SoilTab farmId={farm.id} parcelId={s.id} owner={owner} />
           </Suspense>
         </Tabs.Panel>
 

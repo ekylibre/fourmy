@@ -41,7 +41,14 @@ export const NAVIGATION: NavEntry[] = [
       { path: "/cellar", label: "Cuverie", icon: Wine },
     ],
   },
-  { label: "Réglementaire", icon: Scale, children: [{ path: "/register", label: "Registre phyto", icon: FileText }] },
+  {
+    label: "Réglementaire",
+    icon: Scale,
+    children: [
+      { path: "/register", label: "Registre phyto", icon: FileText },
+      { path: "/fertilization", label: "Fertilisation azotée", icon: Leaf },
+    ],
+  },
   {
     label: "Interopérabilité",
     icon: Plug,

@@ -55,6 +55,9 @@ importers:
       '@fourmy/equipment-3d':
         specifier: workspace:*
         version: link:../../packages/equipment-3d
+      '@fourmy/fertilization-refs':
+        specifier: workspace:*
+        version: link:../../packages/fertilization-refs
       '@fourmy/geo-ign':
         specifier: workspace:*
         version: link:../../packages/geo-ign
@@ -171,6 +174,9 @@ importers:
       '@fourmy/equipment-3d':
         specifier: workspace:*
         version: link:../../packages/equipment-3d
+      '@fourmy/fertilization-refs':
+        specifier: workspace:*
+        version: link:../../packages/fertilization-refs
       '@fourmy/ui-lyvre':
         specifier: workspace:*
         version: link:../../packages/ui-lyvre
@@ -399,6 +405,16 @@ importers:
       '@gltf-transform/extensions':
         specifier: 4.5.1
         version: 4.5.1
+    devDependencies:
+      vitest:
+        specifier: 2.1.8
+        version: 2.1.8(@types/node@24.19.2)(jsdom@29.1.1(@noble/hashes@2.4.0))(lightningcss@1.33.0)(msw@2.7.0(@types/node@24.19.2)(typescript@5.7.3))(sugarss@5.0.2(postcss@8.5.32))
+
+  packages/fertilization-refs:
+    dependencies:
+      '@fourmy/contracts':
+        specifier: workspace:*
+        version: link:../contracts
     devDependencies:
       vitest:
         specifier: 2.1.8
