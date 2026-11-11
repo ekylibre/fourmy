@@ -28,7 +28,7 @@ const vegetation = (over: Partial<ParcelVegetation["canopy"]>, nature = "field_c
   species,
   nature,
   rows: { bearingDeg: 90, spacingM: 0.75, auto: true },
-  canopy: { phase: "growing", heightM: 2, density: 0.8, ndvi: 0.75, observedOn: "2026-07-01", ...over },
+  canopy: { phase: "growing", heightM: 2, density: 0.8, ndvi: 0.75, observedOn: "2026-07-01", source: "ndvi", ...over },
 });
 
 const weather = (over: Partial<DayWeather>): DayWeather => ({

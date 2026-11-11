@@ -27,6 +27,8 @@ export interface ParcelCanopy {
   ndvi: number | null;
   /** Date de la mesure qui fonde l'état. */
   observedOn: string | null;
+  /** Fondement de l'état : le NDVI observé, ou le modèle de croissance quand le NDVI manque (lot AB). */
+  source: "ndvi" | "model";
 }
 
 export interface ParcelVegetation {

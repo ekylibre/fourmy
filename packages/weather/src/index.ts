@@ -153,6 +153,54 @@ export async function openMeteoHours(lat: number, lon: number, from: Date, to: D
   }));
 }
 
+/** Journée météo agronomique (Open-Meteo, heure de Paris). */
+export interface WeatherDay {
+  day: string;
+  temperatureMinC: number | null;
+  temperatureMaxC: number | null;
+  precipitationMm: number | null;
+  /** Évapotranspiration de référence FAO-56 (Penman-Monteith). */
+  et0Mm: number | null;
+}
+
+/**
+ * Journées météo Open-Meteo : l'archive (réanalyse ERA5, quelques jours de
+ * retard) pour `source: "archive"`, sinon l'API de prévision avec 7 jours
+ * passés et 16 jours de prévision (dates ignorées).
+ */
+export async function openMeteoDays(
+  lat: number,
+  lon: number,
+  range: { source: "archive"; from: string; to: string } | { source: "forecast" },
+  fetchImpl: typeof fetch = fetch,
+): Promise<WeatherDay[]> {
+  const params = new URLSearchParams({
+    latitude: lat.toFixed(5),
+    longitude: lon.toFixed(5),
+    daily: "temperature_2m_min,temperature_2m_max,precipitation_sum,et0_fao_evapotranspiration",
+    timezone: "Europe/Paris",
+  });
+  if (range.source === "archive") {
+    params.set("start_date", range.from);
+    params.set("end_date", range.to);
+  } else {
+    params.set("past_days", "7");
+    params.set("forecast_days", "16");
+  }
+  const body = (await getJson(`${range.source === "archive" ? OPEN_METEO_ARCHIVE : OPEN_METEO}?${params}`, fetchImpl, "Open-Meteo")) as {
+    daily?: Record<string, unknown[]>;
+  };
+  const d = body.daily ?? {};
+  const times = (d.time as string[] | undefined) ?? [];
+  return times.map((t, i) => ({
+    day: t,
+    temperatureMinC: num(d.temperature_2m_min?.[i]),
+    temperatureMaxC: num(d.temperature_2m_max?.[i]),
+    precipitationMm: num(d.precipitation_sum?.[i]),
+    et0Mm: num(d.et0_fao_evapotranspiration?.[i]),
+  }));
+}
+
 // --- OpenWeather --------------------------------------------------------------
 
 /** Vérifie la clé (météo actuelle au point). */
