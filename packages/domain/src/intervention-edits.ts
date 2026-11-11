@@ -19,18 +19,21 @@ export const EDITABLE_FIELDS = [
   "doers",
   "purposes",
   "notes",
+  "irrigation",
 ] as const;
 export type EditableField = (typeof EDITABLE_FIELDS)[number];
 /** Attelage lu (id, rang) ou saisi : seuls libellé, matériels, intervenants et périodes se comparent. */
 type EditableCrew = Pick<InterventionCrew, "tools" | "periods"> & { label?: string | null; doers?: InterventionCrew["doers"] };
 
 /** Version lue (intrants avec leur unité) ou saisie (sans) : les deux se comparent. */
-export type EditableIntervention = Omit<Pick<Intervention, EditableField>, "inputs" | "outputs" | "staffing" | "crews"> & {
+export type EditableIntervention = Omit<Pick<Intervention, EditableField>, "inputs" | "outputs" | "staffing" | "crews" | "irrigation"> & {
   inputs: InterventionInput[];
   outputs: InterventionOutput[];
   /** Absent : mode libre (clients antérieurs aux attelages). */
   staffing?: Intervention["staffing"];
   crews?: readonly EditableCrew[];
+  /** Irrigation : absent ou null, pas de dose. */
+  irrigation?: { depthMm: number; method?: string | null } | null;
 };
 
 const isoPeriods = (value: unknown) =>
@@ -46,6 +49,10 @@ export type InterventionChanges = Partial<Record<EditableField, { before: unknow
 function canonical(field: EditableField, value: unknown): unknown {
   if (field === "notes") return (value as string | null | undefined)?.trim() || null;
   if (field === "staffing") return value ?? "free";
+  if (field === "irrigation") {
+    const v = value as EditableIntervention["irrigation"];
+    return v ? { depthMm: v.depthMm, method: v.method ?? null } : null;
+  }
   if (field === "periods") return isoPeriods(value);
   if (field === "crews") {
     // Ordre des attelages conservé (rang) ; dans chacun, ordre sans importance.

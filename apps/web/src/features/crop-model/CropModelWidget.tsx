@@ -1,11 +1,11 @@
 import { Link, useLocation } from "react-router";
-import { Anchor, Badge, Group, Paper, Stack, Text, Title } from "@mantine/core";
+import { Anchor, Badge, Button, Group, Paper, Stack, Text, Title } from "@mantine/core";
 import { Sprout } from "lucide-react";
 import type { CropAlert, CropAlertKind } from "@fourmy/contracts";
-import { useCropModel } from "./crop-model";
+import { irrigationLink, useCropModel } from "./crop-model";
 
 const KINDS: { kind: CropAlertKind; title: string; color: string }[] = [
-  { kind: "water_stress", title: "Stress hydrique (en sec)", color: "brique" },
+  { kind: "water_stress", title: "Stress hydrique", color: "brique" },
   { kind: "irrigation_due", title: "Irrigation à prévoir", color: "ardoise" },
   { kind: "flowering_soon", title: "Floraison dans les 10 jours", color: "lichen" },
   { kind: "harvestable_soon", title: "Récoltable dans les 15 jours", color: "paille" },
@@ -43,14 +43,21 @@ export function CropModelWidget({ farmId, day }: { farmId: string; day: string }
               </Group>
               <Stack gap={2} pl="md">
                 {list.map((a) => (
-                  <Text key={`${a.parcelId}:${a.kind}`} size="sm">
-                    <Anchor component={Link} to={link(a)}>
-                      {a.parcelName}
-                    </Anchor>{" "}
-                    <Text span size="xs" c="dimmed">
-                      {a.text}
+                  <Group key={`${a.parcelId}:${a.kind}`} gap="xs" justify="space-between" wrap="nowrap">
+                    <Text size="sm">
+                      <Anchor component={Link} to={link(a)}>
+                        {a.parcelName}
+                      </Anchor>{" "}
+                      <Text span size="xs" c="dimmed">
+                        {a.text}
+                      </Text>
                     </Text>
-                  </Text>
+                    {a.kind === "irrigation_due" && a.on && (
+                      <Button component={Link} to={irrigationLink(farmId, a.parcelId, a.on, location.search, a.depthMm)} size="compact-xs" variant="light">
+                        Saisir l'irrigation
+                      </Button>
+                    )}
+                  </Group>
                 ))}
               </Stack>
             </div>

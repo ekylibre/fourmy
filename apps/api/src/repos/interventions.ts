@@ -32,6 +32,7 @@ import {
   type InterventionHistoryEntry,
   type InterventionUpdateWrite,
   type InterventionPlanWrite,
+  type IrrigationMethod,
   interventionUpdateWrite,
   type StockMovement,
   type TargetKind,
@@ -155,6 +156,7 @@ function toIntervention(r: Record<string, unknown>): Intervention {
     compliance: (r.compliance as Intervention["compliance"]) ?? null,
     ift: (r.ift as Intervention["ift"]) ?? null,
     weather: (r.weather as Intervention["weather"]) ?? null,
+    irrigation: r.irrigation ? { depthMm: Number((r.irrigation as { depthMm: number }).depthMm), method: (r.irrigation as { method?: IrrigationMethod | null }).method ?? null } : null,
     maintenance:
       maint || ops.length
         ? {
@@ -197,7 +199,7 @@ async function readInterventions(tx: Tx, where: SQL, limit = 1000): Promise<Inte
     tx,
     sql`
       SELECT i.id, i.farm_id, i.procedure, i.status, i.started_at, i.stopped_at, i.origin, i.client_id, i.staffing,
-             i.purposes, i.notes, i.bbch, (SELECT st.label FROM ref_bbch_stages st WHERE st.code = i.bbch) AS bbch_label, i.compliance, i.ift, i.weather, i.maintenance, i.created_at, i.updated_at,
+             i.purposes, i.notes, i.bbch, (SELECT st.label FROM ref_bbch_stages st WHERE st.code = i.bbch) AS bbch_label, i.compliance, i.ift, i.weather, i.maintenance, i.irrigation, i.created_at, i.updated_at,
              (SELECT coalesce(json_agg(json_build_object('equipment_id', m.equipment_id, 'value', m.value, 'correction', m.correction,
                                                          'correction_reason', m.correction_reason)), '[]')
                 FROM meter_readings m WHERE m.intervention_id = i.id) AS meters,
@@ -428,6 +430,13 @@ async function writeBody(tx: Tx, interventionId: string, body: Body, articles: M
   await linkTrackSessions(tx, interventionId, body.trackSessionIds ?? []);
 }
 
+/** Irrigation : dose d'eau et matériel, sur les seules procédures d'irrigation (la règle du domaine l'a vérifié). */
+async function writeIrrigation(tx: Tx, interventionId: string, body: Pick<Body, "irrigation">) {
+  const v = body.irrigation;
+  await tx.execute(sql`
+    UPDATE interventions SET irrigation = ${v ? JSON.stringify({ depthMm: v.depthMm, method: v.method ?? null }) : null}::jsonb WHERE id = ${interventionId}`);
+}
+
 /**
  * Entretien (lot K) : bloc (nature, problème, atelier), opérations du plan
  * réalisées, relevés de compteur. Les relevés n'existent que pour une
@@ -555,6 +564,7 @@ export async function planInTx(
             ${input.staffing ?? "free"}, ${input.bbch ?? null})`);
   await writeBody(tx, id, input, articles);
   await writeMaintenance(tx, farmId, ctx, id, body, false, null);
+  await writeIrrigation(tx, id, body);
   await recordCompliance(tx, ctx, id, body, "plan");
   await audit(tx, farmId, ctx, id, "planned", { procedure: input.procedure });
   await outbox(tx, farmId, buildEvent(ctx, farmId, "intervention.planned", { interventionId: id }));
@@ -699,6 +709,7 @@ async function applyCompletion(
   const { startedAt, stoppedAt } = periodBounds(input.periods);
   await writeBody(tx, interventionId, raw, articles);
   await writeMaintenance(tx, farmId, ctx, interventionId, input, true, stoppedAt);
+  await writeIrrigation(tx, interventionId, input);
   await recordCompliance(tx, ctx, interventionId, { ...input, procedure }, "done");
   // Contenu (re)écrit : l'IFT sera recalculé (worker, ou à la demande depuis la fiche).
   await tx.execute(sql`UPDATE interventions SET ift = NULL WHERE id = ${interventionId}`);
@@ -838,6 +849,7 @@ export async function updateIntervention(
       const bounds = periodBounds(input.periods);
       await writeBody(tx, interventionId, raw, articles);
       await writeMaintenance(tx, farmId, ctx, interventionId, input, false, null);
+      await writeIrrigation(tx, interventionId, input);
       await recordCompliance(tx, ctx, interventionId, input, "plan");
       await tx.execute(sql`
         UPDATE interventions SET procedure = ${input.procedure},
@@ -978,6 +990,7 @@ function writeOf(i: Intervention): InterventionUpdateWrite {
       : {}),
     ...(i.weather ? { weather: i.weather } : {}),
     ...(i.maintenance ? { maintenance: i.maintenance } : {}),
+    ...(i.irrigation ? { irrigation: i.irrigation } : {}),
   });
 }
 

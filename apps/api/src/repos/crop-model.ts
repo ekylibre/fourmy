@@ -3,6 +3,7 @@ import { withFarm, type Database, type Tx } from "@fourmy/db";
 import {
   COVER_REMOVING_PROCEDURES,
   DEFAULT_TAW_MM,
+  IRRIGATION_PROCEDURES,
   PROCEDURES,
   type CropAlert,
   type CropModelAt,
@@ -11,6 +12,7 @@ import {
   type ParcelCropState,
   type ParcelSoil,
   type ParcelSoilWrite,
+  type WaterSupply,
   type WeatherBasis,
 } from "@fourmy/contracts";
 import { addDays, cropModelFor, dailyNormals, simulateSeason, stateAt, weatherSeries, type ModelWeatherDay, type Simulation } from "@fourmy/domain";
@@ -157,6 +159,8 @@ interface Season {
   sownOn: string;
   endedOn: string | null;
   soil: ParcelSoil;
+  /** Irrigations réalisées saisies sur la parcelle pendant la saison : dose (mm) par jour. */
+  applied: Map<string, number>;
 }
 
 /** Parcelles valides au jour, leur dernier semis réalisé (400 jours au plus), leur culture et leur sol. */
@@ -164,6 +168,7 @@ async function seasons(tx: Tx, farmId: string, at: string, parcelId?: string): P
   const noon = sql`${at}::date::timestamptz + interval '12 hours'`;
   const sowing = sql.join(SOWING.map((c) => sql`${c}`), sql`, `);
   const removing = sql.join(COVER_REMOVING_PROCEDURES.map((c) => sql`${c}`), sql`, `);
+  const watering = sql.join(IRRIGATION_PROCEDURES.map((c) => sql`${c}`), sql`, `);
   const list = await rows<{
     id: string;
     name: string;
@@ -172,10 +177,11 @@ async function seasons(tx: Tx, farmId: string, at: string, parcelId?: string): P
     species: string | null;
     taw: number | null;
     irrigated: boolean | null;
+    applied: { day: string; mm: number }[] | null;
   }>(
     tx,
     sql`
-      SELECT lp.id, lp.name, s.sown_on, e.ended_on, prod.species, ps.taw_mm AS taw, ps.irrigated
+      SELECT lp.id, lp.name, s.sown_on, e.ended_on, prod.species, ps.taw_mm AS taw, ps.irrigated, w.applied
       FROM land_parcels lp
       JOIN land_parcel_versions v ON v.land_parcel_id = lp.id AND v.valid @> ${noon}
       LEFT JOIN LATERAL (
@@ -189,6 +195,15 @@ async function seasons(tx: Tx, farmId: string, at: string, parcelId?: string): P
         FROM interventions i JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_id = lp.id
         WHERE i.status = 'done' AND i.procedure IN (${removing}) AND s.sown_on IS NOT NULL
           AND (i.started_at AT TIME ZONE 'Europe/Paris')::date > s.sown_on::date) e ON true
+      -- Irrigations réalisées de la saison (dose en mm sur la parcelle), cumulées par jour.
+      LEFT JOIN LATERAL (
+        SELECT json_agg(json_build_object('day', d.day, 'mm', d.mm) ORDER BY d.day) AS applied FROM (
+          SELECT (i.started_at AT TIME ZONE 'Europe/Paris')::date::text AS day, sum((i.irrigation->>'depthMm')::numeric)::float8 AS mm
+          FROM interventions i JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_id = lp.id
+          WHERE i.status = 'done' AND i.procedure IN (${watering}) AND i.irrigation IS NOT NULL AND s.sown_on IS NOT NULL
+            AND (i.started_at AT TIME ZONE 'Europe/Paris')::date >= s.sown_on::date
+            AND (e.ended_on IS NULL OR (i.started_at AT TIME ZONE 'Europe/Paris')::date <= e.ended_on::date)
+          GROUP BY 1) d) w ON true
       -- Culture : la production de la campagne du semis (un semis d'automne prépare la campagne suivante).
       LEFT JOIN LATERAL (
         SELECT coalesce(p.cultivation, p.species) AS species FROM productions p JOIN campaigns c ON c.id = p.campaign_id
@@ -211,6 +226,7 @@ async function seasons(tx: Tx, farmId: string, at: string, parcelId?: string): P
           sownOn: r.sown_on,
           endedOn: r.ended_on,
           soil: r.taw === null ? { tawMm: DEFAULT_TAW_MM, irrigated: false, auto: true } : { tawMm: r.taw, irrigated: !!r.irrigated, auto: false },
+          applied: new Map((r.applied ?? []).map((a) => [a.day, a.mm])),
         }
       : null,
   }));
@@ -218,12 +234,28 @@ async function seasons(tx: Tx, farmId: string, at: string, parcelId?: string): P
 
 // --- Simulation et état ---------------------------------------------------------
 
-function simulate(season: Season, weather: Awaited<ReturnType<typeof farmDailyWeather>>): Simulation | null {
+const supplyOf = (season: Season): WaterSupply => (season.applied.size > 0 ? "recorded" : season.soil.irrigated ? "ideal" : "rainfed");
+
+/**
+ * Avec des irrigations saisies, elles seules comptent jusqu'à aujourd'hui ;
+ * le pilotage idéal d'une parcelle irriguée ne prévoit que les apports à
+ * venir, à partir de demain.
+ */
+function simulate(season: Season, weather: Awaited<ReturnType<typeof farmDailyWeather>>, today = parisToday()): Simulation | null {
   const model = cropModelFor(season.species);
   if (!model) return null;
   const series = weatherSeries(season.sownOn, addDays(season.sownOn, 365), weather.known, weather.normals);
   if (series.length === 0) return null;
-  return simulateSeason({ model, sownOn: season.sownOn, weather: series, tawMm: season.soil.tawMm, irrigated: season.soil.irrigated, endOn: season.endedOn });
+  return simulateSeason({
+    model,
+    sownOn: season.sownOn,
+    weather: series,
+    tawMm: season.soil.tawMm,
+    irrigated: season.soil.irrigated,
+    endOn: season.endedOn,
+    applied: season.applied,
+    autoFrom: season.applied.size > 0 ? addDays(today, 1) : null,
+  });
 }
 
 function cropState(season: Season, sim: Simulation, at: string, until: string | null): ParcelCropState {
@@ -243,6 +275,7 @@ function cropState(season: Season, sim: Simulation, at: string, until: string | 
     gdd: st.day?.gdd ?? null,
     stages: sim.stages.map(stage),
     soil: season.soil,
+    waterSupply: supplyOf(season),
     water:
       ended || !st.day
         ? null
@@ -254,6 +287,9 @@ function cropState(season: Season, sim: Simulation, at: string, until: string | 
             stressDays: st.stressDays,
             floweringStressDays: st.floweringStressDays,
             irrigationMm: st.irrigationMm,
+            appliedMm: st.appliedMm,
+            appliedDays: st.appliedDays,
+            lastAppliedOn: st.lastAppliedOn,
           },
     weatherUntil: until,
   };
@@ -261,7 +297,11 @@ function cropState(season: Season, sim: Simulation, at: string, until: string | 
 
 const fmt = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
-/** Signalements au jour : floraison et récolte proches, stress hydrique (en sec), irrigation à prévoir. */
+/**
+ * Signalements au jour : floraison et récolte proches, stress hydrique (en
+ * sec, ou malgré les irrigations saisies), irrigation à prévoir (parcelle
+ * irriguée).
+ */
 function alertsFor(s: ParcelCropState, sim: Simulation, at: string): CropAlert[] {
   if (s.stage?.code === "ended") return [];
   const base = { parcelId: s.parcelId, parcelName: s.parcelName };
@@ -274,12 +314,14 @@ function alertsFor(s: ParcelCropState, sim: Simulation, at: string): CropAlert[]
   const emerged = s.stage !== null;
   const matured = s.stages.some((x) => x.code === sim.model.maturity && x.on !== null && x.on <= at);
   if (s.water && emerged && !matured) {
-    if (!s.soil.irrigated && s.water.ks < 1) {
-      out.push({ ...base, kind: "water_stress", on: null, text: `réserve à ${Math.round(s.water.reserve * 100)} %` });
+    // Pilotage idéal : pas de stress par construction. Sinon le stress simulé est réel (pluie et doses saisies).
+    if (s.waterSupply !== "ideal" && s.water.ks < 1) {
+      const irrigatedText = s.water.lastAppliedOn ? `, dernière irrigation le ${fmt(s.water.lastAppliedOn)}` : "";
+      out.push({ ...base, kind: "water_stress", on: null, text: `réserve à ${Math.round(s.water.reserve * 100)} %${irrigatedText}` });
     }
     if (s.soil.irrigated) {
-      const next = sim.days.find((d) => d.date > at && d.date <= addDays(at, IRRIGATION_SOON_DAYS) && d.irrigationMm > 0);
-      if (next) out.push({ ...base, kind: "irrigation_due", on: next.date, text: `vers le ${fmt(next.date)}, environ ${Math.round(next.irrigationMm)} mm` });
+      const next = sim.days.find((d) => d.date >= at && d.date <= addDays(at, IRRIGATION_SOON_DAYS) && d.irrigationMm > 0);
+      if (next) out.push({ ...base, kind: "irrigation_due", on: next.date, depthMm: Math.round(next.irrigationMm), text: `vers le ${fmt(next.date)}, environ ${Math.round(next.irrigationMm)} mm` });
     }
   }
   return out;
@@ -324,7 +366,7 @@ export async function parcelCropModel(db: Database, farmId: string, parcelId: st
     state: cropState(row.season, sim, at, weather.until),
     days: sim.days
       .filter((d) => !stop || d.date <= stop)
-      .map((d) => ({ date: d.date, basis: d.basis, gdd: d.gdd, reserve: d.reserve, ks: d.ks, rainMm: d.rainMm, etcMm: d.etcMm, irrigationMm: d.irrigationMm })),
+      .map((d) => ({ date: d.date, basis: d.basis, gdd: d.gdd, reserve: d.reserve, ks: d.ks, rainMm: d.rainMm, etcMm: d.etcMm, irrigationMm: d.irrigationMm, appliedMm: d.appliedMm })),
     reason: null,
   };
 }

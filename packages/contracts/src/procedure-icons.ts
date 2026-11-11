@@ -34,6 +34,7 @@ export const PROCEDURE_ICONS: Record<string, string> = {
   plant_mowing: "mower",
   hand_weeding: "seedling-solid",
   plant_watering: "irrigation",
+  watering: "irrigation",
   // Cultures : traitements, fertilisation, semis, récolte
   spraying: "sprayer",
   generic_spraying: "spraying",

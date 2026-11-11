@@ -27,6 +27,8 @@ import { CancelModal } from "./CancelModal";
 import { actionLabel, changeLines, interventionDay, STATUS, targetName, type Names } from "./presenters";
 import { ComplianceSection, IftSection } from "./RegulatorySections";
 import { WeatherSummary } from "../weather/Weather";
+import { irrigationVolumeM3 } from "./IrrigationFields";
+import { IRRIGATION_METHOD_LABELS } from "@fourmy/contracts";
 
 const EMPTY_FC: FeatureCollection = { type: "FeatureCollection", features: [] };
 const ORIGINS: Record<string, string> = { web: "Web", mobile: "Mobile", migration: "Reprise d'Ekylibre", plugin: "Extension" };
@@ -260,6 +262,21 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
             </Paper>
 
             <MaintenanceSummary farmId={farm.id} intervention={i} names={names.equipment} />
+
+            {i.irrigation && (
+              <Paper p="md" withBorder aria-label="Irrigation">
+                <Title order={4} mb="xs">
+                  Irrigation
+                </Title>
+                <Text className="lv-num">
+                  <Text span fw={600}>
+                    {formatNumber(i.irrigation.depthMm, 1)} mm
+                  </Text>
+                  {treatedM2 > 0 && ` soit ${Math.round(irrigationVolumeM3(i.irrigation.depthMm, treatedM2)).toLocaleString("fr-FR")} m³ sur ${formatHa(treatedM2)}`}
+                  {i.irrigation.method && ` · ${IRRIGATION_METHOD_LABELS[i.irrigation.method]}`}
+                </Text>
+              </Paper>
+            )}
 
             {(i.inputs.length > 0 || i.outputs.length > 0) && (
               <Paper p="md" withBorder>

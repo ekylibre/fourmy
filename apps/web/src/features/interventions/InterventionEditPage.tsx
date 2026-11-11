@@ -13,14 +13,17 @@ import { InterventionForm, type FormInitial } from "./InterventionForm";
 /**
  * Nouvelle intervention pré-remplie par l'adresse (lot K) : depuis une
  * échéance (`?procedure=equipment_maintenance&equipment=…&operations=a,b&status=planned`)
- * ou une anomalie (`&nature=corrective&problem=…`).
+ * ou une anomalie (`&nature=corrective&problem=…`). Irrigation proposée par
+ * le modèle de croissance : `?procedure=watering&parcels=…&dose=30`.
  */
 function initialFromParams(p: URLSearchParams): FormInitial | undefined {
   const procedure = p.get("procedure");
   if (!procedure) return undefined;
   const nature = p.get("nature");
+  const dose = Number(p.get("dose"));
   return {
     procedure,
+    ...(dose > 0 ? { depthMm: Math.round(dose) } : {}),
     equipmentId: p.get("equipment") ?? undefined,
     operationIds: (p.get("operations") ?? "").split(",").filter(Boolean),
     mode: p.get("status") === "planned" ? "planned" : p.get("status") === "done" ? "done" : undefined,

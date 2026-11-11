@@ -44,9 +44,21 @@ export interface CropWaterState {
   /** Jours de stress de la levée au jour, et dans la fenêtre sensible de la floraison. */
   stressDays: number;
   floweringStressDays: number;
-  /** Irrigation simulée depuis le semis (parcelle irriguée), mm. */
+  /** Irrigation simulée depuis le semis (parcelle irriguée, pilotage idéal), mm. */
   irrigationMm: number;
+  /** Irrigations saisies depuis le semis : total (mm), nombre de jours, dernier jour. */
+  appliedMm: number;
+  appliedDays: number;
+  lastAppliedOn: string | null;
 }
+
+/**
+ * Apports d'eau de la saison : `rainfed` (en sec, pluie seule), `ideal`
+ * (déclarée irriguée sans irrigation saisie : pilotage idéal simulé toute la
+ * saison), `recorded` (irrigations saisies : elles seules comptent jusqu'à
+ * aujourd'hui, puis pilotage idéal si la parcelle est déclarée irriguée).
+ */
+export type WaterSupply = "rainfed" | "ideal" | "recorded";
 
 export interface ParcelCropState {
   parcelId: string;
@@ -64,6 +76,7 @@ export interface ParcelCropState {
   gdd: number | null;
   stages: CropStageDate[];
   soil: ParcelSoil;
+  waterSupply: WaterSupply;
   /** Bilan hydrique au jour (null : récoltée, ou météo indisponible). */
   water: CropWaterState | null;
   /** Dernier jour de météo connue (observée ou prévue) ; au-delà, normales. */
@@ -78,6 +91,8 @@ export interface CropAlert {
   kind: CropAlertKind;
   /** Date de l'événement prévu (stade, irrigation), si elle a un sens. */
   on: string | null;
+  /** Irrigation à prévoir : dose simulée (mm). */
+  depthMm?: number;
   /** Précision courte, affichée sous le titre de la sorte (« vers le 27/06 », « réserve à 14 % »). */
   text: string;
 }
@@ -99,6 +114,7 @@ export interface CropModelDay {
   rainMm: number;
   etcMm: number;
   irrigationMm: number;
+  appliedMm: number;
 }
 
 export interface ParcelCropSeries {

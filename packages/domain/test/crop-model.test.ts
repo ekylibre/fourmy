@@ -69,6 +69,38 @@ describe("modèle de croissance : bilan hydrique", () => {
   });
 });
 
+describe("modèle de croissance : irrigations saisies (lot AC)", () => {
+  const sownOn = "2026-04-10";
+  const weather = summer(sownOn, 150);
+
+  it("en sec, les doses saisies s'ajoutent à la pluie et réduisent le stress", () => {
+    const dry = stateAt(simulateSeason({ model: CROP_MODELS.maize, sownOn, weather, tawMm: 100 }), "2026-08-15");
+    // 30 mm tous les 7 jours de juin à mi-août.
+    const applied = new Map(Array.from({ length: 11 }, (_, i) => [addDays("2026-06-01", i * 7), 30] as const));
+    const sim = simulateSeason({ model: CROP_MODELS.maize, sownOn, weather, tawMm: 100, applied });
+    const st = stateAt(sim, "2026-08-15");
+    expect(st.stressDays).toBeLessThan(dry.stressDays);
+    expect(st.appliedMm).toBe(330);
+    expect(st.appliedDays).toBe(11);
+    expect(st.lastAppliedOn).toBe(addDays("2026-06-01", 70));
+    expect(st.irrigationMm).toBe(0); // rien de simulé : la parcelle n'est pas déclarée irriguée
+    expect(sim.days.find((d) => d.date === "2026-06-01")!.appliedMm).toBe(30);
+  });
+
+  it("irriguée avec des doses saisies : elles seules comptent avant `autoFrom`, le pilotage idéal ensuite", () => {
+    const applied = new Map([["2026-06-01", 30]]);
+    const sim = simulateSeason({ model: CROP_MODELS.maize, sownOn, weather, tawMm: 100, irrigated: true, applied, autoFrom: "2026-07-15" });
+    const before = sim.days.filter((d) => d.date < "2026-07-15");
+    expect(before.every((d) => d.irrigationMm === 0)).toBe(true);
+    expect(before.some((d) => d.ks < 1)).toBe(true); // une seule dose en juin : stress
+    const after = sim.days.filter((d) => d.date >= "2026-07-15" && d.date < "2026-08-20");
+    expect(after.some((d) => d.irrigationMm > 0)).toBe(true);
+    // Sans `autoFrom`, pilotage idéal toute la saison, doses saisies comprises.
+    const ideal = simulateSeason({ model: CROP_MODELS.maize, sownOn, weather, tawMm: 100, irrigated: true, applied });
+    expect(stateAt(ideal, "2026-08-15").stressDays).toBe(0);
+  });
+});
+
 describe("modèle de croissance : météo continue", () => {
   it("météo connue, puis normales des années précédentes", () => {
     const history = [2024, 2025].flatMap((y) => summer(`${y}-06-01`, 30, { tminC: y === 2024 ? 10 : 14 }));

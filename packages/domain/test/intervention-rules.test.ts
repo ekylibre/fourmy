@@ -34,6 +34,18 @@ describe("catalogue des procédures", () => {
 describe("règles de forme", () => {
   const spraying = getProcedure("spraying");
 
+  it("irrigation : dose obligatoire à la réalisation, refusée hors irrigation", () => {
+    const watering = getProcedure("watering");
+    expect(watering).toMatchObject({ label: "Irrigation", legacy: false, category: "crops" });
+    const body = { ...empty, periods: day, targets: [parcel] };
+    expect(validateIntervention(watering, body, "complete", ctx)).toContain("Indiquez la dose d'eau apportée (mm).");
+    expect(validateIntervention(watering, body, "plan", ctx)).toEqual([]);
+    expect(validateIntervention(watering, { ...body, irrigation: { depthMm: 30, method: "reel" } }, "complete", ctx)).toEqual([]);
+    expect(validateIntervention(getProcedure("plowing"), { ...body, irrigation: { depthMm: 30 } }, "complete", ctx)).toContain(
+      "La dose d'eau ne concerne que les irrigations.",
+    );
+  });
+
   it("traitement réalisé valide : parcelle, phyto, période", () => {
     const body = { ...empty, periods: day, targets: [parcel], inputs: [{ articleId: PHYTO, quantity: 2, per: "hectare" as const }], purposes: ["fungicide" as const] };
     expect(validateIntervention(spraying, body, "complete", ctx)).toEqual([]);

@@ -404,7 +404,7 @@ function demoMaize(parcelId: string, parcelName: string, at: string): { state: P
   for (let i = 0; i < 175; i++) {
     const date = isoAdd(sownOn, i);
     const reserve = Math.max(0.1, 1 - Math.max(0, i - 40) * 0.008);
-    days.push({ date, basis: date <= at ? "observed" : "forecast", gdd: i * 13, reserve, ks: reserve < 0.45 ? reserve / 0.45 : 1, rainMm: i % 9 === 0 ? 12 : 0, etcMm: 4, irrigationMm: 0 });
+    days.push({ date, basis: date <= at ? "observed" : "forecast", gdd: i * 13, reserve, ks: reserve < 0.45 ? reserve / 0.45 : 1, rainMm: i % 9 === 0 ? 12 : 0, etcMm: 4, irrigationMm: 0, appliedMm: 0 });
   }
   const dated = stages.map(([code, label, gdd]) => {
     const on = isoAdd(sownOn, Math.ceil(gdd / 13));
@@ -426,8 +426,20 @@ function demoMaize(parcelId: string, parcelName: string, at: string): { state: P
       gdd: today?.gdd ?? null,
       stages: dated,
       soil: { tawMm: 100, irrigated: false, auto: true },
+      waterSupply: "rainfed",
       water: today
-        ? { reserve: today.reserve, tawMm: 100, ks: today.ks, stressBelow: 0.45, stressDays: days.filter((d) => d.date <= at && d.ks < 1).length, floweringStressDays: 0, irrigationMm: 0 }
+        ? {
+            reserve: today.reserve,
+            tawMm: 100,
+            ks: today.ks,
+            stressBelow: 0.45,
+            stressDays: days.filter((d) => d.date <= at && d.ks < 1).length,
+            floweringStressDays: 0,
+            irrigationMm: 0,
+            appliedMm: 0,
+            appliedDays: 0,
+            lastAppliedOn: null,
+          }
         : null,
       weatherUntil: isoAdd(at, 15),
     },
