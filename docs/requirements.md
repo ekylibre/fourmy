@@ -185,8 +185,14 @@ conception : [`teledetection-design.md`](teledetection-design.md).
   broyage, fauche ni labour saisi. L'exploitant saisit l'intervention
   pré-remplie ou écarte le signalement. *Réalisé (lot Z,
   [`teledetection.md`](teledetection.md)).*
-- **FR-TWIN-3, 4, 6 à 9** (végétation 3D, météo visible, modulation ISO-XML,
-  ISOBUS, modèle de culture, capteurs) : voir l'étude, lots ultérieurs.
+- **FR-TWIN-3 (S)** **Végétation 3D** : les rangs de chaque parcelle dans le
+  plan 3D, hauteur et couleur selon l'état observé (NDVI) et les
+  interventions ; orientation des rangs automatique, corrigeable. *Réalisé
+  (lot AA, [`jumeau-3d.md`](jumeau-3d.md)).*
+- **FR-TWIN-4 (S)** **Météo visible** : ciel, brume, pluie ou neige, sol
+  mouillé et gelée d'après la météo du jour de la frise. *Réalisé (lot AA).*
+- **FR-TWIN-6 à 9** (modulation ISO-XML, ISOBUS, modèle de culture,
+  capteurs) : voir l'étude, lots ultérieurs.
 
 ### 4.10 Réglementaire
 - **FR-REG-1 (M)** **Registre phytosanitaire** produit à partir des

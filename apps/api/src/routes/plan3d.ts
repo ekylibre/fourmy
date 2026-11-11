@@ -5,6 +5,13 @@ import { db } from "../db.js";
 import { farmExtent, plan3dAt, enrichHeightsFromIgn } from "../repos/plan3d.js";
 import { atOrNow, BadRequest, domainCtx } from "./helpers.js";
 import { HEIGHTMAP_SIZE, terrainTile } from "../terrain.js";
+import { setParcelRows, vegetationAt } from "../repos/vegetation3d.js";
+import { dayWeather } from "../repos/weather.js";
+import { uuidParam } from "./helpers.js";
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+/** Point d'injection pour les tests (pas d'appel réseau vers Open-Meteo). */
+export const weatherDeps: { fetch: typeof fetch } = { fetch: (input, init) => fetch(input, init) };
 
 /** En deçà, une tuile couvre des centaines de km : relief plat, l'IGN n'est pas sollicité. */
 const MIN_TERRAIN_LEVEL = 10;
@@ -25,6 +32,35 @@ const binary = (data: Float32Array, source: "ign" | "flat" | "fallback") =>
 
 /** Relief (ADR-9, révisée) et plan 3D (ADR-8/10) — agent F. */
 export const plan3dRoutes = new Hono<Env>()
+  // Végétation et météo du plan 3D (lot AA). La météo est facultative : une panne d'Open-Meteo n'empêche pas la végétation.
+  .get("/vegetation3d", async (c) => {
+    const at = c.req.query("at") ?? new Date().toISOString().slice(0, 10);
+    if (!DAY.test(at) || Number.isNaN(Date.parse(at))) throw new BadRequest("at : date AAAA-MM-JJ attendue.");
+    const farmId = c.get("farmId");
+    const [parcels, weather] = await Promise.all([
+      vegetationAt(db(), farmId, at),
+      dayWeather(db(), farmId, at, weatherDeps.fetch).catch((e: unknown) => {
+        console.warn(`[vegetation3d] météo indisponible : ${e instanceof Error ? e.message : e}`);
+        return null;
+      }),
+    ]);
+    return c.json({ at, parcels, weather });
+  })
+  .put("/land-parcels/:id/rows", requireOwner, async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { bearingDeg?: unknown; spacingM?: unknown };
+    const bearing = Number(body.bearingDeg);
+    const spacing = Number(body.spacingM);
+    if (!Number.isFinite(bearing) || !Number.isFinite(spacing)) throw new BadRequest("bearingDeg et spacingM attendus.");
+    if (spacing < 0.1 || spacing > 10) throw new BadRequest("Inter-rang entre 0,1 et 10 m.");
+    // Un rang n'a pas de sens : 190° = 10°.
+    const bearingDeg = Math.round((((bearing % 180) + 180) % 180) * 10) / 10;
+    await setParcelRows(db(), c.get("farmId"), c.get("userId"), uuidParam(c, "id"), { bearingDeg, spacingM: spacing });
+    return c.body(null, 204);
+  })
+  .delete("/land-parcels/:id/rows", requireOwner, async (c) => {
+    await setParcelRows(db(), c.get("farmId"), c.get("userId"), uuidParam(c, "id"), null);
+    return c.body(null, 204);
+  })
   .get("/terrain/heightmap/:z/:x/:y", async (c) => {
     const [z, x, y] = ["z", "x", "y"].map((k) => Number(c.req.param(k)));
     let bounds;
