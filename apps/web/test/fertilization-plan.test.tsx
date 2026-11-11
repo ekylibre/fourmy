@@ -31,6 +31,7 @@ const plan = (patch: Partial<FertilizationPlan> = {}): FertilizationPlan => ({
     opening: { on: "2026-04-01", origin: "default" },
     sowing: { period: null, sownOn: null },
     cover: null,
+    organics: [],
   },
   result: {
     method: "bilan_cau_two_phase",
@@ -175,6 +176,38 @@ describe("plan de fumure", () => {
     // 69 kg N / 46 % = 150 kg d'urée par hectare.
     expect(link.getAttribute("href")).toBe(`/f/${FARM}/prescriptions/new?parcel=${plan().parcel.id}&plan=${PLAN}&stage=6+feuilles&product=Ur%C3%A9e+46&rate=150&unit=kg_ha`);
     expect(screen.getByLabelText("Cartes de modulation du plan")).toHaveTextContent("Carte Azote 6 feuilles (6 feuilles, Urée 46) : moyenne 150,2 kg/ha pour 150 prévus.");
+  });
+
+  it("produits organiques : équivalent minéral réalisé et prévu ; prévoir un apport (lot AO)", async () => {
+    const SLURRY = "00000000-0000-7000-8000-00000000f301";
+    let draft: unknown = null;
+    const organics = [
+      { date: "2025-10-20", product: "Lisier de porc", planned: false, nTotalKgHa: 120, period: "apport d'automne", xa: 6, ri: 67.2, keq: { bilan: 0.05, ri: 0.56, cycle: 0.61 }, missing: null, notRecommended: true },
+      { date: "2026-04-10", product: "Fumier", planned: true, nTotalKgHa: 60, period: "apport de printemps", xa: 0, ri: 0, keq: { bilan: null, ri: null, cycle: null }, missing: "ligne de l'annexe 5 à choisir dans la fiche du fertilisant (Stocks → Fertilisants)", notRecommended: false },
+    ];
+    server.use(
+      http.get("*/fertilization/plans/:id", () => HttpResponse.json(plan({ context: { ...plan().context, organics } }))),
+      http.get("*/fertilizers", () =>
+        HttpResponse.json({
+          items: [{ id: SLURRY, name: "Lisier de porc", kind: "fertilizer", unit: "cubic_meter", lexiconRef: null, composition: { basis: "kg_per_m3", nTotal: 4, nMineralShare: 0.6, p2o5: null, k2o: null, so3: null, density: null, nitrateType: "II", foliar: false }, origin: "confirmed", source: null, proposal: null, analyses: [], usage: 1 }],
+        }),
+      ),
+      http.put("*/fertilization/plans/:id/draft", async ({ request }) => {
+        draft = await request.json();
+        return HttpResponse.json(plan({ context: { ...plan().context, organics } }));
+      }),
+    );
+    renderApp(`/f/${FARM}/fertilization/plans/${PLAN}`);
+    const section = await screen.findByLabelText("Produits organiques");
+    expect(section).toHaveTextContent("apport d'automne : Xa 6 kg, 67,2 kg dans le reliquat · période déconseillée (lixiviation)");
+    expect(section).toHaveTextContent("ligne de l'annexe 5 à choisir");
+    const user = userEvent.setup();
+    await user.click(within(section).getByRole("button", { name: "Prévoir un apport" }));
+    await user.click(within(section).getAllByLabelText("Produit")[0]!);
+    await user.click(await screen.findByRole("option", { name: "Lisier de porc (m³ par ha)" }));
+    await user.type(within(section).getByLabelText("Quantité par hectare"), "30");
+    await user.click(within(section).getByRole("button", { name: "Ajouter" }));
+    await waitFor(() => expect(draft).toMatchObject({ organics: [{ articleId: SLURRY, quantity: 30 }] }));
   });
 
   it("ouverture du bilan, période d'implantation et couvert d'interculture", async () => {

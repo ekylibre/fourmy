@@ -427,4 +427,49 @@ describe.skipIf(!url)("plans de fumure (intégration)", () => {
     ]);
     expect(cover(await check("2025-11-05T09:00:00+01:00", urea, 200))[0]).toMatchObject({ level: "warning", message: expect.stringContaining("92 kg N efficace/ha apportés depuis le 03/10/2025, au-delà du plafond de 70 kg") });
   });
+
+  it("produits organiques : Xa = azote total × Keq de l'annexe 5, réalisé ou prévu (lot AO)", async () => {
+    const [slurry] = await sql`SELECT article_id FROM article_fertilizers WHERE farm_id = ${farmId} AND aplsh_product = 'lisier_mixte_de_porc'`;
+    const before = await plan();
+    const doseBefore = before.result.dose;
+    // 30 m³/ha de lisier à 4 kg N/m³ le 10/04/2026, après l'ouverture (01/04) : 120 kg N.
+    let p = (await (await putDraft({ ...before.draft, openingOn: null, organics: [{ articleId: slurry!.article_id, quantity: 30, plannedOn: "2026-04-10" }] })).json()) as FertilizationPlan;
+    expect(p.context.organics).toEqual([expect.objectContaining({ product: "Lisier de porc", planned: true, nTotalKgHa: 120, missing: expect.stringContaining("ligne de l'annexe 5") })]);
+    expect(p.result.terms.Xa).toEqual({ missing: expect.stringContaining("Lisier de porc du 10/04") });
+    expect(p.result.dose).toBeNull();
+    // Ligne de l'annexe 5 : lisier de porcs mixte (Arvalis), maïs, apport de printemps : Keq 0,56.
+    await sql`UPDATE article_fertilizers SET pro_product = 'lisier_porcs_mixte_fosse_arvalis' WHERE article_id = ${slurry!.article_id}`;
+    p = await plan();
+    expect(p.result.terms.Xa).toMatchObject({ value: 67, detail: "Lisier de porc du 10/04 : 120 kg N × Keq 0,56" });
+    if (doseBefore !== null && p.result.dose !== null) expect(doseBefore - p.result.dose).toBeGreaterThanOrEqual(66);
+    await putDraft({ ...p.draft, organics: [] });
+  });
+
+  it("colza : bilan additif de l'annexe 2.4, profondeur du sol et pesées (lot AO)", async () => {
+    const rape = crypto.randomUUID();
+    const parcelR = crypto.randomUUID();
+    const [c26] = await sql`SELECT id FROM campaigns WHERE farm_id = ${farmId} AND year = 2026`;
+    await sql`INSERT INTO activities (id, farm_id, name, family, reference, cultivation) VALUES (${rape}, ${farmId}, 'Colza', 'plant_farming', 'winter_rape', 'brassica_napus')`;
+    await sql`INSERT INTO land_parcels (id, farm_id, name) VALUES (${parcelR}, ${farmId}, 'Champ Colza')`;
+    await sql`INSERT INTO land_parcel_versions (id, land_parcel_id, shape, area_m2, valid) VALUES (${crypto.randomUUID()}, ${parcelR}, ST_GeomFromText('MULTIPOLYGON(((-0.3 43.38,-0.295 43.38,-0.295 43.3809,-0.3 43.3809,-0.3 43.38)))', 4326), 30000, tstzrange('2025-08-01', NULL))`;
+    await sql`INSERT INTO productions (id, farm_id, campaign_id, land_parcel_id, nature, species, cultivation, activity_id) VALUES (${crypto.randomUUID()}, ${farmId}, ${c26!.id}, ${parcelR}, 'field_crop', 'brassica_napus', 'brassica_napus', ${rape})`;
+    await sql`INSERT INTO parcel_soils (land_parcel_id, farm_id, irrigated, rooting_depth_cm) VALUES (${parcelR}, ${farmId}, false, 60)`;
+    await sql`INSERT INTO parcel_nitrate_zones (land_parcel_id, farm_id, insee, commune, status, referential) VALUES (${parcelR}, ${farmId}, '64389', 'Monassut-Audiracq', 'in', 'test')`;
+    await app.request(`${base()}/fertilization/plans/prepare?campaign=2026`, { method: "POST", headers });
+    const [row] = await sql`SELECT id FROM fertilization_plans WHERE land_parcel_id = ${parcelR}`;
+    const get = async () => (await (await app.request(`${base()}/fertilization/plans/${row!.id}`, { headers })).json()) as FertilizationPlan;
+    const first = await get();
+    expect(first.result).toMatchObject({ method: "bilan_additive", annex: "2.4", dose: null });
+    expect(first.result.missing).toEqual(expect.arrayContaining([expect.stringMatching(/^Pi : pesée de matière verte/)]));
+    const p = (await (
+      await app.request(`${base()}/fertilization/plans/${row!.id}/draft`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ yieldTarget: 35, rapeseed: { biomassEndWinterKgM2: 1.2, biomassStartWinterKgM2: null, legumeCompanion: false, organicHistory: null } }),
+      })
+    ).json()) as FertilizationPlan;
+    // Sol de 60 cm : Rf 15, Ri 20, M 20 ; Pi = 1,2 × 65 = 78 ; X = 245 + 15 − (78 + 20 + 20) = 142.
+    expect(p.result.dose).toBe(142);
+    expect(p.result.terms.M).toMatchObject({ value: 20, detail: "Mh + Mr forfaitaires, sol ≤ 80 cm" });
+  });
 });

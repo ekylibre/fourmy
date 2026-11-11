@@ -14,7 +14,7 @@ import {
   type NitrateType,
   type ProductAnalysisWrite,
 } from "@fourmy/contracts";
-import { aplshProducts } from "@fourmy/fertilization-refs";
+import { aplshProducts, naProProducts } from "@fourmy/fertilization-refs";
 import { api, farmPath } from "../../app/api";
 import { Documents } from "./Documents";
 import { useFarm } from "../../app/farm";
@@ -213,6 +213,16 @@ function FertilizerModal({ farmId, article, onClose }: { farmId: string; article
               searchable
               clearable
               onChange={(v) => setC({ ...c, aplshProduct: v })}
+            />
+            <Select
+              label="Référence de l'annexe 5 (Keq)"
+              description="Équivalent engrais minéral dans le plan de fumure"
+              placeholder="Produit le plus proche"
+              data={naProProducts.rows.map((r) => ({ value: r.key, label: r.family ? `${r.label} (${r.family})` : r.label }))}
+              value={c.proProduct ?? null}
+              searchable
+              clearable
+              onChange={(v) => setC({ ...c, proProduct: v })}
             />
             <NumberInput
               label="Rapport C/N"

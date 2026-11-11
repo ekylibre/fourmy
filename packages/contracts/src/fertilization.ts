@@ -63,6 +63,8 @@ export const fertilizerComposition = z.object({
   /** Organiques (lot AK) : rapport C/N, et dénomination COMIFER pour l'APLSH. */
   cN: z.number().positive().max(200).nullable().optional(),
   aplshProduct: z.string().max(120).nullable().optional(),
+  /** Ligne de l'annexe 5 du référentiel régional (Keq des organiques, lot AO). */
+  proProduct: z.string().max(120).nullable().optional(),
 });
 export type FertilizerComposition = z.infer<typeof fertilizerComposition>;
 
@@ -233,7 +235,7 @@ export type FertilizationSettings = z.infer<typeof fertilizationSettingsWrite>;
 
 // --- Lot AG : plan prévisionnel de fumure -------------------------------------------
 
-export const BALANCE_TERMS = ["Pf", "Rf", "Ri", "Pi", "Mh", "Mhp", "Mr", "MrCi", "Nirr", "Xa", "CAU", "Nbefore4"] as const;
+export const BALANCE_TERMS = ["Pf", "Rf", "Ri", "Pi", "Mh", "Mhp", "Mr", "MrCi", "M", "Fleg", "Fass", "Mha", "Nirr", "Xa", "CAU", "Nbefore4"] as const;
 export type BalanceTerm = (typeof BALANCE_TERMS)[number];
 
 export const BALANCE_TERM_LABELS: Record<BalanceTerm, string> = {
@@ -245,6 +247,10 @@ export const BALANCE_TERM_LABELS: Record<BalanceTerm, string> = {
   Mhp: "Retournement de prairie (Mhp)",
   Mr: "Résidus du précédent (Mr)",
   MrCi: "Culture intermédiaire (MrCi)",
+  M: "Minéralisation de l'humus et des résidus (M)",
+  Fleg: "Précédent pois protéagineux (Fleg)",
+  Fass: "Légumineuses associées (Fass)",
+  Mha: "Historique d'apports organiques (Mha)",
   Nirr: "Azote de l'eau d'irrigation (Nirr)",
   Xa: "Produits organiques (Xa)",
   CAU: "Coefficient apparent d'utilisation (CAU)",
@@ -281,6 +287,17 @@ export const planDraft = z.object({
   openingOn: isoDate.nullable().optional(),
   /** Période d'implantation envisagée, telle que l'écrit l'exploitant (« 10 au 20 avril »). */
   sowingPeriod: z.string().trim().max(80).nullable().optional(),
+  /** Colza (annexe 2.4, lot AO) : pesées de matière verte (kg/m²), légumineuses associées, historique organique. */
+  rapeseed: z
+    .object({
+      biomassEndWinterKgM2: z.number().min(0).max(20).nullable().default(null),
+      biomassStartWinterKgM2: z.number().min(0).max(20).nullable().default(null),
+      legumeCompanion: z.boolean().default(false),
+      organicHistory: z.object({ product: z.string().max(120), frequency: z.enum(["every_year", "two_in_three", "every_two", "every_three_or_more"]) }).nullable().default(null),
+    })
+    .optional(),
+  /** Produits organiques prévus (lot AO) : quantité par hectare dans l'unité de l'article, date prévue. */
+  organics: z.array(z.object({ articleId: z.string().uuid(), quantity: z.number().positive().max(1000), plannedOn: isoDate })).max(6).optional(),
 });
 export type PlanDraft = z.infer<typeof planDraft>;
 
@@ -332,6 +349,20 @@ export interface PlanContext {
   sowing: { period: string | null; sownOn: string | null };
   /** Couvert d'interculture qui précède la culture. */
   cover: CoverCrop | null;
+  /** Apports organiques de la campagne (réalisés ou prévus) et leur équivalent minéral (lot AO). */
+  organics: {
+    date: string;
+    product: string;
+    planned: boolean;
+    nTotalKgHa: number;
+    period: string;
+    /** Équivalent minéral compté dans Xa (Keq bilan) et dans l'APL (Keq Ri). */
+    xa: number;
+    ri: number;
+    keq: { bilan: number | null; ri: number | null; cycle: number | null };
+    missing: string | null;
+    notRecommended: boolean;
+  }[];
 }
 
 export interface PlanVersion {

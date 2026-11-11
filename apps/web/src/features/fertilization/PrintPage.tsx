@@ -242,6 +242,14 @@ function PlansDoc({ farmId, farmName, campaign }: { farmId: string; farmName: st
                 {c.cover ? ` · couvert : ${c.cover.species}` : ""}
               </Text>
             )}
+            {(c.organics ?? []).length > 0 && (
+              <Text size="sm">
+                Produits organiques :{" "}
+                {c.organics
+                  .map((o) => `${o.product} le ${formatDate(o.date)}${o.planned ? " (prévu)" : ""}, ${n(o.nTotalKgHa)} kg N/ha, ${o.missing ? `Keq non déterminé (${o.missing})` : `Xa ${n(o.xa)} kg`}`)
+                  .join(" ; ")}
+              </Text>
+            )}
             <Text size="xs" mt={4}>
               {r.equation} (annexe {r.annex})
             </Text>
