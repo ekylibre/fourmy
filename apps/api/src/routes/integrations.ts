@@ -8,7 +8,12 @@ import {
   removeIntegration,
   syncIntegration,
 } from "../integrations/repo.js";
+import { agrirouterConfig, completeAgrirouterConnect, startAgrirouterConnect } from "../integrations/agrirouter.js";
 import { BadRequest, problem, uuidParam } from "./helpers.js";
+
+/** Catalogue avec la disponibilité des fournisseurs connectés par consentement (configuration du serveur). */
+const catalogue = () =>
+  INTEGRATION_PROVIDERS.map((p) => (p.connect === "oauth" ? { ...p, available: p.provider === "agrirouter" && agrirouterConfig() !== null } : p));
 
 /** Synchros lancées depuis l'API (les tests attendent leur fin). */
 export const pendingSyncs = new Set<Promise<unknown>>();
@@ -21,8 +26,26 @@ export const integrationRoutes = new Hono<Env>()
   .use("/integrations/*", requireOwner)
   .use("/integrations", requireOwner)
   .get("/integrations", async (c) =>
-    c.json({ providers: INTEGRATION_PROVIDERS, items: await listIntegrations(db(), c.get("farmId")) }),
+    c.json({ providers: catalogue(), items: await listIntegrations(db(), c.get("farmId")) }),
   )
+  // agrirouter : consentement dans le compte agrirouter de la ferme, puis retour sur le web.
+  .post("/integrations/agrirouter/connect", async (c) => c.json(await startAgrirouterConnect(db(), c.get("farmId"))))
+  .post("/integrations/agrirouter/complete", async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { state?: unknown; tenantId?: unknown };
+    if (typeof body.state !== "string" || body.state.length > 512 || typeof body.tenantId !== "string" || !/^[0-9a-f-]{36}$/i.test(body.tenantId)) {
+      throw new BadRequest("state et tenantId attendus.");
+    }
+    const farmId = c.get("farmId");
+    await completeAgrirouterConnect(db(), farmId, { state: body.state, tenantId: body.tenantId });
+    // Première lecture des destinataires dans la foulée (en arrière-plan).
+    const [integ] = (await listIntegrations(db(), farmId)).filter((i) => i.provider === "agrirouter");
+    if (integ) {
+      const run = syncIntegration(db(), farmId, integ.id);
+      pendingSyncs.add(run);
+      void run.catch(() => undefined).finally(() => pendingSyncs.delete(run));
+    }
+    return c.json({ items: await listIntegrations(db(), farmId) });
+  })
   .put("/integrations/:provider", async (c) => {
     const provider = integrationProvider.safeParse(c.req.param("provider"));
     if (!provider.success) throw new BadRequest("Fournisseur d'intégration inconnu.");
@@ -47,6 +70,6 @@ export const integrationRoutes = new Hono<Env>()
     return c.json(items.find((i) => i.id === id), first === "done" ? 200 : 202);
   })
   .delete("/integrations/:id", async (c) => {
-    await removeIntegration(db(), c.get("farmId"), uuidParam(c, "id"));
-    return c.body(null, 204);
+    const { remoteError } = await removeIntegration(db(), c.get("farmId"), uuidParam(c, "id"));
+    return remoteError ? c.json({ remoteError }) : c.body(null, 204);
   });

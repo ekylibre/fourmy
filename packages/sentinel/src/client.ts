@@ -1,5 +1,6 @@
 import type { VegetationIndex } from "@fourmy/contracts";
-import { INDICES_EVALSCRIPT, NDVI_IMAGE_EVALSCRIPT, RGB_IMAGE_EVALSCRIPT, VALIDITY_EVALSCRIPT } from "./evalscripts.js";
+import { INDICES_EVALSCRIPT, NDVI_IMAGE_EVALSCRIPT, RGB_IMAGE_EVALSCRIPT, VALIDITY_EVALSCRIPT, indexFromByte, indexRasterEvalscript } from "./evalscripts.js";
+import { decodeGrayPng } from "./png.js";
 
 export const CDSE_BASE_URL = "https://sh.dataspace.copernicus.eu";
 export const CDSE_TOKEN_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token";
@@ -267,6 +268,40 @@ export class SentinelClient {
         return { date: item.interval.from.slice(0, 10), validPx: Math.max(0, (num(s.sampleCount) ?? 0) - (num(s.noDataCount) ?? 0)) };
       });
     return { rows, pu };
+  }
+
+  /**
+   * Raster d'un indice sur une géométrie projetée (zonage, lot AD) : grille
+   * de `resolution` m calée sur le rectangle `bbox` (projeté, multiple de la
+   * résolution), une valeur par pixel ligne par ligne depuis le nord-ouest,
+   * null hors géométrie ou sous un nuage.
+   */
+  async indexRaster(
+    geom: ProjectedGeometry,
+    bbox: Bbox,
+    date: string,
+    index: VegetationIndex,
+    resolution = 10,
+  ): Promise<{ width: number; height: number; values: (number | null)[]; pu: number }> {
+    const width = Math.round((bbox[2] - bbox[0]) / resolution);
+    const height = Math.round((bbox[3] - bbox[1]) / resolution);
+    if (width < 1 || height < 1 || width > 2500 || height > 2500) throw new SentinelError(400, "Emprise de raster invalide.");
+    const res = await this.call(
+      "process",
+      "/api/v1/process",
+      {
+        input: {
+          bounds: { bbox, geometry: geom.geometry, properties: { crs: crsUrl(geom.epsg) } },
+          data: [{ type: "sentinel-2-l2a", dataFilter: { timeRange: { from: `${date}T00:00:00Z`, to: `${date}T23:59:59Z` }, mosaickingOrder: "leastCC" } }],
+        },
+        output: { width, height, responses: [{ identifier: "default", format: { type: "image/png" } }] },
+        evalscript: indexRasterEvalscript(index),
+      },
+      "image/png",
+    );
+    const png = decodeGrayPng(new Uint8Array(await res.arrayBuffer()));
+    if (png.width !== width || png.height !== height) throw new SentinelError(502, `Raster inattendu (${png.width}×${png.height} au lieu de ${width}×${height}).`);
+    return { width, height, values: Array.from(png.gray, indexFromByte), pu: num(res.headers.get("x-processingunits-spent")) ?? 0 };
   }
 
   /** PNG RGBA d'une géométrie WGS84 pour une date : NDVI colorié ou couleurs naturelles. L'image couvre le rectangle englobant. */

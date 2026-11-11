@@ -26,6 +26,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | [`docs/teledetection.md`](docs/teledetection.md) | NDVI des parcelles (Sentinel-2, Copernicus), courbe et comparaison aux années précédentes, images sur la carte et le plan 3D |
 | [`docs/jumeau-3d.md`](docs/jumeau-3d.md) | Plan 3D du jumeau : rangs de végétation selon l'état observé, météo du jour (pluie, brume, sol mouillé, gelée) |
 | [`docs/modele-croissance.md`](docs/modele-croissance.md) | Modèle de croissance : stades par degrés-jours, bilan hydrique, besoin d'irrigation, signalements |
+| [`docs/modulation.md`](docs/modulation.md) | Cartes de modulation (zonage Sentinel-2, doses par zone, ISO-XML et Shapefile) et envoi aux machines par agrirouter |
 | [`docs/activites.md`](docs/activites.md) · [`docs/parcelles.md`](docs/parcelles.md) · [`docs/carto.md`](docs/carto.md) | Activités et productions ; création de parcelles (PAC, cadastre) et fiche ; outils de cartographie |
 | [`docs/materiels.md`](docs/materiels.md) | Matériels : fiche, compteur et relevés, plan d'entretien et échéances, interventions d'entretien, pièces à commander, alertes, avatar 3D (mode d'emploi et API) |
 | [`docs/parcours-attelages.md`](docs/parcours-attelages.md) · [`docs/parcours-attelages-design.md`](docs/parcours-attelages-design.md) | Parcours GPS d'un matériel, intervention tirée des parcours, attelages dans l'intervention : exigences et design |

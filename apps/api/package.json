@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@fourmy/connector-traccar": "workspace:*",
+    "@fourmy/agrirouter": "workspace:*",
     "@fourmy/contracts": "workspace:*",
     "@fourmy/db": "workspace:*",
     "@fourmy/domain": "workspace:*",
@@ -23,6 +24,7 @@
     "@fourmy/geo-ign": "workspace:*",
     "@fourmy/lexicon": "workspace:*",
     "@fourmy/migrator-ekylibre": "workspace:*",
+    "@fourmy/isoxml": "workspace:*",
     "@fourmy/sentinel": "workspace:*",
     "@fourmy/weather": "workspace:*",
     "@hono/node-server": "1.13.8",

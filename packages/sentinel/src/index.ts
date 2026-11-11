@@ -5,3 +5,4 @@
  */
 export * from "./client.js";
 export * from "./evalscripts.js";
+export * from "./png.js";

@@ -25,6 +25,12 @@
     },
     {
       "path": "../../packages/sentinel"
+    },
+    {
+      "path": "../../packages/agrirouter"
+    },
+    {
+      "path": "../../packages/isoxml"
     }
   ],
   "include": [

@@ -1,0 +1,24 @@
+{
+  "name": "@fourmy/agrirouter",
+  "version": "0.0.0",
+  "description": "Client agrirouter (API G4, REST) : consentement OAuth des fermes, points de terminaison, envoi de fichiers aux machines",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "vitest": "2.1.8"
+  }
+}

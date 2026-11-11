@@ -83,6 +83,15 @@ export async function configureIntegration(
   input: IntegrationWrite,
 ): Promise<{ integration: Integration; test: Record<string, unknown> | null }> {
   const def = definition(provider);
+  if (def.connect === "oauth") {
+    // Seule la désactivation passe par ce formulaire ; la connexion se fait par consentement.
+    const [row] = await withFarm(db, farmId, (tx) => rows<Row>(tx, sql`SELECT * FROM integrations WHERE provider = ${provider}`));
+    if (!row?.secret_ciphertext || input.enabled === undefined) throw new BadRequest(`${def.label} : utilisez le bouton « Connecter ».`);
+    const [updated] = await withFarm(db, farmId, (tx) =>
+      rows<Row>(tx, sql`UPDATE integrations SET enabled = ${input.enabled!}, updated_at = now() WHERE id = ${row.id} RETURNING *`),
+    );
+    return { integration: view(updated!), test: null };
+  }
   const [existing] = await withFarm(db, farmId, (tx) =>
     rows<Row>(tx, sql`SELECT * FROM integrations WHERE provider = ${provider}`),
   );
@@ -128,11 +137,30 @@ export async function configureIntegration(
   return { integration, test };
 }
 
-export async function removeIntegration(db: Database, farmId: string, id: string): Promise<void> {
+/**
+ * Retire une intégration. Si le fournisseur sait défaire la connexion de son
+ * côté (agrirouter), il est appelé d'abord ; un échec n'empêche pas le retrait
+ * dans Fourmy (l'exploitant peut aussi retirer l'accès chez le fournisseur).
+ */
+export async function removeIntegration(db: Database, farmId: string, id: string): Promise<{ remoteError: string | null }> {
+  const [row] = await withFarm(db, farmId, (tx) => rows<Row>(tx, sql`SELECT * FROM integrations WHERE id = ${id}`));
+  if (!row) throw new NotFound("Intégration introuvable.");
+  let remoteError: string | null = null;
+  const disconnect = PROVIDERS[row.provider].disconnect;
+  if (disconnect && row.secret_ciphertext) {
+    let secret: string | undefined;
+    try {
+      secret = decryptSecret(row.secret_ciphertext);
+      await disconnect({ farmId, settings: row.settings, secret, equipments: [] });
+    } catch (e) {
+      remoteError = safeMessage(e, secret);
+    }
+  }
   await withFarm(db, farmId, async (tx) => {
     const removed = await rows(tx, sql`DELETE FROM integrations WHERE id = ${id} RETURNING id`);
     if (removed.length === 0) throw new NotFound("Intégration introuvable.");
   });
+  return { remoteError };
 }
 
 /**
