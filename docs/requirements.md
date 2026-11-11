@@ -199,8 +199,16 @@ conception : [`teledetection-design.md`](teledetection-design.md).
   WOFOST et l'assimilation du LAI restent à faire.* Les irrigations saisies
   (procédure « Irrigation », dose en mm) entrent dans le bilan hydrique.
   *Réalisé (lot AC).*
-- **FR-TWIN-6, 7 et 9** (modulation ISO-XML, ISOBUS, capteurs) : voir
-  l'étude, lots ultérieurs.
+- **FR-TWIN-6 (S)** **Carte de modulation** : zonage intra-parcellaire
+  d'après une image Sentinel-2 (2 à 5 zones de même surface), dose par zone
+  (compenser, valoriser, uniforme ; bornes et largeur de la machine), export
+  ISO-XML (TaskData, grille de type 1) et Shapefile. *Réalisé (lot AD,
+  [`modulation.md`](modulation.md)).*
+- **FR-TWIN-7 (C)** Import des TimeLogs ISOBUS : **remplacé** le 2026-11-11
+  par la **connexion à agrirouter** (consentement OAuth de la ferme, envoi
+  des cartes de modulation aux consoles reliées). *Réalisé (lot AD).* La
+  réception (TimeLogs, doses appliquées) passera aussi par agrirouter.
+- **FR-TWIN-9** (capteurs) : voir l'étude, lot ultérieur.
 
 ### 4.10 Réglementaire
 - **FR-REG-1 (M)** **Registre phytosanitaire** produit à partir des
