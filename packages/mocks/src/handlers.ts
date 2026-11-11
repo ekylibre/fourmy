@@ -77,7 +77,7 @@ export const handlers = [
   // Fertilisants (lot AE) : aucun dans la démo.
   http.get(`*${base}/fertilizers`, () => HttpResponse.json({ items: [] })),
   // Fertilisation azotée (lots AF, AI) : paramètres par défaut, aucun justificatif.
-  http.get(`*${base}/fertilization/settings`, () => HttpResponse.json({ region: "nouvelle-aquitaine", campaignStartMmdd: "09-01" })),
+  http.get(`*${base}/fertilization/settings`, () => HttpResponse.json({ region: "nouvelle-aquitaine", campaignStartMmdd: "09-01", aplshZone: null })),
   http.get(`*${base}/fertilization/documents`, () => HttpResponse.json({ items: [] })),
   http.get(`*${base}/fertilization/record`, ({ request }) => {
     const campaign = Number(new URL(request.url).searchParams.get("campaign") ?? new Date().getFullYear());

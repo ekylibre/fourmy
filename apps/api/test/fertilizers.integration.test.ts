@@ -62,8 +62,13 @@ describe.skipIf(!url)("fertilisants (intégration)", () => {
     await app.request(`${base()}/articles/${manure}/fertilizer`, {
       method: "PUT",
       headers,
-      body: JSON.stringify({ basis: "kg_per_t", nTotal: 5.8, nMineralShare: 0.1, nitrateType: "Ib", source: "référentiel" }),
+      body: JSON.stringify({ basis: "kg_per_t", nTotal: 5.8, nMineralShare: 0.1, nitrateType: "Ib", source: "référentiel", cN: 14, aplshProduct: "fumier_de_bovins_stockage_moins_2_mois" }),
     });
+    // Référence APLSH (lot AK) : dénomination du COMIFER et C/N, enregistrés ; dénomination inconnue refusée.
+    expect((await (await app.request(`${base()}/fertilizers`, { headers })).json()).items.find((f: FertilizerArticle) => f.id === manure).composition).toMatchObject({ cN: 14, aplshProduct: "fumier_de_bovins_stockage_moins_2_mois" });
+    expect(
+      (await app.request(`${base()}/articles/${manure}/fertilizer`, { method: "PUT", headers, body: JSON.stringify({ basis: "kg_per_t", nTotal: 5.8, aplshProduct: "inconnu" }) })).status,
+    ).toBe(400);
     const res = await app.request(`${base()}/articles/${manure}/analyses`, {
       method: "POST",
       headers,

@@ -18,6 +18,7 @@ import {
   type WaterSourceWrite,
 } from "@fourmy/contracts";
 import { NA_SOIL_TYPE_LABELS, isNaSoilType } from "@fourmy/fertilization-refs";
+import { APLSH_ZONES } from "@fourmy/fertilization-refs";
 import { api, farmPath } from "../../app/api";
 import { Documents } from "./Documents";
 import { useAt } from "../../app/at";
@@ -57,6 +58,13 @@ export function FertilizationPage() {
     queryKey: ["fertilization-settings", farm.id],
     queryFn: () => api.get<FertilizationSettings>(farmPath(farm.id, "/fertilization/settings")),
   });
+  const saveSettings = useMutation({
+    mutationFn: (s: FertilizationSettings) => api.put<FertilizationSettings>(farmPath(farm.id, "/fertilization/settings"), s),
+    onSuccess: (s) => {
+      client.setQueryData(["fertilization-settings", farm.id], s);
+      void client.invalidateQueries({ queryKey: ["fertilization-record", farm.id] });
+    },
+  });
   if (parcels.isLoading) return <Loading />;
   if (parcels.error) return <ErrorAlert error={parcels.error} />;
   const items = parcels.data!.items;
@@ -76,11 +84,22 @@ export function FertilizationPage() {
             données.
           </Text>
         </div>
-        {owner && (
-          <Button leftSection={<RefreshCw size={16} />} variant="light" onClick={() => refresh.mutate()} loading={refresh.isPending}>
-            Actualiser le zonage
-          </Button>
-        )}
+        <Group align="flex-end">
+          <Select
+            label="Zone climatique (APLSH)"
+            w={240}
+            disabled={!owner || !settings.data}
+            data={[{ value: "", label: "D'après le département" }, ...Object.entries(APLSH_ZONES).map(([value, label]) => ({ value, label }))]}
+            value={settings.data?.aplshZone ?? ""}
+            allowDeselect={false}
+            onChange={(v) => settings.data && saveSettings.mutate({ ...settings.data, aplshZone: (v || null) as FertilizationSettings["aplshZone"] })}
+          />
+          {owner && (
+            <Button leftSection={<RefreshCw size={16} />} variant="light" onClick={() => refresh.mutate()} loading={refresh.isPending}>
+              Actualiser le zonage
+            </Button>
+          )}
+        </Group>
       </Group>
 
       {items.length > 0 && (
@@ -444,6 +463,8 @@ function CampaignWatch({ farmId, campaign, toEstablish }: { farmId: string; camp
         text: `${p.name} : ${p.totalNKgHa} kg N apportés pour ${p.plannedDose} kg prévus${p.steering.length ? " (mesure de pilotage enregistrée)" : ", sans mesure de pilotage"}.`,
       });
     if (r.forced.length) lines.push({ color: "brique.7", text: `${s(r.forced.length, "épandage enregistré", "épandages enregistrés")} en période d'interdiction.` });
+    for (const p of r.parcels.filter((x) => x.aplsh?.over))
+      lines.push({ color: "brique.7", text: `${p.name} : ${p.aplsh!.kgNHa} kg d'azote potentiellement libéré jusqu'en sortie d'hiver sur le couvert, pour un plafond de ${p.aplsh!.ceiling} kg.` });
     const cover = r.parcels.filter((p) => p.soilCover?.level === "warning");
     if (cover.length) lines.push({ color: "brique.7", text: `Couverture des sols à vérifier : ${cover.map((p) => p.name).join(", ")}.` });
   }

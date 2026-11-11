@@ -332,4 +332,42 @@ describe.skipIf(!url)("plans de fumure (intégration)", () => {
     expect((await plan()).result.terms.MrCi).toMatchObject({ value: 0 });
     await sql`DELETE FROM interventions WHERE id IN (${forced}, ${grind})`;
   });
+
+  it("APLSH : plafond de 70 kg sur le couvert d'interculture, au contrôle et au cahier (lot AK)", async () => {
+    const slurry = crypto.randomUUID();
+    await sql`INSERT INTO articles (id, farm_id, name, kind, unit) VALUES (${slurry}, ${farmId}, 'Lisier de porc', 'fertilizer', 'cubic_meter')`;
+    await sql`INSERT INTO article_fertilizers (article_id, farm_id, basis, n_total, n_mineral_share, nitrate_type, aplsh_product, origin)
+              VALUES (${slurry}, ${farmId}, 'kg_per_m3', 4, 0.6, 'II', 'lisier_mixte_de_porc', 'confirmed')`;
+    await sql`INSERT INTO parcel_nitrate_zones (land_parcel_id, farm_id, insee, commune, status, referential) VALUES (${p2025}, ${farmId}, '64389', 'Monassut-Audiracq', 'in', 'test')`;
+    // Couvert de la campagne 2026, sur la parcelle 2026 qui recouvre celle de 2025 ; précédent récolté le 15/10/2025.
+    await app.request(`${base()}/land-parcels/${p2026}/cover-crop`, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({ campaign: 2026, family: "cruciferes", species: "Moutarde", sownOn: "2025-10-18", destroyedOn: "2026-01-20", biomass: "1_3", destructionMode: "mechanical" }),
+    });
+    const check = async (quantity: number) =>
+      (await (
+        await app.request(`${base()}/fertilization/check`, {
+          method: "POST",
+          headers: worker.headers,
+          body: JSON.stringify({ startedAt: "2025-10-20T09:00:00+02:00", parcelIds: [p2025], inputs: [{ articleId: slurry, quantity, per: "hectare" }] }),
+        })
+      ).json()) as FertilizationCheck;
+    // 30 m³ × 4 kg = 120 kg N ; lisier mixte de porc au 15/10, bassin du Sud-Ouest : 75 % → 90 kg.
+    expect((await check(30)).indicators.find((i) => i.code === "fert_aplsh")).toMatchObject({
+      level: "warning",
+      parcelName: "Champ Maïs 2025",
+      message: "APLSH depuis la récolte du précédent (15/10/2025), sur le couvert d'interculture : 90 kg N/ha pour un plafond de 70 kg (PAN 7).",
+    });
+    expect((await check(15)).indicators.find((i) => i.code === "fert_aplsh")).toMatchObject({ level: "ok", message: expect.stringContaining("45 kg N/ha sur 70 kg permis") });
+
+    const spread = crypto.randomUUID();
+    await sql`INSERT INTO interventions (id, farm_id, procedure, status, origin, started_at, stopped_at) VALUES (${spread}, ${farmId}, 'fertilizing', 'done', 'web', '2025-10-20T08:00:00Z', '2025-10-20T10:00:00Z')`;
+    await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id) VALUES (${crypto.randomUUID()}, ${spread}, 'target', 'land_parcel', ${p2025})`;
+    await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id, quantity, unit) VALUES (${crypto.randomUUID()}, ${spread}, 'input', 'article', ${slurry}, 30, 'cubic_meter_per_hectare')`;
+    const r = (await (await app.request(`${base()}/fertilization/record?campaign=2026`, { headers: worker.headers })).json()) as FertilizationRecord;
+    expect(r.parcels.find((x) => x.parcelId === p2026)!.aplsh).toEqual({ from: "2025-10-15", to: "2026-01-20", kgNHa: 90, ceiling: 70, over: true, missing: [] });
+    await sql`DELETE FROM stock_movements WHERE intervention_id = ${spread}`;
+    await sql`DELETE FROM interventions WHERE id = ${spread}`;
+  });
 });

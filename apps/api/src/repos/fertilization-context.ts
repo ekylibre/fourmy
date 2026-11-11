@@ -33,15 +33,18 @@ export async function getSettings(db: Database, farmId: string): Promise<Fertili
 }
 
 export async function settingsInTx(tx: Tx): Promise<FertilizationSettings> {
-  const [r] = await rows<{ region: "nouvelle-aquitaine"; campaign_start_mmdd: string }>(tx, sql`SELECT region, campaign_start_mmdd FROM fertilization_settings`);
-  return { region: r?.region ?? "nouvelle-aquitaine", campaignStartMmdd: r?.campaign_start_mmdd ?? "09-01" };
+  const [r] = await rows<{ region: "nouvelle-aquitaine"; campaign_start_mmdd: string; aplsh_zone: FertilizationSettings["aplshZone"] }>(
+    tx,
+    sql`SELECT region, campaign_start_mmdd, aplsh_zone FROM fertilization_settings`,
+  );
+  return { region: r?.region ?? "nouvelle-aquitaine", campaignStartMmdd: r?.campaign_start_mmdd ?? "09-01", aplshZone: r?.aplsh_zone ?? null };
 }
 
 export async function putSettings(db: Database, farmId: string, s: FertilizationSettings): Promise<FertilizationSettings> {
   await withFarm(db, farmId, (tx) =>
     tx.execute(sql`
-      INSERT INTO fertilization_settings (farm_id, region, campaign_start_mmdd) VALUES (${farmId}, ${s.region}, ${s.campaignStartMmdd})
-      ON CONFLICT (farm_id) DO UPDATE SET region = excluded.region, campaign_start_mmdd = excluded.campaign_start_mmdd, updated_at = now()`),
+      INSERT INTO fertilization_settings (farm_id, region, campaign_start_mmdd, aplsh_zone) VALUES (${farmId}, ${s.region}, ${s.campaignStartMmdd}, ${s.aplshZone ?? null})
+      ON CONFLICT (farm_id) DO UPDATE SET region = excluded.region, campaign_start_mmdd = excluded.campaign_start_mmdd, aplsh_zone = excluded.aplsh_zone, updated_at = now()`),
   );
   return getSettings(db, farmId);
 }

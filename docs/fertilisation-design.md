@@ -511,7 +511,47 @@ Migration `0039_fertilization_aj.sql` :
 
 **Constat sur la ferme de Pierre** : sur 8 parcelles de maïs 2026, le maïs 2025 est récolté le 16/09/2025 (le 04/09 pour l'une). Le premier travail du sol saisi est un déchaumage le 14/10, au-delà des 15 jours, et aucun couvert n'est saisi. Fourmy affiche « à vérifier » : soit un broyage manque dans la saisie, soit la règle n'a pas été respectée.
 
-**Reste à faire** : APLSH, grille d'efficacité, colza et Keq des organiques, lien avec la modulation (FR-FERT-18), rôle conseiller, mobile hors ligne, autres régions.
+**Reste à faire** (après le lot AJ) : APLSH, grille d'efficacité, colza et Keq des organiques, lien avec la modulation (FR-FERT-18), rôle conseiller, mobile hors ligne, autres régions.
+
+### 5.6 Réalisation du lot AK : APLSH (2026-11-11)
+
+**Textes** :
+- PAN 7, annexe I, I (tableau des périodes) : plafond de 70 kg d'azote potentiellement libéré jusqu'en sortie d'hiver (APLSH) par hectare.
+  - Couvert d'interculture : apports depuis la récolte du précédent, types 0, Ia, Ib et II ; le type III compte si le couvert est exporté.
+  - Prairie de plus de 6 mois : apports depuis le 1er septembre, tous types.
+- Référentiel régional NA, article 13 : l'APLSH est le critère de plafonnement.
+
+**Références** (`packages/fertilization-refs/src/aplsh/comifer-2024.ts`) : fichier du COMIFER de novembre 2024, repris tel quel.
+- Pourcentage de l'azote total libéré jusqu'en sortie d'hiver, par zone climatique et par quinzaine d'apport, du 01/07 au 15/11. Un apport prend la référence de la quinzaine qui le précède ; avant le 01/07, celle du 01/07 ; après le 15/11, celle du 15/11.
+- Deux entrées :
+  - la dénomination du produit : 18 produits, dans les 5 zones ;
+  - le C/N et la part d'azote minéral : 8 classes par zone, avec des cases absentes laissées absentes.
+- **Zone climatique** : ni le référentiel régional ni le rapport ne la fixent. Par défaut, Fourmy retient le bassin du Sud-Ouest pour les départements 24, 33, 40, 47 et 64 et l'océanique altéré pour les autres départements de Nouvelle-Aquitaine, d'après les stations du tableau 6 du rapport (Bergerac, Poitiers).
+  - Le choix est modifiable dans les paramètres de la ferme (`fertilization_settings.aplsh_zone`, migration 0040).
+  - À faire valider avec la DREAL, qui publie une calculette APLSH.
+
+**Calcul** (`packages/domain/src/fertilization/aplsh.ts`) :
+- Un engrais minéral libère tout son azote.
+- Un organique libère la part du COMIFER : d'après sa dénomination, sinon d'après son C/N et sa part minérale (`article_fertilizers.aplsh_product`, `c_n` ; le C/N d'une analyse prime).
+- Sans référence, l'apport est nommé « non calculable », jamais supposé.
+
+**Contrôle d'un apport** : sur une parcelle en zone vulnérable.
+- La période de couvert va de la récolte du précédent à la destruction du couvert, ou au 28 février si la destruction n'est pas saisie.
+- Le couvert est cherché pour la campagne suivante, sur la parcelle ou sur celle qui la recouvre (une parcelle par campagne dans Ekylibre).
+- Pour une prairie, la période va du 1er septembre au 15 janvier.
+- Résultat : cumul depuis le début de la période, apport en cours compris. Au-delà de 70 kg, orange ; sinon « X kg sur 70 permis ».
+
+**Cahier et suivi** :
+- Le cahier indique l'APLSH cumulée sur le couvert, de la récolte du précédent à sa destruction, et le dépassement éventuel.
+- Le suivi de la campagne signale les dépassements.
+- Le cahier ne calcule pas encore l'APLSH des prairies.
+
+**Pas encore traités** :
+- les plafonds du tableau 4 du guide du PAR 7 NA, en azote efficace : 50 kg sur un CINE hors ZAR, 30 à 100 kg selon le couvert ;
+- le plafond de 20 kg des effluents peu chargés ;
+- les plans d'épandage (100 kg, note 1).
+
+**Reste à faire** : grille d'efficacité, colza et Keq des organiques, lien avec la modulation, rôle conseiller, mobile, autres régions.
 
 ## 6. Contrats (`@fourmy/contracts`, `fertilization.ts`)
 
@@ -602,7 +642,8 @@ Les termes encore **manquants** sont listés (« à compléter ») sur le tablea
 | **AH — Cahier, contrôles et éditions** | Cahier calculé, couverts (`productions.nature = cover`), contrôles calendrier, plan, plafond, fractionnement, météo, eau, pages imprimables et CSV, tableau de bord, justificatifs | FR-FERT-19 à 23, 25, 26, 30, 33, 34, 36 |
 | **AI — Interdictions, couverts, justificatifs** | Interdiction d'épandage bloquante avec motif, couverts d'interculture (MrCi, cahier), justificatifs joints, date d'ouverture et période d'implantation, analyse de sol annuelle | FR-FERT-19, 23, 25, 28 |
 | **AJ — Conditions, couverture des sols, pilotage** | Conditions d'épandage (gel, pluie, cours d'eau, pente), couverture des sols en interculture, repousses, pilotage et dose permise, tableau de bord de la campagne | FR-FERT-17, 26, 27, 36 |
-| AK — ensuite | APLSH, grille d'efficacité, lien avec la modulation, rôle conseiller, mobile | FR-FERT-18, 28 (APLSH), 29, 35, 40 ; NFR-FERT-7 |
+| **AK — APLSH** | Références APLSH du COMIFER (5 zones), référence d'un fertilisant organique, zone climatique de la ferme, plafond de 70 kg au contrôle et au cahier | FR-FERT-28 |
+| AL — ensuite | Grille d'efficacité, colza et Keq, lien avec la modulation, rôle conseiller, mobile | FR-FERT-18, 29, 35, 40 ; NFR-FERT-7 |
 
 ## 11. Tests
 

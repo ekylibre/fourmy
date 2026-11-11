@@ -14,6 +14,7 @@ import {
   type NitrateType,
   type ProductAnalysisWrite,
 } from "@fourmy/contracts";
+import { aplshProducts } from "@fourmy/fertilization-refs";
 import { api, farmPath } from "../../app/api";
 import { Documents } from "./Documents";
 import { useFarm } from "../../app/farm";
@@ -201,6 +202,29 @@ function FertilizerModal({ farmId, article, onClose }: { farmId: string; article
             onChange={(v) => setC({ ...c, density: optNum(v) })}
           />
         </SimpleGrid>
+        {organic && (
+          <SimpleGrid cols={{ base: 1, sm: 2 }}>
+            <Select
+              label="Référence APLSH (COMIFER)"
+              description="Azote libéré jusqu'en sortie d'hiver : plafond de 70 kg sur les couverts et prairies"
+              placeholder="Produit le plus proche"
+              data={aplshProducts.rows.map((r) => ({ value: r.key, label: `${r.name} (type ${r.type})` }))}
+              value={c.aplshProduct ?? null}
+              searchable
+              clearable
+              onChange={(v) => setC({ ...c, aplshProduct: v })}
+            />
+            <NumberInput
+              label="Rapport C/N"
+              description="À défaut de dénomination : C/N et part minérale"
+              decimalSeparator=","
+              min={0}
+              max={200}
+              value={c.cN ?? ""}
+              onChange={(v) => setC({ ...c, cN: optNum(v) })}
+            />
+          </SimpleGrid>
+        )}
         <Switch label="Apport foliaire (hors calendrier d'épandage)" checked={c.foliar} onChange={(e) => setC({ ...c, foliar: e.currentTarget.checked })} />
         <TextInput label="Source" placeholder="Étiquette, fiche du fournisseur…" value={source} onChange={(e) => setSource(e.currentTarget.value)} maxLength={200} />
         {(save.error || clear.error) && <ErrorAlert error={save.error ?? clear.error} />}
