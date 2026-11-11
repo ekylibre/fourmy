@@ -216,6 +216,12 @@ CREATE TABLE product_analyses (           -- analyses de produits organiques (FR
 
 Le résultat a l'origine `proposed` tant que l'utilisateur ne l'a pas confirmé.
 
+**Écarts de réalisation (lot AE, 2026-11-11)** :
+- Le **nom passe avant le code Lexicon** : chez Pierre, « Solution azotée 32 » est rattachée par erreur à `ammonitrate_33`.
+- La table des codes Lexicon est dans `packages/domain/src/fertilization/proposal.ts`, en attendant `fertilization-refs` (lot AF).
+- La migration `0035_fertilizers.sql` ne crée que `article_fertilizers` et `product_analyses`. Les autres tables du §4 viendront avec leurs lots.
+- L'azote d'un intrant est calculé **dans le navigateur** (fiche et saisie) par la fonction pure du domaine. Le cahier (lot AH) le recalculera côté serveur avec la même fonction.
+
 **Migration Ekylibre** : les relevés `nitrogen_concentration`, `phosphorus_concentration` et `potassium_concentration` des variantes donnent une origine `migrated`. Pierre a 9 variantes concernées. Attention aux unités : `percent` ou `mass_percent`.
 
 ### 4.2 PPF (FR-FERT-9 à 18)

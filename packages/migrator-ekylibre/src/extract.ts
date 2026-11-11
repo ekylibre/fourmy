@@ -187,6 +187,16 @@ export const matters = (s: Sql) =>
     WHERE ip.type IN ('InterventionInput', 'InterventionOutput')
     ORDER BY p.id`;
 
+/** Teneurs N, P, K des variantes (relevés Ekylibre) : composition des fertilisants. */
+export type NutrientReadingRow = { variant_id: number; indicator_name: string; value: string; unit: string | null };
+export const nutrientReadings = (s: Sql) =>
+  s<NutrientReadingRow[]>`
+    SELECT variant_id, indicator_name, measure_value_value::text AS value, measure_value_unit AS unit
+    FROM product_nature_variant_readings
+    WHERE indicator_name IN ('nitrogen_concentration', 'phosphorus_concentration', 'potassium_concentration')
+      AND measure_value_value IS NOT NULL
+    ORDER BY variant_id, indicator_name`;
+
 export type InterventionRow = {
   id: number;
   procedure_name: string;

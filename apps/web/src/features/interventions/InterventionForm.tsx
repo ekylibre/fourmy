@@ -40,6 +40,8 @@ import type {
 import { formatHa } from "@fourmy/ui-lyvre";
 import { isIrrigation } from "@fourmy/contracts";
 import { irrigationBody, irrigationDraft, IrrigationFields, type IrrigationDraft } from "./IrrigationFields";
+import { kgN, nitrogenNote, useFertilizers } from "../fertilization/fertilization";
+import { NitrogenLine } from "../fertilization/NitrogenLine";
 import { api, ApiError, farmPath } from "../../app/api";
 import { unitLabel } from "../../app/labels";
 import { invalidateAfterIntervention, useActivities, useCrewTemplates, useEquipments, usePhytoArticles } from "../../app/queries";
@@ -268,6 +270,18 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
     return d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d}T23:59:59.000Z` : snapshot.at;
   })();
   const article = (id: string | null) => articles.find((a) => a.id === id);
+  // Azote apporté par les fertilisants (lot AE) : composition enregistrée, analyse ou proposition.
+  const fertilizers = useFertilizers(farmId, inputs.some((r) => article(r.articleId)?.kind === "fertilizer"));
+  const inputDay = maintenanceAt.slice(0, 10);
+  const nitrogenOf = (row: QuantityRow) => {
+    const a = article(row.articleId);
+    if (!a || row.quantity === "") return null;
+    return nitrogenNote(fertilizers.data?.get(a.id), { quantity: Number(row.quantity), per: row.per, unit: a.unit }, treatedM2 > 0 ? treatedM2 / 10_000 : null, inputDay);
+  };
+  const nitrogenTotal = inputs.reduce((s, r) => {
+    const n = nitrogenOf(r);
+    return n?.ok ? s + n.totalKgHa : s;
+  }, 0);
   const inputKinds = procedure?.inputKinds ?? [];
   const outputKinds = procedure?.outputKinds ?? [];
   const articleOptions = (kinds: string[], suggested: string[]) =>
@@ -510,6 +524,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               {formatHa(treatedM2)}
             </Text>
           )}
+          {kind === "input" && <NitrogenLine note={nitrogenOf(row)} farmId={farmId} />}
           {kind === "input" && row.articleId && a?.kind === "phyto" && (
             <RegulatoryPictos
               article={phytoArticles.data?.items.find((x) => x.id === row.articleId)}
@@ -873,6 +888,11 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               <>
                 <Divider label={shape === "maintenance" ? "Pièces et fluides" : "Intrants"} labelPosition="left" />
                 {quantityRows("input", inputs, setInputs, articleOptions(inputKinds, procedure!.suggestions.inputs))}
+                {nitrogenTotal > 0 && inputs.filter((r) => nitrogenOf(r)?.ok).length > 1 && (
+                  <Text size="sm" className="lv-num" aria-label="Azote apporté">
+                    Azote apporté : <b>{kgN(Math.round(nitrogenTotal * 10) / 10)}</b>
+                  </Text>
+                )}
                 <Button variant="subtle" size="xs" leftSection={<Plus size={14} />} onClick={() => setInputs([...inputs, emptyRow("hectare")])}>
                   Ajouter un intrant
                 </Button>

@@ -1,7 +1,7 @@
 import { AppShell, Badge, Burger, Button, Group, NavLink, Stack, Text } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { useState } from "react";
-import { Box, Boxes, Grid3x3, ClipboardList, Database, FileText, LayoutDashboard, Map, Plug, Scale, Users, Wine, FlaskConical, Sprout, Tractor, type LucideIcon } from "lucide-react";
+import { Box, Boxes, Grid3x3, Leaf, ClipboardList, Database, FileText, LayoutDashboard, Map, Plug, Scale, Users, Wine, FlaskConical, Sprout, Tractor, type LucideIcon } from "lucide-react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { Wordmark } from "@fourmy/ui-lyvre";
 import { useFarm } from "../app/farm";
@@ -37,6 +37,7 @@ export const NAVIGATION: NavEntry[] = [
     children: [
       { path: "/stocks", label: "État des stocks", icon: Boxes },
       { path: "/phyto", label: "Produits phyto", icon: FlaskConical },
+      { path: "/fertilizers", label: "Fertilisants", icon: Leaf },
       { path: "/cellar", label: "Cuverie", icon: Wine },
     ],
   },

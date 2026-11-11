@@ -23,6 +23,8 @@ import { ErrorAlert, Loading } from "../../components/states";
 import { MapBoundary } from "../../components/MapBoundary";
 import { ProcedureIcon } from "../../components/ProcedureIcon";
 import { ParcelMap } from "../map/ParcelMap";
+import { kgN, nitrogenNote, useFertilizers } from "../fertilization/fertilization";
+import { NitrogenLine } from "../fertilization/NitrogenLine";
 import { CancelModal } from "./CancelModal";
 import { actionLabel, changeLines, interventionDay, STATUS, targetName, type Names } from "./presenters";
 import { ComplianceSection, IftSection } from "./RegulatorySections";
@@ -90,6 +92,14 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
   const areaOf = (t: (typeof i.targets)[number]) => t.workedAreaM2 ?? parcelAt.get(t.id)?.version.areaM2 ?? null;
   const treatedM2 = parcelTargets.reduce((sum, t) => sum + (areaOf(t) ?? 0), 0);
   const treatedHa = treatedM2 / 10_000;
+  // Azote apporté par les fertilisants (lot AE).
+  const fertilizers = useFertilizers(farm.id, i.inputs.length > 0);
+  const nitrogenOfInput = (q: (typeof i.inputs)[number]) =>
+    nitrogenNote(fertilizers.data?.get(q.articleId), { quantity: q.quantity, per: q.per, unit: q.unit }, treatedHa || null, (i.startedAt ?? new Date().toISOString()).slice(0, 10));
+  const nitrogenTotal = i.inputs.reduce((sum, q) => {
+    const n = nitrogenOfInput(q);
+    return n?.ok ? sum + n.totalKgHa : sum;
+  }, 0);
 
   // Trace GPS des matériels pendant l'intervention : fenêtre de ses périodes ;
   // en attelages, chaque matériel sur les périodes de son attelage (FR-ATT-7).
@@ -309,6 +319,7 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
                                 <RegulatoryPictos {...pictosOf(q.articleId)} size={24} />
                               </Box>
                             )}
+                            {q.role === "Intrant" && <NitrogenLine note={nitrogenOfInput(q)} farmId={farm.id} />}
                           </Table.Td>
                           <Table.Td ta="right" className="lv-num" fw={q.per === "hectare" ? 600 : undefined}>
                             {perHa === null ? "—" : `${formatNumber(perHa, 3)} ${unit}/ha`}
@@ -321,6 +332,11 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
                     })}
                   </Table.Tbody>
                 </Table>
+                {nitrogenTotal > 0 && (
+                  <Text size="sm" mt="xs" className="lv-num" aria-label="Azote apporté">
+                    Azote apporté : <b>{kgN(Math.round(nitrogenTotal * 10) / 10)}</b>
+                  </Text>
+                )}
                 <Text size="xs" c="dimmed" mt={4}>
                   En gras, la valeur saisie ; l'autre est calculée sur la surface traitée.
                 </Text>
