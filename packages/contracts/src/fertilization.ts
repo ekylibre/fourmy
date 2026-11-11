@@ -409,7 +409,9 @@ export type FertilizationIndicatorCode =
   // Plafond d'azote potentiellement libéré jusqu'en sortie d'hiver (lot AK).
   | "fert_aplsh"
   // Grille d'efficacité des apports d'azote minéral, COMIFER 2022 (lot AL).
-  | "fert_efficiency";
+  | "fert_efficiency"
+  // Épandage sur couvert d'interculture, tableau 4 du PAR 7 NA (lot AM).
+  | "fert_cover";
 export interface FertilizationIndicator {
   code: FertilizationIndicatorCode;
   level: "ok" | "info" | "warning" | "danger";

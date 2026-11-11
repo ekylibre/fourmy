@@ -590,7 +590,37 @@ La forme vient du nom ou du code Lexicon de l'engrais. Les NPK, le sulfate d'amm
 
 **Sur la ferme de Pierre** : ses apports de solution azotée du 27/05/2026 (0 mm de pluie dans les 3 jours, 26,5 °C) et du 21/06/2026 (28,8 °C) sont notés « limites » à « à éviter ». Il n'a pas d'analyse de terre : pH et CEC restent inconnus.
 
-**Reste à faire** : colza et Keq des organiques, plafonds du tableau 4 en azote efficace, lien avec la modulation, rôle conseiller, mobile, autres régions.
+**Reste à faire** (après le lot AL) : colza et Keq des organiques, plafonds du tableau 4 en azote efficace, lien avec la modulation, rôle conseiller, mobile, autres régions.
+
+### 5.8 Réalisation du lot AM : épandage sur les couverts (2026-11-11)
+
+**Source** : guide du PAR 7 Nouvelle-Aquitaine (version du 16/10/2026), page 15 et tableau 4, relus sur le rendu de la page.
+
+**Règles** (`packages/domain/src/fertilization/cover-ceilings.ts`) :
+- **Interdits** (rouge, motif obligatoire pour enregistrer) :
+  - épandage sur des repousses de céréales ou de colza, ou sur un couvert de légumineuses pures ;
+  - épandage dans les 30 jours qui précèdent la destruction du couvert ;
+  - type III sur un CINE ;
+  - CINE en ZAR ;
+  - type III en ZAR sur un CIE d'interculture courte ou exporté avant la fin de l'année ;
+  - type III à partir du 15/10 sur un CIE exporté avant la fin de l'année ;
+  - type III en ZAR avant le 1er février sur un CIE exporté l'année suivante.
+- **Avant le couvert** : un apport plus de 15 jours avant son semis, mais après la récolte du précédent, est signalé en orange. Fourmy ne sait pas s'il vise le couvert.
+- **Plafonds** d'azote efficace cumulé depuis 15 jours avant le semis du couvert :
+  - CINE hors ZAR : 50 kg, types I et II ;
+  - CIE hors ZAR : 70 kg, types I et II ;
+  - CIE en ZAR : 30 kg (interculture courte) ou 50 kg (longue, exportée avant la fin de l'année) ;
+  - type III sur un CIE, ou CIE exporté l'année suivante : 70 kg en cumulant organiques et minéraux. Fourmy ne calcule pas de dose prévisionnelle pour un couvert : c'est la valeur par défaut du tableau qui s'applique, pas les 100 kg permis avec une dose calculée.
+  - En zone ouest, avant une culture d'automne (interculture courte) : 50 kg au plus.
+- **Classement du couvert** :
+  - interculture courte quand la culture qui suit le couvert est semée à l'automne ;
+  - exporté avant la fin de l'année quand sa date de destruction ou de récolte tombe la même année que son semis ;
+  - sans date, exporté l'année suivante.
+- Un apport dont l'azote efficace est inconnu est nommé (information), jamais compté pour zéro en silence.
+
+**Où** : contrôle d'un apport sur une parcelle en zone vulnérable (indicateur `fert_cover`), à la saisie et à l'enregistrement. Le couvert est cherché comme pour l'APLSH : pour la campagne suivante, sur la parcelle ou sur celle qui la recouvre, à partir de la récolte du précédent.
+
+**Pas encore traités** : la mention « dans les limites des besoins de la culture » n'est que rappelée ; le second plan de fumure propre à un couvert exporté (encadré de la page 15) n'existe pas.
 
 ## 6. Contrats (`@fourmy/contracts`, `fertilization.ts`)
 
@@ -683,7 +713,8 @@ Les termes encore **manquants** sont listés (« à compléter ») sur le tablea
 | **AJ — Conditions, couverture des sols, pilotage** | Conditions d'épandage (gel, pluie, cours d'eau, pente), couverture des sols en interculture, repousses, pilotage et dose permise, tableau de bord de la campagne | FR-FERT-17, 26, 27, 36 |
 | **AK — APLSH** | Références APLSH du COMIFER (5 zones), référence d'un fertilisant organique, zone climatique de la ferme, plafond de 70 kg au contrôle et au cahier | FR-FERT-28 |
 | **AL — Efficacité des apports** | Grille du COMIFER 2022 à la saisie, sur la fiche et au cahier ; vent dans le cache météo | FR-FERT-29 |
-| AM — ensuite | Colza et Keq, plafonds du tableau 4, lien avec la modulation, rôle conseiller, mobile | FR-FERT-18, 35, 40 ; NFR-FERT-7 |
+| **AM — Épandage sur les couverts** | Interdictions et plafonds d'azote efficace du tableau 4 du PAR 7 NA | FR-FERT-25 (PAR) |
+| AN — ensuite | Colza et Keq, plan de fumure d'un couvert exporté, lien avec la modulation, rôle conseiller, mobile | FR-FERT-18, 35, 40 ; NFR-FERT-7 |
 
 ## 11. Tests
 

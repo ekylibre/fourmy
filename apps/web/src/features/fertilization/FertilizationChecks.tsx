@@ -61,7 +61,7 @@ export function FertilizationSummary({ check }: { check: ReturnType<typeof useFe
 /** Azote apporté et indicateurs d'un contrôle (saisie ou fiche de l'intervention). */
 export function CheckDetails({ result }: { result: FertilizationCheck }) {
   // Plan, APLSH et efficacité s'affichent même conformes : ce sont des repères pour décider de l'apport.
-  const shown = result.indicators.filter((i) => i.level !== "ok" || i.code === "fert_plan" || i.code === "fert_aplsh" || i.code === "fert_efficiency");
+  const shown = result.indicators.filter((i) => i.level !== "ok" || i.code === "fert_plan" || i.code === "fert_aplsh" || i.code === "fert_efficiency" || i.code === "fert_cover");
   return (
     <>
       {result.nitrogen && (
