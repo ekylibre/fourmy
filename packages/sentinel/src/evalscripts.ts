@@ -70,3 +70,25 @@ function evaluatePixel(s) {
   if (!ok(s)) return [0, 0, 0, 0];
   return [2.5 * s.B04, 2.5 * s.B03, 2.5 * s.B02, 1];
 }`;
+
+/**
+ * Raster d'un indice pour le zonage intra-parcellaire (lot AD) : un octet par
+ * pixel, 0 hors parcelle ou sous un nuage, sinon 1 + round((indice + 1) × 127)
+ * (pas de 0,008). Décodage : indexFromByte.
+ */
+export const INDEX_RASTER_METHOD = "s2-raster-v1";
+export const indexRasterEvalscript = (index: "ndvi" | "ndre" | "ndmi") => `//VERSION=3
+function setup() {
+  return {
+    input: [{ bands: ["B04", "B05", "B08", "B8A", "B11", "SCL", "dataMask"] }],
+    output: { bands: 1, sampleType: "UINT8" }
+  };
+}
+${ok}
+function evaluatePixel(s) {
+  if (!ok(s)) return [0];
+  const v = ${index === "ndvi" ? "nd(s.B08, s.B04)" : index === "ndre" ? "nd(s.B8A, s.B05)" : "nd(s.B08, s.B11)"};
+  return [Math.max(1, Math.min(255, 1 + Math.round((v + 1) * 127)))];
+}`;
+
+export const indexFromByte = (b: number): number | null => (b === 0 ? null : (b - 1) / 127 - 1);

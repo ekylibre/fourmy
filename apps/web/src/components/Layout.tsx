@@ -1,7 +1,7 @@
 import { AppShell, Badge, Burger, Button, Group, NavLink, Stack, Text } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { useState } from "react";
-import { Box, Boxes, ClipboardList, Database, FileText, LayoutDashboard, Map, Plug, Scale, Users, Wine, FlaskConical, Sprout, Tractor, type LucideIcon } from "lucide-react";
+import { Box, Boxes, Grid3x3, ClipboardList, Database, FileText, LayoutDashboard, Map, Plug, Scale, Users, Wine, FlaskConical, Sprout, Tractor, type LucideIcon } from "lucide-react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { Wordmark } from "@fourmy/ui-lyvre";
 import { useFarm } from "../app/farm";
@@ -24,6 +24,7 @@ export const NAVIGATION: NavEntry[] = [
     children: [
       { path: "/map", label: "Plan 2D", icon: Map },
       { path: "/3d-plan", label: "Plan 3D", icon: Box },
+      { path: "/prescriptions", label: "Modulation", icon: Grid3x3 },
     ],
   },
   { path: "/activities", label: "Activités", icon: Sprout },

@@ -6,6 +6,7 @@ import { syncStations } from "../repos/weather-stations.js";
 import { SentinelClient } from "@fourmy/sentinel";
 import { BudgetReached, farmBbox, monthUsage, monthlyBudget, recordUsage, syncRemoteSensing } from "../repos/remote-sensing.js";
 import { BadRequest } from "../routes/helpers.js";
+import { agrirouterClient, agrirouterRecipients, type AgrirouterSettings } from "./agrirouter.js";
 
 /**
  * Adaptateurs des fournisseurs d'intégration. Chacun sait tester une
@@ -27,6 +28,8 @@ export interface ProviderAdapter {
   test(ctx: ProviderContext): Promise<Record<string, unknown>>;
   /** Synchronise ; renvoie un rapport court (stocké, affiché). */
   sync(ctx: ProviderContext, targetUrl: string): Promise<Record<string, unknown>>;
+  /** Retrait de l'intégration : défait la connexion côté fournisseur (au mieux). */
+  disconnect?(ctx: ProviderContext): Promise<void>;
 }
 
 const isLocalDev = () => {
@@ -139,7 +142,7 @@ const sencrop = stationsAdapter("sencrop", (settings, secret) => new SencropClie
 // Copernicus (télédétection) : un compte CDSE par exploitant. Chaque requête
 // facturable est comptée pour la ferme ; au-delà du budget mensuel, la synchro
 // s'arrête (ce qui est déjà obtenu reste).
-function copernicusClient(farmId: string, settings: Record<string, string>, secret: string, counter = { requests: 0, pu: 0 }) {
+export function copernicusClient(farmId: string, settings: Record<string, string>, secret: string, counter = { requests: 0, pu: 0 }) {
   const budget = monthlyBudget(settings);
   return new SentinelClient(
     { clientId: required(settings.clientId, "Identifiant client OAuth"), clientSecret: secret },
@@ -175,4 +178,25 @@ const copernicus: ProviderAdapter = {
   },
 };
 
-export const PROVIDERS: Record<IntegrationProvider, ProviderAdapter> = { traccar, openweather, meteoblue, weenat, sencrop, copernicus };
+// agrirouter (lot AD) : connexion par consentement (integrations/agrirouter.ts),
+// pas de test de formulaire. La synchro vérifie le point de terminaison de
+// Fourmy et relit les destinataires joignables (machines, logiciels).
+const agrirouter: ProviderAdapter = {
+  async test() {
+    throw new BadRequest("agrirouter se connecte par le bouton « Connecter à agrirouter ».");
+  },
+  async sync({ settings, secret }) {
+    const s = settings as unknown as AgrirouterSettings;
+    if (!s.endpointId) throw new Error("Connexion agrirouter incomplète : reconnectez la ferme.");
+    const { companyName, recipients } = await agrirouterRecipients(secret, s.endpointId);
+    return { companyName, recipients };
+  },
+  async disconnect({ settings, secret }) {
+    const client = agrirouterClient();
+    const s = settings as unknown as AgrirouterSettings;
+    if (s.externalId) await client.deleteEndpoint(secret, s.externalId);
+    await client.revoke(secret);
+  },
+};
+
+export const PROVIDERS: Record<IntegrationProvider, ProviderAdapter> = { traccar, openweather, meteoblue, weenat, sencrop, copernicus, agrirouter };

@@ -53,14 +53,23 @@ export function IntegrationsPage() {
                 {description}
               </Text>
             </div>
-            {inCategory.map((definition) => (
-              <ProviderCard
-                key={definition.provider}
-                farmId={farm.id}
-                definition={definition}
-                integration={items.find((i) => i.provider === definition.provider) ?? null}
-              />
-            ))}
+            {inCategory.map((definition) =>
+              definition.connect === "oauth" ? (
+                <AgrirouterCard
+                  key={definition.provider}
+                  farmId={farm.id}
+                  definition={definition}
+                  integration={items.find((i) => i.provider === definition.provider) ?? null}
+                />
+              ) : (
+                <ProviderCard
+                  key={definition.provider}
+                  farmId={farm.id}
+                  definition={definition}
+                  integration={items.find((i) => i.provider === definition.provider) ?? null}
+                />
+              ),
+            )}
             {withOpenMeteo && <StationsCard farmId={farm.id} />}
             {withOpenMeteo && <OpenMeteoCard />}
           </Stack>
@@ -114,6 +123,126 @@ function StationsCard({ farmId }: { farmId: string }) {
           ))}
         </Table.Tbody>
       </Table>
+    </Paper>
+  );
+}
+
+type Recipient = { id: string; name: string; endpointType: string; formats: string[] };
+
+/**
+ * agrirouter (lot AD) : connexion par consentement dans le compte agrirouter
+ * de la ferme (pas de secret saisi), destinataires joignables, retrait.
+ */
+function AgrirouterCard({ farmId, definition, integration }: { farmId: string; definition: IntegrationProviderDefinition; integration: Integration | null }) {
+  const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+  const onError = (e: unknown) => setError(e instanceof ApiError ? (e.detail ?? e.message) : String(e));
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["integrations"] });
+  const connected = !!integration?.hasSecret;
+  const connect = useMutation({
+    mutationFn: () => api.post<{ url: string }>(farmPath(farmId, "/integrations/agrirouter/connect"), {}),
+    onSuccess: ({ url }) => window.location.assign(url),
+    onError,
+  });
+  const sync = useMutation({
+    mutationFn: () => api.post<Integration>(farmPath(farmId, `/integrations/${integration!.id}/sync`), {}),
+    onSuccess: () => void refresh(),
+    onError,
+  });
+  const remove = useMutation({
+    mutationFn: () => api.delete<{ remoteError?: string }>(farmPath(farmId, `/integrations/${integration!.id}`)),
+    onSuccess: (r) => {
+      notifications.show({
+        color: r?.remoteError ? "paille" : "lichen",
+        message: r?.remoteError ? `Retirée de Fourmy ; à retirer aussi dans agrirouter (${r.remoteError}).` : "Connexion agrirouter retirée.",
+      });
+      void refresh();
+    },
+    onError,
+  });
+  const report = integration?.lastReport as { companyName?: string | null; recipients?: Recipient[] } | null;
+
+  return (
+    <Paper p="md" data-testid={`integration-${definition.provider}`}>
+      <Stack>
+        <Group justify="space-between">
+          <Title order={3}>{definition.label}</Title>
+          {connected && integration && (
+            <Group gap="xs">
+              {integration.running ? (
+                <Badge color="ardoise">Synchronisation…</Badge>
+              ) : (
+                <Badge color={STATUS[integration.status].color}>{integration.status === "ok" ? "Connectée" : STATUS[integration.status].label}</Badge>
+              )}
+              {!integration.enabled && <Badge color="gray">Désactivée</Badge>}
+            </Group>
+          )}
+        </Group>
+        <Text size="sm" c="dimmed">
+          {definition.description}
+        </Text>
+        {definition.available === false && !connected && (
+          <Alert color="paille">agrirouter n'est pas encore configuré sur ce serveur : l'administrateur doit enregistrer Fourmy chez agrirouter.</Alert>
+        )}
+        {error && (
+          <Alert color="brique" withCloseButton onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
+        {connected ? (
+          <>
+            <Text size="sm">
+              Compte agrirouter : <b>{String(integration!.settings.companyName ?? "connecté")}</b>
+              {integration!.settings.connectedAt ? `, depuis le ${formatDate(String(integration!.settings.connectedAt))}` : ""}.
+            </Text>
+            {report?.recipients && (
+              <div>
+                <Text size="sm" fw={600}>
+                  Destinataires joignables
+                </Text>
+                {report.recipients.length ? (
+                  <List size="sm">
+                    {report.recipients.map((r) => (
+                      <List.Item key={r.id}>
+                        {r.name} {r.endpointType === "virtual_communication_unit" ? "(machine)" : ""} : {r.formats.map((f) => (f === "isoxml" ? "ISO-XML" : "Shapefile")).join(", ")}
+                      </List.Item>
+                    ))}
+                  </List>
+                ) : (
+                  <Text size="sm" c="dimmed">
+                    Aucun pour l'instant : dans agrirouter, reliez vos consoles à Fourmy par une route.
+                  </Text>
+                )}
+              </div>
+            )}
+            {integration!.lastError && (
+              <Alert color="brique" title="Dernière synchronisation en échec">
+                {integration!.lastError}
+              </Alert>
+            )}
+            <Group>
+              <Button variant="light" onClick={() => sync.mutate()} loading={sync.isPending} disabled={integration!.running}>
+                Actualiser les destinataires
+              </Button>
+              <Button variant="subtle" onClick={() => connect.mutate()} loading={connect.isPending}>
+                Reconnecter
+              </Button>
+              <Button variant="subtle" color="brique" onClick={() => remove.mutate()} loading={remove.isPending}>
+                Déconnecter
+              </Button>
+            </Group>
+          </>
+        ) : (
+          <Group>
+            <Button onClick={() => connect.mutate()} loading={connect.isPending} disabled={definition.available === false}>
+              Connecter à agrirouter
+            </Button>
+            <Text size="xs" c="dimmed">
+              Vous serez redirigé vers agrirouter pour autoriser Fourmy, puis ramené ici.
+            </Text>
+          </Group>
+        )}
+      </Stack>
     </Paper>
   );
 }

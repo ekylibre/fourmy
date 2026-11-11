@@ -74,6 +74,9 @@ export const handlers = [
     return HttpResponse.json({ enabled: false, from: u.searchParams.get("from"), to: u.searchParams.get("to"), items: [] });
   }),
   http.get(`*${base}/integrations`, () => HttpResponse.json({ providers: INTEGRATION_PROVIDERS, items: [] })),
+  // Cartes de modulation (lot AD) : aucune dans la démo, aucune image à zoner.
+  http.get(`*${base}/prescriptions`, () => HttpResponse.json({ items: [] })),
+  http.get(`*${base}/land-parcels/:id/modulation-dates`, () => HttpResponse.json({ items: [] })),
   http.get(`*${base}/members`, () =>
     page([{ userId: DEMO_USER_ID, email: demoUser.email, name: demoUser.name, role: "owner", personId: null }]),
   ),

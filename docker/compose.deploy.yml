@@ -51,6 +51,13 @@ services:
       FOURMY_TRUSTED_PROXY_HOPS: "2"
       # Imports Ekylibre depuis l'API : serveur des bases sources restaurées.
       EKYLIBRE_SOURCES_URL: ${EKYLIBRE_SOURCES_URL:-postgres://${POSTGRES_USER:-fourmy}:${POSTGRES_PASSWORD}@db:5432/}
+      # agrirouter (cartes de modulation vers les machines) : désactivé sans identifiants.
+      AGRIROUTER_CLIENT_ID: ${AGRIROUTER_CLIENT_ID:-}
+      AGRIROUTER_CLIENT_SECRET: ${AGRIROUTER_CLIENT_SECRET:-}
+      AGRIROUTER_APPLICATION_ID: ${AGRIROUTER_APPLICATION_ID:-}
+      AGRIROUTER_SOFTWARE_VERSION_ID: ${AGRIROUTER_SOFTWARE_VERSION_ID:-}
+      AGRIROUTER_REDIRECT_URI: ${AGRIROUTER_REDIRECT_URI:-${PUBLIC_URL}/agrirouter/callback}
+      AGRIROUTER_ENVIRONMENT: ${AGRIROUTER_ENVIRONMENT:-production}
 
   # Tâches de fond : intégrations des fermes (Traccar : chaque minute), Lexicon,
   # eau, IFT, météo, heures estimées des matériels, alertes d'entretien.
@@ -70,6 +77,13 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-fourmy}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-fourmy}
       NODE_ENV: production
       FOURMY_SECRETS_KEY: ${FOURMY_SECRETS_KEY}
+      # agrirouter (cartes de modulation vers les machines) : désactivé sans identifiants.
+      AGRIROUTER_CLIENT_ID: ${AGRIROUTER_CLIENT_ID:-}
+      AGRIROUTER_CLIENT_SECRET: ${AGRIROUTER_CLIENT_SECRET:-}
+      AGRIROUTER_APPLICATION_ID: ${AGRIROUTER_APPLICATION_ID:-}
+      AGRIROUTER_SOFTWARE_VERSION_ID: ${AGRIROUTER_SOFTWARE_VERSION_ID:-}
+      AGRIROUTER_REDIRECT_URI: ${AGRIROUTER_REDIRECT_URI:-${PUBLIC_URL}/agrirouter/callback}
+      AGRIROUTER_ENVIRONMENT: ${AGRIROUTER_ENVIRONMENT:-production}
       # Référentiel phyto et IFT (docs/phyto.md) : serveurs publics par défaut.
       FOURMY_LEXICON_PACKAGES_URL: ${FOURMY_LEXICON_PACKAGES_URL:-}
       FOURMY_IFT_API_URL: ${FOURMY_IFT_API_URL:-https://ecoagri-pprd.api.agriculture.gouv.fr/ift/v5/api}

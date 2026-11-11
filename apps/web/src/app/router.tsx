@@ -25,6 +25,8 @@ import { RegisterPage } from "../features/register/RegisterPage";
 import { StockPage } from "../features/stock/StockPage";
 import { TeamPage } from "../features/team/TeamPage";
 import { IntegrationsPage } from "../features/integrations/IntegrationsPage";
+import { AgrirouterCallbackPage } from "../features/integrations/AgrirouterCallbackPage";
+import { PrescriptionsPage } from "../features/modulation/PrescriptionsPage";
 import { FarmProvider, useMyFarms } from "./farm";
 import { UNAUTHORIZED_EVENT, useSession } from "./session";
 
@@ -33,6 +35,8 @@ const MapPage = lazy(() => import("../features/map/MapPage").then((m) => ({ defa
 // Cesium (plusieurs Mo) : le plan 3D n'est chargé que s'il est ouvert.
 const InterventionPage = lazy(() => import("../features/interventions/InterventionPage").then((m) => ({ default: m.InterventionPage })));
 const CartoLabPage = lazy(() => import("../carto/CartoLabPage").then((m) => ({ default: m.CartoLabPage })));
+const PrescriptionNewPage = lazy(() => import("../features/modulation/PrescriptionNewPage").then((m) => ({ default: m.PrescriptionNewPage })));
+const PrescriptionPage = lazy(() => import("../features/modulation/PrescriptionPage").then((m) => ({ default: m.PrescriptionPage })));
 const Plan3DPage = lazy(() => import("../3d/Plan3DPage").then((m) => ({ default: m.Plan3DPage })));
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -106,6 +110,8 @@ export const routes = [
   { path: "/", element: <Navigate to="/farms" replace /> },
   { path: "/login", element: <LoginPage /> },
   { path: "/farms", element: <RequireAuth><FarmsPage /></RequireAuth> },
+  // Retour du consentement agrirouter (adresse enregistrée chez agrirouter, sans ferme dans le chemin).
+  { path: "/agrirouter/callback", element: <RequireAuth><AgrirouterCallbackPage /></RequireAuth> },
   legacy("/connexion"),
   legacy("/fermes"),
   {
@@ -143,6 +149,9 @@ export const routes = [
       { path: "imports", element: <ImportsPage /> },
       { path: "team", element: <TeamPage /> },
       { path: "integrations", element: <IntegrationsPage /> },
+      { path: "prescriptions", element: <PrescriptionsPage /> },
+      { path: "prescriptions/new", element: <Suspense fallback={<Loading />}><PrescriptionNewPage /></Suspense> },
+      { path: "prescriptions/:prescriptionId", element: <Suspense fallback={<Loading />}><PrescriptionPage /></Suspense> },
       ...["carte", "carte/outils", "plan-3d", "interventions/:interventionId/modifier", "cuverie", "registre", "equipe"].map(legacy),
     ],
   },
