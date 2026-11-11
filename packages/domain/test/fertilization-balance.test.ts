@@ -26,6 +26,9 @@ describe("dose prévisionnelle : maïs en Pyrénées-Atlantiques (bilan CAU en d
     expect(r.annex).toBe("2.2.b");
     expect(r.missing).toEqual([]);
     expect(value(r, "Pf")).toBe(235); // 107 q × 2,2 (palier 100 à 120 q)
+    // Détails affichés à la française (recette du 11/11).
+    expect(r.terms.Pf).toMatchObject({ detail: expect.stringMatching(/^107 × b 2,2 /) });
+    expect(r.terms.CAU).toMatchObject({ detail: "0,6 avant 4 feuilles, 0,8 ensuite" });
     expect(value(r, "Rf")).toBe(30);
     expect(value(r, "Mh")).toBe(60); // limoneux irrigué
     expect(value(r, "Mr")).toBe(0); // précédent maïs grain, ouverture en avril

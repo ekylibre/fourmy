@@ -196,7 +196,7 @@ describe.skipIf(!url)("plans de fumure (intégration)", () => {
     expect(r.parcels).toHaveLength(1);
     expect(r.parcels[0]).toMatchObject({ name: "Champ Maïs 2026", crop: "Maïs grain", variety: "DKC5432", totalNKgHa: 69, plannedDose: 180, planVersion: 3 });
     expect(r.parcels[0]!.applications).toEqual([
-      expect.objectContaining({ date: "2026-05-12", product: "Urée 46", content: "46 % N", nitrateType: "III", nTotalKgHa: 69, nEfficientKgHa: 69, areaHa: 4 }),
+      expect.objectContaining({ date: "2026-05-12", product: "Urée 46", content: "46 % N", nitrateType: "III", nTotalKgHa: 69, nEfficientKgHa: 69, areaHa: 4, doseLabel: "150 kg/ha" }),
     ]);
     const csv = await app.request(`${base()}/fertilization/record?campaign=2026&format=csv`, { headers });
     expect(csv.headers.get("content-type")).toContain("text/csv");

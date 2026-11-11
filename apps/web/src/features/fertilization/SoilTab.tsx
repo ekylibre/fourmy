@@ -185,10 +185,11 @@ export function SoilTab({ farmId, parcelId, owner }: { farmId: string; parcelId:
                     {a.horizons?.length
                       ? `${rshTotal(a.horizons)} kg N/ha sur ${a.horizons[a.horizons.length - 1]!.toCm} cm`
                       : [
-                          a.values?.organicMatterPct != null ? `MO ${a.values.organicMatterPct} %` : null,
-                          a.values?.clayGKg != null ? `argile ${a.values.clayGKg} g/kg` : null,
-                          a.values?.caco3GKg != null ? `CaCO3 ${a.values.caco3GKg} g/kg` : null,
-                          a.values?.ph != null ? `pH ${a.values.ph}` : null,
+                          a.values?.organicMatterPct != null ? `MO ${a.values.organicMatterPct.toLocaleString("fr-FR")} %` : null,
+                          a.values?.clayGKg != null ? `argile ${a.values.clayGKg.toLocaleString("fr-FR")} g/kg` : null,
+                          a.values?.caco3GKg != null ? `CaCO3 ${a.values.caco3GKg.toLocaleString("fr-FR")} g/kg` : null,
+                          a.values?.ph != null ? `pH ${a.values.ph.toLocaleString("fr-FR")}` : null,
+                          a.values?.cecMeq != null ? `CEC ${a.values.cecMeq.toLocaleString("fr-FR")} méq/100 g` : null,
                         ]
                           .filter(Boolean)
                           .join(" · ")}

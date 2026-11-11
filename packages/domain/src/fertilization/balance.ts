@@ -198,6 +198,9 @@ function gridLookup(rows: { soil: NaSoilType; aplKgNHa: number; rainMm: number; 
   };
 }
 
+/** Nombre à la française dans les détails affichés (virgule décimale). */
+const fr = (v: number) => v.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+
 export function computeBalance(input: BalanceInput): BalanceResult {
   const terms: Partial<Record<Term, TermResult>> = {};
   const warnings: string[] = [];
@@ -256,7 +259,7 @@ export function computeBalance(input: BalanceInput): BalanceResult {
   if (y === null || !(y > 0)) set("Pf", { missing: "objectif de rendement" });
   else if (maize) {
     const row = maizeB.rows.find((r) => r.crop === input.crop && inBand(y, r.yieldMin, r.yieldMinInclusive, r.yieldMax, r.yieldMaxInclusive));
-    set("Pf", row ? { value: round(row.b * y), origin: "reference", source: ref(maizeB), detail: `${y} × b ${row.b} (${row.label})` } : { missing: "besoin par unité de production (b) de cette culture" });
+    set("Pf", row ? { value: round(row.b * y), origin: "reference", source: ref(maizeB), detail: `${fr(y)} × b ${fr(row.b)} (${row.label})` } : { missing: "besoin par unité de production (b) de cette culture" });
   } else {
     const variety = input.variety?.trim().toUpperCase() ?? "";
     const soft = ["soft_wheat", "improver_wheat"].includes(input.crop) ? softWheatVarietyNeeds2026.rows.find((r) => r.variety.toUpperCase() === variety) : undefined;
@@ -264,7 +267,7 @@ export function computeBalance(input: BalanceInput): BalanceResult {
     const def = cerealsB.rows.find((r) => r.crops.includes(input.crop));
     const b = soft?.b ?? durum?.bq14 ?? (input.crop === "durum_wheat" ? durumWheatSudOuestDefaultBq14 : def?.b);
     const src = soft ? ref(softWheatVarietyNeeds2026) : durum ? ref(durumWheatSudOuestVarietyNeeds2026) : ref(cerealsB);
-    set("Pf", b ? { value: round(b * y), origin: "reference", source: src, detail: `${y} q × b ${b}${soft || durum ? ` (variété ${variety})` : ""}` } : { missing: "besoin par quintal (b)" });
+    set("Pf", b ? { value: round(b * y), origin: "reference", source: src, detail: `${fr(y)} q × b ${fr(b)}${soft || durum ? ` (variété ${variety})` : ""}` } : { missing: "besoin par quintal (b)" });
   }
 
   // --- Rf, Mh ------------------------------------------------------------------
@@ -321,7 +324,7 @@ export function computeBalance(input: BalanceInput): BalanceResult {
 
   // --- Ri (et Pi des céréales) --------------------------------------------------------
   if (input.rshMeasured) {
-    set("Ri", { value: round(input.rshMeasured.kgNHa), origin: "measured", source: "reliquat mesuré", detail: `prélevé le ${input.rshMeasured.sampledOn}` });
+    set("Ri", { value: round(input.rshMeasured.kgNHa), origin: "measured", source: "reliquat mesuré", detail: `prélevé le ${input.rshMeasured.sampledOn.slice(8, 10)}/${input.rshMeasured.sampledOn.slice(5, 7)}/${input.rshMeasured.sampledOn.slice(0, 4)}` });
     if (cereal) {
       const t = input.tillers;
       const row = t === null || t === undefined ? undefined : piTillers.rows.find((r) => t >= r.tillersMin && (r.tillersMax === null || t <= r.tillersMax));
@@ -371,7 +374,7 @@ export function computeBalance(input: BalanceInput): BalanceResult {
     const before = maizeCau.rows.find((r) => r.crops.includes(input.crop) && r.stage === "before_4_leaves");
     cauAfter = after?.cau ?? 0.8;
     cauBefore = before?.cau ?? 0.6;
-    set("CAU", { value: cauAfter, origin: "reference", source: ref(maizeCau), detail: `${cauBefore} avant 4 feuilles, ${cauAfter} ensuite` });
+    set("CAU", { value: cauAfter, origin: "reference", source: ref(maizeCau), detail: `${fr(cauBefore)} avant 4 feuilles, ${fr(cauAfter)} ensuite` });
     const n4 = Math.max(0, input.nBefore4Leaves ?? 0);
     set("Nbefore4", { value: n4, origin: "entered", source: "apports prévus", detail: n4 ? `${n4} kg N × CAU ${cauBefore} = ${round(n4 * cauBefore)} kg utiles` : "aucun apport avant 4 feuilles" });
     if (n4 > 50) warnings.push("Premier apport sur maïs semé avant le 1er mai plafonné à 50 kg N (PAR 7 Nouvelle-Aquitaine).");
@@ -442,7 +445,7 @@ function estimateRi(input: BalanceInput, soil: NaSoilType | null, maize: boolean
     value: found.value,
     origin: "computed",
     source: ref(maize ? riMaizeApl : riCerealsApl),
-    detail: `APL = [(A ${a} + X ${round(prev.xMineral)} + Xa ${round(prev.xaCycle ?? 0)} + Mhp ${round(prev.mhp ?? 0)} + MrCi ${round(prev.mrci ?? 0)}) − Pf préc. ${round(pfPrev)} (${prev.yieldRealized} × ${bp})] × ${row.coefRpr}${input.xaBeforeOpening ? ` + ${round(input.xaBeforeOpening)}` : ""} ; ${found.detail}`,
+    detail: `APL = [(A ${a} + X ${round(prev.xMineral)} + Xa ${round(prev.xaCycle ?? 0)} + Mhp ${round(prev.mhp ?? 0)} + MrCi ${round(prev.mrci ?? 0)}) − Pf préc. ${round(pfPrev)} (${fr(prev.yieldRealized)} × ${fr(bp)})] × ${fr(row.coefRpr)}${input.xaBeforeOpening ? ` + ${round(input.xaBeforeOpening)}` : ""} ; ${found.detail}`,
   };
 }
 
@@ -467,7 +470,7 @@ export function yieldTarget(
     return {
       value: Math.round(mean * 10) / 10,
       origin: "computed",
-      detail: `moyenne de ${recent.map(([c, v]) => `${c} : ${v}`).join(", ")}, sans ${values[0]} ni ${values[values.length - 1]}`,
+      detail: `moyenne de ${recent.map(([c, v]) => `${c} : ${fr(v)}`).join(", ")}, sans ${fr(values[0]!)} ni ${fr(values[values.length - 1]!)}`,
     };
   }
   if (fallback) return { value: fallback.value, origin: "reference", detail: `${recent.length} campagne(s) seulement sur la ferme : ${fallback.source}` };
@@ -519,8 +522,8 @@ export function computeRapeseed(input: BalanceInput, annex: string): BalanceResu
     const nEh = eh !== null ? eh * naRapeseedPi.coeffEH : null;
     if (nEh !== null && nSh < nEh) {
       const pi = nSh + (0.5 * (nEh - nSh)) / 1.35;
-      set("Pi", { value: round(pi), origin: "computed", source: "Annexe 2.4 §3 : gel hivernal", detail: `${sh} × 65 + 0,5 × (${eh} × 50 − ${sh} × 65) / 1,35` });
-    } else set("Pi", { value: round(nSh), origin: "computed", source: "Annexe 2.4 §3", detail: `${sh} kg/m² × 65` });
+      set("Pi", { value: round(pi), origin: "computed", source: "Annexe 2.4 §3 : gel hivernal", detail: `${fr(sh)} × 65 + 0,5 × (${fr(eh!)} × 50 − ${fr(sh)} × 65) / 1,35` });
+    } else set("Pi", { value: round(nSh), origin: "computed", source: "Annexe 2.4 §3", detail: `${fr(sh)} kg/m² × 65` });
   }
   set("Fleg", { value: input.previousIsPea ? eq.flegPeaPreviousKgNHa : 0, origin: "reference", source: "Annexe 2.4 : précédent pois protéagineux", detail: input.previousIsPea ? "précédent pois" : "précédent autre que pois" });
   set("Fass", {
