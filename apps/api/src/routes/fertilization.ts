@@ -1,6 +1,7 @@
 import { Hono } from "hono";
-import { fertilizationSettingsWrite, nitrateZoneWrite, planDraft, planEstablish, soilAnalysisWrite, soilProfileWrite, waterSourceWrite } from "@fourmy/contracts";
+import { fertilizationCheckRequest, fertilizationSettingsWrite, nitrateZoneWrite, planDraft, planEstablish, soilAnalysisWrite, soilProfileWrite, waterSourceWrite } from "@fourmy/contracts";
 import { establishPlan, getPlan, listPlans, preparePlans, saveDraft } from "../repos/fertilization-plans.js";
+import { checkApplication, fertilizationRecord } from "../repos/fertilization-record.js";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import {
@@ -81,6 +82,31 @@ export const fertilizationRoutes = new Hono<Env>()
     const parsed = planEstablish.safeParse(await c.req.json().catch(() => ({})));
     if (!parsed.success) return problem(c, 400, "Corps invalide", invalid(parsed.error.issues));
     return c.json(await establishPlan(db(), c.get("farmId"), c.get("userId"), uuidParam(c, "id"), parsed.data.reason, fertilizationDeps.fetch));
+  })
+  // Contrôles à la saisie et cahier d'enregistrement (lot AH).
+  .post("/fertilization/check", async (c) => {
+    const parsed = fertilizationCheckRequest.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", invalid(parsed.error.issues));
+    return c.json(await checkApplication(db(), c.get("farmId"), parsed.data));
+  })
+  .get("/fertilization/record", async (c) => {
+    const record = await fertilizationRecord(db(), c.get("farmId"), campaignOf(c.req.query("campaign")));
+    if (c.req.query("format") !== "csv") return c.json(record);
+    const q = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const lines = [
+      ["Parcelle", "Surface (ha)", "Culture", "Variété", "Semis", "Date d'apport", "Surface épandue (ha)", "Produit", "Teneur", "Type", "Dose", "N total (kg/ha)", "N efficace (kg/ha)", "Saisi le", "Récolte", "Rendement (q/ha)", "Dose prévue (kg N/ha)"].map(q).join(";"),
+      ...record.parcels.flatMap((p) =>
+        (p.applications.length ? p.applications : [null]).map((a) =>
+          [p.name, p.areaHa, p.crop, p.variety, p.sownOn, a?.date, a?.areaHa, a?.product, a?.content, a?.nitrateType, a?.doseLabel, a?.nTotalKgHa, a?.nEfficientKgHa, a?.recordedOn, p.harvestedOn.join(" "), p.yieldQHa, p.plannedDose]
+            .map((v) => (typeof v === "number" ? q(String(v).replace(".", ",")) : q(v)))
+            .join(";"),
+        ),
+      ),
+    ];
+    return c.body(`\ufeff${lines.join("\r\n")}\r\n`, 200, {
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": `attachment; filename="cahier-fertilisation-${record.campaign}.csv"`,
+    });
   })
   .get("/water-sources", async (c) => c.json({ items: await listWaterSources(db(), c.get("farmId")) }))
   .post("/water-sources", requireOwner, async (c) => {

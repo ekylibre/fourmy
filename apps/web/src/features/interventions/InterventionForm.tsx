@@ -41,7 +41,9 @@ import { formatHa } from "@fourmy/ui-lyvre";
 import { isIrrigation } from "@fourmy/contracts";
 import { irrigationBody, irrigationDraft, IrrigationFields, type IrrigationDraft } from "./IrrigationFields";
 import { kgN, nitrogenNote, useFertilizers } from "../fertilization/fertilization";
+import type { FertilizationCheckRequest } from "@fourmy/contracts";
 import { NitrogenLine } from "../fertilization/NitrogenLine";
+import { FertilizationSummary, useFertilizationCheck } from "../fertilization/FertilizationChecks";
 import { api, ApiError, farmPath } from "../../app/api";
 import { unitLabel } from "../../app/labels";
 import { invalidateAfterIntervention, useActivities, useCrewTemplates, useEquipments, usePhytoArticles } from "../../app/queries";
@@ -416,6 +418,25 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
     }
   }
   const complianceCheck = useComplianceCheck(farmId, draft, editing?.id ?? toComplete?.id);
+  // Directive nitrates (lot AH) : calendrier, plan de fumure, premier apport.
+  let fertDraft: FertilizationCheckRequest | null = null;
+  if (code && parcels.length && inputs.some((r) => article(r.articleId)?.kind === "fertilizer" && r.quantity !== "")) {
+    try {
+      const full = body();
+      const startedAt = flatPeriods(full)[0]?.startedAt;
+      if (startedAt)
+        fertDraft = {
+          startedAt,
+          parcelIds: parcels,
+          inputs: full.inputs.filter((i) => article(i.articleId)?.kind === "fertilizer").map(({ articleId, quantity, per }) => ({ articleId, quantity, per })),
+          areaM2: treatedM2 > 0 ? treatedM2 : null,
+          interventionId: editing?.id ?? null,
+        };
+    } catch {
+      fertDraft = null; // date en cours de saisie
+    }
+  }
+  const fertilizationCheck = useFertilizationCheck(farmId, fertDraft);
   const compliance = complianceCheck.result;
   const chooseUsage = (articleId: string, usageId: string | null) =>
     setUsageChoices((m) => {
@@ -671,6 +692,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         compliance={compliance}
       />
       <ComplianceSummary check={complianceCheck} />
+      <FertilizationSummary check={fertilizationCheck} />
     </Stack>
   );
 

@@ -365,3 +365,82 @@ export interface FertilizationPlanSummary {
 
 /** Référentiel inscrit dans chaque version établie. */
 export const PLAN_REFERENTIAL = "Nouvelle-Aquitaine, arrêté référentiel du 29/07/2025";
+
+// --- Lot AH : contrôles à la saisie, cahier d'enregistrement ---------------------------
+
+export const fertilizationCheckRequest = z.object({
+  startedAt: z.string().datetime({ offset: true }),
+  parcelIds: z.array(z.string().uuid()).max(100),
+  inputs: z.array(z.object({ articleId: z.string().uuid(), quantity: z.number().positive(), per: z.enum(["hectare", "total"]) })).max(30),
+  /** Surface travaillée totale (m²), pour une quantité « au total ». */
+  areaM2: z.number().positive().nullable().default(null),
+  /** Intervention modifiée : ses propres apports ne comptent pas deux fois. */
+  interventionId: z.string().uuid().nullable().default(null),
+});
+export type FertilizationCheckRequest = z.infer<typeof fertilizationCheckRequest>;
+
+export type FertilizationIndicatorCode = "fert_calendar" | "fert_plan" | "fert_first_split" | "fert_composition";
+export interface FertilizationIndicator {
+  code: FertilizationIndicatorCode;
+  level: "ok" | "info" | "warning" | "danger";
+  message: string;
+  parcelName?: string;
+}
+export interface FertilizationCheck {
+  level: "ok" | "info" | "warning" | "danger";
+  /** Azote apporté par hectare (kg N/ha), total et efficace connus. */
+  nitrogen: { totalKgHa: number; efficientKgHa: number | null } | null;
+  indicators: FertilizationIndicator[];
+}
+
+/** Un apport du cahier d'enregistrement. */
+export interface RecordApplication {
+  interventionId: string;
+  date: string;
+  /** Saisi le (création de l'intervention) ; en retard au-delà de 30 jours. */
+  recordedOn: string;
+  late: boolean;
+  procedure: string;
+  areaHa: number;
+  product: string;
+  /** Teneur telle qu'affichée (« 46 % N », « 390 kg N/m³ »). */
+  content: string | null;
+  nitrateType: string | null;
+  doseLabel: string;
+  nTotalKgHa: number | null;
+  nEfficientKgHa: number | null;
+  /** Ce qui manque pour compter l'azote. */
+  missing: string | null;
+}
+
+export interface RecordParcel {
+  parcelId: string;
+  name: string;
+  areaHa: number;
+  soilType: string | null;
+  zone: string | null;
+  crop: string;
+  variety: string | null;
+  sownOn: string | null;
+  harvestedOn: string[];
+  yieldQHa: number | null;
+  /** Gestion de l'interculture et des résidus d'après les interventions (broyage, labour…). */
+  interculture: { date: string; label: string }[];
+  /** Techniques culturales simplifiées : aucun labour sur la campagne et les deux précédentes. */
+  noPlowing: boolean | null;
+  applications: RecordApplication[];
+  totalNKgHa: number;
+  /** Dose de la version établie du plan, si elle existe. */
+  plannedDose: number | null;
+  planVersion: number | null;
+}
+
+export interface FertilizationRecord {
+  campaign: number;
+  from: string;
+  to: string;
+  parcels: RecordParcel[];
+  /** Apports à compléter (teneur inconnue) et saisis en retard. */
+  toComplete: number;
+  late: number;
+}

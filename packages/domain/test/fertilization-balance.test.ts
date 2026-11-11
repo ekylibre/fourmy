@@ -136,3 +136,21 @@ describe("fractionnement proposé (PAR 7 Nouvelle-Aquitaine)", () => {
     expect(splitDose(0, "maize_grain")).toEqual([]);
   });
 });
+
+describe("calendrier d'épandage (PAN 7, Nouvelle-Aquitaine, zone ouest et sud du Béarn)", () => {
+  it("maïs, triticale, maïs irrigué (note 4), foliaire, type inconnu", async () => {
+    const { checkCalendar } = await import("../src/index.js");
+    const z = ["ouest", "sud"];
+    const c = (date: string, crop: Parameters<typeof checkCalendar>[0]["crop"], type: "III" | "II" | null, irrigated = false, foliar = false) =>
+      checkCalendar({ date, crop, type, irrigated, foliar, zones: z }).level;
+    expect(c("2026-01-10", "maize_grain", "III")).toBe("danger"); // du 01/07 au 15/02
+    expect(c("2026-05-20", "maize_grain", "III")).toBe("ok");
+    expect(c("2026-07-20", "maize_grain", "III", true)).toBe("info");
+    expect(c("2026-07-20", "maize_grain", "III")).toBe("danger");
+    expect(c("2025-10-10", "triticale", "III")).toBe("danger"); // zone ouest : du 01/07 au 15/01
+    expect(c("2026-01-20", "triticale", "III")).toBe("ok");
+    expect(c("2025-11-20", "maize_grain", "II")).toBe("danger");
+    expect(c("2026-01-10", "maize_grain", "III", false, true)).toBe("ok");
+    expect(c("2026-01-10", "maize_grain", null)).toBe("info");
+  });
+});

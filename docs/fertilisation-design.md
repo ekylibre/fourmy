@@ -413,6 +413,33 @@ Les tables ont été recopiées des annexes, puis vérifiées sur les pages impr
   - le stade et l'outil de pilotage ;
   - les valeurs de la ferme à l'échelle de toute l'exploitation : les surcharges sont propres à chaque plan.
 
+### 5.3 Réalisation du cahier et des contrôles (lot AH, 2026-11-11)
+
+**Contrôle d'un apport** (`POST /fertilization/check`) : appelé pendant la saisie d'une intervention qui contient un fertilisant. Il vérifie :
+- le **calendrier** pour chaque parcelle, selon la culture en place, le type du fertilisant et les zones de la commune ;
+- le **plan établi** et la dose restante, ou son dépassement ;
+- le **premier apport** de plus de 50 kg sur maïs et céréales ;
+- la **teneur connue** du produit.
+
+Un apport foliaire est hors calendrier. Un type de fertilisant inconnu donne « calendrier non vérifié », jamais « conforme ».
+
+**Écart à la conception (D8)** : les feux s'affichent dans la saisie, mais une interdiction ne bloque pas encore l'enregistrement. Il manque le motif de passage outre, enregistré avec l'intervention. C'est à faire avec le contrôle phyto, déjà bloquant.
+
+**Cahier** (`GET /fertilization/record?campaign=&format=json|csv`) : calculé à partir des interventions. Pour chaque parcelle cultivée de la campagne, il donne :
+- les travaux d'interculture (broyage, labour) ;
+- le semis, la récolte et le rendement ;
+- chaque apport d'azote : date, surface, produit, teneur, type, dose, azote total et efficace ;
+- le total, comparé à la dose du plan établi.
+
+**Règles du cahier** :
+- Les produits sans azote (potasse, chaux) n'y figurent pas.
+- Une intervention reprise d'Ekylibre n'est pas « saisie en retard » : elle porte la date de la migration, pas celle de sa saisie.
+- Les techniques culturales simplifiées ne sont signalées que lorsqu'un labour est trouvé. L'absence de labour sur 3 campagnes n'est pas encore affirmée.
+
+**Éditions** : pages imprimables `/f/:ferme/print/fertilization/record|plans?campaign=`, sans menu, avec un saut de page par plan. On les imprime ou on les enregistre en PDF depuis le navigateur ; le cahier s'exporte aussi en CSV.
+
+**Pas encore fait** : couverts d'interculture (nature de production `cover`), justificatifs joints, plafonds de l'azote libéré avant la sortie d'hiver (APLSH), grille d'efficacité des apports minéraux, pilotage.
+
 ## 6. Contrats (`@fourmy/contracts`, `fertilization.ts`)
 
 - `FertilizerComposition`, `ArticleFertilizerWrite` : zod, unités explicites.

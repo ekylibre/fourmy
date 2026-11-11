@@ -99,3 +99,49 @@ describe("plan de fumure", () => {
     await waitFor(() => expect(established).toBe(true));
   });
 });
+
+describe("éditions de la directive nitrates", () => {
+  it("cahier d'enregistrement imprimable : apports, total, plan ; lien CSV", async () => {
+    server.use(
+      http.get("*/fertilization/record", () =>
+        HttpResponse.json({
+          campaign: 2026,
+          from: "2025-09-01",
+          to: "2026-09-01",
+          toComplete: 0,
+          late: 0,
+          parcels: [
+            {
+              parcelId: "00000000-0000-7000-8000-0000000000a1",
+              name: "Champ Maïs 2026",
+              areaHa: 4,
+              soilType: "limoneux",
+              zone: "in",
+              crop: "Maïs grain",
+              variety: "DKC5432",
+              sownOn: "2026-04-09",
+              harvestedOn: [],
+              yieldQHa: null,
+              interculture: [{ date: "2026-03-01", label: "Labour" }],
+              noPlowing: false,
+              applications: [
+                { interventionId: "i1", date: "2026-05-12", recordedOn: "2026-05-12", late: false, procedure: "fertilizing", areaHa: 4, product: "Urée 46", content: "46 % N", nitrateType: "III", doseLabel: "150 kilogram/ha", nTotalKgHa: 69, nEfficientKgHa: 69, missing: null },
+              ],
+              totalNKgHa: 69,
+              plannedDose: 180,
+              planVersion: 3,
+            },
+          ],
+        }),
+      ),
+    );
+    renderApp(`/f/${FARM}/print/fertilization/record?campaign=2026`);
+    expect(await screen.findByRole("heading", { name: "Cahier d'enregistrement des pratiques de fertilisation azotée" })).toBeInTheDocument();
+    const block = screen.getByLabelText("Cahier Champ Maïs 2026");
+    expect(block).toHaveTextContent("En zone vulnérable · sol : Sols limoneux · culture : Maïs grain (DKC5432) · semis 09/04/2026");
+    expect(within(block).getByRole("row", { name: /Urée 46/ })).toHaveTextContent("12/05/2026");
+    expect(block).toHaveTextContent("Total : 69 kg N efficace/ha pour 180 kg prévus au plan (version 3).");
+    expect(screen.getByRole("link", { name: "CSV" })).toHaveAttribute("href", expect.stringContaining("/fertilization/record?campaign=2026&format=csv"));
+    expect(screen.getByRole("button", { name: "Imprimer ou enregistrer en PDF" })).toBeInTheDocument();
+  });
+});

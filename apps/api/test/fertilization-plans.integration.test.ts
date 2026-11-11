@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import postgres from "postgres";
-import type { FertilizationPlan, FertilizationPlanSummary } from "@fourmy/contracts";
+import type { FertilizationCheck, FertilizationPlan, FertilizationPlanSummary, FertilizationRecord } from "@fourmy/contracts";
 import { createApp } from "../src/app.js";
 import { fertilizationDeps } from "../src/routes/fertilization.js";
 import { addMember, setupFarm, teardown } from "./helpers.js";
@@ -162,4 +162,47 @@ describe.skipIf(!url)("plans de fumure (intégration)", () => {
     expect(list.items[0]).toMatchObject({ status: "revised", currentVersion: 3, dose: 180, doseOrigin: "external" });
     expect((await establish("x", worker.headers)).status).toBe(403);
   });
+
+  it("contrôle d'un apport : calendrier (zone ouest), dose restante du plan, premier apport", async () => {
+    await sql`UPDATE parcel_nitrate_zones SET zones = '{ouest,sud}' WHERE land_parcel_id = ${p2026}`;
+    const check = async (startedAt: string, quantity: number) =>
+      (await (
+        await app.request(`${base()}/fertilization/check`, {
+          method: "POST",
+          headers: worker.headers,
+          body: JSON.stringify({ startedAt, parcelIds: [p2026], inputs: [{ articleId: urea, quantity, per: "hectare" }] }),
+        })
+      ).json()) as FertilizationCheck;
+    const winter = await check("2026-01-10T09:00:00+01:00", 100);
+    expect(winter.level).toBe("danger");
+    expect(winter.nitrogen).toEqual({ totalKgHa: 46, efficientKgHa: 46 });
+    expect(winter.indicators.find((i) => i.code === "fert_calendar")).toMatchObject({ level: "danger", parcelName: "Champ Maïs 2026" });
+    const may = await check("2026-05-15T09:00:00+02:00", 100);
+    expect(may.indicators.find((i) => i.code === "fert_calendar")?.level).toBe("ok");
+    // Plan version 3 : 180 kg ; 46 kg apportés, il en reste 134.
+    expect(may.indicators.find((i) => i.code === "fert_plan")).toMatchObject({ level: "ok", message: expect.stringContaining("reste 134 kg") });
+    const big = await check("2026-05-15T09:00:00+02:00", 450);
+    expect(big.indicators.map((i) => i.code)).toEqual(expect.arrayContaining(["fert_plan", "fert_first_split"]));
+    expect(big.indicators.find((i) => i.code === "fert_plan")?.level).toBe("warning");
+  });
+
+  it("cahier d'enregistrement : apports, teneur, rendement, dose prévue ; export CSV", async () => {
+    const i = crypto.randomUUID();
+    await sql`INSERT INTO interventions (id, farm_id, procedure, status, origin, started_at, stopped_at) VALUES (${i}, ${farmId}, 'fertilizing', 'done', 'web', '2026-05-12T08:00:00Z', '2026-05-12T10:00:00Z')`;
+    await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id) VALUES (${crypto.randomUUID()}, ${i}, 'target', 'land_parcel', ${p2026})`;
+    await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id, quantity, unit) VALUES (${crypto.randomUUID()}, ${i}, 'input', 'article', ${urea}, 150, 'kilogram_per_hectare')`;
+    const r = (await (await app.request(`${base()}/fertilization/record?campaign=2026`, { headers: worker.headers })).json()) as FertilizationRecord;
+    expect(r).toMatchObject({ campaign: 2026, from: "2025-09-01", to: "2026-09-01", toComplete: 0 });
+    expect(r.parcels).toHaveLength(1);
+    expect(r.parcels[0]).toMatchObject({ name: "Champ Maïs 2026", crop: "Maïs grain", variety: "DKC5432", totalNKgHa: 69, plannedDose: 180, planVersion: 3 });
+    expect(r.parcels[0]!.applications).toEqual([
+      expect.objectContaining({ date: "2026-05-12", product: "Urée 46", content: "46 % N", nitrateType: "III", nTotalKgHa: 69, nEfficientKgHa: 69, areaHa: 4 }),
+    ]);
+    const csv = await app.request(`${base()}/fertilization/record?campaign=2026&format=csv`, { headers });
+    expect(csv.headers.get("content-type")).toContain("text/csv");
+    const text = await csv.text();
+    expect(text.split("\r\n")[1]).toContain('"Champ Maïs 2026";"4";"Maïs grain";"DKC5432"');
+    expect(text).toContain('"Urée 46";"46 % N";"III"');
+  });
 });
+

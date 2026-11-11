@@ -205,6 +205,12 @@ function Plans({ farmId, owner, year }: { farmId: string; owner: boolean; year: 
               Préparer les plans
             </Button>
           )}
+          <Button variant="subtle" component={Link} to={`/f/${farmId}/print/fertilization/plans?campaign=${campaign}`}>
+            Imprimer les plans
+          </Button>
+          <Button variant="subtle" component={Link} to={`/f/${farmId}/print/fertilization/record?campaign=${campaign}`}>
+            Cahier d'enregistrement
+          </Button>
         </Group>
       </Group>
       {q.isLoading ? (
