@@ -23,6 +23,8 @@ import {
   isStrawCereal,
   nitrogenOfInput,
   steeringAllowance,
+  coverSpreading,
+  SPRING_CROPS,
   aplshOfApplication,
   aplshTotal,
   efficiencyGrid,
@@ -205,66 +207,167 @@ async function aplshCheck(
   day: string,
   before: string,
   exclude: string | null,
-  current: { date: string; product: string; composition: FertilizerComposition; nTotalKgHa: number }[],
+  current: CurrentApplication[],
   fertilizers: Map<string, FertilizerArticle>,
   zone: AplshZone | null,
-  startMmdd: string,
+  cover: CoverAt | null,
 ): Promise<Omit<FertilizationIndicator, "parcelName"> | null> {
   if (!current.length) return null;
   let situation: AplshSituation | null = null;
   const md = day.slice(5, 10);
   if (p.crop === "grassland" && (md >= "09-01" || md <= "01-15")) {
     situation = { kind: "grassland", from: `${md >= "09-01" ? day.slice(0, 4) : Number(day.slice(0, 4)) - 1}-09-01`, countsMineral: true };
-  } else {
-    // Couvert saisi pour la campagne suivante, sur cette parcelle ou sur celle qui la recouvre (Ekylibre : une parcelle par campagne).
-    const [cover] = await rows<{ sown_on: string; destroyed_on: string | null; exported: boolean; harvest: string | null }>(
-      tx,
-      sql`WITH cur AS (SELECT shape FROM land_parcel_versions WHERE land_parcel_id = ${p.parcelId} AND valid @> ${day}::timestamptz LIMIT 1)
-          SELECT cc.sown_on::text, cc.destroyed_on::text, cc.exported,
-                 (SELECT max(i.started_at)::date::text FROM interventions i
-                  JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_id = ${p.parcelId}
-                  WHERE i.status = 'done' AND i.procedure = ANY(${arr(HARVEST)}::text[])
-                    AND i.started_at <= ${before}::timestamptz AND i.started_at > ${before}::timestamptz - interval '1 year') AS harvest
-          FROM cover_crops cc
-          JOIN land_parcel_versions v ON v.land_parcel_id = cc.land_parcel_id
-          , cur
-          WHERE cc.campaign = ${campaignOf(day, startMmdd)} AND ST_Intersects(v.shape, cur.shape)
-            AND ST_Area(ST_Intersection(v.shape, cur.shape)::geography) >= 0.5 * ST_Area(cur.shape::geography)
-          ORDER BY cc.sown_on DESC LIMIT 1`,
-    );
-    // Sans date de destruction, le couvert est réputé détruit avant le 1er mars de la campagne.
-    const end = cover?.destroyed_on ?? `${campaignOf(day, startMmdd)}-02-28`;
-    if (cover && day <= end) {
-      const from = cover.harvest && cover.harvest <= day ? cover.harvest : addDays(cover.sown_on, -15);
-      situation = { kind: "cover", from, countsMineral: cover.exported };
-    }
+  } else if (cover) {
+    const from = cover.harvest && cover.harvest <= day ? cover.harvest : addDays(cover.sownOn, -15);
+    situation = { kind: "cover", from, countsMineral: cover.exported };
   }
   if (!situation) return null;
+  const applications = [...(await pastApplications(tx, p.parcelId, situation.from, before, exclude, fertilizers)), ...current.filter((c) => !c.composition.foliar)].map((a) => ({
+    date: a.date,
+    product: a.product,
+    type: a.composition.nitrateType,
+    aplsh: aplshOfApplication(a.composition, a.date, a.nTotalKgHa, zone),
+  }));
+  const t = aplshTotal(situation, applications);
+  const what = situation.kind === "cover" ? `depuis la récolte du précédent (${fr(situation.from)}), sur le couvert d'interculture` : `depuis le ${fr(situation.from)} sur la prairie`;
+  if (t.over) return { code: "fert_aplsh", level: "warning", message: `APLSH ${what} : ${t.kgNHa} kg N/ha pour un plafond de ${t.ceiling} kg (PAN 7).` };
+  if (t.missing.length) return { code: "fert_aplsh", level: "info", message: `APLSH ${what} : ${t.kgNHa} kg N/ha comptés, plafond ${t.ceiling} kg ; non calculable pour ${t.missing.join(" ; ")}.` };
+  return { code: "fert_aplsh", level: "ok", message: `APLSH ${what} : ${t.kgNHa} kg N/ha sur ${t.ceiling} kg permis.` };
+}
+
+type CurrentApplication = { date: string; product: string; composition: FertilizerComposition; nTotalKgHa: number; nEfficientKgHa: number | null };
+
+interface CoverAt {
+  kind: CoverCrop["kind"];
+  family: CoverCrop["family"];
+  exported: boolean;
+  sownOn: string;
+  destroyedOn: string | null;
+  /** Dernière récolte sur la parcelle de l'apport, dans l'année qui précède. */
+  harvest: string | null;
+  /** Culture principale qui suit le couvert, si elle est saisie. */
+  nextCrop: CropGroup | null;
+}
+
+/**
+ * Couvert d'interculture en place à la date d'un apport : saisi pour la
+ * campagne suivante, sur la parcelle ou sur celle qui la recouvre (Ekylibre :
+ * une parcelle par campagne). Sans date de destruction, il est réputé détruit
+ * avant le 1er mars de la campagne.
+ */
+async function coverAt(tx: Tx, parcelId: string, day: string, before: string, startMmdd: string): Promise<CoverAt | null> {
+  const campaign = campaignOf(day, startMmdd);
+  const [c] = await rows<{
+    kind: CoverCrop["kind"];
+    family: CoverCrop["family"];
+    sown_on: string;
+    destroyed_on: string | null;
+    exported: boolean;
+    harvest: string | null;
+    reference: string | null;
+    cultivation: string | null;
+  }>(
+    tx,
+    sql`WITH cur AS (SELECT shape FROM land_parcel_versions WHERE land_parcel_id = ${parcelId} AND valid @> ${day}::timestamptz LIMIT 1)
+        SELECT cc.kind, cc.family, cc.sown_on::text, cc.destroyed_on::text, cc.exported,
+               (SELECT max(i.started_at)::date::text FROM interventions i
+                JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_id = ${parcelId}
+                WHERE i.status = 'done' AND i.procedure = ANY(${arr(HARVEST)}::text[])
+                  AND i.started_at <= ${before}::timestamptz AND i.started_at > ${before}::timestamptz - interval '1 year') AS harvest,
+               nx.reference, nx.cultivation
+        FROM cover_crops cc
+        JOIN land_parcel_versions v ON v.land_parcel_id = cc.land_parcel_id
+        LEFT JOIN LATERAL (
+          SELECT a.reference, coalesce(pr.cultivation, a.cultivation) AS cultivation FROM productions pr
+          JOIN campaigns c ON c.id = pr.campaign_id AND c.year = cc.campaign LEFT JOIN activities a ON a.id = pr.activity_id
+          WHERE pr.land_parcel_id = cc.land_parcel_id ORDER BY pr.created_at LIMIT 1) nx ON true
+        , cur
+        WHERE cc.campaign = ${campaign} AND ST_Intersects(v.shape, cur.shape)
+          AND ST_Area(ST_Intersection(v.shape, cur.shape)::geography) >= 0.5 * ST_Area(cur.shape::geography)
+        ORDER BY cc.sown_on DESC LIMIT 1`,
+  );
+  // Avant la récolte du précédent (ou, sans récolte connue, plus de 15 jours avant le semis), l'apport vise la culture en place.
+  if (!c || day > (c.destroyed_on ?? `${campaign}-02-28`)) return null;
+  if (c.harvest ? day < c.harvest : day < addDays(c.sown_on, -15)) return null;
+  return {
+    kind: c.kind,
+    family: c.family,
+    exported: c.exported,
+    sownOn: c.sown_on,
+    destroyedOn: c.destroyed_on,
+    harvest: c.harvest,
+    nextCrop: c.reference || c.cultivation ? cropGroupOf({ reference: c.reference, cultivation: c.cultivation }) : null,
+  };
+}
+
+/** Apports d'azote réalisés sur une parcelle entre deux dates, avec leur azote total et efficace. */
+async function pastApplications(tx: Tx, parcelId: string, from: string, before: string, exclude: string | null, fertilizers: Map<string, FertilizerArticle>): Promise<CurrentApplication[]> {
   const past = await rows<{ day: string; article_id: string; quantity: string; unit: string | null; area_m2: string | null; worked: string | null }>(
     tx,
     sql`SELECT i.started_at::date::text AS day, p.ref_id AS article_id, p.quantity, p.unit,
                (SELECT v.area_m2 FROM land_parcel_versions v WHERE v.land_parcel_id = t.ref_id AND v.valid @> i.started_at LIMIT 1) AS area_m2,
                t.attrs->>'workedAreaM2' AS worked
         FROM interventions i
-        JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_id = ${p.parcelId}
+        JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_id = ${parcelId}
         JOIN intervention_parameters p ON p.intervention_id = i.id AND p.role = 'input' AND p.ref_type = 'article' AND p.quantity IS NOT NULL
         WHERE i.status = 'done' AND i.procedure = ANY(${arr(FERTILIZING)}::text[])
-          AND i.started_at >= ${situation.from}::date AND i.started_at < ${before}::timestamptz
+          AND i.started_at >= ${from}::date AND i.started_at < ${before}::timestamptz
           ${exclude ? sql`AND i.id <> ${exclude}` : sql``}`,
   );
-  const applications = [
-    ...past.flatMap((r) => {
-      const f = fertilizers.get(r.article_id);
-      const n = nitrogen(f, r.day, Number(r.quantity), r.unit, ((num(r.worked) ?? num(r.area_m2)) ?? 0) / 10_000 || null);
-      return "missing" in n || !(n.totalKgHa > 0) || n.composition.foliar ? [] : [{ date: r.day, product: f!.name, composition: n.composition, nTotalKgHa: n.totalKgHa }];
-    }),
-    ...current.filter((c) => !c.composition.foliar),
-  ].map((a) => ({ date: a.date, product: a.product, type: a.composition.nitrateType, aplsh: aplshOfApplication(a.composition, a.date, a.nTotalKgHa, zone) }));
-  const t = aplshTotal(situation, applications);
-  const what = situation.kind === "cover" ? `depuis la récolte du précédent (${fr(situation.from)}), sur le couvert d'interculture` : `depuis le ${fr(situation.from)} sur la prairie`;
-  if (t.over) return { code: "fert_aplsh", level: "warning", message: `APLSH ${what} : ${t.kgNHa} kg N/ha pour un plafond de ${t.ceiling} kg (PAN 7).` };
-  if (t.missing.length) return { code: "fert_aplsh", level: "info", message: `APLSH ${what} : ${t.kgNHa} kg N/ha comptés, plafond ${t.ceiling} kg ; non calculable pour ${t.missing.join(" ; ")}.` };
-  return { code: "fert_aplsh", level: "ok", message: `APLSH ${what} : ${t.kgNHa} kg N/ha sur ${t.ceiling} kg permis.` };
+  return past.flatMap((r) => {
+    const f = fertilizers.get(r.article_id);
+    const n = nitrogen(f, r.day, Number(r.quantity), r.unit, ((num(r.worked) ?? num(r.area_m2)) ?? 0) / 10_000 || null);
+    return "missing" in n || !(n.totalKgHa > 0) || n.composition.foliar
+      ? []
+      : [{ date: r.day, product: f!.name, composition: n.composition, nTotalKgHa: n.totalKgHa, nEfficientKgHa: n.efficientKgHa }];
+  });
+}
+
+/**
+ * Épandage sur un couvert d'interculture (lot AM, guide du PAR 7 NA, tableau
+ * 4) : interdictions (repousses, légumineuses pures, période, type III sur
+ * CINE, ZAR), puis plafond d'azote efficace cumulé depuis 15 jours avant le
+ * semis du couvert.
+ */
+async function coverSpreadingCheck(
+  tx: Tx,
+  p: ParcelCrop,
+  cover: CoverAt,
+  day: string,
+  before: string,
+  exclude: string | null,
+  current: CurrentApplication[],
+  fertilizers: Map<string, FertilizerArticle>,
+): Promise<Omit<FertilizationIndicator, "parcelName">[]> {
+  const out: Omit<FertilizationIndicator, "parcelName">[] = [];
+  const interculture = cover.nextCrop && !SPRING_CROPS.has(cover.nextCrop) ? "short" : "long";
+  const base = {
+    date: day,
+    cover: { kind: cover.kind, pureLegumes: cover.family === "legumineuses", exported: cover.exported, sownOn: cover.sownOn, destroyedOn: cover.destroyedOn },
+    interculture,
+    zar: p.zones.includes("zar"),
+    west: p.zones.includes("ouest"),
+  } as const;
+  const ceilings = new Map<string, { ceiling: number; cumulates: "organic" | "all"; label: string }>();
+  for (const c of current.filter((x) => !x.composition.foliar)) {
+    const r = coverSpreading({ ...base, type: c.composition.nitrateType });
+    // Avant le couvert (sur chaume), l'interdiction est probable mais Fourmy ne sait pas si l'apport vise le couvert : orange.
+    if (!r.allowed) out.push({ code: "fert_cover", level: day < addDays(cover.sownOn, -15) ? "warning" : "danger", message: `${c.product} : ${r.reason}` });
+    else ceilings.set(`${r.ceiling}|${r.cumulates}`, r);
+  }
+  if (!ceilings.size) return out;
+  const from = addDays(cover.sownOn, -15);
+  const all = [...(await pastApplications(tx, p.parcelId, from, before, exclude, fertilizers)), ...current.filter((c) => !c.composition.foliar)];
+  for (const r of ceilings.values()) {
+    const counted = all.filter((a) => r.cumulates === "all" || a.composition.nitrateType !== "III");
+    const unknown = counted.filter((a) => a.nEfficientKgHa === null).map((a) => a.product);
+    const kg = Math.round(counted.reduce((sum, a) => sum + (a.nEfficientKgHa ?? 0), 0));
+    const what = `Couvert d'interculture (${r.label}) : ${kg} kg N efficace/ha apportés depuis le ${fr(from)}`;
+    if (kg > r.ceiling) out.push({ code: "fert_cover", level: "warning", message: `${what}, au-delà du plafond de ${r.ceiling} kg.` });
+    else if (unknown.length) out.push({ code: "fert_cover", level: "info", message: `${what} ; azote efficace inconnu pour ${[...new Set(unknown)].join(", ")}.` });
+    else out.push({ code: "fert_cover", level: "ok", message: `${what}, sur ${r.ceiling} kg permis, dans la limite des besoins du couvert.` });
+  }
+  return out;
 }
 
 const addDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
@@ -415,10 +518,13 @@ export async function checkApplicationTx(tx: Tx, farmId: string, req: Fertilizat
         const current = fert.flatMap((i) => {
           const f = fertilizers.get(i.articleId)!;
           const n = nitrogen(f, day, i.quantity, i.per === "hectare" ? `${f.unit}_per_hectare` : f.unit, areaHa);
-          return "missing" in n || !(n.totalKgHa > 0) ? [] : [{ date: day, product: f.name, composition: n.composition, nTotalKgHa: n.totalKgHa }];
+          return "missing" in n || !(n.totalKgHa > 0) ? [] : [{ date: day, product: f.name, composition: n.composition, nTotalKgHa: n.totalKgHa, nEfficientKgHa: n.efficientKgHa }];
         });
-        const x = await aplshCheck(tx, p, day, req.startedAt, req.interventionId, current, fertilizers, settings.aplshZone ?? defaultAplshZone(p.department), settings.campaignStartMmdd);
+        const cover = await coverAt(tx, p.parcelId, day, req.startedAt, settings.campaignStartMmdd);
+        const x = await aplshCheck(tx, p, day, req.startedAt, req.interventionId, current, fertilizers, settings.aplshZone ?? defaultAplshZone(p.department), cover);
         if (x) indicators.push({ ...x, parcelName: p.name });
+        // Épandage sur le couvert (lot AM) : interdictions et plafonds du tableau 4 du PAR 7.
+        if (cover) for (const y of await coverSpreadingCheck(tx, p, cover, day, req.startedAt, req.interventionId, current, fertilizers)) indicators.push({ ...y, parcelName: p.name });
       }
     }
     return {

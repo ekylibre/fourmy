@@ -398,4 +398,33 @@ describe.skipIf(!url)("plans de fumure (intégration)", () => {
     const may12 = record.parcels.find((x) => x.parcelId === p2026)!.applications.find((a) => a.date === "2026-05-12")!;
     expect(may12.efficiency).toEqual({ level: "info", message: expect.stringContaining("note entre 10 et 14, de « conditions moyennes, pertes d'efficacité possibles » à « conditions limites") });
   });
+
+  it("épandage sur couvert d'interculture : interdictions et plafonds du tableau 4 du PAR 7 (lot AM)", async () => {
+    // Couvert non exporté (CINE) semé le 18/10/2025 sur la parcelle 2026 (test APLSH) ; précédent récolté le 15/10/2025.
+    const check = async (startedAt: string, articleId: string, quantity: number) =>
+      (await (
+        await app.request(`${base()}/fertilization/check`, {
+          method: "POST",
+          headers: worker.headers,
+          body: JSON.stringify({ startedAt, parcelIds: [p2025], inputs: [{ articleId, quantity, per: "hectare" }] }),
+        })
+      ).json()) as FertilizationCheck;
+    const cover = (r: FertilizationCheck) => r.indicators.filter((i) => i.code === "fert_cover");
+    expect(cover(await check("2025-10-20T09:00:00+02:00", urea, 50))).toEqual([
+      expect.objectContaining({ level: "danger", message: "Urée 46 : Engrais minéral (type III) interdit sur un couvert non exporté (CINE)." }),
+    ]);
+    // Dans les 30 jours avant la destruction (20/01/2026) : interdit.
+    const late = cover(await check("2025-12-28T09:00:00+01:00", urea, 50));
+    expect(late[0]).toMatchObject({ level: "danger", message: expect.stringContaining("30 jours avant sa destruction") });
+    // Couvert exporté (CIE) : l'urée compte dans un plafond de 70 kg d'azote efficace (organiques et minéraux).
+    await app.request(`${base()}/land-parcels/${p2026}/cover-crop`, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({ campaign: 2026, family: "graminees_seigle_avoine", species: "Seigle", sownOn: "2025-10-18", destroyedOn: "2026-04-20", exported: true, biomass: "ge_3", destructionMode: "harvest" }),
+    });
+    expect(cover(await check("2025-11-05T09:00:00+01:00", urea, 100))).toEqual([
+      expect.objectContaining({ level: "ok", message: expect.stringContaining("46 kg N efficace/ha apportés depuis le 03/10/2025, sur 70 kg permis") }),
+    ]);
+    expect(cover(await check("2025-11-05T09:00:00+01:00", urea, 200))[0]).toMatchObject({ level: "warning", message: expect.stringContaining("92 kg N efficace/ha apportés depuis le 03/10/2025, au-delà du plafond de 70 kg") });
+  });
 });

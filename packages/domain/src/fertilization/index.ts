@@ -9,3 +9,4 @@ export * from "./calendar.js";
 export * from "./conditions.js";
 export * from "./aplsh.js";
 export * from "./efficiency.js";
+export * from "./cover-ceilings.js";
