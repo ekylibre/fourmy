@@ -119,6 +119,13 @@ function RecordDoc({ farmId, farmName, campaign }: { farmId: string; farmName: s
               </Text>
             )}
           </Text>
+          {p.aplsh && (
+            <Text size="sm" c={p.aplsh.over ? "brique.7" : undefined}>
+              Azote potentiellement libéré jusqu'en sortie d'hiver sur le couvert, du {formatDate(p.aplsh.from)} au {formatDate(p.aplsh.to)} :{" "}
+              <b>{n(p.aplsh.kgNHa)} kg N/ha</b> pour un plafond de {p.aplsh.ceiling} kg{p.aplsh.over ? " (dépassé)" : ""}
+              {p.aplsh.missing.length ? ` ; non calculé pour ${p.aplsh.missing.join(" ; ")}` : ""}.
+            </Text>
+          )}
           {(p.steering ?? []).length > 0 && (
             <Text size="sm">
               Pilotage :{" "}

@@ -23,8 +23,11 @@ import {
   isStrawCereal,
   nitrogenOfInput,
   steeringAllowance,
+  aplshOfApplication,
+  aplshTotal,
+  type AplshSituation,
 } from "@fourmy/domain";
-import type { CropGroup } from "@fourmy/fertilization-refs";
+import { defaultAplshZone, type AplshZone, type CropGroup } from "@fourmy/fertilization-refs";
 import { cropLabel, previousOf } from "./fertilization-plans.js";
 import { getSettings, settingsInTx } from "./fertilization-context.js";
 import { fertilizersInTx, listFertilizers } from "./fertilizers.js";
@@ -82,6 +85,8 @@ interface ParcelCrop {
   plan: { id: string; dose: number; version: number; reservedKgNHa: number } | null;
   /** Cours d'eau le plus proche (fossés exclus), si les cours d'eau de la ferme sont chargés. */
   water: { name: string | null; distanceM: number } | null;
+  /** Département de la commune (zone climatique APLSH par défaut). */
+  department: string | null;
 }
 
 async function parcelCrops(tx: Tx, farmId: string, parcelIds: string[], day: string, startMmdd: string): Promise<ParcelCrop[]> {
@@ -102,11 +107,12 @@ async function parcelCrops(tx: Tx, farmId: string, parcelIds: string[], day: str
     reserved: string | null;
     water_name: string | null;
     water_m: number | null;
+    insee: string | null;
   }>(
     tx,
     sql`SELECT lp.id, lp.name, pr.reference, pr.cultivation, pr.year, ps.irrigated, z.zones, z.status, fp.id AS plan_id, v.dose_efficient AS dose, v.version,
                (SELECT sum(a.n_efficient) FROM fertilization_plan_applications a WHERE a.plan_id = fp.id AND a.version = fp.current_version AND a.reserved_for_steering) AS reserved,
-               w.name AS water_name, w.d AS water_m
+               w.name AS water_name, w.d AS water_m, z.insee
         FROM land_parcels lp
         LEFT JOIN LATERAL (
           SELECT wi.name, ST_Distance(wi.geom::geography, sh.shape::geography) AS d
@@ -133,8 +139,85 @@ async function parcelCrops(tx: Tx, farmId: string, parcelIds: string[], day: str
     zone: r.status,
     plan: r.plan_id && r.dose !== null && r.version !== null ? { id: r.plan_id, dose: Number(r.dose), version: r.version, reservedKgNHa: Number(r.reserved ?? 0) } : null,
     water: r.water_m !== null ? { name: r.water_name, distanceM: Number(r.water_m) } : null,
+    department: r.insee ? r.insee.slice(0, 2) : null,
   }));
 }
+
+/**
+ * APLSH (lot AK, FR-FERT-28) : si l'apport tombe sur un couvert d'interculture
+ * (de la récolte du précédent à la destruction du couvert) ou sur une prairie
+ * (du 1er septembre au 15 janvier), cumul de l'azote potentiellement libéré
+ * jusqu'en sortie d'hiver depuis le début de la période, plafonné à 70 kg.
+ */
+async function aplshCheck(
+  tx: Tx,
+  p: ParcelCrop,
+  day: string,
+  before: string,
+  exclude: string | null,
+  current: { date: string; product: string; composition: FertilizerComposition; nTotalKgHa: number }[],
+  fertilizers: Map<string, FertilizerArticle>,
+  zone: AplshZone | null,
+  startMmdd: string,
+): Promise<Omit<FertilizationIndicator, "parcelName"> | null> {
+  if (!current.length) return null;
+  let situation: AplshSituation | null = null;
+  const md = day.slice(5, 10);
+  if (p.crop === "grassland" && (md >= "09-01" || md <= "01-15")) {
+    situation = { kind: "grassland", from: `${md >= "09-01" ? day.slice(0, 4) : Number(day.slice(0, 4)) - 1}-09-01`, countsMineral: true };
+  } else {
+    // Couvert saisi pour la campagne suivante, sur cette parcelle ou sur celle qui la recouvre (Ekylibre : une parcelle par campagne).
+    const [cover] = await rows<{ sown_on: string; destroyed_on: string | null; exported: boolean; harvest: string | null }>(
+      tx,
+      sql`WITH cur AS (SELECT shape FROM land_parcel_versions WHERE land_parcel_id = ${p.parcelId} AND valid @> ${day}::timestamptz LIMIT 1)
+          SELECT cc.sown_on::text, cc.destroyed_on::text, cc.exported,
+                 (SELECT max(i.started_at)::date::text FROM interventions i
+                  JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_id = ${p.parcelId}
+                  WHERE i.status = 'done' AND i.procedure = ANY(${arr(HARVEST)}::text[])
+                    AND i.started_at <= ${before}::timestamptz AND i.started_at > ${before}::timestamptz - interval '1 year') AS harvest
+          FROM cover_crops cc
+          JOIN land_parcel_versions v ON v.land_parcel_id = cc.land_parcel_id
+          , cur
+          WHERE cc.campaign = ${campaignOf(day, startMmdd)} AND ST_Intersects(v.shape, cur.shape)
+            AND ST_Area(ST_Intersection(v.shape, cur.shape)::geography) >= 0.5 * ST_Area(cur.shape::geography)
+          ORDER BY cc.sown_on DESC LIMIT 1`,
+    );
+    // Sans date de destruction, le couvert est réputé détruit avant le 1er mars de la campagne.
+    const end = cover?.destroyed_on ?? `${campaignOf(day, startMmdd)}-02-28`;
+    if (cover && day <= end) {
+      const from = cover.harvest && cover.harvest <= day ? cover.harvest : addDays(cover.sown_on, -15);
+      situation = { kind: "cover", from, countsMineral: cover.exported };
+    }
+  }
+  if (!situation) return null;
+  const past = await rows<{ day: string; article_id: string; quantity: string; unit: string | null; area_m2: string | null; worked: string | null }>(
+    tx,
+    sql`SELECT i.started_at::date::text AS day, p.ref_id AS article_id, p.quantity, p.unit,
+               (SELECT v.area_m2 FROM land_parcel_versions v WHERE v.land_parcel_id = t.ref_id AND v.valid @> i.started_at LIMIT 1) AS area_m2,
+               t.attrs->>'workedAreaM2' AS worked
+        FROM interventions i
+        JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_id = ${p.parcelId}
+        JOIN intervention_parameters p ON p.intervention_id = i.id AND p.role = 'input' AND p.ref_type = 'article' AND p.quantity IS NOT NULL
+        WHERE i.status = 'done' AND i.procedure = ANY(${arr(FERTILIZING)}::text[])
+          AND i.started_at >= ${situation.from}::date AND i.started_at < ${before}::timestamptz
+          ${exclude ? sql`AND i.id <> ${exclude}` : sql``}`,
+  );
+  const applications = [
+    ...past.flatMap((r) => {
+      const f = fertilizers.get(r.article_id);
+      const n = nitrogen(f, r.day, Number(r.quantity), r.unit, ((num(r.worked) ?? num(r.area_m2)) ?? 0) / 10_000 || null);
+      return "missing" in n || !(n.totalKgHa > 0) || n.composition.foliar ? [] : [{ date: r.day, product: f!.name, composition: n.composition, nTotalKgHa: n.totalKgHa }];
+    }),
+    ...current.filter((c) => !c.composition.foliar),
+  ].map((a) => ({ date: a.date, product: a.product, type: a.composition.nitrateType, aplsh: aplshOfApplication(a.composition, a.date, a.nTotalKgHa, zone) }));
+  const t = aplshTotal(situation, applications);
+  const what = situation.kind === "cover" ? `depuis la récolte du précédent (${fr(situation.from)}), sur le couvert d'interculture` : `depuis le ${fr(situation.from)} sur la prairie`;
+  if (t.over) return { code: "fert_aplsh", level: "warning", message: `APLSH ${what} : ${t.kgNHa} kg N/ha pour un plafond de ${t.ceiling} kg (PAN 7).` };
+  if (t.missing.length) return { code: "fert_aplsh", level: "info", message: `APLSH ${what} : ${t.kgNHa} kg N/ha comptés, plafond ${t.ceiling} kg ; non calculable pour ${t.missing.join(" ; ")}.` };
+  return { code: "fert_aplsh", level: "ok", message: `APLSH ${what} : ${t.kgNHa} kg N/ha sur ${t.ceiling} kg permis.` };
+}
+
+const addDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
 /** Azote efficace (minéral) déjà apporté sur la parcelle pendant la campagne, hors une intervention. */
 async function appliedSoFar(tx: Tx, parcelId: string, from: string, before: string, exclude: string | null, fertilizers: Map<string, FertilizerArticle>): Promise<{ total: number; count: number }> {
@@ -256,6 +339,16 @@ export async function checkApplicationTx(tx: Tx, farmId: string, req: Fertilizat
       if (so.count === 0 && efficient !== null && efficient > 50 && (isMaizeOrSorghum(p.crop) || (isStrawCereal(p.crop) && p.crop !== "barley_spring"))) {
         indicators.push({ code: "fert_first_split", level: "warning", message: `Premier apport de ${Math.round(efficient)} kg N : 50 kg au plus (PAR 7 Nouvelle-Aquitaine).`, parcelName: p.name });
       }
+      // Plafond d'APLSH (lot AK) : couvert d'interculture ou prairie, en zone vulnérable.
+      if (p.zone === "in" || p.zone === "partial") {
+        const current = fert.flatMap((i) => {
+          const f = fertilizers.get(i.articleId)!;
+          const n = nitrogen(f, day, i.quantity, i.per === "hectare" ? `${f.unit}_per_hectare` : f.unit, areaHa);
+          return "missing" in n || !(n.totalKgHa > 0) ? [] : [{ date: day, product: f.name, composition: n.composition, nTotalKgHa: n.totalKgHa }];
+        });
+        const x = await aplshCheck(tx, p, day, req.startedAt, req.interventionId, current, fertilizers, settings.aplshZone ?? defaultAplshZone(p.department), settings.campaignStartMmdd);
+        if (x) indicators.push({ ...x, parcelName: p.name });
+      }
     }
     return {
       level: worst(indicators.map((x) => x.level)),
@@ -273,6 +366,47 @@ export async function checkApplicationTx(tx: Tx, farmId: string, req: Fertilizat
  * semis, les apports (date, surface, produit, teneur, azote), les récoltes et
  * le rendement, les techniques culturales simplifiées.
  */
+/** Dernière récolte avant le semis de la culture (ou avant le 1er mars) : celle du précédent. */
+function previousHarvest(events: { procedure: string; day: string }[], sown: string | null, campaign: number): string | null {
+  const limit = sown ?? `${campaign}-03-01`;
+  return (
+    events
+      .filter((e) => HARVEST.includes(e.procedure) && e.day >= `${campaign - 1}-06-01` && e.day < limit)
+      .map((e) => e.day)
+      .sort()
+      .at(-1) ?? null
+  );
+}
+
+/**
+ * APLSH sur le couvert d'interculture (lot AK) : apports de la récolte du
+ * précédent à la destruction du couvert, types 0 à II (et III si le couvert
+ * est exporté), comparés au plafond de 70 kg.
+ */
+function coverAplsh(
+  events: { procedure: string; day: string; role: string | null; article_id: string | null; quantity: string | null; unit: string | null; worked: string | null; area_m2: string | null }[],
+  areaM2: number,
+  sown: string | null,
+  cover: CoverCrop | null,
+  campaign: number,
+  fertilizers: Map<string, FertilizerArticle>,
+  zone: AplshZone | null,
+): RecordParcel["aplsh"] {
+  if (!cover) return null;
+  const from = previousHarvest(events, sown, campaign) ?? cover.sownOn;
+  const to = cover.destroyedOn ?? sown ?? `${campaign}-03-01`;
+  const applications = events
+    .filter((e) => FERTILIZING.includes(e.procedure) && e.role === "input" && e.article_id && fertilizers.has(e.article_id) && e.quantity !== null && e.day >= from && e.day <= to)
+    .flatMap((e) => {
+      const f = fertilizers.get(e.article_id!)!;
+      const n = nitrogen(f, e.day, Number(e.quantity), e.unit, ((num(e.worked) ?? num(e.area_m2)) ?? areaM2) / 10_000);
+      if ("missing" in n || !(n.totalKgHa > 0) || n.composition.foliar) return [];
+      return [{ date: e.day, product: f.name, type: n.composition.nitrateType, aplsh: aplshOfApplication(n.composition, e.day, n.totalKgHa, zone) }];
+    });
+  const t = aplshTotal({ kind: "cover", from, countsMineral: cover.exported }, applications);
+  return { from, to, kgNHa: t.kgNHa, ceiling: t.ceiling, over: t.over, missing: t.missing };
+}
+
 /**
  * Couverture des sols avant la culture (FR-FERT-27) : précédent de la
  * campagne d'avant, sa dernière récolte avant le semis, le couvert saisi et
@@ -288,13 +422,7 @@ function soilCoverOf(
   campaign: number,
 ): SoilCoverStatus {
   const previous = prev ? cropGroupOf({ reference: prev.reference, cultivation: prev.cultivation }) : null;
-  const limit = sown ?? `${campaign}-03-01`;
-  const harvestedOn =
-    events
-      .filter((e) => HARVEST.includes(e.procedure) && e.day >= `${campaign - 1}-06-01` && e.day < limit)
-      .map((e) => e.day)
-      .sort()
-      .at(-1) ?? null;
+  const harvestedOn = previousHarvest(events, sown, campaign);
   return checkSoilCover({
     crop,
     previous: previous ? { crop: previous, harvestedOn } : null,
@@ -324,12 +452,13 @@ export async function fertilizationRecord(db: Database, farmId: string, campaign
       plan_id: string | null;
       dose: string | null;
       version: number | null;
+      insee: string | null;
     }>(
       tx,
       sql`SELECT DISTINCT ON (lp.id) lp.id, lp.name,
                  (SELECT v.area_m2 FROM land_parcel_versions v WHERE v.land_parcel_id = lp.id
                   ORDER BY (v.valid @> make_date(${campaign}, 6, 1)::timestamptz) DESC, upper(v.valid) DESC NULLS FIRST LIMIT 1) AS area_m2,
-                 ps.soil_type, z.status AS zone, z.zones, a.reference, coalesce(pr.cultivation, a.cultivation) AS cultivation, pr.species,
+                 ps.soil_type, z.status AS zone, z.zones, z.insee, a.reference, coalesce(pr.cultivation, a.cultivation) AS cultivation, pr.species,
                  fp.id AS plan_id, v.dose_efficient AS dose, v.version
           FROM productions pr JOIN campaigns c ON c.id = pr.campaign_id AND c.year = ${campaign}
           JOIN land_parcels lp ON lp.id = pr.land_parcel_id
@@ -348,12 +477,15 @@ export async function fertilizationRecord(db: Database, farmId: string, campaign
     for (const p of parcels) if (p.zone === "in" || p.zone === "partial") prevs.set(p.id, await previousOf(tx, farmId, p.id, campaign));
     const prevIds = [...prevs.values()].map((x) => x?.parcel_id).filter((x): x is string => !!x && !ids.includes(x));
     const prevEvents = prevIds.length
-      ? await rows<{ parcel_id: string; procedure: string; day: string }>(
+      ? await rows<{ parcel_id: string; procedure: string; day: string; worked: string | null; area_m2: string | null; article_id: string | null; quantity: string | null; unit: string | null; role: string | null }>(
           tx,
-          sql`SELECT t.ref_id AS parcel_id, i.procedure, i.started_at::date::text AS day
+          sql`SELECT t.ref_id AS parcel_id, i.procedure, i.started_at::date::text AS day, t.attrs->>'workedAreaM2' AS worked,
+                     (SELECT v.area_m2 FROM land_parcel_versions v WHERE v.land_parcel_id = t.ref_id AND v.valid @> i.started_at LIMIT 1) AS area_m2,
+                     p.ref_id AS article_id, p.quantity, p.unit, p.role
               FROM interventions i JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target'
+              LEFT JOIN intervention_parameters p ON p.intervention_id = i.id AND p.role = 'input' AND p.ref_type = 'article'
               WHERE i.farm_id = ${farmId} AND i.status = 'done' AND t.ref_id IN (SELECT unnest(${arr(prevIds)}::uuid[]))
-                AND i.procedure = ANY(${arr([...HARVEST, ...RESIDUES])}::text[])
+                AND i.procedure = ANY(${arr([...HARVEST, ...RESIDUES, ...FERTILIZING])}::text[])
                 AND i.started_at >= make_date(${campaign - 1}, 6, 1) AND i.started_at < ${w.to}::date`,
         )
       : [];
@@ -422,6 +554,8 @@ export async function fertilizationRecord(db: Database, farmId: string, campaign
         // Cahier de l'azote : les apports sans azote (potasse, chaux) n'y figurent pas.
         .filter((a) => a.nTotalKgHa === null || a.nTotalKgHa > 0);
       const plowed = mine.some((e) => PLOWING.includes(e.procedure));
+      // Interculture : travaux et apports sur cette parcelle et sur celle du précédent.
+      const around = [...mine.map((e) => ({ ...e, area_m2: p.area_m2 })), ...prevEvents.filter((e) => e.parcel_id === prevs.get(p.id)?.parcel_id)];
       const interculture = [
         ...new Map(
           mine
@@ -442,7 +576,8 @@ export async function fertilizationRecord(db: Database, farmId: string, campaign
         yieldQHa: yields.length ? Math.round((yields.reduce((s, v) => s + v, 0) / yields.length) * 10) / 10 : null,
         interculture,
         cover: covers.get(p.id) ?? null,
-        soilCover: prevs.has(p.id) ? soilCoverOf(prevs.get(p.id) ?? null, p.zones, crop, [...mine, ...prevEvents.filter((e) => e.parcel_id === prevs.get(p.id)?.parcel_id)], sown, covers.get(p.id) ?? null, campaign) : null,
+        soilCover: prevs.has(p.id) ? soilCoverOf(prevs.get(p.id) ?? null, p.zones, crop, around, sown, covers.get(p.id) ?? null, campaign) : null,
+        aplsh: prevs.has(p.id) ? coverAplsh(around, Number(p.area_m2), sown, covers.get(p.id) ?? null, campaign, fertilizers, settings.aplshZone ?? defaultAplshZone(p.insee?.slice(0, 2) ?? null)) : null,
         steering: p.plan_id ? (steering.get(p.plan_id) ?? []) : [],
         // Trois campagnes de recul ne sont pas toutes chargées : « null » quand on ne peut pas conclure.
         noPlowing: plowed ? false : null,

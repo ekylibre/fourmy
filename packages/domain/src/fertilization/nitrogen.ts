@@ -72,7 +72,7 @@ export function effectiveComposition(
   article: {
     composition: FertilizerComposition | null;
     proposal: FertilizerComposition | null;
-    analyses: { sampledOn: string; basis: "kg_per_t" | "kg_per_m3"; nTotal: number; nNh4: number | null }[];
+    analyses: { sampledOn: string; basis: "kg_per_t" | "kg_per_m3"; nTotal: number; nNh4: number | null; cN?: number | null }[];
   },
   on: string,
   validYears = 5,
@@ -95,6 +95,8 @@ export function effectiveComposition(
         density: base?.density ?? null,
         nitrateType: base?.nitrateType ?? null,
         foliar: false,
+        cN: analysis.cN ?? base?.cN ?? null,
+        aplshProduct: base?.aplshProduct ?? null,
       },
     };
   }

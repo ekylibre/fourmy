@@ -60,6 +60,9 @@ export const fertilizerComposition = z.object({
   nitrateType: nitrateType.nullable().default(null),
   /** Apport foliaire : hors calendrier d'épandage. */
   foliar: z.boolean().default(false),
+  /** Organiques (lot AK) : rapport C/N, et dénomination COMIFER pour l'APLSH. */
+  cN: z.number().positive().max(200).nullable().optional(),
+  aplshProduct: z.string().max(120).nullable().optional(),
 });
 export type FertilizerComposition = z.infer<typeof fertilizerComposition>;
 
@@ -219,9 +222,12 @@ export interface ParcelFertilizationContext {
   analyses: SoilAnalysis[];
 }
 
+export const APLSH_ZONE_KEYS = ["bassin_sud_ouest", "oceanique_altere", "oceanique_degrade", "semi_continental", "montagne"] as const;
 export const fertilizationSettingsWrite = z.object({
   region: z.enum(["nouvelle-aquitaine"]),
   campaignStartMmdd: z.string().regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/),
+  /** Zone climatique des références APLSH (lot AK) ; null : d'après le département. */
+  aplshZone: z.enum(APLSH_ZONE_KEYS).nullable().optional(),
 });
 export type FertilizationSettings = z.infer<typeof fertilizationSettingsWrite>;
 
@@ -399,7 +405,9 @@ export type FertilizationIndicatorCode =
   | "fert_frost"
   | "fert_wet"
   | "fert_water"
-  | "fert_slope";
+  | "fert_slope"
+  // Plafond d'azote potentiellement libéré jusqu'en sortie d'hiver (lot AK).
+  | "fert_aplsh";
 export interface FertilizationIndicator {
   code: FertilizationIndicatorCode;
   level: "ok" | "info" | "warning" | "danger";
@@ -452,6 +460,8 @@ export interface RecordParcel {
   soilCover: SoilCoverStatus | null;
   /** Mesures de pilotage de la campagne (lot AJ). */
   steering: SteeringMeasurement[];
+  /** APLSH cumulée sur le couvert d'interculture, de la récolte du précédent à sa destruction (lot AK). */
+  aplsh: { from: string; to: string; kgNHa: number; ceiling: number; over: boolean; missing: string[] } | null;
   /** Techniques culturales simplifiées : aucun labour sur la campagne et les deux précédentes. */
   noPlowing: boolean | null;
   applications: RecordApplication[];

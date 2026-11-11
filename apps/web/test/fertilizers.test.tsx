@@ -41,6 +41,28 @@ describe("fertilisants", () => {
     await waitFor(() => expect(saved).toMatchObject({ basis: "kg_per_m3", nTotal: 390, density: 1.3, nitrateType: "III", source: "nom « Solution azotée 390 » (solution azotée)" }));
   });
 
+  it("organique : référence APLSH du COMIFER et C/N (lot AK)", async () => {
+    let saved: unknown = null;
+    const slurry = { basis: "kg_per_m3", nTotal: 4, nMineralShare: 0.6, p2o5: null, k2o: null, so3: null, density: null, nitrateType: "II", foliar: false } as const;
+    server.use(
+      http.get("*/fertilizers", () => HttpResponse.json({ items: [{ ...items[1], name: "Lisier", composition: slurry, origin: "confirmed", source: "analyse" }] })),
+      http.put("*/articles/:id/fertilizer", async ({ request }) => {
+        saved = await request.json();
+        return HttpResponse.json(items[1]);
+      }),
+    );
+    renderApp(`/f/${FARM}/fertilizers`);
+    const table = await screen.findByRole("table", { name: "Fertilisants" });
+    const user = userEvent.setup();
+    await user.click(within(within(table).getByText("Lisier").closest("tr")!).getByRole("button"));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getAllByLabelText("Référence APLSH (COMIFER)")[0]!);
+    await user.click(await screen.findByRole("option", { name: "Lisier mixte de porc (type II)" }));
+    await user.type(within(dialog).getByLabelText("Rapport C/N"), "4");
+    await user.click(within(dialog).getByRole("button", { name: "Enregistrer" }));
+    await waitFor(() => expect(saved).toMatchObject({ aplshProduct: "lisier_mixte_de_porc", cN: 4 }));
+  });
+
   it("la fiche d'une intervention affiche l'azote apporté par hectare", async () => {
     const demo = demoInterventions[0]!;
     const article = demo.inputs[0]!.articleId;

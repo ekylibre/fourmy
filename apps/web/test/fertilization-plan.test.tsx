@@ -74,7 +74,7 @@ describe("plan de fumure", () => {
           toComplete: 0,
           late: 0,
           forced: [],
-          parcels: [{ parcelId: "x", name: "Champ Maïs 2026", areaHa: 4, soilType: null, zone: "in", crop: "Maïs grain", variety: null, sownOn: null, harvestedOn: [], yieldQHa: null, interculture: [], cover: null, soilCover: { level: "warning", situation: "long", messages: [] }, steering: [], noPlowing: null, applications: [], totalNKgHa: 230, plannedDose: 180, planVersion: 1 }],
+          parcels: [{ parcelId: "x", name: "Champ Maïs 2026", areaHa: 4, soilType: null, zone: "in", crop: "Maïs grain", variety: null, sownOn: null, harvestedOn: [], yieldQHa: null, interculture: [], cover: null, soilCover: { level: "warning", situation: "long", messages: [] }, aplsh: { from: "2025-09-20", to: "2025-12-10", kgNHa: 90, ceiling: 70, over: true, missing: [] }, steering: [], noPlowing: null, applications: [], totalNKgHa: 230, plannedDose: 180, planVersion: 1 }],
         }),
       ),
     );
@@ -85,6 +85,8 @@ describe("plan de fumure", () => {
     expect(screen.getByText("1 plan à établir.")).toBeInTheDocument();
     expect(await within(screen.getByLabelText("Suivi de la campagne")).findByText("Couverture des sols à vérifier : Champ Maïs 2026.")).toBeInTheDocument();
     expect(screen.getByText("Champ Maïs 2026 : 230 kg N apportés pour 180 kg prévus, sans mesure de pilotage.")).toBeInTheDocument();
+    expect(screen.getByText("Champ Maïs 2026 : 90 kg d'azote potentiellement libéré jusqu'en sortie d'hiver sur le couvert, pour un plafond de 70 kg.")).toBeInTheDocument();
+    expect((await screen.findAllByLabelText("Zone climatique (APLSH)"))[0]).toHaveValue("D'après le département");
   });
 
   it("fiche : données, bilan sourcé, apports proposés ; établir le plan", async () => {
@@ -212,6 +214,7 @@ describe("éditions de la directive nitrates", () => {
                 { interventionId: "i1", date: "2026-05-12", recordedOn: "2026-05-12", late: false, procedure: "fertilizing", areaHa: 4, product: "Urée 46", content: "46 % N", nitrateType: "III", doseLabel: "150 kilogram/ha", nTotalKgHa: 69, nEfficientKgHa: 69, missing: null },
               ],
               soilCover: { level: "warning", situation: "long", messages: ["Couverture implantée le 05/10/2025, après la date limite du 30/09/2025."] },
+              aplsh: { from: "2025-09-20", to: "2025-12-10", kgNHa: 90, ceiling: 70, over: true, missing: [] },
               steering: [{ id: "s1", planId: "p", measuredOn: "2026-06-10", stage: "10 feuilles", tool: "N-Tester", value: "580", advisedKgNHa: 40, notes: null, createdAt: "2026-06-10T08:00:00Z" }],
               cover: { id: "c1", parcelId: "00000000-0000-7000-8000-0000000000a1", campaign: 2026, kind: "sown", family: "cruciferes", species: "Moutarde blanche", sownOn: "2025-09-05", destroyedOn: "2025-12-10", exported: false, biomass: "1_3", destructionMode: "mechanical", notes: null },
               totalNKgHa: 69,
@@ -229,6 +232,7 @@ describe("éditions de la directive nitrates", () => {
     expect(within(block).getByRole("row", { name: /Urée 46/ })).toHaveTextContent("12/05/2026");
     expect(block).toHaveTextContent("Couvert d'interculture : Moutarde blanche (Crucifères (moutarde, radis…)), semé le 05/09/2025, détruit le 10/12/2025 (mécanique (broyage, labour))");
     expect(block).toHaveTextContent("couverture des sols : à vérifier (Couverture implantée le 05/10/2025, après la date limite du 30/09/2025.)");
+    expect(block).toHaveTextContent("Azote potentiellement libéré jusqu'en sortie d'hiver sur le couvert, du 20/09/2025 au 10/12/2025 : 90 kg N/ha pour un plafond de 70 kg (dépassé).");
     expect(block).toHaveTextContent("Pilotage : N-Tester 580 le 10/06/2026 (10 feuilles), 40 kg N/ha conseillés");
     expect(screen.getByLabelText("Épandages en période d'interdiction")).toHaveTextContent("20/01/2026 (Champ Maïs 2026) — motif : Dérogation préfectorale");
     expect(block).toHaveTextContent("Total : 69 kg N efficace/ha pour 180 kg prévus au plan (version 3).");

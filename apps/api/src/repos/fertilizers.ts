@@ -1,8 +1,9 @@
 import { sql } from "drizzle-orm";
+import { aplshProducts } from "@fourmy/fertilization-refs";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
 import type { FertilizerArticle, FertilizerComposition, FertilizerWrite, ProductAnalysis, ProductAnalysisWrite } from "@fourmy/contracts";
 import { proposeComposition } from "@fourmy/domain";
-import { NotFound } from "../routes/helpers.js";
+import { BadRequest, NotFound } from "../routes/helpers.js";
 
 /**
  * Fertilisants de la ferme (lot AE, docs/fertilisation-design.md §4.1) :
@@ -28,6 +29,8 @@ type Row = {
   density: string | null;
   nitrate_type: FertilizerComposition["nitrateType"];
   foliar: boolean | null;
+  c_n: string | null;
+  aplsh_product: string | null;
   origin: FertilizerArticle["origin"];
   source: string | null;
   usage: number;
@@ -45,12 +48,14 @@ function composition(r: Row): FertilizerComposition | null {
     density: n(r.density),
     nitrateType: r.nitrate_type,
     foliar: r.foliar ?? false,
+    cN: n(r.c_n),
+    aplshProduct: r.aplsh_product,
   };
 }
 
 const SELECT = sql`
   SELECT a.id, a.name, a.kind, a.unit, a.lexicon_ref,
-         f.basis, f.n_total, f.n_mineral_share, f.p2o5, f.k2o, f.so3, f.density, f.nitrate_type, f.foliar, f.origin, f.source,
+         f.basis, f.n_total, f.n_mineral_share, f.p2o5, f.k2o, f.so3, f.density, f.nitrate_type, f.foliar, f.c_n, f.aplsh_product, f.origin, f.source,
          (SELECT count(DISTINCT p.intervention_id)::int FROM intervention_parameters p JOIN interventions i ON i.id = p.intervention_id
           WHERE p.role = 'input' AND p.ref_id = a.id AND i.status = 'done') AS usage
   FROM articles a LEFT JOIN article_fertilizers f ON f.article_id = a.id`;
@@ -121,15 +126,17 @@ export async function getFertilizer(db: Database, farmId: string, articleId: str
 
 /** Composition saisie ou confirmée par l'utilisateur. */
 export async function saveFertilizer(db: Database, farmId: string, userId: string, articleId: string, w: FertilizerWrite): Promise<FertilizerArticle> {
+  if (w.aplshProduct && !aplshProducts.rows.some((r) => r.key === w.aplshProduct)) throw new BadRequest("aplshProduct : dénomination COMIFER inconnue.");
   await withFarm(db, farmId, async (tx) => {
     const [a] = await rows(tx, sql`SELECT id FROM articles WHERE id = ${articleId}`);
     if (!a) throw new NotFound("Article introuvable.");
     await tx.execute(sql`
-      INSERT INTO article_fertilizers (article_id, farm_id, basis, n_total, n_mineral_share, p2o5, k2o, so3, density, nitrate_type, foliar, origin, source, updated_by)
-      VALUES (${articleId}, ${farmId}, ${w.basis}, ${w.nTotal}, ${w.nMineralShare}, ${w.p2o5}, ${w.k2o}, ${w.so3}, ${w.density}, ${w.nitrateType}, ${w.foliar}, 'confirmed', ${w.source}, ${userId})
+      INSERT INTO article_fertilizers (article_id, farm_id, basis, n_total, n_mineral_share, p2o5, k2o, so3, density, nitrate_type, foliar, c_n, aplsh_product, origin, source, updated_by)
+      VALUES (${articleId}, ${farmId}, ${w.basis}, ${w.nTotal}, ${w.nMineralShare}, ${w.p2o5}, ${w.k2o}, ${w.so3}, ${w.density}, ${w.nitrateType}, ${w.foliar},
+              ${w.cN ?? null}, ${w.aplshProduct ?? null}, 'confirmed', ${w.source}, ${userId})
       ON CONFLICT (article_id) DO UPDATE SET basis = excluded.basis, n_total = excluded.n_total, n_mineral_share = excluded.n_mineral_share,
         p2o5 = excluded.p2o5, k2o = excluded.k2o, so3 = excluded.so3, density = excluded.density, nitrate_type = excluded.nitrate_type,
-        foliar = excluded.foliar, origin = 'confirmed', source = excluded.source, updated_by = excluded.updated_by, updated_at = now()`);
+        foliar = excluded.foliar, c_n = excluded.c_n, aplsh_product = excluded.aplsh_product, origin = 'confirmed', source = excluded.source, updated_by = excluded.updated_by, updated_at = now()`);
   });
   return getFertilizer(db, farmId, articleId);
 }

@@ -22,6 +22,7 @@ export * from "./na-2025/rsh.js";
 export * from "./calendar/pan7.js";
 export * from "./zoning/adour-garonne-2026.js";
 export * from "./varieties/wheat-2026.js";
+export * from "./aplsh/comifer-2024.js";
 
 export const ZONING_REFERENTIAL = "Zones vulnérables Adour-Garonne, arrêté du 24/08/2026";
 
