@@ -224,3 +224,144 @@ export const fertilizationSettingsWrite = z.object({
   campaignStartMmdd: z.string().regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/),
 });
 export type FertilizationSettings = z.infer<typeof fertilizationSettingsWrite>;
+
+// --- Lot AG : plan prévisionnel de fumure -------------------------------------------
+
+export const BALANCE_TERMS = ["Pf", "Rf", "Ri", "Pi", "Mh", "Mhp", "Mr", "MrCi", "Nirr", "Xa", "CAU", "Nbefore4"] as const;
+export type BalanceTerm = (typeof BALANCE_TERMS)[number];
+
+export const BALANCE_TERM_LABELS: Record<BalanceTerm, string> = {
+  Pf: "Besoin total de la culture (Pf)",
+  Rf: "Azote restant dans le sol à la récolte (Rf)",
+  Ri: "Reliquat à l'ouverture du bilan (Ri)",
+  Pi: "Azote déjà absorbé à l'ouverture (Pi)",
+  Mh: "Minéralisation de l'humus (Mh)",
+  Mhp: "Retournement de prairie (Mhp)",
+  Mr: "Résidus du précédent (Mr)",
+  MrCi: "Culture intermédiaire (MrCi)",
+  Nirr: "Azote de l'eau d'irrigation (Nirr)",
+  Xa: "Produits organiques (Xa)",
+  CAU: "Coefficient apparent d'utilisation (CAU)",
+  Nbefore4: "Azote minéral apporté avant 4 feuilles",
+};
+
+const coverFamily = z.enum(["cruciferes", "graminees_seigle_avoine", "graminees_ray_grass", "legumineuses", "hydrophyllacees", "melange_graminees_legumineuses", "melange_cruciferes_legumineuses"]);
+
+export const plannedApplication = z.object({
+  stage: z.string().trim().min(1).max(80),
+  plannedOn: isoDate.nullable().default(null),
+  articleId: z.string().uuid().nullable().default(null),
+  /** Azote efficace (équivalent engrais minéral), kg N/ha. */
+  nKgHa: z.number().min(0).max(500),
+  reservedForSteering: z.boolean().default(false),
+});
+export type PlannedApplication = z.infer<typeof plannedApplication>;
+
+/** Saisies du brouillon : ce que Fourmy ne peut pas deviner, et les corrections de la ferme. */
+export const planDraft = z.object({
+  yieldTarget: z.number().positive().max(2000).nullable().optional(),
+  strawReturned: z.boolean().nullable().optional(),
+  irrigationMm: z.number().min(0).max(1500).nullable().optional(),
+  nBefore4Leaves: z.number().min(0).max(200).nullable().optional(),
+  tillers: z.number().int().min(0).max(30).nullable().optional(),
+  unfavourable: z.boolean().optional(),
+  valueA: z.number().min(0).max(400).nullable().optional(),
+  cover: z.object({ family: coverFamily, biomass: z.enum(["le_1", "1_3", "ge_3"]), destruction: z.enum(["nov_dec", "after_january"]) }).nullable().optional(),
+  overrides: z.record(z.enum(BALANCE_TERMS), z.object({ value: z.number().min(-500).max(1000), reason: z.string().trim().min(3).max(300) })).optional(),
+  applications: z.array(plannedApplication).max(8).optional(),
+  external: z
+    .object({ doseKgNHa: z.number().min(0).max(500), tool: z.string().trim().min(1).max(120), advisor: z.string().trim().max(120).nullable().default(null), computedOn: isoDate })
+    .nullable()
+    .optional(),
+  note: z.string().trim().max(1000).nullable().optional(),
+});
+export type PlanDraft = z.infer<typeof planDraft>;
+
+export const planEstablish = z.object({ reason: z.string().trim().min(3).max(500).nullable().default(null) });
+
+export type PlanTermValue = { value: number; origin: "computed" | "measured" | "reference" | "entered" | "override"; source: string; detail?: string } | { missing: string };
+
+export interface PlanResult {
+  method: string;
+  annex: string | null;
+  equation: string;
+  terms: Partial<Record<BalanceTerm, PlanTermValue>>;
+  dose: number | null;
+  ceiling: number | null;
+  floor30: boolean;
+  negative: boolean;
+  warnings: string[];
+  missing: string[];
+}
+
+/** Données que Fourmy a rassemblées pour le calcul, avec leur origine. */
+export interface PlanContext {
+  department: string | null;
+  crop: string;
+  cropLabel: string;
+  variety: string | null;
+  soilType: string | null;
+  irrigated: boolean;
+  previous: {
+    crop: string;
+    label: string;
+    parcelName: string;
+    yieldRealized: number | null;
+    /** Azote minéral apporté au précédent (kg N/ha), apports comptés seulement. */
+    xMineral: number | null;
+    strawReturned: boolean | null;
+    /** Apports du précédent que le calcul n'a pas pu compter. */
+    uncounted: string[];
+  } | null;
+  yieldTarget: { value: number; origin: "computed" | "reference" | "entered"; detail: string } | null;
+  rain: { mm: number; from: string; to: string; normalsFrom: string | null } | null;
+  rsh: { kgNHa: number; sampledOn: string } | null;
+  water: { origin: "surface" | "groundwater" | null; no3MgL: number | null; name: string | null };
+  irrigationMm: { value: number; detail: string } | null;
+  zone: string | null;
+}
+
+export interface PlanVersion {
+  version: number;
+  establishedAt: string;
+  establishedBy: string | null;
+  reason: string | null;
+  referential: string;
+  method: string;
+  external: PlanDraft["external"] | null;
+  doseEfficient: number | null;
+  applications: (PlannedApplication & { nTotal: number })[];
+  snapshot: { context: PlanContext; result: PlanResult; draft: PlanDraft };
+}
+
+export interface FertilizationPlan {
+  id: string;
+  campaign: number;
+  parcel: { id: string; name: string; areaM2: number };
+  status: "draft" | "established" | "revised";
+  currentVersion: number | null;
+  draft: PlanDraft;
+  context: PlanContext;
+  result: PlanResult;
+  /** Apports proposés (fractionnement) quand le brouillon n'en a pas. */
+  proposedApplications: PlannedApplication[];
+  versions: PlanVersion[];
+}
+
+export interface FertilizationPlanSummary {
+  id: string;
+  campaign: number;
+  parcel: { id: string; name: string; areaM2: number };
+  cropLabel: string;
+  zone: string | null;
+  status: FertilizationPlan["status"];
+  currentVersion: number | null;
+  /** Dose de la dernière version établie, sinon celle du brouillon (calculée ou saisie). */
+  dose: number | null;
+  doseOrigin: "fourmy" | "external" | null;
+  missing: number;
+  establishedAt: string | null;
+}
+
+/** Référentiel inscrit dans chaque version établie. */
+export const PLAN_REFERENTIAL = "Nouvelle-Aquitaine, arrêté référentiel du 29/07/2025";

@@ -5,6 +5,7 @@ import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, RefreshCw } from "lucide-react";
 import {
+  type FertilizationPlanSummary,
   NITRATE_ZONE_LABELS,
   WATER_ORIGIN_LABELS,
   rshTotal,
@@ -84,6 +85,11 @@ export function FertilizationPage() {
         </Alert>
       )}
 
+      <Plans farmId={farm.id} owner={owner} year={Number(day.slice(0, 4))} />
+
+      <Title order={2} size="h3">
+        Parcelles
+      </Title>
       <Paper withBorder>
         <Table aria-label="Parcelles et zonage" highlightOnHover>
           <Table.Thead>
@@ -146,6 +152,122 @@ export function FertilizationPage() {
 
       <WaterSources farmId={farm.id} owner={owner} />
     </Stack>
+  );
+}
+
+const PLAN_STATUS: Record<FertilizationPlanSummary["status"], { label: string; color: string }> = {
+  draft: { label: "Brouillon", color: "paille" },
+  established: { label: "Établi", color: "lichen" },
+  revised: { label: "Révisé", color: "lichen" },
+};
+
+/** Plans prévisionnels de fumure de la campagne (lot AG) : état, dose, données manquantes. */
+function Plans({ farmId, owner, year }: { farmId: string; owner: boolean; year: number }) {
+  const location = useLocation();
+  const client = useQueryClient();
+  const [campaign, setCampaign] = useState(year);
+  const q = useQuery({
+    queryKey: ["fertilization-plans", farmId, campaign],
+    queryFn: () => api.get<{ items: FertilizationPlanSummary[] }>(farmPath(farmId, `/fertilization/plans?campaign=${campaign}`)),
+  });
+  const prepare = useMutation({
+    mutationFn: () => api.post<{ created: number }>(farmPath(farmId, `/fertilization/plans/prepare?campaign=${campaign}`), {}),
+    onSuccess: (r) => {
+      void client.invalidateQueries({ queryKey: ["fertilization-plans", farmId] });
+      notifications.show({ color: r.created ? "lichen" : "paille", message: r.created ? `${r.created} plan(s) préparé(s).` : `Aucune culture saisie pour ${campaign} sans plan.` });
+    },
+  });
+  const items = q.data?.items ?? [];
+  const toEstablish = items.filter((p) => p.status === "draft").length;
+  return (
+    <Paper withBorder p="md" aria-label="Plans de fumure">
+      <Group justify="space-between" mb="xs">
+        <div>
+          <Title order={2} size="h3">
+            Plans prévisionnels de fumure
+          </Title>
+          <Text size="sm" c="dimmed">
+            Un plan par parcelle cultivée, établi avant le premier apport de sortie d'hiver. Dose calculée selon le référentiel régional, ou venue d'un
+            outil ou d'un conseiller.
+          </Text>
+        </div>
+        <Group>
+          <Select
+            aria-label="Campagne"
+            w={110}
+            data={[year - 1, year, year + 1].map((y) => ({ value: String(y), label: `Campagne ${y}` }))}
+            value={String(campaign)}
+            allowDeselect={false}
+            onChange={(v) => setCampaign(Number(v))}
+          />
+          {owner && (
+            <Button variant="light" onClick={() => prepare.mutate()} loading={prepare.isPending}>
+              Préparer les plans
+            </Button>
+          )}
+        </Group>
+      </Group>
+      {q.isLoading ? (
+        <Loading />
+      ) : q.error ? (
+        <ErrorAlert error={q.error} />
+      ) : items.length === 0 ? (
+        <Text size="sm" c="dimmed">
+          Aucun plan pour {campaign}. « Préparer les plans » en crée un pour chaque parcelle cultivée de la campagne.
+        </Text>
+      ) : (
+        <>
+          {toEstablish > 0 && (
+            <Text size="sm" mb="xs">
+              {toEstablish} plan{toEstablish > 1 ? "s" : ""} à établir.
+            </Text>
+          )}
+          <Table aria-label="Plans de la campagne" highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Parcelle</Table.Th>
+                <Table.Th>Culture</Table.Th>
+                <Table.Th>État</Table.Th>
+                <Table.Th>Dose</Table.Th>
+                <Table.Th>À compléter</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {items.map((p) => (
+                <Table.Tr key={p.id}>
+                  <Table.Td>
+                    <Anchor component={Link} to={`/f/${farmId}/fertilization/plans/${p.id}${location.search}`}>
+                      {p.parcel.name}
+                    </Anchor>
+                  </Table.Td>
+                  <Table.Td>{p.cropLabel}</Table.Td>
+                  <Table.Td>
+                    <Badge variant="light" color={PLAN_STATUS[p.status].color}>
+                      {PLAN_STATUS[p.status].label}
+                      {p.currentVersion && p.currentVersion > 1 ? ` (v${p.currentVersion})` : ""}
+                    </Badge>
+                  </Table.Td>
+                  <Table.Td className="lv-num">
+                    {p.dose !== null ? `${p.dose} kg N/ha${p.doseOrigin === "external" ? " (outil)" : ""}` : "—"}
+                  </Table.Td>
+                  <Table.Td>
+                    {p.missing > 0 ? (
+                      <Text size="xs" c="paille.8">
+                        {p.missing} donnée{p.missing > 1 ? "s" : ""}
+                      </Text>
+                    ) : (
+                      <Text size="xs" c="dimmed">
+                        —
+                      </Text>
+                    )}
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </>
+      )}
+    </Paper>
   );
 }
 

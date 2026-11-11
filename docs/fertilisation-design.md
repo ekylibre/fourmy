@@ -389,6 +389,30 @@ Les tables ont été recopiées des annexes, puis vérifiées sur les pages impr
 - **Calendrier** : Monassut-Audiracq et Saint-Laurent-Bretagne sont en **zone ouest et zone sud** (jeu data.gouv). Pour les céréales d'automne et le type III, l'interdiction court du 01/09 au 15/01 en zone sud, et du **01/07 au 15/01 en zone ouest**, avec des exemptions en juillet-août.
 - **Statut ZV du jeu data.gouv** : il date d'avant l'arrêté de 2026 ; 85 communes de Nouvelle-Aquitaine y sont encore « hors ZV ». Le statut ZV vient donc de l'arrêté de bassin, et seuls les drapeaux de zone viennent du calendrier.
 
+### 5.2 Réalisation du calcul (lot AG, 2026-11-11)
+
+- **Écritures calculées** :
+  - maïs et sorgho en bilan CAU en deux temps (annexe 2.2.b) ;
+  - céréales à paille en bilan CAU (2.1.b) ;
+  - dose plafond des autres cultures (annexe 4.4), dont la vigne : 80 kg par an, avec le rappel des 240 kg sur 3 ans.
+- **Pas encore calculés** : colza, tournesol (dose pivot), tabac, lin, prairies. Le plan l'indique et accepte la dose d'un outil ou d'un conseiller.
+- **Départements 16, 17, 79, 86** : l'annexe permet le bilan additif ou le bilan CAU. L'écriture CAU est retenue, comme dans le reste de la région.
+- **Lecture des grilles Ri** : interpolation bilinéaire entre les cases voisines, signalée dans le détail du terme.
+  - Une pluie au-delà de la dernière colonne est lue dans cette colonne, où les valeurs plafonnent.
+  - Un APL au-delà de 100 kg, ou une pluie en deçà de la première colonne, rend Ri manquant : reliquat à mesurer.
+  - Un APL négatif vaut 0.
+- **Arrondi** à l'unité sans l'erreur des flottants : 95 × 2,3 = 218,5, arrondi à 219.
+- **Pluie** du 1er octobre au 1er mai pour le maïs et au 1er mars pour les céréales, tirée de la météo en cache du modèle de croissance. Les jours à venir prennent les normales, et l'écran le dit.
+- **Objectif de rendement** : moyenne olympique des campagnes de la ferme pour la même culture. Le rendement d'une campagne est la moyenne des rendements à l'hectare des récoltes. À défaut, la référence départementale (statistique agricole annuelle).
+- **Précédent** :
+  - c'est la production de la campagne précédente qui recouvre au moins la moitié de la parcelle (les parcelles de Pierre changent de nom chaque année) ;
+  - son azote minéral est la somme des apports de type III comptés ;
+  - les apports incalculables (teneur inconnue, type à préciser) sont listés en avertissement.
+- **Pas encore faits** :
+  - Xa (produits organiques) : il faut rattacher le produit à sa ligne Keq de l'annexe 5 ;
+  - le stade et l'outil de pilotage ;
+  - les valeurs de la ferme à l'échelle de toute l'exploitation : les surcharges sont propres à chaque plan.
+
 ## 6. Contrats (`@fourmy/contracts`, `fertilization.ts`)
 
 - `FertilizerComposition`, `ArticleFertilizerWrite` : zod, unités explicites.

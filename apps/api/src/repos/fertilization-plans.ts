@@ -1,0 +1,478 @@
+import { sql } from "drizzle-orm";
+import { withFarm, type Database, type Tx } from "@fourmy/db";
+import {
+  PLAN_REFERENTIAL,
+  PROCEDURES,
+  rshTotal,
+  type FertilizationPlan,
+  type FertilizationPlanSummary,
+  type FertilizerArticle,
+  type PlanContext,
+  type PlanDraft,
+  type PlannedApplication,
+  type PlanResult,
+  type PlanVersion,
+  type SoilHorizon,
+} from "@fourmy/contracts";
+import {
+  computeBalance,
+  cropGroupOf,
+  effectiveComposition,
+  isStrawCereal,
+  nitrogenOfInput,
+  splitDose,
+  SPRING_CROPS,
+  yieldTarget as olympicYield,
+  type BalanceInput,
+} from "@fourmy/domain";
+import { isNaSoilType, naYieldReferences, type CropGroup } from "@fourmy/fertilization-refs";
+import { BadRequest, NotFound } from "../routes/helpers.js";
+import { farmDailyWeather } from "./crop-model.js";
+import { listFertilizers } from "./fertilizers.js";
+
+/**
+ * Plans prévisionnels de fumure (lot AG, docs/fertilisation-design.md §4.2,
+ * §9) : un plan par parcelle et par campagne. Fourmy rassemble ce qu'il sait
+ * (culture, sol, précédent réalisé, pluie, reliquats, irrigation), y ajoute
+ * les saisies du brouillon et calcule la dose (domaine, `computeBalance`).
+ * Établir fige une version : données, termes, référentiel et apports prévus.
+ */
+
+const rows = async <T>(tx: Tx, q: ReturnType<typeof sql>) => (await tx.execute(q)) as unknown as T[];
+const iso = (v: string | Date) => new Date(v).toISOString();
+const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+
+const HARVEST = PROCEDURES.filter((p) => p.shape === "harvest").map((p) => p.code);
+const FERTILIZING = PROCEDURES.filter((p) => p.shape === "fertilization" || p.code === "all_in_one_sowing" || p.code === "vine_spraying_with_fertilizing").map((p) => p.code);
+const IRRIGATION = ["watering", "plant_watering", "vine_watering"];
+const arr = (xs: string[]) => `{${xs.join(",")}}`;
+
+const CROP_LABELS: Partial<Record<CropGroup, string>> = {
+  maize_grain: "Maïs grain",
+  maize_silage: "Maïs fourrage",
+  maize_sweet: "Maïs doux",
+  maize_seed: "Maïs semence",
+  sorghum_grain: "Sorgho grain",
+  soft_wheat: "Blé tendre",
+  durum_wheat: "Blé dur",
+  barley_winter: "Orge d'hiver",
+  barley_spring: "Orge de printemps",
+  oat: "Avoine",
+  rye: "Seigle",
+  triticale: "Triticale",
+  rapeseed_winter: "Colza",
+  sunflower: "Tournesol",
+  grassland: "Prairie",
+  vine: "Vigne",
+  legumes: "Légumineuse",
+  other: "Autre culture",
+};
+export const cropLabel = (g: CropGroup) => CROP_LABELS[g] ?? g;
+
+// --- Données de la ferme --------------------------------------------------------------
+
+interface PlanRow {
+  id: string;
+  campaign: number;
+  land_parcel_id: string;
+  parcel_name: string;
+  area_m2: string;
+  status: FertilizationPlan["status"];
+  current_version: number | null;
+  draft: PlanDraft;
+  reference: string | null;
+  cultivation: string | null;
+  species: string | null;
+}
+
+const PLAN_SELECT = sql`
+  SELECT p.id, p.campaign, p.land_parcel_id, lp.name AS parcel_name, p.status, p.current_version, p.draft,
+         (SELECT v.area_m2 FROM land_parcel_versions v WHERE v.land_parcel_id = lp.id
+          ORDER BY (v.valid @> make_date(p.campaign, 6, 1)::timestamptz) DESC, upper(v.valid) DESC NULLS FIRST LIMIT 1) AS area_m2,
+         a.reference, coalesce(pr.cultivation, a.cultivation) AS cultivation, pr.species
+  FROM fertilization_plans p
+  JOIN land_parcels lp ON lp.id = p.land_parcel_id
+  LEFT JOIN productions pr ON pr.id = p.production_id
+  LEFT JOIN activities a ON a.id = pr.activity_id`;
+
+/** Rendement à l'hectare d'une sortie de récolte (q/ha), d'après son unité ; null si non convertible. */
+function quintalsPerHa(quantity: number, unit: string | null, areaHa: number | null): number | null {
+  if (!unit) return null;
+  const perHa = /_per_hectare$/.test(unit);
+  const base = unit.replace(/_per_hectare$/, "").toLowerCase();
+  const toQ = base === "quintal" ? 1 : base === "ton" || base === "tonne" || base === "t" ? 10 : base === "kilogram" || base === "kg" ? 0.01 : null;
+  if (toQ === null) return null;
+  if (perHa) return quantity * toQ;
+  return areaHa && areaHa > 0 ? (quantity * toQ) / areaHa : null;
+}
+
+/** Rendements réalisés (q/ha) par parcelle et par année, sur les interventions de récolte. */
+async function harvestYields(tx: Tx, farmId: string, from: number, to: number): Promise<{ parcelId: string; year: number; yieldQHa: number }[]> {
+  const list = await rows<{ parcel_id: string; year: number; quantity: string; unit: string | null; area_m2: string | null; worked: string | null }>(
+    tx,
+    sql`SELECT t.ref_id AS parcel_id, extract(year FROM i.started_at)::int AS year, o.quantity, o.unit,
+               (SELECT v.area_m2 FROM land_parcel_versions v WHERE v.land_parcel_id = t.ref_id AND v.valid @> i.started_at LIMIT 1) AS area_m2,
+               t.attrs->>'workedAreaM2' AS worked
+        FROM interventions i
+        JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_type = 'land_parcel'
+        JOIN intervention_parameters o ON o.intervention_id = i.id AND o.role = 'output' AND o.quantity IS NOT NULL
+        WHERE i.farm_id = ${farmId} AND i.status = 'done' AND i.procedure = ANY(${arr(HARVEST)}::text[])
+          AND extract(year FROM i.started_at) BETWEEN ${from} AND ${to}`,
+  );
+  const by = new Map<string, number[]>();
+  for (const r of list) {
+    const areaHa = (num(r.worked) ?? num(r.area_m2) ?? 0) / 10_000;
+    const q = quintalsPerHa(Number(r.quantity), r.unit, areaHa || null);
+    if (q === null || !(q > 0) || q > 2000) continue;
+    const k = `${r.parcel_id}|${r.year}`;
+    by.set(k, [...(by.get(k) ?? []), q]);
+  }
+  return [...by.entries()].map(([k, qs]) => {
+    const [parcelId, year] = k.split("|");
+    return { parcelId: parcelId!, year: Number(year), yieldQHa: Math.round((qs.reduce((s, q) => s + q, 0) / qs.length) * 10) / 10 };
+  });
+}
+
+/** Productions de la ferme par campagne avec leur groupe de cultures. */
+async function productionsByYear(tx: Tx, farmId: string, from: number, to: number) {
+  return rows<{ year: number; parcel_id: string; reference: string | null; cultivation: string | null }>(
+    tx,
+    sql`SELECT c.year, pr.land_parcel_id AS parcel_id, a.reference, coalesce(pr.cultivation, a.cultivation) AS cultivation
+        FROM productions pr JOIN campaigns c ON c.id = pr.campaign_id LEFT JOIN activities a ON a.id = pr.activity_id
+        WHERE pr.farm_id = ${farmId} AND c.year BETWEEN ${from} AND ${to}`,
+  );
+}
+
+/** Précédent : production de la campagne précédente sur la parcelle qui recouvre au moins la moitié de celle-ci. */
+async function previousOf(tx: Tx, farmId: string, parcelId: string, campaign: number) {
+  const [r] = await rows<{ parcel_id: string; name: string; reference: string | null; cultivation: string | null; share: number }>(
+    tx,
+    sql`WITH cur AS (
+          SELECT shape FROM land_parcel_versions WHERE land_parcel_id = ${parcelId}
+          ORDER BY (valid @> make_date(${campaign}, 6, 1)::timestamptz) DESC, upper(valid) DESC NULLS FIRST LIMIT 1)
+        SELECT lp.id AS parcel_id, lp.name, a.reference, coalesce(pr.cultivation, a.cultivation) AS cultivation,
+               ST_Area(ST_Intersection(v.shape, cur.shape)::geography) / nullif(ST_Area(cur.shape::geography), 0) AS share
+        FROM productions pr
+        JOIN campaigns c ON c.id = pr.campaign_id AND c.year = ${campaign - 1}
+        JOIN land_parcels lp ON lp.id = pr.land_parcel_id
+        JOIN land_parcel_versions v ON v.land_parcel_id = lp.id AND v.valid @> make_date(${campaign - 1}, 6, 1)::timestamptz
+        LEFT JOIN activities a ON a.id = pr.activity_id, cur
+        WHERE pr.farm_id = ${farmId} AND ST_Intersects(v.shape, cur.shape)
+        ORDER BY share DESC NULLS LAST LIMIT 1`,
+  );
+  return r && r.share >= 0.5 ? r : null;
+}
+
+/** Azote minéral apporté (kg N/ha) sur une parcelle entre deux dates, d'après les compositions ; null si un apport est incalculable. */
+async function mineralNApplied(tx: Tx, parcelId: string, from: string, to: string, fertilizers: Map<string, FertilizerArticle>): Promise<{ total: number; uncounted: string[] }> {
+  const inputs = await rows<{ day: string; article_id: string; quantity: string; unit: string | null; area_m2: string | null; worked: string | null }>(
+    tx,
+    sql`SELECT i.started_at::date::text AS day, p.ref_id AS article_id, p.quantity, p.unit,
+               (SELECT v.area_m2 FROM land_parcel_versions v WHERE v.land_parcel_id = t.ref_id AND v.valid @> i.started_at LIMIT 1) AS area_m2,
+               t.attrs->>'workedAreaM2' AS worked
+        FROM interventions i
+        JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_id = ${parcelId}
+        JOIN intervention_parameters p ON p.intervention_id = i.id AND p.role = 'input' AND p.ref_type = 'article' AND p.quantity IS NOT NULL
+        WHERE i.status = 'done' AND i.procedure = ANY(${arr(FERTILIZING)}::text[]) AND i.started_at >= ${from}::date AND i.started_at < ${to}::date`,
+  );
+  let total = 0;
+  const uncounted = new Set<string>();
+  for (const r of inputs) {
+    const f = fertilizers.get(r.article_id);
+    if (!f) continue;
+    const eff = effectiveComposition(f, r.day);
+    const m = /^(.+)_per_hectare$/.exec(r.unit ?? "");
+    const area = (num(r.worked) ?? num(r.area_m2) ?? 0) / 10_000;
+    const n = eff ? nitrogenOfInput({ quantity: Number(r.quantity), per: m ? "hectare" : "total", unit: m ? m[1]! : (r.unit ?? ""), areaHa: area || null, composition: eff.composition }) : null;
+    if (!n || "missing" in n) {
+      if (f.kind === "fertilizer") uncounted.add(`${f.name} (teneur ou dose inconnue)`);
+      continue;
+    }
+    if (eff!.composition.nitrateType === "III" || eff!.composition.nMineralShare === 1) total += n.totalKgHa;
+    else if (n.totalKgHa > 0) uncounted.add(`${f.name} (type de fertilisant à préciser)`);
+  }
+  return { total: Math.round(total), uncounted: [...uncounted] };
+}
+
+/** Pluie du 1er octobre de l'année précédente à `toMd` (MM-JJ) : observée, puis normales pour les jours à venir. */
+async function rainSince(db: Database, farmId: string, campaign: number, toMd: string, fetchImpl: typeof fetch) {
+  const from = `${campaign - 1}-10-01`;
+  const to = `${campaign}-${toMd}`;
+  const weather = await farmDailyWeather(db, farmId, from, fetchImpl);
+  if (!weather.until && !weather.normals.size) return null;
+  let mm = 0;
+  let normalsFrom: string | null = null;
+  for (let d = new Date(`${from}T00:00:00Z`); d < new Date(`${to}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + 1)) {
+    const day = d.toISOString().slice(0, 10);
+    const known = weather.known.get(day);
+    if (known) {
+      mm += known.rainMm;
+      continue;
+    }
+    const normal = weather.normals.get(day.slice(5));
+    if (!normal) return null;
+    normalsFrom ??= day;
+    mm += normal.rainMm;
+  }
+  return { mm: Math.round(mm), from, to, normalsFrom };
+}
+
+// --- Contexte et calcul -------------------------------------------------------------------
+
+async function contextOf(db: Database, farmId: string, plan: PlanRow, fertilizers: Map<string, FertilizerArticle>, fetchImpl: typeof fetch): Promise<{ context: PlanContext; input: BalanceInput }> {
+  const crop = cropGroupOf({ reference: plan.reference, cultivation: plan.cultivation });
+  const variety = plan.species && plan.species !== plan.cultivation ? plan.species : null;
+  const d = plan.draft;
+  const gathered = await withFarm(db, farmId, async (tx) => {
+    const [soil] = await rows<{ soil_type: string | null; irrigated: boolean | null; origin: "surface" | "groundwater" | null; nitrate: string | null; wname: string | null; insee: string | null; status: string | null }>(
+      tx,
+      sql`SELECT ps.soil_type, ps.irrigated, w.origin, w.nitrate_mg_l AS nitrate, w.name AS wname, z.insee, z.status
+          FROM land_parcels lp
+          LEFT JOIN parcel_soils ps ON ps.land_parcel_id = lp.id
+          LEFT JOIN water_sources w ON w.id = ps.water_source_id
+          LEFT JOIN parcel_nitrate_zones z ON z.land_parcel_id = lp.id
+          WHERE lp.id = ${plan.land_parcel_id}`,
+    );
+    const prev = await previousOf(tx, farmId, plan.land_parcel_id, plan.campaign);
+    const yields = await harvestYields(tx, farmId, plan.campaign - 7, plan.campaign - 1);
+    const prods = await productionsByYear(tx, farmId, plan.campaign - 7, plan.campaign - 1);
+    let prevN: Awaited<ReturnType<typeof mineralNApplied>> | null = null;
+    let prevIrrigation: number | null = null;
+    if (prev) {
+      prevN = await mineralNApplied(tx, prev.parcel_id, `${plan.campaign - 2}-09-01`, `${plan.campaign - 1}-12-31`, fertilizers);
+      const [irr] = await rows<{ mm: string | null }>(
+        tx,
+        sql`SELECT sum((i.irrigation->>'depthMm')::numeric) AS mm FROM interventions i
+            JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_id = ${prev.parcel_id}
+            WHERE i.status = 'done' AND i.procedure = ANY(${arr(IRRIGATION)}::text[]) AND extract(year FROM i.started_at) = ${plan.campaign - 1}`,
+      );
+      prevIrrigation = num(irr?.mm);
+    }
+    const rsh = await rows<{ sampled_on: string; horizons: SoilHorizon[] }>(
+      tx,
+      sql`SELECT sampled_on::text, horizons FROM soil_analyses WHERE land_parcel_id = ${plan.land_parcel_id} AND kind = 'rsh'
+            AND sampled_on BETWEEN make_date(${plan.campaign - 1}, 11, 1) AND make_date(${plan.campaign}, 6, 30)
+          ORDER BY sampled_on DESC LIMIT 1`,
+    );
+    return { soil, prev, yields, prods, prevN, prevIrrigation, rsh: rsh[0] ?? null };
+  });
+  const { soil, prev, prevN } = gathered;
+  const department = soil?.insee ? soil.insee.slice(0, 2) : null;
+  const irrigated = !!soil?.irrigated;
+  const prevCrop = prev ? cropGroupOf({ reference: prev.reference, cultivation: prev.cultivation }) : null;
+  const prevYield = prev ? (gathered.yields.find((y) => y.parcelId === prev.parcel_id && y.year === plan.campaign - 1)?.yieldQHa ?? null) : null;
+
+  // Objectif : saisi, sinon moyenne olympique des campagnes de la ferme pour la même culture, sinon référence départementale.
+  const sameCrop = new Set(gathered.prods.filter((p) => cropGroupOf(p) === crop).map((p) => `${p.parcel_id}|${p.year}`));
+  const byYear = new Map<number, number[]>();
+  for (const y of gathered.yields) if (sameCrop.has(`${y.parcelId}|${y.year}`)) byYear.set(y.year, [...(byYear.get(y.year) ?? []), y.yieldQHa]);
+  const history = [...byYear.entries()].map(([campaign, ys]) => ({ campaign, yield: Math.round((ys.reduce((s, v) => s + v, 0) / ys.length) * 10) / 10 }));
+  const ref = department ? naYieldReferences.rows.find((r) => r.department === department && r.crops.includes(crop) && (r.irrigated === undefined || r.irrigated === irrigated)) : undefined;
+  const auto = olympicYield(history, plan.campaign, ref?.yieldQHa ? { value: ref.yieldQHa, source: `référence départementale ${department} (${ref.cropLabel}, statistique agricole annuelle)` } : null);
+  const yieldTarget: PlanContext["yieldTarget"] =
+    d.yieldTarget != null ? { value: d.yieldTarget, origin: "entered", detail: "saisi" } : "missing" in auto ? null : { value: auto.value, origin: auto.origin, detail: auto.detail };
+
+  const spring = SPRING_CROPS.has(crop);
+  const rain = await rainSince(db, farmId, plan.campaign, spring ? "05-01" : "03-01", fetchImpl).catch(() => null);
+  const rshKg = gathered.rsh?.horizons?.length ? rshTotal(gathered.rsh.horizons) : null;
+  const irrigationMm: PlanContext["irrigationMm"] =
+    d.irrigationMm != null
+      ? { value: d.irrigationMm, detail: "saisi" }
+      : irrigated && gathered.prevIrrigation
+        ? { value: gathered.prevIrrigation, detail: `irrigations saisies en ${plan.campaign - 1} sur ${prev?.name}` }
+        : null;
+  const strawReturned = d.strawReturned ?? null;
+
+  const context: PlanContext = {
+    department,
+    crop,
+    cropLabel: cropLabel(crop),
+    variety,
+    soilType: soil?.soil_type ?? null,
+    irrigated,
+    previous: prev && prevCrop ? { crop: prevCrop, label: cropLabel(prevCrop), parcelName: prev.name, yieldRealized: prevYield, xMineral: prevN?.total ?? null, strawReturned, uncounted: prevN?.uncounted ?? [] } : null,
+    yieldTarget,
+    rain,
+    rsh: rshKg !== null ? { kgNHa: rshKg, sampledOn: gathered.rsh!.sampled_on } : null,
+    water: { origin: soil?.origin ?? null, no3MgL: num(soil?.nitrate), name: soil?.wname ?? null },
+    irrigationMm,
+    zone: soil?.status ?? null,
+  };
+  const input: BalanceInput = {
+    campaign: plan.campaign,
+    department: department ?? "",
+    crop,
+    variety,
+    soilType: soil?.soil_type && isNaSoilType(soil.soil_type) ? soil.soil_type : null,
+    irrigated,
+    yieldTarget: yieldTarget?.value ?? null,
+    rshMeasured: context.rsh,
+    tillers: d.tillers ?? null,
+    previous: prevCrop ? { crop: prevCrop, strawReturned: isStrawCereal(prevCrop) ? strawReturned : null, yieldRealized: prevYield, xMineral: prevN?.total ?? null } : null,
+    cover: d.cover ?? null,
+    rainMm: rain?.mm ?? null,
+    valueA: d.valueA ?? null,
+    irrigation: irrigated && irrigationMm ? { plannedMm: irrigationMm.value, no3MgL: context.water.no3MgL, origin: context.water.origin } : null,
+    nBefore4Leaves: d.nBefore4Leaves ?? 0,
+    unfavourable: d.unfavourable ?? false,
+    overrides: d.overrides,
+  };
+  return { context, input };
+}
+
+function resultOf(input: BalanceInput, context: PlanContext): PlanResult {
+  const r = computeBalance(input);
+  const warnings = [...r.warnings];
+  if (!context.department) warnings.unshift("Zonage de la parcelle non déterminé : actualisez-le (Réglementaire → Fertilisation azotée).");
+  if (context.previous?.uncounted.length && !context.rsh)
+    warnings.push(`Apports du précédent non comptés dans l'estimation du reliquat : ${context.previous.uncounted.join(", ")}. Complétez leur composition (Stocks → Fertilisants) ou mesurez le reliquat.`);
+  return { ...r, warnings };
+}
+
+async function plansData(db: Database, farmId: string, where: ReturnType<typeof sql>, fetchImpl: typeof fetch) {
+  const list = await withFarm(db, farmId, (tx) => rows<PlanRow>(tx, sql`${PLAN_SELECT} WHERE ${where} ORDER BY lp.name`));
+  if (!list.length) return [];
+  const fertilizers = new Map((await listFertilizers(db, farmId)).map((f) => [f.id, f]));
+  const out = [];
+  for (const p of list) {
+    const { context, input } = await contextOf(db, farmId, p, fertilizers, fetchImpl);
+    out.push({ row: p, context, result: resultOf(input, context) });
+  }
+  return out;
+}
+
+// --- Lecture --------------------------------------------------------------------------------
+
+/** Brouillons pour chaque parcelle cultivée de la campagne qui n'a pas encore de plan. */
+export async function preparePlans(db: Database, farmId: string, campaign: number): Promise<{ created: number }> {
+  return withFarm(db, farmId, async (tx) => {
+    const created = await rows(
+      tx,
+      sql`INSERT INTO fertilization_plans (id, farm_id, campaign, land_parcel_id, production_id)
+          SELECT DISTINCT ON (pr.land_parcel_id) gen_random_uuid(), ${farmId}, ${campaign}, pr.land_parcel_id, pr.id
+          FROM productions pr JOIN campaigns c ON c.id = pr.campaign_id AND c.year = ${campaign}
+          WHERE pr.farm_id = ${farmId}
+          ORDER BY pr.land_parcel_id, pr.created_at
+          ON CONFLICT (farm_id, campaign, land_parcel_id, kind) DO NOTHING
+          RETURNING id`,
+    );
+    return { created: created.length };
+  });
+}
+
+export async function listPlans(db: Database, farmId: string, campaign: number, fetchImpl: typeof fetch = fetch): Promise<FertilizationPlanSummary[]> {
+  const data = await plansData(db, farmId, sql`p.campaign = ${campaign}`, fetchImpl);
+  const versions = await withFarm(db, farmId, (tx) =>
+    rows<{ plan_id: string; dose_efficient: string | null; established_at: string | Date; external: unknown }>(
+      tx,
+      sql`SELECT v.plan_id, v.dose_efficient, v.established_at, v.external FROM fertilization_plan_versions v
+          JOIN fertilization_plans p ON p.id = v.plan_id AND v.version = p.current_version WHERE p.campaign = ${campaign}`,
+    ),
+  );
+  return data.map(({ row, context, result }) => {
+    const v = versions.find((x) => x.plan_id === row.id);
+    const external = row.draft.external ?? null;
+    return {
+      id: row.id,
+      campaign: row.campaign,
+      parcel: { id: row.land_parcel_id, name: row.parcel_name, areaM2: Math.round(Number(row.area_m2)) },
+      cropLabel: context.cropLabel,
+      zone: context.zone,
+      status: row.status,
+      currentVersion: row.current_version,
+      dose: v ? num(v.dose_efficient) : external ? external.doseKgNHa : result.dose,
+      doseOrigin: v ? (v.external ? "external" : "fourmy") : external ? "external" : result.dose !== null ? "fourmy" : null,
+      missing: result.missing.length,
+      establishedAt: v ? iso(v.established_at) : null,
+    };
+  });
+}
+
+export async function getPlan(db: Database, farmId: string, planId: string, fetchImpl: typeof fetch = fetch): Promise<FertilizationPlan> {
+  const [data] = await plansData(db, farmId, sql`p.id = ${planId}`, fetchImpl);
+  if (!data) throw new NotFound("Plan de fumure introuvable.");
+  const { row, context, result } = data;
+  const versions = await withFarm(db, farmId, async (tx) => {
+    const vs = await rows<{ version: number; established_at: string | Date; who: string | null; reason: string | null; referential: string; method: string; external: PlanDraft["external"]; dose_efficient: string | null; snapshot: PlanVersion["snapshot"] }>(
+      tx,
+      sql`SELECT v.version, v.established_at, coalesce(u.name, u.email) AS who, v.reason, v.referential, v.method, v.external, v.dose_efficient, v.snapshot
+          FROM fertilization_plan_versions v LEFT JOIN users u ON u.id = v.established_by
+          WHERE v.plan_id = ${planId} ORDER BY v.version DESC`,
+    );
+    const apps = await rows<{ version: number; rank: number; stage: string; planned_on: string | null; article_id: string | null; n_efficient: string; n_total: string; reserved_for_steering: boolean }>(
+      tx,
+      sql`SELECT version, rank, stage, planned_on::text, article_id, n_efficient, n_total, reserved_for_steering
+          FROM fertilization_plan_applications WHERE plan_id = ${planId} ORDER BY version, rank`,
+    );
+    return vs.map(
+      (v): PlanVersion => ({
+        version: v.version,
+        establishedAt: iso(v.established_at),
+        establishedBy: v.who,
+        reason: v.reason,
+        referential: v.referential,
+        method: v.method,
+        external: v.external ?? null,
+        doseEfficient: num(v.dose_efficient),
+        applications: apps
+          .filter((a) => a.version === v.version)
+          .map((a) => ({ stage: a.stage, plannedOn: a.planned_on, articleId: a.article_id, nKgHa: Number(a.n_efficient), nTotal: Number(a.n_total), reservedForSteering: a.reserved_for_steering })),
+        snapshot: v.snapshot,
+      }),
+    );
+  });
+  const dose = row.draft.external?.doseKgNHa ?? result.dose;
+  return {
+    id: row.id,
+    campaign: row.campaign,
+    parcel: { id: row.land_parcel_id, name: row.parcel_name, areaM2: Math.round(Number(row.area_m2)) },
+    status: row.status,
+    currentVersion: row.current_version,
+    draft: row.draft,
+    context,
+    result,
+    proposedApplications: dose !== null ? splitDose(dose, context.crop as CropGroup, { nBefore4Leaves: row.draft.nBefore4Leaves ?? 0 }) : [],
+    versions,
+  };
+}
+
+// --- Écriture -------------------------------------------------------------------------------
+
+export async function saveDraft(db: Database, farmId: string, planId: string, draft: PlanDraft): Promise<void> {
+  await withFarm(db, farmId, async (tx) => {
+    const done = await rows(tx, sql`UPDATE fertilization_plans SET draft = ${JSON.stringify(draft)}::jsonb, updated_at = now() WHERE id = ${planId} RETURNING id`);
+    if (!done.length) throw new NotFound("Plan de fumure introuvable.");
+  });
+}
+
+/**
+ * Établit le plan : version 1, ou révision (version n + 1, motif obligatoire).
+ * Il faut une dose : calculée par Fourmy (tous les termes connus) ou venue
+ * d'un outil ou d'un conseiller. La somme des apports prévus ne dépasse pas
+ * la dose retenue.
+ */
+export async function establishPlan(db: Database, farmId: string, userId: string, planId: string, reason: string | null, fetchImpl: typeof fetch = fetch): Promise<FertilizationPlan> {
+  const plan = await getPlan(db, farmId, planId, fetchImpl);
+  const external = plan.draft.external ?? null;
+  const dose = external?.doseKgNHa ?? plan.result.dose;
+  if (dose === null) throw new BadRequest(`Dose incomplète : ${plan.result.missing.join(" ; ") || "méthode non prise en charge"}. Complétez le plan ou saisissez la dose d'un outil ou d'un conseiller.`);
+  if (plan.currentVersion !== null && !reason) throw new BadRequest("Une révision demande son motif.");
+  const applications: PlannedApplication[] = plan.draft.applications?.length ? plan.draft.applications : plan.proposedApplications;
+  const sum = applications.reduce((s, a) => s + a.nKgHa, 0);
+  if (sum > dose + 0.5) throw new BadRequest(`Les apports prévus (${Math.round(sum)} kg N) dépassent la dose retenue (${dose} kg N).`);
+  const version = (plan.currentVersion ?? 0) + 1;
+  await withFarm(db, farmId, async (tx) => {
+    await tx.execute(sql`
+      INSERT INTO fertilization_plan_versions (plan_id, version, farm_id, established_by, reason, referential, method, external, snapshot, dose_efficient, dose_total)
+      VALUES (${planId}, ${version}, ${farmId}, ${userId}, ${version === 1 ? null : reason}, ${PLAN_REFERENTIAL}, ${external ? "external" : plan.result.method},
+              ${external ? JSON.stringify(external) : null}::jsonb,
+              ${JSON.stringify({ context: plan.context, result: plan.result, draft: plan.draft })}::jsonb, ${dose}, ${sum})`);
+    for (const [k, a] of applications.entries()) {
+      await tx.execute(sql`
+        INSERT INTO fertilization_plan_applications (plan_id, version, rank, farm_id, stage, planned_on, article_id, n_efficient, n_total, reserved_for_steering)
+        VALUES (${planId}, ${version}, ${k + 1}, ${farmId}, ${a.stage}, ${a.plannedOn}::date, ${a.articleId}, ${a.nKgHa}, ${a.nKgHa}, ${a.reservedForSteering})`);
+    }
+    await tx.execute(sql`UPDATE fertilization_plans SET status = ${version === 1 ? "established" : "revised"}, current_version = ${version}, updated_at = now() WHERE id = ${planId}`);
+  });
+  return getPlan(db, farmId, planId, fetchImpl);
+}

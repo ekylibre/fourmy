@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { fertilizationSettingsWrite, nitrateZoneWrite, soilAnalysisWrite, soilProfileWrite, waterSourceWrite } from "@fourmy/contracts";
+import { fertilizationSettingsWrite, nitrateZoneWrite, planDraft, planEstablish, soilAnalysisWrite, soilProfileWrite, waterSourceWrite } from "@fourmy/contracts";
+import { establishPlan, getPlan, listPlans, preparePlans, saveDraft } from "../repos/fertilization-plans.js";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import {
@@ -18,8 +19,16 @@ import {
 } from "../repos/fertilization-context.js";
 import { BadRequest, problem, uuidParam } from "./helpers.js";
 
+/** Météo (Open-Meteo) des plans de fumure, remplaçable dans les tests. */
+export const fertilizationDeps: { fetch: typeof fetch } = { fetch: (input, init) => fetch(input, init) };
+
 const invalid = (issues: { message: string; path: PropertyKey[] }[]) => issues.map((i) => `${i.path.join(".") || "corps"} : ${i.message}`).join(" ");
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const campaignOf = (v: string | undefined) => {
+  const n = Number(v ?? new Date().getFullYear());
+  if (!Number.isInteger(n) || n < 2000 || n > 2100) throw new BadRequest("campaign : année attendue.");
+  return n;
+};
 
 /**
  * Contexte de la fertilisation azotée (lot AF) : paramètres, zonage nitrates,
@@ -58,6 +67,21 @@ export const fertilizationRoutes = new Hono<Env>()
   .delete("/land-parcels/:id/soil-analyses/:analysisId", requireOwner, async (c) =>
     c.json(await deleteSoilAnalysis(db(), c.get("farmId"), uuidParam(c, "id"), uuidParam(c, "analysisId"))),
   )
+  // Plans prévisionnels de fumure (lot AG).
+  .get("/fertilization/plans", async (c) => c.json({ items: await listPlans(db(), c.get("farmId"), campaignOf(c.req.query("campaign")), fertilizationDeps.fetch) }))
+  .post("/fertilization/plans/prepare", requireOwner, async (c) => c.json(await preparePlans(db(), c.get("farmId"), campaignOf(c.req.query("campaign")))))
+  .get("/fertilization/plans/:id", async (c) => c.json(await getPlan(db(), c.get("farmId"), uuidParam(c, "id"), fertilizationDeps.fetch)))
+  .put("/fertilization/plans/:id/draft", requireOwner, async (c) => {
+    const parsed = planDraft.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", invalid(parsed.error.issues));
+    await saveDraft(db(), c.get("farmId"), uuidParam(c, "id"), parsed.data);
+    return c.json(await getPlan(db(), c.get("farmId"), uuidParam(c, "id"), fertilizationDeps.fetch));
+  })
+  .post("/fertilization/plans/:id/establish", requireOwner, async (c) => {
+    const parsed = planEstablish.safeParse(await c.req.json().catch(() => ({})));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", invalid(parsed.error.issues));
+    return c.json(await establishPlan(db(), c.get("farmId"), c.get("userId"), uuidParam(c, "id"), parsed.data.reason, fertilizationDeps.fetch));
+  })
   .get("/water-sources", async (c) => c.json({ items: await listWaterSources(db(), c.get("farmId")) }))
   .post("/water-sources", requireOwner, async (c) => {
     const parsed = waterSourceWrite.safeParse(await c.req.json().catch(() => null));
