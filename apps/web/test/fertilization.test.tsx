@@ -48,6 +48,56 @@ const context = (patch: Partial<ParcelFertilizationContext> = {}): ParcelFertili
 });
 const water = { id: "00000000-0000-7000-8000-00000000b001", name: "Forage", origin: "groundwater", nitrateMgL: 18, measuredOn: "2026-07-01", method: "strip", parcels: 1 };
 
+describe("démarrage de la fertilisation (lot AP)", () => {
+  it("liste ce qui manque, avec un lien vers chaque saisie", async () => {
+    const PLAN = "00000000-0000-7000-8000-00000000c001";
+    const PREV = "00000000-0000-7000-8000-0000000000b9";
+    server.use(
+      http.get("*/fertilization/parcels", () => HttpResponse.json({ items: [context({ analyses: [] })] })),
+      http.get("*/water-sources", () => HttpResponse.json({ items: [] })),
+      http.get("*/fertilizers", () =>
+        HttpResponse.json({
+          items: [
+            { id: "f1", name: "Zintrac 850", kind: "fertilizer", unit: "Litre", lexiconRef: null, composition: null, origin: null, source: null, proposal: null, analyses: [], usage: 2 },
+            { id: "f2", name: "Urée 46", kind: "fertilizer", unit: "Kilogramme", lexiconRef: null, composition: { basis: "mass_percent", nTotal: 46, nMineralShare: 1, p2o5: null, k2o: null, so3: null, density: null, nitrateType: "III", foliar: false }, origin: "confirmed", source: null, proposal: null, analyses: [], usage: 5 },
+          ],
+        }),
+      ),
+      http.get("*/fertilization/plans", () =>
+        HttpResponse.json({ items: [{ id: PLAN, campaign: 2026, parcel: { id: PARCEL, name: "Les Rouffiats", areaM2: 60000 }, cropLabel: "Maïs grain", zone: "in", status: "draft", currentVersion: null, dose: null, doseOrigin: "fourmy", missing: 3, establishedAt: null }] }),
+      ),
+      http.get("*/fertilization/record", () =>
+        HttpResponse.json({
+          campaign: 2026,
+          from: "2025-09-01",
+          to: "2026-09-01",
+          toComplete: 0,
+          late: 0,
+          forced: [],
+          parcels: [
+            {
+              parcelId: PARCEL, name: "Les Rouffiats", areaHa: 6, soilType: null, zone: "in", crop: "Maïs grain", variety: null, sownOn: null, harvestedOn: [], yieldQHa: null, interculture: [], cover: null,
+              soilCover: { level: "warning", situation: "long", messages: [], previousParcelId: PREV, harvestedOn: "2025-09-16" },
+              aplsh: null, steering: [], noPlowing: null, applications: [], totalNKgHa: 0, plannedDose: null, planVersion: null,
+            },
+          ],
+        }),
+      ),
+    );
+    renderApp(`/f/${FARM}/fertilization?at=2026-06-01`);
+    const box = await screen.findByLabelText("Démarrage");
+    expect(within(box).getByRole("link", { name: "Sol de Les Rouffiats" })).toHaveAttribute("href", `/f/${FARM}/land-parcels/${PARCEL}?tab=soil`);
+    expect(within(box).getByRole("link", { name: /Ajouter une analyse/ })).toBeInTheDocument();
+    expect(await within(box).findByRole("link", { name: "Zintrac 850" })).toHaveAttribute("href", `/f/${FARM}/fertilizers`);
+    expect(within(box).queryByRole("link", { name: "Urée 46" })).not.toBeInTheDocument();
+    expect(await within(box).findByRole("link", { name: "Les Rouffiats (3 données à saisir)" })).toHaveAttribute("href", `/f/${FARM}/fertilization/plans/${PLAN}`);
+    const grind = await within(box).findByRole("link", { name: /saisir le broyage des cannes \(récolte du 16\/09\/2025\)/ });
+    expect(grind.getAttribute("href")).toBe(`/f/${FARM}/interventions/new?procedure=crop_residues_grinding&status=done&parcels=${PREV}&at=2025-09-16`);
+    // Organiques : aucun produit organique utilisé, l'étape est faite.
+    expect(within(box).getByText("1 sur 6")).toBeInTheDocument();
+  });
+});
+
 describe("fertilisation azotée", () => {
   it("onglet Sol : zonage, type de sol régional enregistré, reliquat", async () => {
     let saved: unknown = null;

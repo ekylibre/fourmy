@@ -527,6 +527,9 @@ export interface SoilCoverStatus {
   level: "ok" | "info" | "warning";
   situation: "long" | "short_after_rapeseed" | "none";
   messages: string[];
+  /** Parcelle du précédent et sa récolte (lot AP) : pour saisir un broyage ou un couvert. */
+  previousParcelId?: string | null;
+  harvestedOn?: string | null;
 }
 
 // --- Lot AI : couverts d'interculture, justificatifs, contrôle enregistré ----------------

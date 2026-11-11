@@ -776,7 +776,13 @@ export async function fertilizationRecord(db: Database, farmId: string, campaign
         yieldQHa: yields.length ? Math.round((yields.reduce((s, v) => s + v, 0) / yields.length) * 10) / 10 : null,
         interculture,
         cover: covers.get(p.id) ?? null,
-        soilCover: prevs.has(p.id) ? soilCoverOf(prevs.get(p.id) ?? null, p.zones, crop, around, sown, covers.get(p.id) ?? null, campaign) : null,
+        soilCover: prevs.has(p.id)
+          ? {
+              ...soilCoverOf(prevs.get(p.id) ?? null, p.zones, crop, around, sown, covers.get(p.id) ?? null, campaign),
+              previousParcelId: prevs.get(p.id)?.parcel_id ?? null,
+              harvestedOn: previousHarvest(around, sown, campaign),
+            }
+          : null,
         aplsh: prevs.has(p.id) ? coverAplsh(around, Number(p.area_m2), sown, covers.get(p.id) ?? null, campaign, fertilizers, settings.aplshZone ?? defaultAplshZone(p.insee?.slice(0, 2) ?? null)) : null,
         steering: p.plan_id ? (steering.get(p.plan_id) ?? []) : [],
         // Trois campagnes de recul ne sont pas toutes chargées : « null » quand on ne peut pas conclure.

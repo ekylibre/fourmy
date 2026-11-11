@@ -317,7 +317,13 @@ describe.skipIf(!url)("plans de fumure (intégration)", () => {
 
     const r = await record();
     expect(r.forced).toEqual([{ interventionId: forced, date: "2026-01-20", parcels: ["Champ Maïs 2026"], reason: "Dérogation" }]);
-    expect(r.parcels[0]!.soilCover).toMatchObject({ level: "warning", situation: "long", messages: [expect.stringContaining("cannes à broyer finement et enfouir dans les 15 jours (au plus tard le 30/10/2025)")] });
+    expect(r.parcels[0]!.soilCover).toMatchObject({
+      level: "warning",
+      situation: "long",
+      messages: [expect.stringContaining("cannes à broyer finement et enfouir dans les 15 jours (au plus tard le 30/10/2025)")],
+      previousParcelId: p2025,
+      harvestedOn: "2025-10-15",
+    });
 
     const grind = crypto.randomUUID();
     await sql`INSERT INTO interventions (id, farm_id, procedure, status, origin, started_at, stopped_at) VALUES (${grind}, ${farmId}, 'crop_residues_grinding', 'done', 'web', '2025-10-20T08:00:00Z', '2025-10-20T12:00:00Z')`;
