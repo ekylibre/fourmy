@@ -40,6 +40,7 @@ import {
 } from "@fourmy/contracts";
 import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
 import { checkCompliance, type CheckableBody } from "./phyto.js";
+import { checkApplicationTx } from "./fertilization-record.js";
 import { addReadingInTx } from "./equipments.js";
 import { buildTrackDraft, linkTrackSessions } from "./track-sessions.js";
 
@@ -154,6 +155,7 @@ function toIntervention(r: Record<string, unknown>): Intervention {
     origin: r.origin as Intervention["origin"],
     clientId: (r.client_id as string | null) ?? null,
     compliance: (r.compliance as Intervention["compliance"]) ?? null,
+    nitrateCheck: (r.nitrate_check as Intervention["nitrateCheck"]) ?? null,
     ift: (r.ift as Intervention["ift"]) ?? null,
     weather: (r.weather as Intervention["weather"]) ?? null,
     irrigation: r.irrigation ? { depthMm: Number((r.irrigation as { depthMm: number }).depthMm), method: (r.irrigation as { method?: IrrigationMethod | null }).method ?? null } : null,
@@ -199,7 +201,7 @@ async function readInterventions(tx: Tx, where: SQL, limit = 1000): Promise<Inte
     tx,
     sql`
       SELECT i.id, i.farm_id, i.procedure, i.status, i.started_at, i.stopped_at, i.origin, i.client_id, i.staffing,
-             i.purposes, i.notes, i.bbch, (SELECT st.label FROM ref_bbch_stages st WHERE st.code = i.bbch) AS bbch_label, i.compliance, i.ift, i.weather, i.maintenance, i.irrigation, i.created_at, i.updated_at,
+             i.purposes, i.notes, i.bbch, (SELECT st.label FROM ref_bbch_stages st WHERE st.code = i.bbch) AS bbch_label, i.compliance, i.nitrate_check, i.ift, i.weather, i.maintenance, i.irrigation, i.created_at, i.updated_at,
              (SELECT coalesce(json_agg(json_build_object('equipment_id', m.equipment_id, 'value', m.value, 'correction', m.correction,
                                                          'correction_reason', m.correction_reason)), '[]')
                 FROM meter_readings m WHERE m.intervention_id = i.id) AS meters,
@@ -537,7 +539,42 @@ async function recordCompliance(tx: Tx, ctx: DomainCtx, interventionId: string, 
     throw new DomainError(`Feu rouge réglementaire : ${dangers.join(" ")} Pour enregistrer quand même, indiquez un motif.`);
   }
   await tx.execute(sql`UPDATE interventions SET compliance = ${JSON.stringify(result)}::jsonb WHERE id = ${interventionId}`);
+  await recordNitrateCheck(tx, ctx, interventionId, body, mode);
   return result;
+}
+
+/**
+ * Contrôle nitrates (lot AI, FR-FERT-25) enregistré avec l'intervention :
+ * calendrier d'épandage, plan de fumure, premier apport. Une réalisation
+ * saisie sur le web pendant une période d'interdiction est refusée sans motif ;
+ * le motif (le même que pour le phyto) reste attaché à l'intervention.
+ */
+async function recordNitrateCheck(tx: Tx, ctx: DomainCtx, interventionId: string, body: CheckableBody, mode: "plan" | "done") {
+  const startedAt = body.periods[0]?.startedAt ?? body.plannedAt;
+  const parcels = body.targets.filter((t) => t.kind === "land_parcel");
+  if (!startedAt || !parcels.length || !body.inputs.length) {
+    await tx.execute(sql`UPDATE interventions SET nitrate_check = NULL WHERE id = ${interventionId}`);
+    return;
+  }
+  const [{ farm_id: farmId } = { farm_id: "" }] = await rows<{ farm_id: string }>(tx, sql`SELECT farm_id FROM interventions WHERE id = ${interventionId}`);
+  const areaM2 = parcels.every((t) => t.workedAreaM2) ? parcels.reduce((sum, t) => sum + (t.workedAreaM2 ?? 0), 0) : null;
+  const check = await checkApplicationTx(tx, farmId, {
+    startedAt: new Date(startedAt).toISOString(),
+    parcelIds: parcels.map((t) => t.id),
+    inputs: body.inputs.map(({ articleId, quantity, per }) => ({ articleId, quantity, per })),
+    areaM2,
+    interventionId,
+  });
+  if (!check.indicators.length && !check.nitrogen) {
+    await tx.execute(sql`UPDATE interventions SET nitrate_check = NULL WHERE id = ${interventionId}`);
+    return;
+  }
+  const reason = body.compliance?.reason?.trim() || null;
+  if (mode === "done" && check.level === "danger" && ctx.origin === "web" && !reason) {
+    const dangers = check.indicators.filter((i) => i.level === "danger").map((i) => `${i.parcelName ? `${i.parcelName} : ` : ""}${i.message}`);
+    throw new DomainError(`Épandage interdit : ${dangers.join(" ")} Pour enregistrer quand même, indiquez un motif.`);
+  }
+  await tx.execute(sql`UPDATE interventions SET nitrate_check = ${JSON.stringify({ ...check, reason: check.level === "danger" ? reason : null, checkedAt: new Date().toISOString() })}::jsonb WHERE id = ${interventionId}`);
 }
 
 // ---------------------------------------------------------------------------

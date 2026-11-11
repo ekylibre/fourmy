@@ -28,6 +28,9 @@ const plan = (patch: Partial<FertilizationPlan> = {}): FertilizationPlan => ({
     water: { origin: null, no3MgL: null, name: null },
     irrigationMm: null,
     zone: "in",
+    opening: { on: "2026-04-01", origin: "default" },
+    sowing: { period: null, sownOn: null },
+    cover: null,
   },
   result: {
     method: "bilan_cau_two_phase",
@@ -98,6 +101,38 @@ describe("plan de fumure", () => {
     await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Établir" }));
     await waitFor(() => expect(established).toBe(true));
   });
+
+  it("ouverture du bilan, période d'implantation et couvert d'interculture", async () => {
+    let draft: unknown = null;
+    let cover: unknown = null;
+    server.use(
+      http.get("*/fertilization/plans/:id", () => HttpResponse.json(plan())),
+      http.get("*/fertilizers", () => HttpResponse.json({ items: [] })),
+      http.put("*/fertilization/plans/:id/draft", async ({ request }) => {
+        draft = await request.json();
+        return HttpResponse.json(plan({ draft: draft as FertilizationPlan["draft"] }));
+      }),
+      http.put("*/land-parcels/:id/cover-crop", async ({ request }) => {
+        cover = await request.json();
+        return HttpResponse.json({ id: "c1", parcelId: plan().parcel.id, ...(cover as object) });
+      }),
+    );
+    renderApp(`/f/${FARM}/fertilization/plans/${PLAN}`);
+    const data = await screen.findByLabelText("Données de la parcelle");
+    expect(data).toHaveTextContent("Ouverture du bilan01/04/2026 (date par défaut)");
+    expect(data).toHaveTextContent("période d'implantation à saisir");
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Période d'implantation"), "15 avril – 10 mai");
+    await user.tab();
+    await waitFor(() => expect(draft).toMatchObject({ sowingPeriod: "15 avril – 10 mai" }));
+
+    const section = screen.getByLabelText("Couvert d'interculture");
+    await user.click(within(section).getByRole("button", { name: "Saisir un couvert" }));
+    await user.type(within(section).getByLabelText("Espèces"), "Moutarde blanche");
+    await user.click(within(section).getByRole("button", { name: "Enregistrer le couvert" }));
+    await waitFor(() => expect(cover).toMatchObject({ campaign: 2026, family: "cruciferes", species: "Moutarde blanche", sownOn: "2025-09-01" }));
+  });
 });
 
 describe("éditions de la directive nitrates", () => {
@@ -127,6 +162,7 @@ describe("éditions de la directive nitrates", () => {
               applications: [
                 { interventionId: "i1", date: "2026-05-12", recordedOn: "2026-05-12", late: false, procedure: "fertilizing", areaHa: 4, product: "Urée 46", content: "46 % N", nitrateType: "III", doseLabel: "150 kilogram/ha", nTotalKgHa: 69, nEfficientKgHa: 69, missing: null },
               ],
+              cover: { id: "c1", parcelId: "00000000-0000-7000-8000-0000000000a1", campaign: 2026, family: "cruciferes", species: "Moutarde blanche", sownOn: "2025-09-05", destroyedOn: "2025-12-10", exported: false, biomass: "1_3", destructionMode: "mechanical", notes: null },
               totalNKgHa: 69,
               plannedDose: 180,
               planVersion: 3,
@@ -140,6 +176,7 @@ describe("éditions de la directive nitrates", () => {
     const block = screen.getByLabelText("Cahier Champ Maïs 2026");
     expect(block).toHaveTextContent("En zone vulnérable · sol : Sols limoneux · culture : Maïs grain (DKC5432) · semis 09/04/2026");
     expect(within(block).getByRole("row", { name: /Urée 46/ })).toHaveTextContent("12/05/2026");
+    expect(block).toHaveTextContent("Couvert d'interculture : Moutarde blanche (Crucifères (moutarde, radis…)), semé le 05/09/2025, détruit le 10/12/2025 (mécanique (broyage, labour))");
     expect(block).toHaveTextContent("Total : 69 kg N efficace/ha pour 180 kg prévus au plan (version 3).");
     expect(screen.getByRole("link", { name: "CSV" })).toHaveAttribute("href", expect.stringContaining("/fertilization/record?campaign=2026&format=csv"));
     expect(screen.getByRole("button", { name: "Imprimer ou enregistrer en PDF" })).toBeInTheDocument();

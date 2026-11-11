@@ -4,6 +4,8 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import {
   BALANCE_TERM_LABELS,
   BALANCE_TERMS,
+  COVER_FAMILY_LABELS,
+  DESTRUCTION_MODE_LABELS,
   NITRATE_ZONE_LABELS,
   type FertilizationPlan,
   type FertilizationPlanSummary,
@@ -96,6 +98,12 @@ function RecordDoc({ farmId, farmName, campaign }: { farmId: string; farmName: s
           <Text size="sm">
             Interculture et résidus : {p.interculture.length ? p.interculture.map((i) => `${i.label} le ${formatDate(i.date)}`).join(", ") : "rien de saisi"}
             {p.noPlowing === false ? " · labour sur la période" : ""}
+          </Text>
+          <Text size="sm">
+            Couvert d'interculture :{" "}
+            {p.cover
+              ? `${p.cover.species} (${COVER_FAMILY_LABELS[p.cover.family]}), semé le ${formatDate(p.cover.sownOn)}, ${p.cover.destroyedOn ? `détruit le ${formatDate(p.cover.destroyedOn)}` : "destruction non saisie"}${p.cover.destructionMode ? ` (${DESTRUCTION_MODE_LABELS[p.cover.destructionMode].toLowerCase()})` : ""}${p.cover.exported ? ", exporté" : ""}`
+              : "aucun saisi"}
           </Text>
           <Table fz="xs" mt={4} withTableBorder>
             <Table.Thead>
@@ -199,6 +207,12 @@ function PlansDoc({ farmId, farmName, campaign }: { farmId: string; farmName: st
               Objectif de production : {c.yieldTarget ? `${n(c.yieldTarget.value)} q/ha (${c.yieldTarget.detail})` : "—"} · précédent :{" "}
               {c.previous ? `${c.previous.label}, ${n(c.previous.yieldRealized)} q/ha` : "—"} · reliquat : {c.rsh ? `${c.rsh.kgNHa} kg N/ha mesuré le ${formatDate(c.rsh.sampledOn)}` : "estimé"}
             </Text>
+            {c.opening && (
+              <Text size="sm">
+                Ouverture du bilan : {formatDate(c.opening.on)} · implantation : {c.sowing?.sownOn ? `semée le ${formatDate(c.sowing.sownOn)}` : (c.sowing?.period ?? "non précisée")}
+                {c.cover ? ` · couvert : ${c.cover.species}` : ""}
+              </Text>
+            )}
             <Text size="xs" mt={4}>
               {r.equation} (annexe {r.annex})
             </Text>

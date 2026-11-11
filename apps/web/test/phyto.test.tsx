@@ -158,6 +158,30 @@ describe("fiche : contrôle et IFT", () => {
     expect(within(ift).getByLabelText("IFT de l'intervention")).toHaveTextContent("0,667");
     expect(await within(ift).findByText(/Fongicide X · Les Rouffiats/)).toBeInTheDocument();
   });
+
+  it("montre le contrôle nitrates enregistré et le motif d'un épandage en période d'interdiction", async () => {
+    server.use(
+      http.get("*/interventions/:id", () =>
+        HttpResponse.json({
+          ...DEMO,
+          history: [],
+          nitrateCheck: {
+            level: "danger",
+            nitrogen: { totalKgHa: 46, efficientKgHa: 46 },
+            indicators: [{ code: "fert_calendar", level: "danger", parcelName: "Les Rouffiats", message: "Période d'interdiction d'épandage : du 01/07 au 15/02 pour un fertilisant de type III sur cette culture." }],
+            reason: "Dérogation préfectorale",
+            checkedAt: "2026-01-12T10:00:00.000Z",
+          },
+        }),
+      ),
+    );
+    renderApp(`/f/${FARM}/interventions/${DEMO.id}?at=2026-06-10`);
+    const nitrates = await screen.findByLabelText("Directive nitrates");
+    expect(within(nitrates).getByText("Interdit")).toBeInTheDocument();
+    expect(nitrates).toHaveTextContent("Azote apporté : 46 kg N/ha.");
+    expect(nitrates).toHaveTextContent("Les Rouffiats : Période d'interdiction d'épandage");
+    expect(nitrates).toHaveTextContent("Motif : « Dérogation préfectorale »");
+  });
 });
 
 describe("page Produits phyto", () => {

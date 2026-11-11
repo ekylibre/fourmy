@@ -29,9 +29,11 @@ const iso = (v: string | Date | null) => (v === null ? null : new Date(v).toISOS
 // --- Paramètres --------------------------------------------------------------
 
 export async function getSettings(db: Database, farmId: string): Promise<FertilizationSettings> {
-  const [r] = await withFarm(db, farmId, (tx) =>
-    rows<{ region: "nouvelle-aquitaine"; campaign_start_mmdd: string }>(tx, sql`SELECT region, campaign_start_mmdd FROM fertilization_settings`),
-  );
+  return withFarm(db, farmId, settingsInTx);
+}
+
+export async function settingsInTx(tx: Tx): Promise<FertilizationSettings> {
+  const [r] = await rows<{ region: "nouvelle-aquitaine"; campaign_start_mmdd: string }>(tx, sql`SELECT region, campaign_start_mmdd FROM fertilization_settings`);
   return { region: r?.region ?? "nouvelle-aquitaine", campaignStartMmdd: r?.campaign_start_mmdd ?? "09-01" };
 }
 
@@ -83,6 +85,7 @@ export async function saveWaterSource(db: Database, farmId: string, id: string |
               VALUES (${wid}, ${farmId}, ${w.name}, ${w.origin}, ${w.nitrateMgL}, ${w.measuredOn}::date, ${w.method}) RETURNING id`,
     );
     if (!done.length) throw new NotFound("Point d'eau introuvable.");
+    await tx.execute(sql`DELETE FROM regulatory_documents WHERE owner_type = 'water_source' AND owner_id = ${id}`);
   });
   const found = (await listWaterSources(db, farmId)).find((x) => x.id === wid);
   return found!;
@@ -92,6 +95,7 @@ export async function deleteWaterSource(db: Database, farmId: string, id: string
   await withFarm(db, farmId, async (tx) => {
     const done = await rows(tx, sql`DELETE FROM water_sources WHERE id = ${id} RETURNING id`);
     if (!done.length) throw new NotFound("Point d'eau introuvable.");
+    await tx.execute(sql`DELETE FROM regulatory_documents WHERE owner_type = 'water_source' AND owner_id = ${id}`);
   });
 }
 
@@ -148,6 +152,7 @@ export async function deleteSoilAnalysis(db: Database, farmId: string, parcelId:
   await withFarm(db, farmId, async (tx) => {
     const done = await rows(tx, sql`DELETE FROM soil_analyses WHERE id = ${id} AND land_parcel_id = ${parcelId} RETURNING id`);
     if (!done.length) throw new NotFound("Analyse introuvable.");
+    await tx.execute(sql`DELETE FROM regulatory_documents WHERE owner_type = 'soil_analysis' AND owner_id = ${id}`);
   });
   return parcelContext(db, farmId, parcelId);
 }

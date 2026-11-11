@@ -1,7 +1,7 @@
 import { Alert, Badge, Group, List, Loader, Paper, Text } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
-import type { FertilizationCheck, FertilizationCheckRequest } from "@fourmy/contracts";
+import type { FertilizationCheck, FertilizationCheckRequest, NitrateCheckRecord } from "@fourmy/contracts";
 import { api, farmPath } from "../../app/api";
 
 const LEVELS: Record<FertilizationCheck["level"], { label: string; color: string }> = {
@@ -31,7 +31,6 @@ export function useFertilizationCheck(farmId: string, draft: FertilizationCheckR
 export function FertilizationSummary({ check }: { check: ReturnType<typeof useFertilizationCheck> }) {
   const { query, result, active } = check;
   if (!active) return null;
-  const shown = (result?.indicators ?? []).filter((i) => i.level !== "ok" || i.code === "fert_plan");
   return (
     <Paper withBorder p="sm" aria-label="Contrôle nitrates">
       <Group justify="space-between" mb={4}>
@@ -48,7 +47,17 @@ export function FertilizationSummary({ check }: { check: ReturnType<typeof useFe
           Contrôle indisponible pour le moment.
         </Alert>
       )}
-      {result?.nitrogen && (
+      {result && <CheckDetails result={result} />}
+    </Paper>
+  );
+}
+
+/** Azote apporté et indicateurs d'un contrôle (saisie ou fiche de l'intervention). */
+export function CheckDetails({ result }: { result: FertilizationCheck }) {
+  const shown = result.indicators.filter((i) => i.level !== "ok" || i.code === "fert_plan");
+  return (
+    <>
+      {result.nitrogen && (
         <Text size="sm" className="lv-num">
           Azote apporté : {result.nitrogen.totalKgHa.toLocaleString("fr-FR")} kg N/ha
           {result.nitrogen.efficientKgHa !== null && result.nitrogen.efficientKgHa !== result.nitrogen.totalKgHa ? ` (${result.nitrogen.efficientKgHa.toLocaleString("fr-FR")} efficaces)` : ""}.
@@ -66,11 +75,36 @@ export function FertilizationSummary({ check }: { check: ReturnType<typeof useFe
           ))}
         </List>
       )}
-      {result && result.level === "danger" && (
+      {result.level === "danger" && (
         <Text size="xs" c="dimmed" mt={4}>
           Un épandage en période d'interdiction est une infraction au programme d'actions nitrates : vérifiez la date et le produit.
         </Text>
       )}
+    </>
+  );
+}
+
+/**
+ * Fiche d'une intervention (lot AI) : contrôle nitrates enregistré à la
+ * saisie, et le motif quand l'épandage a eu lieu en période d'interdiction.
+ */
+export function NitrateCheckSection({ check }: { check: NitrateCheckRecord | null | undefined }) {
+  if (!check) return null;
+  return (
+    <Paper p="md" withBorder aria-label="Directive nitrates">
+      <Group justify="space-between" mb="xs">
+        <Text fw={700}>Directive nitrates</Text>
+        <Badge color={LEVELS[check.level].color}>{LEVELS[check.level].label}</Badge>
+      </Group>
+      <CheckDetails result={check} />
+      {check.reason && (
+        <Alert color="brique" variant="light" mt="sm" title="Enregistré en période d'interdiction">
+          Motif : « {check.reason} »
+        </Alert>
+      )}
+      <Text size="xs" c="dimmed" mt="xs">
+        Contrôlé à la saisie le {new Date(check.checkedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}.
+      </Text>
     </Paper>
   );
 }

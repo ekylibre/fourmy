@@ -92,7 +92,7 @@ export interface BalanceInput {
     mrci?: number;
   } | null;
   /** Culture intermédiaire avant la culture. */
-  cover?: { family: CoverFamily; biomass: CoverBiomassClass; destruction: "nov_dec" | "after_january" } | null;
+  cover?: { family: CoverFamily; biomass: CoverBiomassClass | null; destruction: "nov_dec" | "after_january" | null } | null;
   /** Prairie retournée dans l'historique. */
   grassland?: { destruction: "spring" | "autumn"; rank: 1 | 2; productionType: GrasslandProductionType; mode: GrasslandMode | null; ageClass: GrasslandAgeClass } | null;
   /** Pluie du 1er octobre au 1er mai (céréales : au jour d'ouverture), mm. */
@@ -285,8 +285,12 @@ export function computeBalance(input: BalanceInput): BalanceResult {
   else if (!input.cover) set("MrCi", { value: 0, origin: "computed", source: "historique", detail: "pas de culture intermédiaire avant la culture" });
   else {
     const c = input.cover;
-    const row = mrciTable.rows.find((r) => r.family === c.family && r.biomass === c.biomass && r.destruction === c.destruction && r.opening === opening);
-    set("MrCi", row ? { value: row.mrciKgNHa, origin: "reference", source: ref(mrciTable) } : { missing: "couvert absent de la table MrCi" });
+    if (!c.biomass) set("MrCi", { missing: "biomasse du couvert d'interculture" });
+    else if (!c.destruction) set("MrCi", { missing: "date de destruction du couvert d'interculture" });
+    else {
+      const row = mrciTable.rows.find((r) => r.family === c.family && r.biomass === c.biomass && r.destruction === c.destruction && r.opening === opening);
+      set("MrCi", row ? { value: row.mrciKgNHa, origin: "reference", source: ref(mrciTable), detail: `couvert détruit ${c.destruction === "nov_dec" ? "en novembre-décembre" : "après janvier"}` } : { missing: "couvert absent de la table MrCi" });
+    }
   }
   if (!input.grassland) set("Mhp", { value: 0, origin: "computed", source: "historique", detail: "pas de prairie retournée" });
   else {

@@ -28,6 +28,7 @@ import { NitrogenLine } from "../fertilization/NitrogenLine";
 import { CancelModal } from "./CancelModal";
 import { actionLabel, changeLines, interventionDay, STATUS, targetName, type Names } from "./presenters";
 import { ComplianceSection, IftSection } from "./RegulatorySections";
+import { NitrateCheckSection } from "../fertilization/FertilizationChecks";
 import { WeatherSummary } from "../weather/Weather";
 import { irrigationVolumeM3 } from "./IrrigationFields";
 import { IRRIGATION_METHOD_LABELS } from "@fourmy/contracts";
@@ -419,6 +420,7 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
               </Text>
             )}
             <ComplianceSection farmId={farm.id} intervention={i} />
+            <NitrateCheckSection check={i.nitrateCheck} />
             <IftSection farmId={farm.id} intervention={i} names={names} />
             <Paper p="md" withBorder>
               <Title order={4} mb="sm">

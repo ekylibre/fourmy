@@ -9,6 +9,8 @@ import {
   NITRATE_ZONE_LABELS,
   WATER_ORIGIN_LABELS,
   rshTotal,
+  SOIL_ANALYSIS_KIND_LABELS,
+  type FertilizationSettings,
   type ParcelFertilizationContext,
   type WaterOrigin,
   type WaterSource,
@@ -16,6 +18,7 @@ import {
 } from "@fourmy/contracts";
 import { NA_SOIL_TYPE_LABELS, isNaSoilType } from "@fourmy/fertilization-refs";
 import { api, farmPath } from "../../app/api";
+import { Documents } from "./Documents";
 import { useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
 import { formatDate } from "../../app/labels";
@@ -49,6 +52,10 @@ export function FertilizationPage() {
       });
     },
   });
+  const settings = useQuery({
+    queryKey: ["fertilization-settings", farm.id],
+    queryFn: () => api.get<FertilizationSettings>(farmPath(farm.id, "/fertilization/settings")),
+  });
   if (parcels.isLoading) return <Loading />;
   if (parcels.error) return <ErrorAlert error={parcels.error} />;
   const items = parcels.data!.items;
@@ -56,6 +63,7 @@ export function FertilizationPage() {
   const areaInZone = inZone.reduce((s, p) => s + p.areaM2, 0);
   const noSoil = inZone.filter((p) => !p.soil.soilType).length;
   const unknownZone = items.filter((p) => !p.zone || p.zone.status === "unknown").length;
+  const analysis = annualAnalysis(inZone, Number(day.slice(0, 4)), settings.data?.campaignStartMmdd ?? "09-01");
 
   return (
     <Stack>
@@ -82,6 +90,13 @@ export function FertilizationPage() {
               ? "Zonage à déterminer : actualisez-le."
               : "Aucune parcelle en zone vulnérable : plan de fumure et cahier conseillés, non obligatoires."}
           {noSoil > 0 && ` ${noSoil} parcelle${noSoil > 1 ? "s" : ""} en zone vulnérable sans type de sol.`}
+        </Alert>
+      )}
+      {areaInZone > 30_000 && (
+        <Alert color={analysis.done ? "lichen" : "paille"} variant="light" aria-label="Analyse de sol annuelle">
+          {analysis.done
+            ? `Analyse de sol de la campagne ${analysis.campaign} faite : ${analysis.done.label} le ${formatDate(analysis.done.sampledOn)} (${analysis.done.parcel}).`
+            : `Analyse de sol de la campagne ${analysis.campaign} à faire : un reliquat sortie d'hiver, un reliquat post-récolte ou une analyse de terre (matière organique) sur une parcelle en zone vulnérable, entre le ${formatDate(analysis.from)} et le ${formatDate(analysis.to)}.`}
         </Alert>
       )}
 
@@ -391,7 +406,22 @@ function WaterModal({ farmId, source, onClose }: { farmId: string; source: Water
             </Button>
           )}
         </Group>
+        {source && <Documents farmId={farmId} ownerType="water_source" ownerId={source.id} owner label="Analyses d'eau" />}
       </Stack>
     </Modal>
   );
+}
+
+/**
+ * Analyse de sol annuelle (PAN 7, au-delà de 3 ha en zone vulnérable) : une
+ * analyse au moins par campagne sur une parcelle en zone vulnérable.
+ */
+export function annualAnalysis(parcels: ParcelFertilizationContext[], campaign: number, startMmdd: string) {
+  const from = `${campaign - 1}-${startMmdd}`;
+  const end = new Date(Date.parse(`${campaign}-${startMmdd}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  const found = parcels
+    .flatMap((p) => p.analyses.map((a) => ({ parcel: p.name, sampledOn: a.sampledOn, label: SOIL_ANALYSIS_KIND_LABELS[a.kind].toLowerCase() })))
+    .filter((a) => a.sampledOn >= from && a.sampledOn <= end)
+    .sort((a, b) => b.sampledOn.localeCompare(a.sampledOn));
+  return { campaign, from, to: end, done: found[0] ?? null };
 }

@@ -65,6 +65,19 @@ describe("dose prévisionnelle : maïs en Pyrénées-Atlantiques (bilan CAU en d
   });
 });
 
+describe("couvert d'interculture (MrCi, lot AI)", () => {
+  it("valeur de la table quand le couvert est complet ; sinon le manque est nommé", () => {
+    const full = computeBalance({ ...maize, cover: { family: "cruciferes", biomass: "1_3", destruction: "nov_dec" } });
+    expect(full.terms.MrCi).toMatchObject({ origin: "reference", detail: "couvert détruit en novembre-décembre" });
+    expect(full.missing).not.toContain("biomasse du couvert d'interculture");
+    const noBiomass = computeBalance({ ...maize, cover: { family: "cruciferes", biomass: null, destruction: "nov_dec" } });
+    expect(noBiomass.terms.MrCi).toEqual({ missing: "biomasse du couvert d'interculture" });
+    expect(noBiomass.dose).toBeNull();
+    const notDestroyed = computeBalance({ ...maize, cover: { family: "cruciferes", biomass: "1_3", destruction: null } });
+    expect(notDestroyed.terms.MrCi).toEqual({ missing: "date de destruction du couvert d'interculture" });
+  });
+});
+
 describe("dose prévisionnelle : triticale (bilan CAU)", () => {
   it("Ri + Pi lus dans la grille des céréales, CAU 0,9", () => {
     const r = computeBalance({

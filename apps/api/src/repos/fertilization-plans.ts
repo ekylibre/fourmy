@@ -29,6 +29,7 @@ import { isNaSoilType, naYieldReferences, type CropGroup } from "@fourmy/fertili
 import { BadRequest, NotFound } from "../routes/helpers.js";
 import { farmDailyWeather } from "./crop-model.js";
 import { listFertilizers } from "./fertilizers.js";
+import { coversInTx } from "./cover-crops.js";
 
 /**
  * Plans prévisionnels de fumure (lot AG, docs/fertilisation-design.md §4.2,
@@ -45,6 +46,7 @@ const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const HARVEST = PROCEDURES.filter((p) => p.shape === "harvest").map((p) => p.code);
 const FERTILIZING = PROCEDURES.filter((p) => p.shape === "fertilization" || p.code === "all_in_one_sowing" || p.code === "vine_spraying_with_fertilizing").map((p) => p.code);
 const IRRIGATION = ["watering", "plant_watering", "vine_watering"];
+const SOWING = PROCEDURES.filter((p) => p.shape === "sowing").map((p) => p.code);
 const arr = (xs: string[]) => `{${xs.join(",")}}`;
 
 const CROP_LABELS: Partial<Record<CropGroup, string>> = {
@@ -254,7 +256,14 @@ async function contextOf(db: Database, farmId: string, plan: PlanRow, fertilizer
             AND sampled_on BETWEEN make_date(${plan.campaign - 1}, 11, 1) AND make_date(${plan.campaign}, 6, 30)
           ORDER BY sampled_on DESC LIMIT 1`,
     );
-    return { soil, prev, yields, prods, prevN, prevIrrigation, rsh: rsh[0] ?? null };
+    const cover = (await coversInTx(tx, [plan.land_parcel_id], plan.campaign)).get(plan.land_parcel_id) ?? null;
+    const [sown] = await rows<{ day: string }>(
+      tx,
+      sql`SELECT min(i.started_at)::date::text AS day FROM interventions i
+          JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_id = ${plan.land_parcel_id}
+          WHERE i.status = 'done' AND i.procedure = ANY(${arr(SOWING)}::text[]) AND i.started_at >= make_date(${plan.campaign - 1}, 7, 1) AND i.started_at < make_date(${plan.campaign}, 8, 1)`,
+    );
+    return { soil, prev, yields, prods, prevN, prevIrrigation, rsh: rsh[0] ?? null, cover, sownOn: sown?.day ?? null };
   });
   const { soil, prev, prevN } = gathered;
   const department = soil?.insee ? soil.insee.slice(0, 2) : null;
@@ -283,6 +292,17 @@ async function contextOf(db: Database, farmId: string, plan: PlanRow, fertilizer
         : null;
   const strawReturned = d.strawReturned ?? null;
 
+  // Ouverture du bilan : saisie, sinon la date du reliquat mesuré, sinon le 1er avril (printemps) ou le 1er février.
+  const opening: PlanContext["opening"] = d.openingOn
+    ? { on: d.openingOn, origin: "entered" }
+    : rshKg !== null
+      ? { on: gathered.rsh!.sampled_on, origin: "rsh" }
+      : { on: `${plan.campaign}-${spring ? "04-01" : "02-01"}`, origin: "default" };
+  const openingMd = opening.on.slice(5, 10);
+  const openingClass = openingMd >= "04-01" && openingMd <= "09-30" ? "april" : "end_of_winter";
+  const cover = gathered.cover;
+  const destroyedMonth = cover?.destroyedOn ? Number(cover.destroyedOn.slice(5, 7)) : null;
+
   const context: PlanContext = {
     department,
     crop,
@@ -297,6 +317,9 @@ async function contextOf(db: Database, farmId: string, plan: PlanRow, fertilizer
     water: { origin: soil?.origin ?? null, no3MgL: num(soil?.nitrate), name: soil?.wname ?? null },
     irrigationMm,
     zone: soil?.status ?? null,
+    opening,
+    sowing: { period: d.sowingPeriod ?? null, sownOn: gathered.sownOn },
+    cover,
   };
   const input: BalanceInput = {
     campaign: plan.campaign,
@@ -309,7 +332,14 @@ async function contextOf(db: Database, farmId: string, plan: PlanRow, fertilizer
     rshMeasured: context.rsh,
     tillers: d.tillers ?? null,
     previous: prevCrop ? { crop: prevCrop, strawReturned: isStrawCereal(prevCrop) ? strawReturned : null, yieldRealized: prevYield, xMineral: prevN?.total ?? null } : null,
-    cover: d.cover ?? null,
+    opening: openingClass,
+    cover: cover
+      ? {
+          family: cover.family,
+          biomass: cover.biomass,
+          destruction: destroyedMonth === null ? null : destroyedMonth >= 8 ? "nov_dec" : "after_january",
+        }
+      : null,
     rainMm: rain?.mm ?? null,
     valueA: d.valueA ?? null,
     irrigation: irrigated && irrigationMm ? { plannedMm: irrigationMm.value, no3MgL: context.water.no3MgL, origin: context.water.origin } : null,

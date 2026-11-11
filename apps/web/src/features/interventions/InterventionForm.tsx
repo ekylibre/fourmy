@@ -445,7 +445,11 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       else delete next[articleId];
       return next;
     });
-  const dangers = compliance ? dangerMessages(compliance) : [];
+  const dangers = [
+    ...(compliance ? dangerMessages(compliance) : []),
+    // Directive nitrates (lot AI) : épandage en période d'interdiction, même motif que le phyto.
+    ...(fertilizationCheck.result?.indicators ?? []).filter((i) => i.level === "danger").map((i) => `${i.parcelName ? `${i.parcelName} : ` : ""}${i.message}`),
+  ];
 
   const submit = useMutation({
     mutationFn: async () => {

@@ -438,7 +438,35 @@ Un apport foliaire est hors calendrier. Un type de fertilisant inconnu donne « 
 
 **Éditions** : pages imprimables `/f/:ferme/print/fertilization/record|plans?campaign=`, sans menu, avec un saut de page par plan. On les imprime ou on les enregistre en PDF depuis le navigateur ; le cahier s'exporte aussi en CSV.
 
-**Pas encore fait** : couverts d'interculture (nature de production `cover`), justificatifs joints, plafonds de l'azote libéré avant la sortie d'hiver (APLSH), grille d'efficacité des apports minéraux, pilotage.
+**Pas encore fait** (après le lot AH) : couverts d'interculture, justificatifs joints, plafonds de l'azote libéré avant la sortie d'hiver (APLSH), grille d'efficacité des apports minéraux, pilotage.
+
+### 5.4 Réalisation du lot AI (2026-11-11)
+
+Migration `0038_fertilization_ai.sql` : colonne `interventions.nitrate_check`, tables `cover_crops` et `regulatory_documents`, avec RLS.
+
+**Interdiction bloquante (fin de l'écart D8)** : à l'enregistrement d'une intervention, l'API refait le contrôle nitrates (`checkApplicationTx`, dans la même transaction que le contrôle phyto). Si une intervention réalisée est saisie sur le web pendant une période d'interdiction, l'API la refuse (422) tant qu'il manque un motif. Le motif est celui du contrôle phyto (`compliance.reason`) : une seule fenêtre « Feu rouge réglementaire » dans la saisie regroupe les deux. Le contrôle et son motif sont enregistrés dans `nitrate_check` et montrés sur la fiche de l'intervention. Depuis le mobile, l'intervention est enregistrée et l'interdiction reste visible, comme pour le phyto. Les interventions reprises d'Ekylibre ne sont pas recontrôlées.
+
+**Date d'ouverture et implantation** :
+- Le brouillon du plan reçoit `openingOn` et `sowingPeriod`.
+- La date d'ouverture retenue est la date saisie. À défaut, c'est la date du reliquat mesuré, puis le 1er avril (culture de printemps) ou le 1er février.
+- Elle fixe la classe d'ouverture des tables Mr et MrCi : « avril » du 1er avril au 30 septembre, « sortie d'hiver » sinon.
+- La date de semis réalisée est reprise de la première intervention de semis de la campagne.
+
+**Couverts d'interculture** (FR-FERT-19, 23) :
+- Un couvert par parcelle et par campagne, saisi dans le plan : famille de la table MrCi, espèces, semis, destruction et mode, biomasse, export.
+- Il donne MrCi, la destruction étant classée novembre-décembre ou après janvier. Sans biomasse ou sans date de destruction, MrCi est nommé manquant.
+- Il figure au cahier, à l'écran, à l'impression et dans le CSV.
+- On ne passe pas par `productions.nature = cover`, prévu à la conception : un couvert n'a ni activité ni rendement, et une table dédiée garde les champs de la table MrCi.
+
+**Justificatifs** (FR-FERT-28) :
+- `POST /fertilization/documents` (multipart : `file`, `ownerType`, `ownerId`), puis `GET` en liste ou en téléchargement, et `DELETE`.
+- Formats PDF, JPEG ou PNG, reconnus au contenu et non au nom, 10 Mio au plus.
+- Ils se joignent à une dose externe (plan), une analyse de sol, une analyse de produit, un point d'eau ou un couvert. Ils sont supprimés avec leur objet.
+- Lecture pour les membres ; ajout et retrait pour le responsable.
+
+**Analyse de sol annuelle** : au-delà de 3 ha en zone vulnérable, la page Fertilisation azotée dit si une analyse (reliquat sortie d'hiver, reliquat post-récolte ou analyse de terre) a été faite dans la campagne sur une parcelle en zone vulnérable. La campagne commence à la date des paramètres de la ferme.
+
+**Reste à faire** : pilotage et révision en cours de campagne, APLSH, grille d'efficacité, colza et Keq des organiques, conditions d'épandage (sol gelé, pentes), rôle conseiller, mobile, autres régions.
 
 ## 6. Contrats (`@fourmy/contracts`, `fertilization.ts`)
 
@@ -527,7 +555,8 @@ Les termes encore **manquants** sont listés (« à compléter ») sur le tablea
 | **AF — Référentiels, sol et zonage** | `packages/fertilization-refs` (Nouvelle-Aquitaine 2025, calendrier PAN 7, zonage Adour-Garonne 2026, variétés de blé 2026), type de sol régional, analyses de sol, points d'eau, statut ZV par parcelle, paramètres de la ferme. Demande d'accord au COMIFER | FR-FERT-1 à 4, 31, 32, 37 à 39 |
 | **AG — PPF et calcul** | Domaine (objectif, bilan maïs, céréales, colza, plafonds, fractionnement), PPF versionné, préparation de la campagne, dose venue d'ailleurs, surcharges, écrans PPF | FR-FERT-9 à 16, 38 |
 | **AH — Cahier, contrôles et éditions** | Cahier calculé, couverts (`productions.nature = cover`), contrôles calendrier, plan, plafond, fractionnement, météo, eau, pages imprimables et CSV, tableau de bord, justificatifs | FR-FERT-19 à 23, 25, 26, 30, 33, 34, 36 |
-| AI — ensuite | Pilotage et révision, APLSH, grille d'efficacité, couverture des sols, lien avec la modulation, rôle conseiller, mobile | FR-FERT-17, 18, 27 à 29, 35, 40 ; NFR-FERT-7 |
+| **AI — Interdictions, couverts, justificatifs** | Interdiction d'épandage bloquante avec motif, couverts d'interculture (MrCi, cahier), justificatifs joints, date d'ouverture et période d'implantation, analyse de sol annuelle | FR-FERT-19, 23, 25, 28 |
+| AJ — ensuite | Pilotage et révision, APLSH, grille d'efficacité, lien avec la modulation, rôle conseiller, mobile | FR-FERT-17, 18, 27, 29, 35, 40 ; NFR-FERT-7 |
 
 ## 11. Tests
 

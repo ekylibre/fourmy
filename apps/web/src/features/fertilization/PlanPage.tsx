@@ -26,7 +26,12 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import {
   BALANCE_TERM_LABELS,
   BALANCE_TERMS,
+  COVER_BIOMASS_LABELS,
+  COVER_FAMILY_LABELS,
+  DESTRUCTION_MODE_LABELS,
   type BalanceTerm,
+  type CoverCrop,
+  type CoverCropWrite,
   type FertilizationPlan,
   type PlanDraft,
   type PlannedApplication,
@@ -38,6 +43,7 @@ import { useFarm } from "../../app/farm";
 import { formatDate, formatDateTime } from "../../app/labels";
 import { ErrorAlert, Loading } from "../../components/states";
 import { useFertilizers } from "./fertilization";
+import { Documents } from "./Documents";
 
 const ORIGIN: Record<string, { label: string; color: string }> = {
   computed: { label: "calculé", color: "ardoise" },
@@ -140,6 +146,12 @@ export function PlanPage() {
                 )}
               </Row>
               <Row label="Objectif de rendement">{c.yieldTarget ? `${fmt(c.yieldTarget.value)} q/ha (${c.yieldTarget.detail})` : <Missing>à saisir</Missing>}</Row>
+              <Row label="Ouverture du bilan">
+                {formatDate(c.opening.on)} ({c.opening.origin === "entered" ? "saisie" : c.opening.origin === "rsh" ? "date du reliquat mesuré" : "date par défaut"})
+              </Row>
+              <Row label="Implantation">
+                {c.sowing.sownOn ? `semée le ${formatDate(c.sowing.sownOn)}` : c.sowing.period ? `prévue : ${c.sowing.period}` : <Missing>période d'implantation à saisir</Missing>}
+              </Row>
               <Row label="Reliquat mesuré">{c.rsh ? `${c.rsh.kgNHa} kg N/ha le ${formatDate(c.rsh.sampledOn)}` : "aucun : estimé d'après le précédent et la pluie"}</Row>
               <Row label="Pluie depuis le 1er octobre">
                 {c.rain ? `${c.rain.mm} mm jusqu'au ${formatDate(c.rain.to)}${c.rain.normalsFrom ? ` (normales à partir du ${formatDate(c.rain.normalsFrom)})` : ""}` : <Missing>météo indisponible</Missing>}
@@ -170,6 +182,24 @@ export function PlanPage() {
               onBlur={(e) => {
                 const v = e.currentTarget.value.replace(",", ".").replace(/[^\d.]/g, "");
                 update({ yieldTarget: v ? Number(v) : null });
+              }}
+            />
+            <TextInput
+              label="Date d'ouverture du bilan"
+              type="date"
+              description={draft.openingOn ? undefined : `Par défaut : ${formatDate(c.opening.on)}`}
+              disabled={!owner}
+              value={draft.openingOn ?? ""}
+              onChange={(e) => update({ openingOn: e.currentTarget.value || null })}
+            />
+            <TextInput
+              label="Période d'implantation"
+              placeholder="15 avril – 10 mai"
+              disabled={!owner}
+              defaultValue={draft.sowingPeriod ?? ""}
+              onBlur={(e) => {
+                const v = e.currentTarget.value.trim() || null;
+                if (v !== (draft.sowingPeriod ?? null)) update({ sowingPeriod: v });
               }}
             />
             {c.irrigated && (
@@ -275,7 +305,16 @@ export function PlanPage() {
         {r.floor30 && <Text size="sm" mt="xs">Dose inférieure à 30 kg : le forfait de 30 kg est possible si l'apport ne peut pas être plus précis (article 12).</Text>}
       </Paper>
 
-      <ExternalDose farmId={farm.id} owner={owner} draft={draft} fourmyDose={r.dose} onChange={(external) => update({ external })} />
+      <CoverSection
+        farmId={farm.id}
+        owner={owner}
+        parcelId={p.parcel.id}
+        campaign={p.campaign}
+        cover={c.cover}
+        onSaved={() => void client.invalidateQueries({ queryKey: ["fertilization-plan", farm.id, planId] })}
+      />
+
+      <ExternalDose farmId={farm.id} planId={planId} owner={owner} draft={draft} fourmyDose={r.dose} onChange={(external) => update({ external })} />
 
       <Applications farmId={farm.id} owner={owner} dose={dose} applications={applications} proposed={!draft.applications?.length} onChange={(apps) => update({ applications: apps })} />
 
@@ -420,11 +459,10 @@ function OverrideModal({ term, current, onClose, onSave }: { term: BalanceTerm; 
   );
 }
 
-function ExternalDose({ farmId, owner, draft, fourmyDose, onChange }: { farmId: string; owner: boolean; draft: PlanDraft; fourmyDose: number | null; onChange: (e: PlanDraft["external"]) => void }) {
+function ExternalDose({ farmId, planId, owner, draft, fourmyDose, onChange }: { farmId: string; planId: string; owner: boolean; draft: PlanDraft; fourmyDose: number | null; onChange: (e: PlanDraft["external"]) => void }) {
   const [editing, setEditing] = useState(false);
   const e = draft.external;
   const [form, setForm] = useState({ doseKgNHa: e?.doseKgNHa ?? 0, tool: e?.tool ?? "", advisor: e?.advisor ?? "", computedOn: e?.computedOn ?? new Date().toISOString().slice(0, 10) });
-  void farmId;
   return (
     <Paper withBorder p="md" aria-label="Dose d'un outil ou d'un conseiller">
       <Group justify="space-between">
@@ -451,6 +489,11 @@ function ExternalDose({ farmId, owner, draft, fourmyDose, onChange }: { farmId: 
             </Anchor>
           )}
         </Text>
+      )}
+      {e && (
+        <div style={{ marginTop: 8 }}>
+          <Documents farmId={farmId} ownerType="plan" ownerId={planId} owner={owner} label="Sortie de l'outil, avis du conseiller" />
+        </div>
       )}
       {editing && (
         <Stack mt="xs">
@@ -588,5 +631,97 @@ function EstablishModal({ farmId, planId, revision, dose, onClose, onDone }: { f
         </Group>
       </Stack>
     </Modal>
+  );
+}
+
+const BLANK_COVER = (campaign: number): CoverCropWrite => ({
+  campaign,
+  family: "cruciferes",
+  species: "",
+  sownOn: `${campaign - 1}-09-01`,
+  destroyedOn: null,
+  exported: false,
+  biomass: null,
+  destructionMode: null,
+  notes: null,
+});
+const options = (labels: Record<string, string>) => Object.entries(labels).map(([value, label]) => ({ value, label }));
+
+/**
+ * Couvert d'interculture avant la culture (lot AI, FR-FERT-19) : famille,
+ * semis, destruction, biomasse. Il fixe MrCi dans le bilan et figure au
+ * cahier d'enregistrement.
+ */
+function CoverSection({ farmId, owner, parcelId, campaign, cover, onSaved }: { farmId: string; owner: boolean; parcelId: string; campaign: number; cover: CoverCrop | null; onSaved: () => void }) {
+  const [form, setForm] = useState<CoverCropWrite | null>(null);
+  const path = farmPath(farmId, `/land-parcels/${parcelId}/cover-crop`);
+  const save = useMutation({
+    mutationFn: (w: CoverCropWrite) => api.put<CoverCrop>(path, w),
+    onSuccess: () => {
+      setForm(null);
+      onSaved();
+    },
+  });
+  const remove = useMutation({ mutationFn: () => api.delete(`${path}?campaign=${campaign}`), onSuccess: onSaved });
+  const edit = () => {
+    if (!cover) return setForm(BLANK_COVER(campaign));
+    const { id: _id, parcelId: _p, ...w } = cover;
+    setForm(w);
+  };
+  return (
+    <Paper withBorder p="md" aria-label="Couvert d'interculture">
+      <Group justify="space-between">
+        <div>
+          <Title order={4}>Couvert d'interculture</Title>
+          <Text size="sm" c="dimmed">
+            Couvert semé après la culture précédente : il compte dans le bilan (MrCi) et au cahier d'enregistrement.
+          </Text>
+        </div>
+        {owner && !form && (
+          <Button size="compact-sm" variant="light" leftSection={cover ? <Pencil size={14} /> : <Plus size={14} />} onClick={edit}>
+            {cover ? "Modifier" : "Saisir un couvert"}
+          </Button>
+        )}
+      </Group>
+      {cover && !form && (
+        <Stack gap="xs" mt="xs">
+          <Text size="sm">
+            <b>{cover.species}</b> ({COVER_FAMILY_LABELS[cover.family]}) semé le {formatDate(cover.sownOn)}
+            {cover.destroyedOn ? `, détruit le ${formatDate(cover.destroyedOn)}` : ", destruction à saisir"}
+            {cover.destructionMode ? ` (${DESTRUCTION_MODE_LABELS[cover.destructionMode].toLowerCase()})` : ""}
+            {cover.biomass ? ` · biomasse ${COVER_BIOMASS_LABELS[cover.biomass]}` : " · biomasse à estimer"}
+            {cover.exported ? " · exporté" : ""}.
+            {owner && (
+              <Anchor component="button" size="sm" ml="xs" c="brique" onClick={() => remove.mutate()}>
+                Retirer
+              </Anchor>
+            )}
+          </Text>
+          <Documents farmId={farmId} ownerType="cover_crop" ownerId={cover.id} owner={owner} label="Photos, factures de semences" />
+        </Stack>
+      )}
+      {form && (
+        <Stack mt="xs">
+          <SimpleGrid cols={{ base: 1, sm: 3 }}>
+            <Select label="Famille" data={options(COVER_FAMILY_LABELS)} value={form.family} allowDeselect={false} onChange={(v) => v && setForm({ ...form, family: v as CoverCropWrite["family"] })} />
+            <TextInput label="Espèces" placeholder="Moutarde blanche, phacélie…" value={form.species} onChange={(e) => setForm({ ...form, species: e.currentTarget.value })} />
+            <TextInput label="Semé le" type="date" value={form.sownOn} onChange={(e) => setForm({ ...form, sownOn: e.currentTarget.value })} />
+            <TextInput label="Détruit le" type="date" value={form.destroyedOn ?? ""} onChange={(e) => setForm({ ...form, destroyedOn: e.currentTarget.value || null })} />
+            <Select label="Mode de destruction" data={options(DESTRUCTION_MODE_LABELS)} value={form.destructionMode} clearable onChange={(v) => setForm({ ...form, destructionMode: v as CoverCropWrite["destructionMode"] })} />
+            <Select label="Biomasse à la destruction" data={options(COVER_BIOMASS_LABELS)} value={form.biomass} clearable onChange={(v) => setForm({ ...form, biomass: v as CoverCropWrite["biomass"] })} />
+          </SimpleGrid>
+          <Switch label="Couvert exporté (fauché, pâturé)" checked={form.exported} onChange={(e) => setForm({ ...form, exported: e.currentTarget.checked })} />
+          {save.error && <ErrorAlert error={save.error} />}
+          <Group>
+            <Button size="xs" disabled={!form.species.trim() || !form.sownOn} loading={save.isPending} onClick={() => save.mutate({ ...form, species: form.species.trim() })}>
+              Enregistrer le couvert
+            </Button>
+            <Button size="xs" variant="subtle" onClick={() => setForm(null)}>
+              Annuler
+            </Button>
+          </Group>
+        </Stack>
+      )}
+    </Paper>
   );
 }

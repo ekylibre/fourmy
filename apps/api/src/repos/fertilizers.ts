@@ -101,11 +101,14 @@ function view(r: Row, analyses: ProductAnalysis[]): FertilizerArticle {
  * article qui a une composition (amendement, engrais rangé en « autre »).
  */
 export async function listFertilizers(db: Database, farmId: string): Promise<FertilizerArticle[]> {
-  return withFarm(db, farmId, async (tx) => {
-    const list = await rows<Row>(tx, sql`${SELECT} WHERE a.kind = 'fertilizer' OR f.article_id IS NOT NULL ORDER BY a.name`);
-    const analyses = await analysesOf(tx, list.map((r) => r.id));
-    return list.map((r) => view(r, analyses.get(r.id) ?? []));
-  });
+  return withFarm(db, farmId, fertilizersInTx);
+}
+
+/** Fertilisants lus dans une transaction déjà ouverte (contrôle à l'enregistrement d'une intervention). */
+export async function fertilizersInTx(tx: Tx): Promise<FertilizerArticle[]> {
+  const list = await rows<Row>(tx, sql`${SELECT} WHERE a.kind = 'fertilizer' OR f.article_id IS NOT NULL ORDER BY a.name`);
+  const analyses = await analysesOf(tx, list.map((r) => r.id));
+  return list.map((r) => view(r, analyses.get(r.id) ?? []));
 }
 
 export async function getFertilizer(db: Database, farmId: string, articleId: string): Promise<FertilizerArticle> {
@@ -151,6 +154,7 @@ export async function addProductAnalysis(db: Database, farmId: string, userId: s
 export async function removeProductAnalysis(db: Database, farmId: string, articleId: string, analysisId: string): Promise<FertilizerArticle> {
   await withFarm(db, farmId, async (tx) => {
     const removed = await rows(tx, sql`DELETE FROM product_analyses WHERE id = ${analysisId} AND article_id = ${articleId} RETURNING id`);
+    if (removed.length) await tx.execute(sql`DELETE FROM regulatory_documents WHERE owner_type = 'product_analysis' AND owner_id = ${analysisId}`);
     if (!removed.length) throw new NotFound("Analyse introuvable.");
   });
   return getFertilizer(db, farmId, articleId);
