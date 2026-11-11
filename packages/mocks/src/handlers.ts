@@ -21,6 +21,7 @@ import {
   DEMO_USER_ID,
   demoParcelIndicesAt,
   demoParcelSeries,
+  demoVegetation3d,
 } from "./fixtures.js";
 
 /**
@@ -79,6 +80,10 @@ export const handlers = [
   ),
   http.get(`*${base}/remote-sensing/scenes`, () => HttpResponse.json({ items: [] })),
   http.get(`*${base}/remote-sensing/anomalies`, () => HttpResponse.json({ items: [] })),
+  // Végétation et météo du plan 3D (lot AA).
+  http.get(`*${base}/vegetation3d`, ({ request }) => HttpResponse.json(demoVegetation3d(new URL(request.url).searchParams.get("at") ?? "2026-06-01"))),
+  http.put(`*${base}/land-parcels/:id/rows`, () => new HttpResponse(null, { status: 204 })),
+  http.delete(`*${base}/land-parcels/:id/rows`, () => new HttpResponse(null, { status: 204 })),
   http.post(`*${base}/remote-sensing/anomalies/dismiss`, () => new HttpResponse(null, { status: 204 })),
   http.get(`*${base}/land-parcels/:id/indices`, ({ request, params }) => {
     const q = new URL(request.url).searchParams;

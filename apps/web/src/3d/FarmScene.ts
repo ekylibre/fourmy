@@ -14,8 +14,12 @@ import {
   Quaternion,
   SampledProperty,
   Transforms,
+  Axis,
   Color,
   ColorMaterialProperty,
+  Model,
+  PostProcessStage,
+  ShadowMode,
   CustomHeightmapTerrainProvider,
   ImageryLayer,
   Rectangle,
@@ -44,6 +48,36 @@ import {
 import { outerRing, type Pt } from "@fourmy/domain";
 import type { GeoJsonGeometry } from "@fourmy/contracts";
 import { behind, cesiumHeading, headings, initialView, splitRuns, type Sample } from "./geometry";
+import { localFrame, rowPieces } from "@fourmy/domain";
+import type { ParcelVegetation } from "@fourmy/contracts";
+import { instancedBoxGlb, type BoxInstance } from "./vegetation-glb";
+import { vegetationStyle } from "./vegetation";
+import type { WeatherLook } from "./weather-look";
+
+/** Pluie ou neige en post-traitement : traits (ou flocons) qui tombent devant la scène. */
+const PRECIPITATION_GLSL = `
+uniform sampler2D colorTexture;
+uniform float u_time;
+uniform float u_intensity;
+uniform float u_snow;
+in vec2 v_textureCoordinates;
+float hash(float n) { return fract(sin(n) * 43758.5453); }
+void main() {
+  vec2 uv = v_textureCoordinates;
+  vec4 color = texture(colorTexture, uv);
+  float cols = mix(110.0, 70.0, u_snow);
+  float col = floor(uv.x * cols);
+  float speed = mix(1.8, 0.22, u_snow) * (0.8 + 0.4 * hash(col));
+  float phase = uv.y * mix(3.0, 2.0, u_snow) + u_time * speed + hash(col * 1.7);
+  float y = fract(phase);
+  float len = mix(0.07, 0.015, u_snow);
+  float drop = smoothstep(0.0, len * 0.3, y) * (1.0 - smoothstep(len * 0.3, len, y));
+  drop *= step(0.9 - 0.35 * u_intensity, hash(col * 3.7 + floor(phase)));
+  float xw = abs(fract(uv.x * cols) - 0.5);
+  drop *= 1.0 - smoothstep(mix(0.04, 0.18, u_snow), mix(0.1, 0.32, u_snow), xw);
+  vec3 tint = mix(vec3(0.74, 0.79, 0.87), vec3(1.0), u_snow);
+  out_FragColor = vec4(mix(color.rgb * (1.0 - 0.1 * u_intensity), tint, drop * mix(0.35, 0.85, u_snow)), color.a);
+}`;
 
 /** Avatar 3D d'un rejeu (lot M) : modèle, logo, outils attelés. */
 export interface TrackAvatar {
@@ -164,6 +198,14 @@ export class FarmScene {
   private satKey: string | null = null;
   private parcelTint: Map<string, string> | null = null;
   private parcelAlpha = 0.4;
+  /** Végétation (un modèle instancié par parcelle) et météo du jour (lot AA). */
+  private vegModels: Model[] = [];
+  private vegUrls: string[] = [];
+  private vegKey = "";
+  private vegGeneration = 0;
+  private precipitation: PostProcessStage | null = null;
+  private ortho: ImageryLayer | null = null;
+  private defaultFog = 2e-4;
   /** Géométries ignorées au dernier affichage (invalides). */
   skipped = 0;
   private readonly handler: ScreenSpaceEventHandler;
@@ -193,7 +235,8 @@ export class FarmScene {
       console.error("[vue 3D]", error);
       opts.onRenderError?.(error);
     });
-    this.viewer.imageryLayers.addImageryProvider(IGN_ORTHO);
+    this.ortho = this.viewer.imageryLayers.addImageryProvider(IGN_ORTHO);
+    this.defaultFog = this.viewer.scene.fog.density;
     this.viewer.scene.globe.depthTestAgainstTerrain = true; // clic sur le relief, cuves masquées par les collines
     this.viewer.clock.onTick.addEventListener((clock) => {
       opts.onClockTick?.(JulianDate.toIso8601(clock.currentTime, 0));
@@ -220,6 +263,8 @@ export class FarmScene {
   /** Remplace le plan (parcelles, bâtiments, cuves) — appelé à chaque date de la frise. */
   setPlan(plan: PlanData) {
     this.plan = plan;
+    // La végétation dépend des formes du plan : à reconstruire au prochain setVegetation.
+    this.vegKey = "";
     for (const e of this.planEntities) this.viewer.entities.remove(e);
     this.planEntities = [];
     // Une géométrie invalide est ignorée (et comptée), jamais fatale à la vue.
@@ -341,6 +386,123 @@ export class FarmScene {
     // Une autre image a pu être demandée pendant le chargement.
     if (this.satKey !== key || this.viewer.isDestroyed()) return;
     this.satLayer = this.viewer.imageryLayers.addImageryProvider(provider);
+  }
+
+  /**
+   * Végétation du plan 3D (lot AA) : un glTF instancié par parcelle, un pavé
+   * par tronçon de rang (≤ 15 m, pour suivre le relief), posé sur le relief,
+   * hauteur et couleur selon l'état observé. `null` la retire.
+   */
+  async setVegetation(items: ParcelVegetation[] | null, frost = false): Promise<{ parcels: number; instances: number }> {
+    const key = items ? JSON.stringify([frost, items.map((i) => [i.parcelId, i.rows, i.canopy])]) : "";
+    if (key === this.vegKey) return { parcels: this.vegModels.length, instances: 0 };
+    this.vegKey = key;
+    const generation = ++this.vegGeneration;
+    for (const m of this.vegModels) this.viewer.scene.primitives.remove(m);
+    this.vegModels = [];
+    for (const u of this.vegUrls) URL.revokeObjectURL(u);
+    this.vegUrls = [];
+    if (!items || !this.plan) return { parcels: 0, instances: 0 };
+    const shapes = new Map(this.plan.parcels.map((p) => [p.id, p.shape]));
+    let instances = 0;
+    for (const item of items) {
+      const style = vegetationStyle(item, frost);
+      const shape = shapes.get(item.parcelId) as { type: string; coordinates?: unknown } | undefined;
+      if (!style || !shape) continue;
+      const polygons = (shape.type === "MultiPolygon" ? shape.coordinates : shape.type === "Polygon" ? [shape.coordinates] : []) as [number, number][][][];
+      const outer = polygons[0]?.[0];
+      if (!outer?.length) continue;
+      const lon0 = outer.reduce((a, p) => a + p[0], 0) / outer.length;
+      const lat0 = outer.reduce((a, p) => a + p[1], 0) / outer.length;
+      const frame = localFrame(lon0, lat0);
+      const rings = polygons.flat().map((ring) => ring.map(([lon, lat]) => frame.toLocal(lon, lat)));
+      let spacing = style.spacingM;
+      let pieces = rowPieces(rings, { bearingDeg: item.rows.bearingDeg, spacingM: spacing, insetM: 1, maxPieceM: 15, limit: 30_000 });
+      // Très grande parcelle : on espace les rangs dessinés plutôt que de saturer la carte graphique.
+      while (pieces === null) {
+        spacing *= 2;
+        pieces = rowPieces(rings, { bearingDeg: item.rows.bearingDeg, spacingM: spacing, insetM: 1, maxPieceM: 15, limit: 30_000 });
+      }
+      if (pieces.length === 0) continue;
+      // Altitude aux deux bouts de chaque tronçon : il s'incline avec la pente au lieu de faire des marches.
+      const b = CesiumMath.toRadians(item.rows.bearingDeg);
+      const [dx, dy] = [Math.sin(b), Math.cos(b)];
+      const ends = pieces.flatMap((p) => [
+        Cartographic.fromDegrees(...frame.toLonLat(p.x - (dx * p.length) / 2, p.y - (dy * p.length) / 2)),
+        Cartographic.fromDegrees(...frame.toLonLat(p.x + (dx * p.length) / 2, p.y + (dy * p.length) / 2)),
+      ]);
+      const cartos = [Cartographic.fromDegrees(lon0, lat0), ...ends];
+      const grounded = await sampleTerrain(this.viewer.terrainProvider, 15, cartos).catch(() => cartos);
+      if (generation !== this.vegGeneration || this.viewer.isDestroyed()) return { parcels: 0, instances: 0 };
+      const h0 = grounded[0]!.height || 0;
+      const yaw = CesiumMath.toRadians(90 - item.rows.bearingDeg);
+      const widthM = Math.min(style.widthM * (spacing / style.spacingM), spacing * 0.95);
+      const boxes: BoxInstance[] = pieces.map((p, i) => {
+        const za = grounded[1 + 2 * i]!.height || h0;
+        const zb = grounded[2 + 2 * i]!.height || h0;
+        return {
+          x: p.x,
+          y: p.y,
+          z: (za + zb) / 2 - h0 + style.baseM,
+          yaw,
+          pitch: Math.atan2(zb - za, p.length),
+          length: p.length,
+          width: widthM,
+          height: style.heightM,
+        };
+      });
+      // Model.fromGltfAsync veut une adresse : le glTF généré passe par une URL de blob, libérée avec le modèle.
+      const url = URL.createObjectURL(new Blob([instancedBoxGlb(boxes) as BlobPart], { type: "model/gltf-binary" }));
+      this.vegUrls.push(url);
+      const model = await Model.fromGltfAsync({
+        url,
+        modelMatrix: Transforms.eastNorthUpToFixedFrame(Cartesian3.fromDegrees(lon0, lat0, h0)),
+        upAxis: Axis.Z,
+        forwardAxis: Axis.X,
+        color: Color.fromCssColorString(style.color),
+        shadows: ShadowMode.DISABLED,
+        id: `vegetation:${item.parcelId}`,
+      });
+      if (generation !== this.vegGeneration || this.viewer.isDestroyed()) {
+        model.destroy();
+        return { parcels: 0, instances: 0 };
+      }
+      this.viewer.scene.primitives.add(model);
+      this.vegModels.push(model);
+      instances += boxes.length;
+    }
+    return { parcels: this.vegModels.length, instances };
+  }
+
+  /** Ambiance du jour (FR-TWIN-4) : ciel, brume, pluie ou neige, sol mouillé. `null` : ciel neutre. */
+  setWeather(look: WeatherLook | null) {
+    const scene = this.viewer.scene;
+    if (scene.skyAtmosphere) {
+      scene.skyAtmosphere.brightnessShift = look?.brightness ?? 0;
+      scene.skyAtmosphere.saturationShift = look?.saturation ?? 0;
+    }
+    scene.atmosphere.brightnessShift = (look?.brightness ?? 0) * 0.6;
+    scene.atmosphere.saturationShift = (look?.saturation ?? 0) * 0.6;
+    scene.fog.density = look?.fogDensity ?? this.defaultFog;
+    if (this.ortho) {
+      // Sol mouillé : photographie aérienne assombrie, plus contrastée.
+      this.ortho.brightness = look?.wetSoil ? 0.78 : look && look.brightness < -0.2 ? 0.9 : 1;
+      this.ortho.contrast = look?.wetSoil ? 1.12 : 1;
+      this.ortho.saturation = look ? 1 + look.saturation * 0.4 : 1;
+    }
+    if (this.precipitation) {
+      scene.postProcessStages.remove(this.precipitation);
+      this.precipitation = null;
+    }
+    if (look && (look.rain > 0 || look.snow)) {
+      const start = performance.now();
+      const stage = new PostProcessStage({
+        fragmentShader: PRECIPITATION_GLSL,
+        uniforms: { u_time: () => (performance.now() - start) / 1000, u_intensity: look.snow ? 0.6 : look.rain, u_snow: look.snow ? 1 : 0 },
+      });
+      scene.postProcessStages.add(stage);
+      this.precipitation = stage;
+    }
   }
 
   private addTank(t: PlanData["tanks"][number], add: (e: Entity.ConstructorOptions) => void) {
@@ -592,6 +754,8 @@ export class FarmScene {
   }
 
   destroy() {
+    this.vegGeneration++;
+    for (const u of this.vegUrls) URL.revokeObjectURL(u);
     this.handler.destroy();
     this.viewer.destroy();
   }

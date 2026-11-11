@@ -13,7 +13,7 @@ import type {
   TrackCoverage,
 } from "@fourmy/contracts";
 import { PROCEDURES, SHAPE_LABELS, TREATMENT_PURPOSE_LABELS, copernicusAttribution } from "@fourmy/contracts";
-import type { ParcelIndexSeries, ParcelIndicesAt } from "@fourmy/contracts";
+import type { ParcelIndexSeries, ParcelIndicesAt, Vegetation3dAt } from "@fourmy/contracts";
 import type { Activity, Article, Intervention, Person, PhytoRegisterEntry, ProcedureCatalogue, StockLevel } from "@fourmy/contracts";
 
 /**
@@ -361,5 +361,20 @@ export function demoParcelSeries(parcelId: string, from: string, to: string): Pa
     referenceYears: [Number(from.slice(0, 4)) - 2, Number(from.slice(0, 4)) - 1],
     interventions: [{ id: "demo-semis", procedure: "sowing", at: `${to.slice(0, 4)}-04-12` }],
     attribution: copernicusAttribution([Number(from.slice(0, 4)), Number(to.slice(0, 4))]),
+  };
+}
+
+/** Végétation du plan 3D (démo) : la vigne en feuilles, la grande culture en croissance ; temps éclairci. */
+export function demoVegetation3d(at: string): Vegetation3dAt {
+  return {
+    at,
+    parcels: demoLandParcelsAt.map((p, i) => ({
+      parcelId: p.id,
+      species: i === 0 ? "Malbec" : "zea_mays",
+      nature: i === 0 ? "vine" : "field_crop",
+      rows: { bearingDeg: 35 + i * 40, spacingM: i === 0 ? 2 : 0.75, auto: true },
+      canopy: { phase: "growing", heightM: i === 0 ? 1.6 : 1.9, density: 0.8, ndvi: demoNdvi(at), observedOn: isoAdd(at, -3) },
+    })),
+    weather: { day: at, source: "open_meteo", kind: "observed", icon: "02d", precipitationMm: 0, precipitation48hMm: 0, temperatureMinC: 11, temperatureMaxC: 24, windMaxKmh: 18 },
   };
 }

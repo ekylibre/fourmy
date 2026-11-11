@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Grid, Group, Paper, SegmentedControl, Select, Stack, Switch, Text, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -20,6 +20,9 @@ import { placementFromClick } from "./geometry";
 import { ndviColor } from "@fourmy/contracts";
 import { imageFor, useParcelIndicesAt, useRemoteSensingStatus, useSatelliteLayer } from "../features/remote-sensing/remote-sensing";
 import { SatelliteControl } from "../features/remote-sensing/SatelliteControl";
+import type { Vegetation3dAt } from "@fourmy/contracts";
+import { weatherLook } from "./weather-look";
+import { PHASE_LABELS } from "./vegetation";
 
 type Plan = PlanData & { at: string; unplaced: { id: string; name: string; reason: string }[] };
 
@@ -106,6 +109,27 @@ export function Plan3DPage() {
     if (plan.data) scene.current?.setPlan(plan.data);
   }, [plan.data]);
   useEffect(() => scene.current?.selectTank(selected), [selected]);
+
+  // Jumeau (lot AA) : rangs de végétation selon l'état observé, ambiance de la météo du jour.
+  const [vegOn, setVegOn] = useState(true);
+  const [weatherOn, setWeatherOn] = useState(true);
+  const vegetation = useQuery({
+    queryKey: ["vegetation3d", farm.id, day],
+    queryFn: () => api.get<Vegetation3dAt>(farmPath(farm.id, `/vegetation3d?at=${day}`)),
+    placeholderData: (prev) => prev,
+    staleTime: 10 * 60_000,
+  });
+  // Mémorisé : un nouvel objet à chaque rendu recréerait l'effet de pluie.
+  const weather = vegetation.data?.weather ?? null;
+  const look = useMemo(() => weatherLook(weather), [weather]);
+  useEffect(() => {
+    if (!plan.data || !vegetation.data) return;
+    scene.current
+      ?.setVegetation(vegOn ? vegetation.data.parcels : null, weatherOn && (look?.frost ?? false))
+      .catch((e) => console.warn("Végétation 3D non construite", e));
+  }, [plan.data, vegetation.data, vegOn, weatherOn, look?.frost]);
+  useEffect(() => scene.current?.setWeather(weatherOn ? look : null), [weatherOn, look]);
+  const phases = (vegetation.data?.parcels ?? []).reduce<Record<string, number>>((m, p) => ({ ...m, [p.canopy.phase]: (m[p.canopy.phase] ?? 0) + 1 }), {});
 
   // Télédétection (FR-TWIN-5) : image Sentinel-2 drapée sur le relief, ou parcelles teintées par leur NDVI.
   const [sat, setSat] = useSatelliteLayer();
@@ -213,6 +237,28 @@ export function Plan3DPage() {
         </Grid.Col>
         <Grid.Col span={{ base: 12, lg: 4 }}>
           <Stack>
+            <Paper p="md">
+              <Title order={4} mb="xs">
+                Jumeau : végétation et météo
+              </Title>
+              <Switch label="Rangs de végétation (état observé)" checked={vegOn} onChange={(e) => setVegOn(e.currentTarget.checked)} />
+              {vegOn && vegetation.data && (
+                <Text size="xs" c="dimmed" mt={4} aria-label="Phases des parcelles">
+                  {Object.entries(phases)
+                    .map(([phase, n]) => `${n} ${PHASE_LABELS[phase as keyof typeof PHASE_LABELS]}`)
+                    .join(" · ") || "Aucune parcelle"}
+                </Text>
+              )}
+              <Switch mt="xs" label="Météo du jour" checked={weatherOn} onChange={(e) => setWeatherOn(e.currentTarget.checked)} />
+              {weatherOn && (
+                <Text size="xs" c="dimmed" mt={4}>
+                  {look ? `${look.label}${look.wetSoil ? " · sol mouillé" : ""}${look.frost ? " · gelée" : ""}` : vegetation.isLoading ? "…" : "Météo indisponible"}
+                </Text>
+              )}
+              <Text size="xs" c="dimmed" mt="xs">
+                Hauteur et couleur des rangs d'après le NDVI Sentinel-2 et les interventions saisies ; orientation des rangs : grand axe de la parcelle, à corriger dans sa fiche.
+              </Text>
+            </Paper>
             <SatelliteControl farmId={farm.id} enabled={rsEnabled} data={rs.data} layer={sat} onChange={setSat} />
             <Paper p="md">
               <Group justify="space-between">

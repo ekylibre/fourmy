@@ -1,7 +1,8 @@
 import { sql, type SQL } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
-import type { InterventionTarget, InterventionWeather, SprayingForecast, WorkPeriod } from "@fourmy/contracts";
+import type { DayWeather, InterventionTarget, InterventionWeather, SprayingForecast, WorkPeriod } from "@fourmy/contracts";
 import {
+  dominantIcon,
   meteoblueForecast,
   openMeteoHours,
   openWeatherForecast,
@@ -206,4 +207,40 @@ export async function fillInterventionWeather(db: Database, farmId: string, inte
 
 export async function pendingWeather(db: Database, limit = 20): Promise<{ id: string; farm_id: string }[]> {
   return (await db.execute(sql`SELECT id, farm_id FROM fourmy_weather_pending(${limit})`)) as unknown as { id: string; farm_id: string }[];
+}
+
+/**
+ * Météo d'un jour au centre de la ferme, résumée pour le plan 3D (lot AA) :
+ * temps dominant de la journée (6 h à 20 h), pluie du jour et des 48 h
+ * précédentes (sol mouillé), températures extrêmes, rafale maximale.
+ * Prévision si le jour est à venir, observation sinon.
+ */
+export async function dayWeather(db: Database, farmId: string, day: string, fetchImpl: typeof fetch = fetch): Promise<DayWeather | null> {
+  const { point, providers } = await withFarm(db, farmId, async (tx) => ({ point: await weatherPoint(tx), providers: await keyedProviders(tx) }));
+  if (!point) return null;
+  // Journée locale (heure de Paris, approchée à UTC+1) et les deux précédentes.
+  const end = new Date(`${day}T00:00:00+01:00`).getTime() + 24 * HOUR;
+  const from = new Date(end - 72 * HOUR);
+  const { source, hours } = await hoursFor(providers, point.lat, point.lon, from, new Date(end), fetchImpl);
+  const inDay = (h: WeatherHour) => new Date(h.at).getTime() >= end - 24 * HOUR && new Date(h.at).getTime() < end;
+  const today = hours.filter(inDay);
+  if (today.length === 0) return null;
+  const sum = (hs: WeatherHour[]) => (hs.some((h) => h.precipitationMm !== null) ? Math.round(hs.reduce((s, h) => s + (h.precipitationMm ?? 0), 0) * 10) / 10 : null);
+  const temps = today.map((h) => h.temperatureC).filter((t): t is number => t !== null);
+  const winds = today.map((h) => h.gustKmh ?? h.windKmh).filter((w): w is number => w !== null);
+  const daylight = today.filter((h) => {
+    const hour = (new Date(h.at).getUTCHours() + 1) % 24;
+    return hour >= 6 && hour <= 20;
+  });
+  return {
+    day,
+    source,
+    kind: end > Date.now() ? "forecast" : "observed",
+    icon: dominantIcon((daylight.length ? daylight : today).map((h) => h.icon)),
+    precipitationMm: sum(today),
+    precipitation48hMm: sum(hours.filter((h) => new Date(h.at).getTime() >= end - 48 * HOUR && new Date(h.at).getTime() < end)),
+    temperatureMinC: temps.length ? Math.min(...temps) : null,
+    temperatureMaxC: temps.length ? Math.max(...temps) : null,
+    windMaxKmh: winds.length ? Math.max(...winds) : null,
+  };
 }

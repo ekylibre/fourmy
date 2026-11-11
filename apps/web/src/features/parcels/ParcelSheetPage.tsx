@@ -18,6 +18,7 @@ import { ActivityBadge } from "../activities/ActivityBadge";
 import { CertificationBadges, ParcelCertificationsModal } from "../certifications/Certifications";
 import { ParcelMap } from "../map/ParcelMap";
 import { SprayingConditions } from "../weather/Weather";
+import { ParcelRows } from "./ParcelRows";
 
 /** Onglets ouvrables par l'URL (`?tab=vegetation` depuis une alerte satellite). */
 const TABS = ["general", "crops", "cadastre", "water", "vegetation", "weather", "interventions"];
@@ -171,6 +172,9 @@ function Sheet({ sheet: s }: { sheet: ParcelSheet }) {
               </Stack>
             </Grid.Col>
           </Grid>
+          <div style={{ marginTop: "var(--mantine-spacing-md)" }}>
+            <ParcelRows farmId={farm.id} parcelId={s.id} owner={owner} />
+          </div>
         </Tabs.Panel>
 
         <Tabs.Panel value="crops" pt="md">
