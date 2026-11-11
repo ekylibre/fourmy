@@ -196,7 +196,9 @@ conception : [`teledetection-design.md`](teledetection-design.md).
   hydrique (ou besoin d'irrigation), d'après le semis saisi et la météo.
   *Réalisé (lot AB) en version simple : degrés-jours et bilan FAO-56, maïs et
   céréales à paille ([`modele-croissance.md`](modele-croissance.md)).
-  WOFOST et l'assimilation du LAI restent à faire.*
+  WOFOST et l'assimilation du LAI restent à faire.* Les irrigations saisies
+  (procédure « Irrigation », dose en mm) entrent dans le bilan hydrique.
+  *Réalisé (lot AC).*
 - **FR-TWIN-6, 7 et 9** (modulation ISO-XML, ISOBUS, capteurs) : voir
   l'étude, lots ultérieurs.
 
