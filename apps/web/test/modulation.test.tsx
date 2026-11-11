@@ -136,6 +136,22 @@ describe("cartes de modulation", () => {
     expect(screen.getByLabelText("Apport du plan de fumure")).toHaveTextContent("300 kg/ha prévus, 103 kg/ha en moyenne sur la carte");
   });
 
+  it("depuis un apport daté : l'image proposée est celle qui précède la date prévue (recette du 11/11)", async () => {
+    server.use(
+      http.get("*/land-parcels/:id/modulation-dates", () =>
+        HttpResponse.json({
+          items: [
+            { date: "2026-11-08", mean: 0.3, validRatio: 1 },
+            { date: "2026-06-10", mean: 0.52, validRatio: 0.98 },
+            { date: "2026-05-20", mean: 0.41, validRatio: 0.95 },
+          ],
+        }),
+      ),
+    );
+    renderApp(`/f/${FARM}/prescriptions/new?parcel=${PARCEL}&plan=p1&stage=6+feuilles&product=Ur%C3%A9e&rate=150&unit=kg_ha&on=2026-06-15`);
+    expect(await screen.findByDisplayValue("10/06/2026 · NDVI 0,52")).toBeInTheDocument();
+  });
+
   it("fiche : téléchargements, envoi par agrirouter aux seules machines qui acceptent le format", async () => {
     let sent: unknown = null;
     server.use(

@@ -86,7 +86,9 @@ describe("plan de fumure", () => {
     expect(within(table).getByRole("link", { name: "Champ Maïs 2026" })).toHaveAttribute("href", expect.stringContaining(`/fertilization/plans/${PLAN}`));
     expect(within(table).getByText("223 kg N/ha")).toBeInTheDocument();
     expect(screen.getByText("1 plan à établir.")).toBeInTheDocument();
-    expect(await within(screen.getByLabelText("Suivi de la campagne")).findByText("Couverture des sols à vérifier : Champ Maïs 2026.")).toBeInTheDocument();
+    // La couverture des sols n'est plus répétée dans le suivi : elle est dans l'encadré « À compléter » (recette du 11/11).
+    await within(screen.getByLabelText("Suivi de la campagne")).findByText(/kg d'azote potentiellement libéré/);
+    expect(within(screen.getByLabelText("Suivi de la campagne")).queryByText(/Couverture des sols/)).not.toBeInTheDocument();
     expect(screen.getByText("Champ Maïs 2026 : 230 kg N apportés pour 180 kg prévus, sans mesure de pilotage.")).toBeInTheDocument();
     expect(screen.getByText("Champ Maïs 2026 : 90 kg d'azote potentiellement libéré jusqu'en sortie d'hiver sur le couvert, pour un plafond de 70 kg.")).toBeInTheDocument();
     expect((await screen.findAllByLabelText("Zone climatique (APLSH)"))[0]).toHaveValue("D'après le département");
@@ -232,6 +234,30 @@ describe("plan de fumure", () => {
     expect(screen.queryByLabelText("Données de la parcelle")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Couvert d'interculture")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Dose d'un outil ou d'un conseiller")).toBeInTheDocument();
+  });
+
+  it("retirer un couvert demande une confirmation (recette du 11/11)", async () => {
+    let deleted = false;
+    const cover = { id: "c1", parcelId: plan().parcel.id, campaign: 2026, kind: "sown" as const, family: "cruciferes" as const, species: "Moutarde", sownOn: "2025-09-01", destroyedOn: null, exported: false, biomass: null, destructionMode: null, notes: null };
+    server.use(
+      http.get("*/fertilization/plans/:id", () => HttpResponse.json(plan({ context: { ...plan().context, cover } }))),
+      http.get("*/fertilizers", () => HttpResponse.json({ items: [] })),
+      http.delete("*/land-parcels/:id/cover-crop", () => {
+        deleted = true;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    renderApp(`/f/${FARM}/fertilization/plans/${PLAN}`);
+    const section = await screen.findByLabelText("Couvert d'interculture");
+    const user = userEvent.setup();
+    await user.click(within(section).getByRole("button", { name: "Retirer" }));
+    const dialog = await screen.findByRole("dialog", { name: "Retirer le couvert" });
+    expect(dialog).toHaveTextContent("Le couvert « Moutarde » et ses justificatifs seront supprimés.");
+    await user.click(within(dialog).getByRole("button", { name: "Annuler" }));
+    expect(deleted).toBe(false);
+    await user.click(within(section).getByRole("button", { name: "Retirer" }));
+    await user.click(within(await screen.findByRole("dialog", { name: "Retirer le couvert" })).getByRole("button", { name: "Retirer" }));
+    await waitFor(() => expect(deleted).toBe(true));
   });
 
   it("ouverture du bilan, période d'implantation et couvert d'interculture", async () => {

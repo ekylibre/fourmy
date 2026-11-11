@@ -15,6 +15,7 @@ import {
   type ProductAnalysisWrite,
 } from "@fourmy/contracts";
 import { aplshProducts, naProProducts } from "@fourmy/fertilization-refs";
+import { useConfirm } from "../../components/confirm";
 import { api, farmPath } from "../../app/api";
 import { Documents } from "./Documents";
 import { useFarm } from "../../app/farm";
@@ -265,8 +266,10 @@ function Analyses({ farmId, article }: { farmId: string; article: FertilizerArti
   };
   const add = useMutation({ mutationFn: () => api.post<FertilizerArticle>(farmPath(farmId, `/articles/${article.id}/analyses`), a), onSuccess: done });
   const remove = useMutation({ mutationFn: (id: string) => api.delete<FertilizerArticle>(farmPath(farmId, `/articles/${article.id}/analyses/${id}`)), onSuccess: (f) => f && done(f) });
+  const { confirm, element: confirmEl } = useConfirm();
   return (
     <Stack gap="xs" aria-label="Analyses du produit">
+      {confirmEl}
       <Title order={5}>Analyses</Title>
       <Text size="xs" c="dimmed">
         La plus récente de moins de 5 ans remplace la composition pour le calcul de l'azote apporté (référentiel régional, art. 8).
@@ -287,7 +290,11 @@ function Analyses({ farmId, article }: { farmId: string; article: FertilizerArti
                   <Documents farmId={farmId} ownerType="product_analysis" ownerId={x.id} owner label="Bulletin" />
                 </Table.Td>
                 <Table.Td>
-                  <ActionIcon variant="subtle" color="brique" aria-label="Retirer l'analyse" onClick={() => remove.mutate(x.id)}>
+                  <ActionIcon variant="subtle" color="brique" aria-label="Retirer l'analyse"
+                    onClick={async () =>
+                      (await confirm({ title: "Retirer l'analyse", message: `L'analyse du ${formatDate(x.sampledOn)} et son bulletin seront supprimés.`, action: "Retirer" })) && remove.mutate(x.id)
+                    }
+                  >
                     <Trash2 size={14} />
                   </ActionIcon>
                 </Table.Td>

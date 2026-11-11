@@ -72,10 +72,13 @@ export function PrescriptionNewPage() {
   // Doses saisies à la main (null : calculées).
   const [edited, setEdited] = useState<(number | null)[]>([]);
 
-  // Date par défaut : la plus récente proposée.
+  // Date par défaut : la plus proche avant la date prévue de l'apport du plan (`on`), sinon la plus récente.
+  const plannedOn = params.get("on");
   useEffect(() => {
-    if (dates.data && !dates.data.items.some((d) => d.date === date)) setDate(dates.data.items[0]?.date ?? null);
-  }, [dates.data, date]);
+    if (!dates.data || dates.data.items.some((d) => d.date === date)) return;
+    const sorted = [...dates.data.items].sort((a, b) => b.date.localeCompare(a.date));
+    setDate((plannedOn ? sorted.find((d) => d.date <= plannedOn) : undefined)?.date ?? sorted[0]?.date ?? null);
+  }, [dates.data, date, plannedOn]);
   useEffect(() => setZoning(null), [parcelId, index, date, zoneCount]);
   useEffect(() => setEdited([]), [zoneCount, strategy, baseRate, modulationPct, minRate, maxRate, unit]);
 

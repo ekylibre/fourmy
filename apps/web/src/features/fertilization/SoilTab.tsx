@@ -15,6 +15,7 @@ import {
   type WaterSource,
 } from "@fourmy/contracts";
 import { NA_SOIL_TYPE_LABELS, NA_SOIL_TYPES } from "@fourmy/fertilization-refs";
+import { useConfirm } from "../../components/confirm";
 import { api, farmPath } from "../../app/api";
 import { Documents } from "./Documents";
 import { formatDate } from "../../app/labels";
@@ -44,6 +45,7 @@ export function SoilTab({ farmId, parcelId, owner }: { farmId: string; parcelId:
   const q = useParcelFertilization(farmId, parcelId);
   const waters = useWaterSources(farmId);
   const [adding, setAdding] = useState(false);
+  const { confirm, element: confirmEl } = useConfirm();
   const refresh = (c: ParcelFertilizationContext) => {
     client.setQueryData(["fertilization-parcel", farmId, parcelId], c);
     void client.invalidateQueries({ queryKey: ["fertilization-parcels", farmId] });
@@ -73,6 +75,7 @@ export function SoilTab({ farmId, parcelId, owner }: { farmId: string; parcelId:
 
   return (
     <Stack>
+      {confirmEl}
       <Paper withBorder p="md" aria-label="Zonage nitrates">
         <Group justify="space-between">
           <Title order={4}>Zonage nitrates</Title>
@@ -200,7 +203,11 @@ export function SoilTab({ farmId, parcelId, owner }: { farmId: string; parcelId:
                   </Table.Td>
                   {owner && (
                     <Table.Td>
-                      <ActionIcon variant="subtle" color="brique" aria-label="Retirer l'analyse" onClick={() => remove.mutate(a.id)}>
+                      <ActionIcon variant="subtle" color="brique" aria-label="Retirer l'analyse"
+                        onClick={async () =>
+                          (await confirm({ title: "Retirer l'analyse", message: `L'analyse du ${formatDate(a.sampledOn)} et son bulletin seront supprimés.`, action: "Retirer" })) && remove.mutate(a.id)
+                        }
+                      >
                         <Trash2 size={14} />
                       </ActionIcon>
                     </Table.Td>

@@ -347,6 +347,8 @@ export interface PlanContext {
   opening: { on: string; origin: "entered" | "rsh" | "default" };
   /** Période d'implantation envisagée (saisie) et semis réalisé, s'il est saisi. */
   sowing: { period: string | null; sownOn: string | null };
+  /** Maïs : azote minéral réalisé du semis à 30 jours après (starter), repris avant 4 feuilles sauf saisie. */
+  starter?: { kgNHa: number; from: string; to: string } | null;
   /** Couvert d'interculture qui précède la culture. */
   cover: CoverCrop | null;
   /** Apports organiques de la campagne (réalisés ou prévus) et leur équivalent minéral (lot AO). */

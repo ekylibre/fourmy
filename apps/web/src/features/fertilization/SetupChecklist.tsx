@@ -10,6 +10,8 @@ import { useFertilizers } from "./fertilization";
 interface Step {
   key: string;
   title: string;
+  /** Ce qui a été fait, affiché sous une étape cochée. */
+  doneDetail?: string;
   /** Pourquoi Fourmy en a besoin. */
   why: string;
   done: boolean;
@@ -29,12 +31,13 @@ export function SetupChecklist({
   farmId,
   campaign,
   parcels,
-  analysisDone,
+  analysis,
 }: {
   farmId: string;
   campaign: number;
   parcels: ParcelFertilizationContext[];
-  analysisDone: boolean | null;
+  /** Analyse de sol annuelle (au-delà de 3 ha en zone vulnérable) ; null si non exigée. */
+  analysis: { from: string; to: string; done: { label: string; sampledOn: string; parcel: string } | null } | null;
 }) {
   const fertilizers = useFertilizers(farmId);
   const plans = useQuery({
@@ -74,9 +77,12 @@ export function SetupChecklist({
     {
       key: "analysis",
       title: `Analyse de terre de la campagne ${year}`,
-      why: "Obligatoire chaque année au-delà de 3 ha en zone vulnérable ; son pH et sa CEC servent aussi à noter l'efficacité des apports.",
-      done: analysisDone !== false,
-      todo: analysisDone === false ? [{ label: `Ajouter une analyse (${inZone[0]!.name}, onglet Sol)`, to: soilTab(inZone[0]!.parcelId) }] : [],
+      why: analysis
+        ? `Obligatoire chaque année au-delà de 3 ha en zone vulnérable : reliquat sortie d'hiver, reliquat post-récolte ou analyse de terre, sur une parcelle en zone vulnérable, entre le ${formatDate(analysis.from)} et le ${formatDate(analysis.to)}. Son pH et sa CEC servent aussi à noter l'efficacité des apports.`
+        : "",
+      done: !analysis || !!analysis.done,
+      doneDetail: analysis?.done ? `${analysis.done.label} le ${formatDate(analysis.done.sampledOn)} (${analysis.done.parcel})` : undefined,
+      todo: analysis && !analysis.done ? [{ label: `Ajouter une analyse (${inZone[0]!.name}, onglet Sol)`, to: soilTab(inZone[0]!.parcelId) }] : [],
     },
     {
       key: "fertilizers",
@@ -147,6 +153,7 @@ export function SetupChecklist({
             <div>
               <Text size="sm" fw={600} c={s.done ? "dimmed" : undefined}>
                 {s.title}
+                {s.done && s.doneDetail ? ` : ${s.doneDetail}` : ""}
               </Text>
               {!s.done && (
                 <>

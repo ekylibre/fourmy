@@ -19,6 +19,7 @@ import {
 } from "@fourmy/contracts";
 import { NA_SOIL_TYPE_LABELS, isNaSoilType } from "@fourmy/fertilization-refs";
 import { APLSH_ZONES } from "@fourmy/fertilization-refs";
+import { useConfirm } from "../../components/confirm";
 import { api, farmPath } from "../../app/api";
 import { Documents } from "./Documents";
 import { SetupChecklist } from "./SetupChecklist";
@@ -71,7 +72,6 @@ export function FertilizationPage() {
   const items = parcels.data!.items;
   const inZone = items.filter((p) => p.zone?.status === "in" || p.zone?.status === "partial");
   const areaInZone = inZone.reduce((s, p) => s + p.areaM2, 0);
-  const noSoil = inZone.filter((p) => !p.soil.soilType).length;
   const unknownZone = items.filter((p) => !p.zone || p.zone.status === "unknown").length;
   const analysis = annualAnalysis(inZone, Number(day.slice(0, 4)), settings.data?.campaignStartMmdd ?? "09-01");
 
@@ -110,18 +110,11 @@ export function FertilizationPage() {
             : unknownZone
               ? "Zonage à déterminer : actualisez-le."
               : "Aucune parcelle en zone vulnérable : plan de fumure et cahier conseillés, non obligatoires."}
-          {noSoil > 0 && ` ${noSoil} parcelle${noSoil > 1 ? "s" : ""} en zone vulnérable sans type de sol.`}
-        </Alert>
-      )}
-      {areaInZone > 30_000 && (
-        <Alert color={analysis.done ? "lichen" : "paille"} variant="light" aria-label="Analyse de sol annuelle">
-          {analysis.done
-            ? `Analyse de sol de la campagne ${analysis.campaign} faite : ${analysis.done.label} le ${formatDate(analysis.done.sampledOn)} (${analysis.done.parcel}).`
-            : `Analyse de sol de la campagne ${analysis.campaign} à faire : un reliquat sortie d'hiver, un reliquat post-récolte ou une analyse de terre (matière organique) sur une parcelle en zone vulnérable, entre le ${formatDate(analysis.from)} et le ${formatDate(analysis.to)}.`}
         </Alert>
       )}
 
-      <SetupChecklist farmId={farm.id} campaign={Number(day.slice(0, 4))} parcels={items} analysisDone={areaInZone > 30_000 ? !!analysis.done : null} />
+      {/* Ce qui reste à saisir (sol, analyse, fertilisants, plans, couverture) : ici seulement, pas dans les bandeaux ni le suivi. */}
+      <SetupChecklist farmId={farm.id} campaign={Number(day.slice(0, 4))} parcels={items} analysis={areaInZone > 30_000 ? analysis : null} />
 
       <Plans farmId={farm.id} owner={owner} year={Number(day.slice(0, 4))} />
 
@@ -380,8 +373,10 @@ function WaterModal({ farmId, source, onClose }: { farmId: string; source: Water
     onSuccess: done,
   });
   const remove = useMutation({ mutationFn: () => api.delete(farmPath(farmId, `/water-sources/${source!.id}`)), onSuccess: done });
+  const { confirm, element: confirmEl } = useConfirm();
   return (
     <Modal opened onClose={onClose} title={source ? source.name : "Nouveau point d'eau"}>
+      {confirmEl}
       <Stack>
         <TextInput label="Nom" placeholder="Forage du Braquet, retenue collinaire…" value={w.name} onChange={(e) => setW({ ...w, name: e.currentTarget.value })} required maxLength={100} />
         <Select
@@ -420,7 +415,14 @@ function WaterModal({ farmId, source, onClose }: { farmId: string; source: Water
             Enregistrer
           </Button>
           {source && (
-            <Button variant="subtle" color="brique" onClick={() => remove.mutate()} loading={remove.isPending}>
+            <Button
+              variant="subtle"
+              color="brique"
+              onClick={async () =>
+                (await confirm({ title: "Supprimer le point d'eau", message: `« ${source.name} » et ses analyses d'eau seront supprimés ; les parcelles qu'il irrigue n'auront plus de point d'eau.`, action: "Supprimer" })) && remove.mutate()
+              }
+              loading={remove.isPending}
+            >
               Supprimer
             </Button>
           )}
@@ -457,7 +459,6 @@ function CampaignWatch({ farmId, campaign, toEstablish }: { farmId: string; camp
   const lines: { color: string; text: string }[] = [];
   if (toEstablish) lines.push({ color: "paille.8", text: `${s(toEstablish, "plan", "plans")} à établir.` });
   if (r) {
-    if (r.toComplete) lines.push({ color: "paille.8", text: `${s(r.toComplete, "apport", "apports")} dont l'azote n'est pas connu (composition à compléter).` });
     if (r.late) lines.push({ color: "paille.8", text: `${s(r.late, "apport saisi", "apports saisis")} plus de 30 jours après l'épandage.` });
     const over = r.parcels.filter((p) => p.plannedDose !== null && p.totalNKgHa > p.plannedDose);
     for (const p of over)
@@ -468,8 +469,6 @@ function CampaignWatch({ farmId, campaign, toEstablish }: { farmId: string; camp
     if (r.forced.length) lines.push({ color: "brique.7", text: `${s(r.forced.length, "épandage enregistré", "épandages enregistrés")} en période d'interdiction.` });
     for (const p of r.parcels.filter((x) => x.aplsh?.over))
       lines.push({ color: "brique.7", text: `${p.name} : ${p.aplsh!.kgNHa} kg d'azote potentiellement libéré jusqu'en sortie d'hiver sur le couvert, pour un plafond de ${p.aplsh!.ceiling} kg.` });
-    const cover = r.parcels.filter((p) => p.soilCover?.level === "warning");
-    if (cover.length) lines.push({ color: "brique.7", text: `Couverture des sols à vérifier : ${cover.map((p) => p.name).join(", ")}.` });
   }
   return (
     <Stack gap={2} mb="xs" aria-label="Suivi de la campagne">

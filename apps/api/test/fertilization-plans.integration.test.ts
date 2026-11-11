@@ -513,4 +513,30 @@ describe.skipIf(!url)("plans de fumure (intégration)", () => {
     expect((await check(180))[0]).toMatchObject({ level: "ok", message: expect.stringContaining("plan du couvert : 90 kg") });
     expect((await check(220))[0]).toMatchObject({ level: "warning", message: expect.stringContaining("au-delà du plafond de 90 kg") });
   });
+
+  it("maïs : le starter réalisé dans les 30 jours après le semis compte avant 4 feuilles, sauf saisie (recette du 11/11)", async () => {
+    const ids: string[] = [];
+    for (const [procedure, day, input] of [
+      ["sowing", "2026-04-10", null],
+      ["fertilizing", "2026-04-12", 50],
+      ["fertilizing", "2026-06-01", 100],
+    ] as const) {
+      const i = crypto.randomUUID();
+      ids.push(i);
+      await sql`INSERT INTO interventions (id, farm_id, procedure, status, origin, started_at, stopped_at) VALUES (${i}, ${farmId}, ${procedure}, 'done', 'web', ${`${day}T08:00:00Z`}, ${`${day}T10:00:00Z`})`;
+      await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id) VALUES (${crypto.randomUUID()}, ${i}, 'target', 'land_parcel', ${p2026})`;
+      if (input) await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id, quantity, unit) VALUES (${crypto.randomUUID()}, ${i}, 'input', 'article', ${urea}, ${input}, 'kilogram_per_hectare')`;
+    }
+    const before = await plan();
+    await putDraft({ ...before.draft, nBefore4Leaves: null });
+    const p = await plan();
+    // 50 kg d'urée le 12/04 (semis le 10/04) : 23 kg N ; l'apport du 01/06 est hors fenêtre.
+    expect(p.context.starter).toEqual({ kgNHa: 23, from: "2026-04-10", to: "2026-05-10" });
+    expect(p.result.terms.Nbefore4).toMatchObject({ value: 23, origin: "computed", source: "apports réalisés du 10/04 au 10/05 (semis + 30 jours)" });
+    const entered = (await (await putDraft({ ...p.draft, nBefore4Leaves: 40 })).json()) as FertilizationPlan;
+    expect(entered.result.terms.Nbefore4).toMatchObject({ value: 40, origin: "entered" });
+    await putDraft({ ...entered.draft, nBefore4Leaves: null });
+    await sql`DELETE FROM stock_movements WHERE intervention_id IN ${sql(ids)}`;
+    await sql`DELETE FROM interventions WHERE id IN ${sql(ids)}`;
+  });
 });
