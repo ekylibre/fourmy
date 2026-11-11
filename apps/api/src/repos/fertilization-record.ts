@@ -25,6 +25,11 @@ import {
   steeringAllowance,
   aplshOfApplication,
   aplshTotal,
+  efficiencyGrid,
+  efficiencyMessage,
+  mineralFormOf,
+  type EfficiencyInput,
+  type MineralForm,
   type AplshSituation,
 } from "@fourmy/domain";
 import { defaultAplshZone, type AplshZone, type CropGroup } from "@fourmy/fertilization-refs";
@@ -32,6 +37,7 @@ import { cropLabel, previousOf } from "./fertilization-plans.js";
 import { getSettings, settingsInTx } from "./fertilization-context.js";
 import { fertilizersInTx, listFertilizers } from "./fertilizers.js";
 import { coversInTx } from "./cover-crops.js";
+import { farmDailyWeather } from "./crop-model.js";
 import { steeringInTx } from "./steering.js";
 
 const fr = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
@@ -141,6 +147,50 @@ async function parcelCrops(tx: Tx, farmId: string, parcelIds: string[], day: str
     water: r.water_m !== null ? { name: r.water_name, distanceM: Number(r.water_m) } : null,
     department: r.insee ? r.insee.slice(0, 2) : null,
   }));
+}
+
+/**
+ * Conditions de la grille d'efficacité (lot AL) : pH et CEC de la dernière
+ * analyse de terre, couverture estimée d'après le dernier NDVI de moins de
+ * 15 jours (NDVI moyen d'au moins 0,5 : plus de 50 % de couverture), pluie du
+ * jour et des deux suivants, vent maximal et température moyenne du jour
+ * (cache Open-Meteo de la ferme ; moyenne = (minimum + maximum) / 2).
+ */
+async function efficiencyConditions(
+  tx: Tx,
+  farmId: string,
+  parcelId: string,
+  day: string,
+): Promise<Omit<EfficiencyInput, "form">> {
+  const [soil] = await rows<{ ph: number | null; cec: number | null }>(
+    tx,
+    sql`SELECT (soil_values->>'ph')::float8 AS ph, (soil_values->>'cecMeq')::float8 AS cec FROM soil_analyses
+        WHERE land_parcel_id = ${parcelId} AND kind = 'soil' AND sampled_on <= ${day}::date AND soil_values IS NOT NULL
+        ORDER BY sampled_on DESC LIMIT 1`,
+  );
+  const [ndvi] = await rows<{ mean: number | null }>(
+    tx,
+    sql`SELECT pi.mean FROM parcel_indices pi JOIN land_parcel_versions v ON v.id = pi.land_parcel_version_id
+        WHERE v.land_parcel_id = ${parcelId} AND pi.vegetation_index = 'ndvi' AND pi.mean IS NOT NULL
+          AND pi.acquired_on <= ${day}::date AND pi.acquired_on > ${day}::date - 15
+        ORDER BY pi.acquired_on DESC LIMIT 1`,
+  );
+  const days = await rows<{ day: string; tmin: number | null; tmax: number | null; rain: number | null; wind: number | null }>(
+    tx,
+    sql`SELECT day::text, tmin_c AS tmin, tmax_c AS tmax, rain_mm AS rain, wind_max_kmh AS wind FROM daily_weather
+        WHERE farm_id = ${farmId} AND day >= ${day}::date AND day <= ${day}::date + 2 ORDER BY day`,
+  );
+  const today = days.find((d) => d.day === day);
+  const rain3 = days.length === 3 && days.every((d) => d.rain !== null) ? days.reduce((sum, d) => sum + d.rain!, 0) : null;
+  const mean = today?.tmin != null && today.tmax != null ? (today.tmin + today.tmax) / 2 : null;
+  return {
+    ph: soil?.ph ?? null,
+    cecMeq: soil?.cec ?? null,
+    coverOver50: ndvi?.mean != null ? ndvi.mean >= 0.5 : null,
+    rain3dMm: rain3 === null ? null : Math.round(rain3 * 10) / 10,
+    windKmh: today?.wind ?? null,
+    temperatureC: mean !== null ? Math.round(mean * 10) / 10 : null,
+  };
 }
 
 /**
@@ -255,7 +305,9 @@ const worst = (levels: FertilizationIndicator["level"][]) =>
  * plafond du premier apport, teneur connue. Ce que Fourmy ne peut pas vérifier
  * est dit « non vérifié », jamais « conforme ».
  */
-export async function checkApplication(db: Database, farmId: string, req: FertilizationCheckRequest): Promise<FertilizationCheck> {
+export async function checkApplication(db: Database, farmId: string, req: FertilizationCheckRequest, fetchImpl?: typeof fetch): Promise<FertilizationCheck> {
+  // Météo du jour et des deux suivants (grille d'efficacité) : cache de la ferme, rafraîchi hors transaction.
+  if (fetchImpl) await farmDailyWeather(db, farmId, req.startedAt.slice(0, 10), fetchImpl).catch(() => null);
   return withFarm(db, farmId, (tx) => checkApplicationTx(tx, farmId, req));
 }
 
@@ -338,6 +390,25 @@ export async function checkApplicationTx(tx: Tx, farmId: string, req: Fertilizat
       }
       if (so.count === 0 && efficient !== null && efficient > 50 && (isMaizeOrSorghum(p.crop) || (isStrawCereal(p.crop) && p.crop !== "barley_spring"))) {
         indicators.push({ code: "fert_first_split", level: "warning", message: `Premier apport de ${Math.round(efficient)} kg N : 50 kg au plus (PAR 7 Nouvelle-Aquitaine).`, parcelName: p.name });
+      }
+      // Efficacité d'un apport d'azote minéral en surface (lot AL) : grille du COMIFER.
+      const forms = [
+        ...new Set(
+          fert.flatMap((i) => {
+            const f = fertilizers.get(i.articleId)!;
+            const eff = effectiveComposition(f, day);
+            const form = eff && !eff.composition.foliar ? mineralFormOf(f, eff.composition) : null;
+            return form ? [form] : [];
+          }),
+        ),
+      ];
+      if (forms.length) {
+        const conditions = await efficiencyConditions(tx, farmId, p.parcelId, day);
+        for (const form of forms) {
+          const r = efficiencyGrid({ form, ...conditions });
+          const level = r.quality[0] === "good" ? "ok" : r.quality[0] === "medium" ? "info" : "warning";
+          indicators.push({ code: "fert_efficiency", level, message: efficiencyMessage(r), parcelName: p.name });
+        }
       }
       // Plafond d'APLSH (lot AK) : couvert d'interculture ou prairie, en zone vulnérable.
       if (p.zone === "in" || p.zone === "partial") {
@@ -503,6 +574,17 @@ export async function fertilizationRecord(db: Database, farmId: string, campaign
         )
       : [];
     const covers = await coversInTx(tx, ids, campaign);
+    // Contrôles enregistrés avec les interventions (efficacité des apports, lot AL).
+    const interventionIds = [...new Set(events.map((e) => e.id))];
+    const stored = new Map(
+      (interventionIds.length
+        ? await rows<{ id: string; indicators: FertilizationIndicator[] | null }>(
+            tx,
+            sql`SELECT id, nitrate_check->'indicators' AS indicators FROM interventions WHERE id IN (SELECT unnest(${arr(interventionIds)}::uuid[])) AND nitrate_check IS NOT NULL`,
+          )
+        : []
+      ).map((r) => [r.id, r.indicators ?? []]),
+    );
     const steering = await steeringInTx(tx, parcels.map((p) => p.plan_id).filter((x): x is string => !!x));
     // Épandages enregistrés en période d'interdiction, avec leur motif.
     const forced = await rows<{ id: string; day: string; parcels: string[]; reason: string | null }>(
@@ -526,7 +608,7 @@ export async function fertilizationRecord(db: Database, farmId: string, campaign
       const yields = inCampaign
         .filter((e) => HARVEST.includes(e.procedure) && e.role === "output" && e.quantity !== null && /quintal_per_hectare|ton_per_hectare/.test(e.unit ?? ""))
         .map((e) => Number(e.quantity) * (e.unit === "ton_per_hectare" ? 10 : 1));
-      const applications: RecordApplication[] = inCampaign
+      const applications: (RecordApplication & { form: MineralForm | null })[] = inCampaign
         .filter((e) => FERTILIZING.includes(e.procedure) && e.role === "input" && e.article_id && fertilizers.has(e.article_id) && e.quantity !== null)
         .map((e) => {
           const f = fertilizers.get(e.article_id!)!;
@@ -549,10 +631,22 @@ export async function fertilizationRecord(db: Database, farmId: string, campaign
             nTotalKgHa: "missing" in n ? null : n.totalKgHa,
             nEfficientKgHa: "missing" in n ? null : n.efficientKgHa,
             missing: "missing" in n ? (n.missing ?? null) : null,
+            efficiency: null as RecordApplication["efficiency"],
+            form: "missing" in n ? null : mineralFormOf(f, n.composition),
           };
         })
         // Cahier de l'azote : les apports sans azote (potasse, chaux) n'y figurent pas.
         .filter((a) => a.nTotalKgHa === null || a.nTotalKgHa > 0);
+      // Efficacité des apports d'azote minéral (lot AL) : celle enregistrée à la saisie, sinon recalculée d'après le cache météo.
+      for (const a of applications) {
+        if (!a.form) continue;
+        const saved = stored.get(a.interventionId)?.find((i) => i.code === "fert_efficiency" && (!i.parcelName || i.parcelName === p.name));
+        if (saved) a.efficiency = { level: saved.level === "danger" ? "warning" : (saved.level as "ok" | "info" | "warning"), message: saved.message };
+        else {
+          const r = efficiencyGrid({ form: a.form, ...(await efficiencyConditions(tx, farmId, p.id, a.date)) });
+          a.efficiency = { level: r.quality[0] === "good" ? "ok" : r.quality[0] === "medium" ? "info" : "warning", message: efficiencyMessage(r) };
+        }
+      }
       const plowed = mine.some((e) => PLOWING.includes(e.procedure));
       // Interculture : travaux et apports sur cette parcelle et sur celle du précédent.
       const around = [...mine.map((e) => ({ ...e, area_m2: p.area_m2 })), ...prevEvents.filter((e) => e.parcel_id === prevs.get(p.id)?.parcel_id)];
@@ -581,7 +675,7 @@ export async function fertilizationRecord(db: Database, farmId: string, campaign
         steering: p.plan_id ? (steering.get(p.plan_id) ?? []) : [],
         // Trois campagnes de recul ne sont pas toutes chargées : « null » quand on ne peut pas conclure.
         noPlowing: plowed ? false : null,
-        applications,
+        applications: applications.map(({ form: _form, ...a }) => a),
         totalNKgHa: Math.round(applications.reduce((s, a) => s + (a.nEfficientKgHa ?? 0), 0)),
         plannedDose: num(p.dose),
         planVersion: p.version,

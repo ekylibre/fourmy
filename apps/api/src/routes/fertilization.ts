@@ -98,7 +98,7 @@ export const fertilizationRoutes = new Hono<Env>()
   .post("/fertilization/check", async (c) => {
     const parsed = fertilizationCheckRequest.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return problem(c, 400, "Corps invalide", invalid(parsed.error.issues));
-    return c.json(await checkApplication(db(), c.get("farmId"), parsed.data));
+    return c.json(await checkApplication(db(), c.get("farmId"), parsed.data, fertilizationDeps.fetch));
   })
   .get("/fertilization/record", async (c) => {
     const record = await fertilizationRecord(db(), c.get("farmId"), campaignOf(c.req.query("campaign")));

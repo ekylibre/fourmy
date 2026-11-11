@@ -407,7 +407,9 @@ export type FertilizationIndicatorCode =
   | "fert_water"
   | "fert_slope"
   // Plafond d'azote potentiellement libéré jusqu'en sortie d'hiver (lot AK).
-  | "fert_aplsh";
+  | "fert_aplsh"
+  // Grille d'efficacité des apports d'azote minéral, COMIFER 2022 (lot AL).
+  | "fert_efficiency";
 export interface FertilizationIndicator {
   code: FertilizationIndicatorCode;
   level: "ok" | "info" | "warning" | "danger";
@@ -439,6 +441,8 @@ export interface RecordApplication {
   nEfficientKgHa: number | null;
   /** Ce qui manque pour compter l'azote. */
   missing: string | null;
+  /** Efficacité d'un apport d'azote minéral (grille COMIFER 2022, lot AL) : enregistrée à la saisie, sinon recalculée. */
+  efficiency: { level: "ok" | "info" | "warning"; message: string } | null;
 }
 
 export interface RecordParcel {

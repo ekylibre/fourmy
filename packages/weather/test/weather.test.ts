@@ -31,13 +31,15 @@ describe("fournisseurs ramenés au même format", () => {
     const urls: URL[] = [];
     const fake = (async (u: string) => {
       urls.push(new URL(u));
-      return Response.json({ daily: { time: ["2026-06-01", "2026-06-02"], temperature_2m_min: [12, null], temperature_2m_max: [26, 24], precipitation_sum: [0, 4.2], et0_fao_evapotranspiration: [5.1, 3] } });
+      return Response.json({ daily: { time: ["2026-06-01", "2026-06-02"], temperature_2m_min: [12, null], temperature_2m_max: [26, 24], precipitation_sum: [0, 4.2], et0_fao_evapotranspiration: [5.1, 3], wind_speed_10m_max: [22.3, null] } });
     }) as unknown as typeof fetch;
     const days = await openMeteoDays(43.38, -0.21, { source: "archive", from: "2026-06-01", to: "2026-06-02" }, fake);
     expect(urls[0]!.origin).toBe("https://archive-api.open-meteo.com");
     expect(urls[0]!.searchParams.get("daily")).toContain("et0_fao_evapotranspiration");
     expect(urls[0]!.searchParams.get("timezone")).toBe("Europe/Paris");
-    expect(days[0]).toEqual({ day: "2026-06-01", temperatureMinC: 12, temperatureMaxC: 26, precipitationMm: 0, et0Mm: 5.1 });
+    expect(urls[0]!.searchParams.get("daily")).toContain("wind_speed_10m_max");
+    expect(urls[0]!.searchParams.get("wind_speed_unit")).toBe("kmh");
+    expect(days[0]).toEqual({ day: "2026-06-01", temperatureMinC: 12, temperatureMaxC: 26, precipitationMm: 0, et0Mm: 5.1, windMaxKmh: 22.3 });
     expect(days[1]!.temperatureMinC).toBeNull();
     await openMeteoDays(43.38, -0.21, { source: "forecast" }, fake);
     expect(urls[1]!.origin).toBe("https://api.open-meteo.com");

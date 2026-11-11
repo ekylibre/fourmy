@@ -69,15 +69,15 @@ async function store(tx: Tx, farmId: string, days: WeatherDay[], source: "archiv
   for (let i = 0; i < usable.length; i += 500) {
     const chunk = usable.slice(i, i + 500);
     const values = sql.join(
-      chunk.map((d) => sql`(${farmId}, ${d.day}::date, ${d.temperatureMinC}, ${d.temperatureMaxC}, ${d.precipitationMm}, ${d.et0Mm}, ${source})`),
+      chunk.map((d) => sql`(${farmId}, ${d.day}::date, ${d.temperatureMinC}, ${d.temperatureMaxC}, ${d.precipitationMm}, ${d.et0Mm}, ${d.windMaxKmh ?? null}, true, ${source})`),
       sql`, `,
     );
     // L'archive est définitive ; une prévision ne remplace jamais une journée d'archive.
     await tx.execute(sql`
-      INSERT INTO daily_weather (farm_id, day, tmin_c, tmax_c, rain_mm, et0_mm, source) VALUES ${values}
+      INSERT INTO daily_weather (farm_id, day, tmin_c, tmax_c, rain_mm, et0_mm, wind_max_kmh, with_wind, source) VALUES ${values}
       ON CONFLICT (farm_id, day) DO UPDATE SET tmin_c = excluded.tmin_c, tmax_c = excluded.tmax_c, rain_mm = excluded.rain_mm,
-        et0_mm = excluded.et0_mm, source = excluded.source, fetched_at = now()
-      WHERE daily_weather.source = 'forecast'`);
+        et0_mm = excluded.et0_mm, wind_max_kmh = excluded.wind_max_kmh, with_wind = true, source = excluded.source, fetched_at = now()
+      WHERE daily_weather.source = 'forecast' OR (excluded.source = 'archive' AND NOT daily_weather.with_wind)`);
   }
 }
 
@@ -98,10 +98,12 @@ export async function farmDailyWeather(
   const { point, span } = await withFarm(db, farmId, async (tx) => ({
     point: await farmCenter(tx, farmId),
     span: (
-      await rows<{ lo: string | null; hi: string | null; fresh: string | null }>(
+      await rows<{ lo: string | null; hi: string | null; fresh: string | null; windless: string | null }>(
         tx,
         sql`SELECT min(day) FILTER (WHERE source = 'archive')::text AS lo, max(day) FILTER (WHERE source = 'archive')::text AS hi,
-                   max(fetched_at) FILTER (WHERE source = 'forecast')::text AS fresh
+                   max(fetched_at) FILTER (WHERE source = 'forecast')::text AS fresh,
+                   -- Vent ajouté au cache (lot AL) : la dernière année d'archive est rechargée une fois si le vent y manque.
+                   min(day) FILTER (WHERE source = 'archive' AND NOT with_wind AND day >= ${addDays(today, -400)}::date)::text AS windless
             FROM daily_weather WHERE farm_id = ${farmId}`,
       )
     )[0],
@@ -112,6 +114,7 @@ export async function farmDailyWeather(
     else {
       if (span.lo > histStart) ranges.push([histStart, addDays(span.lo, -1)]);
       if (span.hi < archiveEnd) ranges.push([addDays(span.hi, 1), archiveEnd]);
+      if (span.windless) ranges.push([span.windless, span.hi < archiveEnd ? span.hi : archiveEnd]);
     }
     // Téléchargements hors transaction ; chaque lot reçu est enregistré aussitôt.
     try {
