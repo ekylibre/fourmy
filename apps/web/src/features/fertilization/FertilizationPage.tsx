@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, RefreshCw } from "lucide-react";
 import {
   type FertilizationPlanSummary,
+  type FertilizationRecord,
   NITRATE_ZONE_LABELS,
   WATER_ORIGIN_LABELS,
   rshTotal,
@@ -238,11 +239,7 @@ function Plans({ farmId, owner, year }: { farmId: string; owner: boolean; year: 
         </Text>
       ) : (
         <>
-          {toEstablish > 0 && (
-            <Text size="sm" mb="xs">
-              {toEstablish} plan{toEstablish > 1 ? "s" : ""} à établir.
-            </Text>
-          )}
+          <CampaignWatch farmId={farmId} campaign={campaign} toEstablish={toEstablish} />
           <Table aria-label="Plans de la campagne" highlightOnHover>
             <Table.Thead>
               <Table.Tr>
@@ -424,4 +421,45 @@ export function annualAnalysis(parcels: ParcelFertilizationContext[], campaign: 
     .filter((a) => a.sampledOn >= from && a.sampledOn <= end)
     .sort((a, b) => b.sampledOn.localeCompare(a.sampledOn));
   return { campaign, from, to: end, done: found[0] ?? null };
+}
+
+/**
+ * Tableau de bord de la campagne (lot AJ, FR-FERT-36) : plans à établir,
+ * apports à compléter ou saisis en retard, dépassements, épandages en période
+ * d'interdiction, couverture des sols à vérifier.
+ */
+function CampaignWatch({ farmId, campaign, toEstablish }: { farmId: string; campaign: number; toEstablish: number }) {
+  const q = useQuery({ queryKey: ["fertilization-record", farmId, campaign], queryFn: () => api.get<FertilizationRecord>(farmPath(farmId, `/fertilization/record?campaign=${campaign}`)) });
+  const r = q.data;
+  const s = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`;
+  const lines: { color: string; text: string }[] = [];
+  if (toEstablish) lines.push({ color: "paille.8", text: `${s(toEstablish, "plan", "plans")} à établir.` });
+  if (r) {
+    if (r.toComplete) lines.push({ color: "paille.8", text: `${s(r.toComplete, "apport", "apports")} dont l'azote n'est pas connu (composition à compléter).` });
+    if (r.late) lines.push({ color: "paille.8", text: `${s(r.late, "apport saisi", "apports saisis")} plus de 30 jours après l'épandage.` });
+    const over = r.parcels.filter((p) => p.plannedDose !== null && p.totalNKgHa > p.plannedDose);
+    for (const p of over)
+      lines.push({
+        color: p.steering.length ? "ardoise" : "brique.7",
+        text: `${p.name} : ${p.totalNKgHa} kg N apportés pour ${p.plannedDose} kg prévus${p.steering.length ? " (mesure de pilotage enregistrée)" : ", sans mesure de pilotage"}.`,
+      });
+    if (r.forced.length) lines.push({ color: "brique.7", text: `${s(r.forced.length, "épandage enregistré", "épandages enregistrés")} en période d'interdiction.` });
+    const cover = r.parcels.filter((p) => p.soilCover?.level === "warning");
+    if (cover.length) lines.push({ color: "brique.7", text: `Couverture des sols à vérifier : ${cover.map((p) => p.name).join(", ")}.` });
+  }
+  return (
+    <Stack gap={2} mb="xs" aria-label="Suivi de la campagne">
+      {q.isLoading && <Text size="sm" c="dimmed">Suivi de la campagne…</Text>}
+      {r && lines.length === 0 && (
+        <Text size="sm" c="lichen.8">
+          Rien à signaler pour la campagne {campaign}.
+        </Text>
+      )}
+      {lines.map((l, k) => (
+        <Text key={k} size="sm" c={l.color}>
+          {l.text}
+        </Text>
+      ))}
+    </Stack>
+  );
 }

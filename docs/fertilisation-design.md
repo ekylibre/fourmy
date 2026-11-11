@@ -466,7 +466,52 @@ Migration `0038_fertilization_ai.sql` : colonne `interventions.nitrate_check`, t
 
 **Analyse de sol annuelle** : au-delà de 3 ha en zone vulnérable, la page Fertilisation azotée dit si une analyse (reliquat sortie d'hiver, reliquat post-récolte ou analyse de terre) a été faite dans la campagne sur une parcelle en zone vulnérable. La campagne commence à la date des paramètres de la ferme.
 
-**Reste à faire** : pilotage et révision en cours de campagne, APLSH, grille d'efficacité, colza et Keq des organiques, conditions d'épandage (sol gelé, pentes), rôle conseiller, mobile, autres régions.
+**Reste à faire** (après le lot AI) : pilotage et révision en cours de campagne, APLSH, grille d'efficacité, colza et Keq des organiques, conditions d'épandage (sol gelé, pentes), rôle conseiller, mobile, autres régions.
+
+### 5.5 Réalisation du lot AJ (2026-11-11)
+
+Migration `0039_fertilization_aj.sql` :
+- `cover_crops.kind` : couvert semé, repousses de céréales ou de colza. Des repousses n'ont pas de famille de la table MrCi ; le plan compte alors MrCi à 0.
+- Table `steering_measurements` (RLS).
+- Les justificatifs acceptent le type `steering`.
+
+**Conditions d'épandage** (FR-FERT-26, PAN 7 annexe I, VI) : `checkSpreadingConditions`, appelé par le contrôle d'un apport sur les parcelles en zone vulnérable.
+- **Gel** : si la température la plus basse de la météo de l'intervention est de 0 °C ou moins, l'épandage est interdit sur sol gelé ou enneigé (orange). Un fumier compact ou un compost de type 0 ou I, solide, reste permis (information).
+- **Pluie** : à partir de 15 mm le jour même, Fourmy rappelle l'interdiction sur sol détrempé ou inondé.
+- **Cours d'eau** : distance au cours d'eau le plus proche de la parcelle (`water_items` du contrôle phyto, fossés exclus).
+  - Types 0, I et II à moins de 35 m : orange (35 m, 10 m avec une couverture permanente).
+  - Type III à moins de 2 m : information.
+  - À moins de 100 m : rappel de la règle des pentes (10 % pour un liquide, 15 % sinon).
+- Fourmy ne voit ni le sol, ni la pente, ni la zone réellement épandue. Ces conditions ne bloquent pas l'enregistrement : seul le calendrier peut le bloquer.
+- La saisie envoie la météo dans le contrôle ; l'enregistrement reprend celle de l'intervention.
+
+**Couverture des sols** (FR-FERT-27, guide du PAR 7 Nouvelle-Aquitaine du 16/10/2026, tableaux 11 et 12) : `checkSoilCover`, présenté au cahier pour chaque parcelle en zone vulnérable.
+- Le précédent est la production de la campagne d'avant sur la parcelle qui recouvre au moins la moitié de celle-ci. Comme pour le plan, c'est la même parcelle ou une autre, car Ekylibre crée une parcelle par campagne.
+- La date de récolte retenue est la dernière avant le semis.
+- **Interculture longue** (culture de printemps) :
+  - après un maïs grain ou un sorgho grain : couvert avant le 01/12, ou cannes broyées et enfouies dans les 15 jours suivant la récolte ;
+  - après une récolte du 15/09 au 15/10 : couvert dans les 15 jours ;
+  - après une récolte postérieure au 15/10 : couverture non obligatoire, sauf derrière tournesol (cannes à broyer) ;
+  - sinon : couvert ou repousses avant le 30/09 (le 15/09 en ZAR).
+  - Maintien de 2,5 mois (3 en ZAR) ; destruction au plus tôt le 15/11 (le 01/02 pour des légumineuses pures) ; destruction chimique signalée.
+- **Interculture courte derrière colza** : couvert ou repousses maintenus au moins 1 mois.
+- Pas encore traités : la limite de 20 % de la SAU en repousses et légumineuses pures, et les adaptations 2 à 11 du tableau 12 (sols argileux, porte-graines, inondations…).
+
+**Pilotage** (FR-FERT-17) : mesures par plan (`POST /fertilization/plans/:id/steering`, `DELETE /fertilization/steering/:id`), avec leur bulletin en justificatif.
+- La dernière mesure fixe l'apport de pilotage. La dose permise est la dose du plan, moins l'apport réservé au pilotage, plus la dose conseillée (`steeringAllowance`).
+- Au contrôle, un dépassement du plan couvert par cette dose permise passe en information (« justifié par la mesure ») ; au-delà, il reste orange.
+- Les mesures figurent au cahier.
+
+**Tableau de bord** (FR-FERT-36) : sur la page Fertilisation azotée, sous les plans de la campagne choisie :
+- plans à établir ;
+- apports à compléter ou saisis en retard ;
+- dépassements, avec ou sans mesure de pilotage ;
+- épandages enregistrés en période d'interdiction (aussi listés au cahier, avec leur motif) ;
+- couverture des sols à vérifier.
+
+**Constat sur la ferme de Pierre** : sur 8 parcelles de maïs 2026, le maïs 2025 est récolté le 16/09/2025 (le 04/09 pour l'une). Le premier travail du sol saisi est un déchaumage le 14/10, au-delà des 15 jours, et aucun couvert n'est saisi. Fourmy affiche « à vérifier » : soit un broyage manque dans la saisie, soit la règle n'a pas été respectée.
+
+**Reste à faire** : APLSH, grille d'efficacité, colza et Keq des organiques, lien avec la modulation (FR-FERT-18), rôle conseiller, mobile hors ligne, autres régions.
 
 ## 6. Contrats (`@fourmy/contracts`, `fertilization.ts`)
 
@@ -556,7 +601,8 @@ Les termes encore **manquants** sont listés (« à compléter ») sur le tablea
 | **AG — PPF et calcul** | Domaine (objectif, bilan maïs, céréales, colza, plafonds, fractionnement), PPF versionné, préparation de la campagne, dose venue d'ailleurs, surcharges, écrans PPF | FR-FERT-9 à 16, 38 |
 | **AH — Cahier, contrôles et éditions** | Cahier calculé, couverts (`productions.nature = cover`), contrôles calendrier, plan, plafond, fractionnement, météo, eau, pages imprimables et CSV, tableau de bord, justificatifs | FR-FERT-19 à 23, 25, 26, 30, 33, 34, 36 |
 | **AI — Interdictions, couverts, justificatifs** | Interdiction d'épandage bloquante avec motif, couverts d'interculture (MrCi, cahier), justificatifs joints, date d'ouverture et période d'implantation, analyse de sol annuelle | FR-FERT-19, 23, 25, 28 |
-| AJ — ensuite | Pilotage et révision, APLSH, grille d'efficacité, lien avec la modulation, rôle conseiller, mobile | FR-FERT-17, 18, 27, 29, 35, 40 ; NFR-FERT-7 |
+| **AJ — Conditions, couverture des sols, pilotage** | Conditions d'épandage (gel, pluie, cours d'eau, pente), couverture des sols en interculture, repousses, pilotage et dose permise, tableau de bord de la campagne | FR-FERT-17, 26, 27, 36 |
+| AK — ensuite | APLSH, grille d'efficacité, lien avec la modulation, rôle conseiller, mobile | FR-FERT-18, 28 (APLSH), 29, 35, 40 ; NFR-FERT-7 |
 
 ## 11. Tests
 

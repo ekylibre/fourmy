@@ -28,7 +28,10 @@ import {
   BALANCE_TERMS,
   COVER_BIOMASS_LABELS,
   COVER_FAMILY_LABELS,
+  COVER_KIND_LABELS,
   DESTRUCTION_MODE_LABELS,
+  type SteeringMeasurement,
+  type SteeringWrite,
   type BalanceTerm,
   type CoverCrop,
   type CoverCropWrite,
@@ -317,6 +320,17 @@ export function PlanPage() {
       <ExternalDose farmId={farm.id} planId={planId} owner={owner} draft={draft} fourmyDose={r.dose} onChange={(external) => update({ external })} />
 
       <Applications farmId={farm.id} owner={owner} dose={dose} applications={applications} proposed={!draft.applications?.length} onChange={(apps) => update({ applications: apps })} />
+
+      {p.currentVersion && (
+        <Steering
+          farmId={farm.id}
+          planId={planId}
+          owner={owner}
+          steering={p.steering}
+          planDose={p.versions.find((v) => v.version === p.currentVersion)?.doseEfficient ?? null}
+          onChanged={() => void client.invalidateQueries({ queryKey: ["fertilization-plan", farm.id, planId] })}
+        />
+      )}
 
       {owner && (
         <Group>
@@ -636,6 +650,7 @@ function EstablishModal({ farmId, planId, revision, dose, onClose, onDone }: { f
 
 const BLANK_COVER = (campaign: number): CoverCropWrite => ({
   campaign,
+  kind: "sown",
   family: "cruciferes",
   species: "",
   sownOn: `${campaign - 1}-09-01`,
@@ -686,10 +701,11 @@ function CoverSection({ farmId, owner, parcelId, campaign, cover, onSaved }: { f
       {cover && !form && (
         <Stack gap="xs" mt="xs">
           <Text size="sm">
-            <b>{cover.species}</b> ({COVER_FAMILY_LABELS[cover.family]}) semé le {formatDate(cover.sownOn)}
+            <b>{cover.species}</b> ({cover.family ? COVER_FAMILY_LABELS[cover.family] : COVER_KIND_LABELS[cover.kind].toLowerCase()}) {cover.kind === "sown" ? "semé" : "levées"} le{" "}
+            {formatDate(cover.sownOn)}
             {cover.destroyedOn ? `, détruit le ${formatDate(cover.destroyedOn)}` : ", destruction à saisir"}
             {cover.destructionMode ? ` (${DESTRUCTION_MODE_LABELS[cover.destructionMode].toLowerCase()})` : ""}
-            {cover.biomass ? ` · biomasse ${COVER_BIOMASS_LABELS[cover.biomass]}` : " · biomasse à estimer"}
+            {cover.kind !== "sown" ? "" : cover.biomass ? ` · biomasse ${COVER_BIOMASS_LABELS[cover.biomass]}` : " · biomasse à estimer"}
             {cover.exported ? " · exporté" : ""}.
             {owner && (
               <Anchor component="button" size="sm" ml="xs" c="brique" onClick={() => remove.mutate()}>
@@ -703,18 +719,127 @@ function CoverSection({ farmId, owner, parcelId, campaign, cover, onSaved }: { f
       {form && (
         <Stack mt="xs">
           <SimpleGrid cols={{ base: 1, sm: 3 }}>
-            <Select label="Famille" data={options(COVER_FAMILY_LABELS)} value={form.family} allowDeselect={false} onChange={(v) => v && setForm({ ...form, family: v as CoverCropWrite["family"] })} />
+            <Select
+              label="Couverture"
+              data={options(COVER_KIND_LABELS)}
+              value={form.kind}
+              allowDeselect={false}
+              onChange={(v) => v && setForm({ ...form, kind: v as CoverCropWrite["kind"], family: v === "sown" ? (form.family ?? "cruciferes") : null, biomass: v === "sown" ? form.biomass : null })}
+            />
+            {form.kind === "sown" && (
+              <Select label="Famille" data={options(COVER_FAMILY_LABELS)} value={form.family} allowDeselect={false} onChange={(v) => v && setForm({ ...form, family: v as CoverCropWrite["family"] })} />
+            )}
             <TextInput label="Espèces" placeholder="Moutarde blanche, phacélie…" value={form.species} onChange={(e) => setForm({ ...form, species: e.currentTarget.value })} />
-            <TextInput label="Semé le" type="date" value={form.sownOn} onChange={(e) => setForm({ ...form, sownOn: e.currentTarget.value })} />
+            <TextInput label={form.kind === "sown" ? "Semé le" : "Levées le"} type="date" value={form.sownOn} onChange={(e) => setForm({ ...form, sownOn: e.currentTarget.value })} />
             <TextInput label="Détruit le" type="date" value={form.destroyedOn ?? ""} onChange={(e) => setForm({ ...form, destroyedOn: e.currentTarget.value || null })} />
             <Select label="Mode de destruction" data={options(DESTRUCTION_MODE_LABELS)} value={form.destructionMode} clearable onChange={(v) => setForm({ ...form, destructionMode: v as CoverCropWrite["destructionMode"] })} />
-            <Select label="Biomasse à la destruction" data={options(COVER_BIOMASS_LABELS)} value={form.biomass} clearable onChange={(v) => setForm({ ...form, biomass: v as CoverCropWrite["biomass"] })} />
+            {form.kind === "sown" && (
+              <Select label="Biomasse à la destruction" data={options(COVER_BIOMASS_LABELS)} value={form.biomass} clearable onChange={(v) => setForm({ ...form, biomass: v as CoverCropWrite["biomass"] })} />
+            )}
           </SimpleGrid>
           <Switch label="Couvert exporté (fauché, pâturé)" checked={form.exported} onChange={(e) => setForm({ ...form, exported: e.currentTarget.checked })} />
           {save.error && <ErrorAlert error={save.error} />}
           <Group>
             <Button size="xs" disabled={!form.species.trim() || !form.sownOn} loading={save.isPending} onClick={() => save.mutate({ ...form, species: form.species.trim() })}>
               Enregistrer le couvert
+            </Button>
+            <Button size="xs" variant="subtle" onClick={() => setForm(null)}>
+              Annuler
+            </Button>
+          </Group>
+        </Stack>
+      )}
+    </Paper>
+  );
+}
+
+/**
+ * Pilotage en cours de saison (lot AJ, FR-FERT-17) : une mesure (N-Tester,
+ * Jubil, capteur, satellite) donne la dose de l'apport de pilotage. Elle seule
+ * justifie de dépasser la dose du plan ; elle est conservée avec son bulletin.
+ */
+function Steering({
+  farmId,
+  planId,
+  owner,
+  steering,
+  planDose,
+  onChanged,
+}: {
+  farmId: string;
+  planId: string;
+  owner: boolean;
+  steering: FertilizationPlan["steering"];
+  planDose: number | null;
+  onChanged: () => void;
+}) {
+  const blank: SteeringWrite = { measuredOn: new Date().toISOString().slice(0, 10), stage: null, tool: "", value: null, advisedKgNHa: 0, notes: null };
+  const [form, setForm] = useState<SteeringWrite | null>(null);
+  const add = useMutation({
+    mutationFn: (w: SteeringWrite) => api.post<SteeringMeasurement>(farmPath(farmId, `/fertilization/plans/${planId}/steering`), w),
+    onSuccess: () => {
+      setForm(null);
+      onChanged();
+    },
+  });
+  const remove = useMutation({ mutationFn: (id: string) => api.delete(farmPath(farmId, `/fertilization/steering/${id}`)), onSuccess: onChanged });
+  return (
+    <Paper withBorder p="md" aria-label="Pilotage">
+      <Group justify="space-between">
+        <div>
+          <Title order={4}>Pilotage en cours de saison</Title>
+          <Text size="sm" c="dimmed">
+            {steering.measurements.length && steering.allowedDose !== null
+              ? `Dose permise après la dernière mesure : ${steering.allowedDose} kg N/ha (plan : ${planDose ?? "—"} kg${steering.reservedKgNHa ? `, dont ${steering.reservedKgNHa} kg réservés au pilotage` : ""}).`
+              : "Une mesure d'un outil de pilotage fixe l'apport de pilotage ; elle seule justifie de dépasser la dose du plan. Les indices satellite de Fourmy restent un repère."}
+          </Text>
+        </div>
+        {owner && !form && (
+          <Button size="compact-sm" variant="light" leftSection={<Plus size={14} />} onClick={() => setForm(blank)}>
+            Ajouter une mesure
+          </Button>
+        )}
+      </Group>
+      {steering.measurements.length > 0 && (
+        <Table fz="sm" mt="xs">
+          <Table.Tbody>
+            {steering.measurements.map((m) => (
+              <Table.Tr key={m.id}>
+                <Table.Td className="lv-num">{formatDate(m.measuredOn)}</Table.Td>
+                <Table.Td>
+                  {m.tool}
+                  {m.value ? ` : ${m.value}` : ""}
+                  {m.stage ? ` (${m.stage})` : ""}
+                </Table.Td>
+                <Table.Td className="lv-num">{m.advisedKgNHa} kg N/ha conseillés</Table.Td>
+                <Table.Td>
+                  <Documents farmId={farmId} ownerType="steering" ownerId={m.id} owner={owner} label="Bulletin" />
+                </Table.Td>
+                <Table.Td>
+                  {owner && (
+                    <ActionIcon variant="subtle" color="brique" aria-label="Retirer la mesure" onClick={() => remove.mutate(m.id)}>
+                      <Trash2 size={14} />
+                    </ActionIcon>
+                  )}
+                </Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      )}
+      {form && (
+        <Stack mt="xs">
+          <SimpleGrid cols={{ base: 1, sm: 5 }}>
+            <TextInput label="Mesuré le" type="date" value={form.measuredOn} onChange={(e) => setForm({ ...form, measuredOn: e.currentTarget.value })} />
+            <TextInput label="Outil" placeholder="N-Tester, Jubil…" value={form.tool} onChange={(e) => setForm({ ...form, tool: e.currentTarget.value })} />
+            <TextInput label="Stade" value={form.stage ?? ""} onChange={(e) => setForm({ ...form, stage: e.currentTarget.value || null })} />
+            <TextInput label="Valeur mesurée" value={form.value ?? ""} onChange={(e) => setForm({ ...form, value: e.currentTarget.value || null })} />
+            <NumberInput label="Dose conseillée (kg N/ha)" min={0} max={300} value={form.advisedKgNHa} onChange={(v) => setForm({ ...form, advisedKgNHa: Number(v) || 0 })} />
+          </SimpleGrid>
+          {add.error && <ErrorAlert error={add.error} />}
+          <Group>
+            <Button size="xs" disabled={!form.tool.trim() || !form.measuredOn} loading={add.isPending} onClick={() => add.mutate({ ...form, tool: form.tool.trim() })}>
+              Enregistrer la mesure
             </Button>
             <Button size="xs" variant="subtle" onClick={() => setForm(null)}>
               Annuler

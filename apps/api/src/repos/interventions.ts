@@ -549,7 +549,15 @@ async function recordCompliance(tx: Tx, ctx: DomainCtx, interventionId: string, 
  * saisie sur le web pendant une période d'interdiction est refusée sans motif ;
  * le motif (le même que pour le phyto) reste attaché à l'intervention.
  */
-async function recordNitrateCheck(tx: Tx, ctx: DomainCtx, interventionId: string, body: CheckableBody, mode: "plan" | "done") {
+/** Température la plus basse et pluie de la météo enregistrée avec l'intervention. */
+function weatherOf(w: unknown): { minTemperatureC: number | null; precipitationMm: number | null } | null {
+  if (!w || typeof w !== "object") return null;
+  const x = w as { temperatureC?: number | null; precipitationMm?: number | null; hours?: { temperatureC: number | null }[] };
+  const temps = [x.temperatureC, ...(x.hours ?? []).map((h) => h.temperatureC)].filter((t): t is number => typeof t === "number");
+  return { minTemperatureC: temps.length ? Math.min(...temps) : null, precipitationMm: x.precipitationMm ?? null };
+}
+
+async function recordNitrateCheck(tx: Tx, ctx: DomainCtx, interventionId: string, body: CheckableBody & { weather?: unknown }, mode: "plan" | "done") {
   const startedAt = body.periods[0]?.startedAt ?? body.plannedAt;
   const parcels = body.targets.filter((t) => t.kind === "land_parcel");
   if (!startedAt || !parcels.length || !body.inputs.length) {
@@ -564,6 +572,7 @@ async function recordNitrateCheck(tx: Tx, ctx: DomainCtx, interventionId: string
     inputs: body.inputs.map(({ articleId, quantity, per }) => ({ articleId, quantity, per })),
     areaM2,
     interventionId,
+    weather: weatherOf(body.weather),
   });
   if (!check.indicators.length && !check.nitrogen) {
     await tx.execute(sql`UPDATE interventions SET nitrate_check = NULL WHERE id = ${interventionId}`);

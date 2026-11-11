@@ -44,3 +44,13 @@ export function splitDose(dose: number, crop: CropGroup, opts: { nBefore4Leaves?
   }
   return [app("Apport", dose)];
 }
+
+/**
+ * Pilotage (lot AJ, FR-FERT-17) : la dernière mesure fixe l'apport de
+ * pilotage. La dose permise devient la dose du plan, moins l'apport réservé
+ * au pilotage, plus la dose conseillée ; sans mesure, c'est la dose du plan.
+ */
+export function steeringAllowance(planDose: number, reservedKgNHa: number, measurements: { measuredOn: string; advisedKgNHa: number }[]): number {
+  const last = [...measurements].sort((a, b) => a.measuredOn.localeCompare(b.measuredOn)).at(-1);
+  return last ? Math.round(planDose - reservedKgNHa + last.advisedKgNHa) : planDose;
+}

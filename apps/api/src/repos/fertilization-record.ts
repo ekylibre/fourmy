@@ -10,13 +10,28 @@ import {
   type FertilizerComposition,
   type RecordApplication,
   type RecordParcel,
+  type CoverCrop,
+  type SoilCoverStatus,
 } from "@fourmy/contracts";
-import { checkCalendar, cropGroupOf, effectiveComposition, isMaizeOrSorghum, isStrawCereal, nitrogenOfInput } from "@fourmy/domain";
+import {
+  checkCalendar,
+  checkSoilCover,
+  checkSpreadingConditions,
+  cropGroupOf,
+  effectiveComposition,
+  isMaizeOrSorghum,
+  isStrawCereal,
+  nitrogenOfInput,
+  steeringAllowance,
+} from "@fourmy/domain";
 import type { CropGroup } from "@fourmy/fertilization-refs";
-import { cropLabel } from "./fertilization-plans.js";
+import { cropLabel, previousOf } from "./fertilization-plans.js";
 import { getSettings, settingsInTx } from "./fertilization-context.js";
 import { fertilizersInTx, listFertilizers } from "./fertilizers.js";
 import { coversInTx } from "./cover-crops.js";
+import { steeringInTx } from "./steering.js";
+
+const fr = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 
 /**
  * Cahier d'enregistrement et contrôles à la saisie (lot AH,
@@ -64,16 +79,39 @@ interface ParcelCrop {
   irrigated: boolean;
   zones: string[];
   zone: string | null;
-  plan: { dose: number; version: number } | null;
+  plan: { id: string; dose: number; version: number; reservedKgNHa: number } | null;
+  /** Cours d'eau le plus proche (fossés exclus), si les cours d'eau de la ferme sont chargés. */
+  water: { name: string | null; distanceM: number } | null;
 }
 
 async function parcelCrops(tx: Tx, farmId: string, parcelIds: string[], day: string, startMmdd: string): Promise<ParcelCrop[]> {
   if (!parcelIds.length) return [];
   const campaign = campaignOf(day, startMmdd);
-  const list = await rows<{ id: string; name: string; reference: string | null; cultivation: string | null; year: number | null; irrigated: boolean | null; zones: string[] | null; status: string | null; dose: string | null; version: number | null }>(
+  const list = await rows<{
+    id: string;
+    name: string;
+    reference: string | null;
+    cultivation: string | null;
+    year: number | null;
+    irrigated: boolean | null;
+    zones: string[] | null;
+    status: string | null;
+    plan_id: string | null;
+    dose: string | null;
+    version: number | null;
+    reserved: string | null;
+    water_name: string | null;
+    water_m: number | null;
+  }>(
     tx,
-    sql`SELECT lp.id, lp.name, pr.reference, pr.cultivation, pr.year, ps.irrigated, z.zones, z.status, v.dose_efficient AS dose, v.version
+    sql`SELECT lp.id, lp.name, pr.reference, pr.cultivation, pr.year, ps.irrigated, z.zones, z.status, fp.id AS plan_id, v.dose_efficient AS dose, v.version,
+               (SELECT sum(a.n_efficient) FROM fertilization_plan_applications a WHERE a.plan_id = fp.id AND a.version = fp.current_version AND a.reserved_for_steering) AS reserved,
+               w.name AS water_name, w.d AS water_m
         FROM land_parcels lp
+        LEFT JOIN LATERAL (
+          SELECT wi.name, ST_Distance(wi.geom::geography, sh.shape::geography) AS d
+          FROM (SELECT shape FROM land_parcel_versions WHERE land_parcel_id = lp.id AND valid @> ${day}::timestamptz LIMIT 1) sh, water_items wi
+          WHERE NOT wi.ditch ORDER BY wi.geom <-> sh.shape LIMIT 1) w ON true
         LEFT JOIN LATERAL (
           SELECT a.reference, coalesce(p.cultivation, a.cultivation) AS cultivation, c.year FROM productions p
           JOIN campaigns c ON c.id = p.campaign_id LEFT JOIN activities a ON a.id = p.activity_id
@@ -93,7 +131,8 @@ async function parcelCrops(tx: Tx, farmId: string, parcelIds: string[], day: str
     irrigated: !!r.irrigated,
     zones: r.zones ?? [],
     zone: r.status,
-    plan: r.dose !== null && r.version !== null ? { dose: Number(r.dose), version: r.version } : null,
+    plan: r.plan_id && r.dose !== null && r.version !== null ? { id: r.plan_id, dose: Number(r.dose), version: r.version, reservedKgNHa: Number(r.reserved ?? 0) } : null,
+    water: r.water_m !== null ? { name: r.water_name, distanceM: Number(r.water_m) } : null,
   }));
 }
 
@@ -163,6 +202,22 @@ export async function checkApplicationTx(tx: Tx, farmId: string, req: Fertilizat
       for (const p of parcels) {
         const cal = checkCalendar({ date: day, crop: p.crop, type: n.composition.nitrateType, foliar: n.composition.foliar, irrigated: p.irrigated, zones: p.zones });
         if (cal.level !== "ok" || parcels.length === 1) indicators.push({ code: "fert_calendar", level: cal.level, message: `${f.name} : ${cal.message}`, parcelName: p.name });
+        // Conditions d'épandage (lot AJ) : en zone vulnérable, où le PAN s'applique.
+        if (p.zone === "in" || p.zone === "partial") {
+          const c = n.composition;
+          for (const x of checkSpreadingConditions({
+            type: c.nitrateType,
+            solid: c.basis === "kg_per_t",
+            liquid: c.basis === "kg_per_m3" || c.density !== null,
+            foliar: c.foliar,
+            weather: req.weather ?? null,
+            water: p.water,
+          })) {
+            // Gel et pluie valent pour l'intervention : une fois par parcelle.
+            const same = indicators.some((y) => y.code === x.code && y.parcelName === p.name && (x.code === "fert_frost" || x.code === "fert_wet" || y.message.endsWith(x.message)));
+            if (!same) indicators.push({ ...x, message: x.code === "fert_water" ? `${f.name} : ${x.message}` : x.message, parcelName: p.name });
+          }
+        }
       }
     }
     // Plan : établi, dose non dépassée, premier apport plafonné.
@@ -173,12 +228,28 @@ export async function checkApplicationTx(tx: Tx, farmId: string, req: Fertilizat
         if (p.zone === "in" || p.zone === "partial")
           indicators.push({ code: "fert_plan", level: "warning", message: `Pas de plan de fumure établi pour la campagne ${p.campaign} : il doit l'être avant le premier apport de sortie d'hiver.`, parcelName: p.name });
       } else if (efficient !== null && so.total + efficient > p.plan.dose) {
-        indicators.push({
-          code: "fert_plan",
-          level: "warning",
-          message: `Dépassement du plan (version ${p.plan.version}) : ${so.total + Math.round(efficient)} kg N apportés pour ${p.plan.dose} kg prévus. Justifiez-le par une mesure de pilotage.`,
-          parcelName: p.name,
-        });
+        // Pilotage : la dernière mesure fixe l'apport de pilotage et peut justifier le dépassement.
+        const measures = (await steeringInTx(tx, [p.plan.id])).get(p.plan.id) ?? [];
+        const allowed = steeringAllowance(p.plan.dose, p.plan.reservedKgNHa, measures);
+        const applied = so.total + Math.round(efficient);
+        const last = measures.at(-1);
+        indicators.push(
+          measures.length && applied <= allowed
+            ? {
+                code: "fert_plan",
+                level: "info",
+                message: `${applied} kg N apportés pour ${p.plan.dose} kg prévus : dépassement justifié par la mesure ${last!.tool} du ${fr(last!.measuredOn)} (${allowed} kg permis).`,
+                parcelName: p.name,
+              }
+            : {
+                code: "fert_plan",
+                level: "warning",
+                message: measures.length
+                  ? `Dépassement : ${applied} kg N apportés pour ${allowed} kg permis après la mesure ${last!.tool} du ${fr(last!.measuredOn)} (plan version ${p.plan.version} : ${p.plan.dose} kg).`
+                  : `Dépassement du plan (version ${p.plan.version}) : ${applied} kg N apportés pour ${p.plan.dose} kg prévus. Justifiez-le par une mesure de pilotage.`,
+                parcelName: p.name,
+              },
+        );
       } else if (efficient !== null) {
         indicators.push({ code: "fert_plan", level: "ok", message: `${so.total + Math.round(efficient)} kg N apportés sur ${p.plan.dose} kg prévus (reste ${Math.max(0, p.plan.dose - so.total - Math.round(efficient))} kg).`, parcelName: p.name });
       }
@@ -202,18 +273,64 @@ export async function checkApplicationTx(tx: Tx, farmId: string, req: Fertilizat
  * semis, les apports (date, surface, produit, teneur, azote), les récoltes et
  * le rendement, les techniques culturales simplifiées.
  */
+/**
+ * Couverture des sols avant la culture (FR-FERT-27) : précédent de la
+ * campagne d'avant, sa dernière récolte avant le semis, le couvert saisi et
+ * les travaux des résidus (broyage, enfouissement).
+ */
+function soilCoverOf(
+  prev: { reference: string | null; cultivation: string | null } | null,
+  zones: string[] | null,
+  crop: CropGroup,
+  events: { procedure: string; day: string }[],
+  sown: string | null,
+  cover: CoverCrop | null,
+  campaign: number,
+): SoilCoverStatus {
+  const previous = prev ? cropGroupOf({ reference: prev.reference, cultivation: prev.cultivation }) : null;
+  const limit = sown ?? `${campaign}-03-01`;
+  const harvestedOn =
+    events
+      .filter((e) => HARVEST.includes(e.procedure) && e.day >= `${campaign - 1}-06-01` && e.day < limit)
+      .map((e) => e.day)
+      .sort()
+      .at(-1) ?? null;
+  return checkSoilCover({
+    crop,
+    previous: previous ? { crop: previous, harvestedOn } : null,
+    zar: (zones ?? []).includes("zar"),
+    cover: cover
+      ? { kind: cover.kind, pureLegumes: cover.family === "legumineuses", sownOn: cover.sownOn, destroyedOn: cover.destroyedOn, destructionMode: cover.destructionMode }
+      : null,
+    residueWorks: events.filter((e) => RESIDUES.includes(e.procedure)).map((e) => e.day),
+  });
+}
+
 export async function fertilizationRecord(db: Database, farmId: string, campaign: number): Promise<FertilizationRecord> {
   const settings = await getSettings(db, farmId);
   const w = window(campaign, settings.campaignStartMmdd);
   const fertilizers = new Map((await listFertilizers(db, farmId)).map((f) => [f.id, f]));
   return withFarm(db, farmId, async (tx) => {
-    const parcels = await rows<{ id: string; name: string; area_m2: string; soil_type: string | null; zone: string | null; reference: string | null; cultivation: string | null; species: string | null; dose: string | null; version: number | null }>(
+    const parcels = await rows<{
+      id: string;
+      name: string;
+      area_m2: string;
+      soil_type: string | null;
+      zone: string | null;
+      zones: string[] | null;
+      reference: string | null;
+      cultivation: string | null;
+      species: string | null;
+      plan_id: string | null;
+      dose: string | null;
+      version: number | null;
+    }>(
       tx,
       sql`SELECT DISTINCT ON (lp.id) lp.id, lp.name,
                  (SELECT v.area_m2 FROM land_parcel_versions v WHERE v.land_parcel_id = lp.id
                   ORDER BY (v.valid @> make_date(${campaign}, 6, 1)::timestamptz) DESC, upper(v.valid) DESC NULLS FIRST LIMIT 1) AS area_m2,
-                 ps.soil_type, z.status AS zone, a.reference, coalesce(pr.cultivation, a.cultivation) AS cultivation, pr.species,
-                 v.dose_efficient AS dose, v.version
+                 ps.soil_type, z.status AS zone, z.zones, a.reference, coalesce(pr.cultivation, a.cultivation) AS cultivation, pr.species,
+                 fp.id AS plan_id, v.dose_efficient AS dose, v.version
           FROM productions pr JOIN campaigns c ON c.id = pr.campaign_id AND c.year = ${campaign}
           JOIN land_parcels lp ON lp.id = pr.land_parcel_id
           LEFT JOIN activities a ON a.id = pr.activity_id
@@ -225,6 +342,21 @@ export async function fertilizationRecord(db: Database, farmId: string, campaign
           ORDER BY lp.id, pr.created_at`,
     );
     const ids = parcels.map((p) => p.id);
+    // Précédent (couverture des sols) : la parcelle de la campagne d'avant qui recouvre celle-ci,
+    // la même ou une autre (Ekylibre crée une parcelle par campagne).
+    const prevs = new Map<string, Awaited<ReturnType<typeof previousOf>>>();
+    for (const p of parcels) if (p.zone === "in" || p.zone === "partial") prevs.set(p.id, await previousOf(tx, farmId, p.id, campaign));
+    const prevIds = [...prevs.values()].map((x) => x?.parcel_id).filter((x): x is string => !!x && !ids.includes(x));
+    const prevEvents = prevIds.length
+      ? await rows<{ parcel_id: string; procedure: string; day: string }>(
+          tx,
+          sql`SELECT t.ref_id AS parcel_id, i.procedure, i.started_at::date::text AS day
+              FROM interventions i JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target'
+              WHERE i.farm_id = ${farmId} AND i.status = 'done' AND t.ref_id IN (SELECT unnest(${arr(prevIds)}::uuid[]))
+                AND i.procedure = ANY(${arr([...HARVEST, ...RESIDUES])}::text[])
+                AND i.started_at >= make_date(${campaign - 1}, 6, 1) AND i.started_at < ${w.to}::date`,
+        )
+      : [];
     const events = ids.length
       ? await rows<{ parcel_id: string; id: string; procedure: string; origin: string; day: string; created: string; worked: string | null; article_id: string | null; quantity: string | null; unit: string | null; role: string | null }>(
           tx,
@@ -239,6 +371,18 @@ export async function fertilizationRecord(db: Database, farmId: string, campaign
         )
       : [];
     const covers = await coversInTx(tx, ids, campaign);
+    const steering = await steeringInTx(tx, parcels.map((p) => p.plan_id).filter((x): x is string => !!x));
+    // Épandages enregistrés en période d'interdiction, avec leur motif.
+    const forced = await rows<{ id: string; day: string; parcels: string[]; reason: string | null }>(
+      tx,
+      sql`SELECT i.id, i.started_at::date::text AS day, i.nitrate_check->>'reason' AS reason,
+                 array(SELECT lp.name FROM intervention_parameters t JOIN land_parcels lp ON lp.id = t.ref_id
+                       WHERE t.intervention_id = i.id AND t.role = 'target' ORDER BY lp.name) AS parcels
+          FROM interventions i
+          WHERE i.farm_id = ${farmId} AND i.status = 'done' AND i.nitrate_check->>'level' = 'danger'
+            AND i.started_at >= ${w.from}::date AND i.started_at < ${w.to}::date
+          ORDER BY i.started_at`,
+    );
     const out: RecordParcel[] = [];
     for (const p of parcels) {
       const crop = cropGroupOf({ reference: p.reference, cultivation: p.cultivation });
@@ -298,6 +442,8 @@ export async function fertilizationRecord(db: Database, farmId: string, campaign
         yieldQHa: yields.length ? Math.round((yields.reduce((s, v) => s + v, 0) / yields.length) * 10) / 10 : null,
         interculture,
         cover: covers.get(p.id) ?? null,
+        soilCover: prevs.has(p.id) ? soilCoverOf(prevs.get(p.id) ?? null, p.zones, crop, [...mine, ...prevEvents.filter((e) => e.parcel_id === prevs.get(p.id)?.parcel_id)], sown, covers.get(p.id) ?? null, campaign) : null,
+        steering: p.plan_id ? (steering.get(p.plan_id) ?? []) : [],
         // Trois campagnes de recul ne sont pas toutes chargées : « null » quand on ne peut pas conclure.
         noPlowing: plowed ? false : null,
         applications,
@@ -308,6 +454,14 @@ export async function fertilizationRecord(db: Database, farmId: string, campaign
     }
     out.sort((a, b) => a.name.localeCompare(b.name, "fr"));
     const all = out.flatMap((p) => p.applications);
-    return { campaign, from: w.from, to: w.to, parcels: out, toComplete: all.filter((a) => a.missing).length, late: all.filter((a) => a.late).length };
+    return {
+      campaign,
+      from: w.from,
+      to: w.to,
+      parcels: out,
+      toComplete: all.filter((a) => a.missing).length,
+      late: all.filter((a) => a.late).length,
+      forced: forced.map((f) => ({ interventionId: f.id, date: f.day, parcels: f.parcels, reason: f.reason })),
+    };
   });
 }

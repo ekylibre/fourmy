@@ -43,7 +43,7 @@ import { irrigationBody, irrigationDraft, IrrigationFields, type IrrigationDraft
 import { kgN, nitrogenNote, useFertilizers } from "../fertilization/fertilization";
 import type { FertilizationCheckRequest } from "@fourmy/contracts";
 import { NitrogenLine } from "../fertilization/NitrogenLine";
-import { FertilizationSummary, useFertilizationCheck } from "../fertilization/FertilizationChecks";
+import { FertilizationSummary, useFertilizationCheck, weatherExtremes } from "../fertilization/FertilizationChecks";
 import { api, ApiError, farmPath } from "../../app/api";
 import { unitLabel } from "../../app/labels";
 import { invalidateAfterIntervention, useActivities, useCrewTemplates, useEquipments, usePhytoArticles } from "../../app/queries";
@@ -431,6 +431,8 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
           inputs: full.inputs.filter((i) => article(i.articleId)?.kind === "fertilizer").map(({ articleId, quantity, per }) => ({ articleId, quantity, per })),
           areaM2: treatedM2 > 0 ? treatedM2 : null,
           interventionId: editing?.id ?? null,
+          // Conditions d'épandage (lot AJ) : gel et forte pluie d'après la météo de la saisie.
+          weather: weather ? weatherExtremes(weather) : null,
         };
     } catch {
       fertDraft = null; // date en cours de saisie

@@ -353,6 +353,8 @@ export interface FertilizationPlan {
   /** Apports proposés (fractionnement) quand le brouillon n'en a pas. */
   proposedApplications: PlannedApplication[];
   versions: PlanVersion[];
+  /** Mesures de pilotage (lot AJ) et dose de l'apport de pilotage qu'elles autorisent. */
+  steering: { measurements: SteeringMeasurement[]; reservedKgNHa: number; allowedDose: number | null };
 }
 
 export interface FertilizationPlanSummary {
@@ -383,10 +385,21 @@ export const fertilizationCheckRequest = z.object({
   areaM2: z.number().positive().nullable().default(null),
   /** Intervention modifiée : ses propres apports ne comptent pas deux fois. */
   interventionId: z.string().uuid().nullable().default(null),
+  /** Météo de l'intervention (lot AJ) : gel et forte pluie rappellent les conditions d'épandage. */
+  weather: z.object({ minTemperatureC: z.number().nullable(), precipitationMm: z.number().nullable() }).nullable().optional(),
 });
 export type FertilizationCheckRequest = z.infer<typeof fertilizationCheckRequest>;
 
-export type FertilizationIndicatorCode = "fert_calendar" | "fert_plan" | "fert_first_split" | "fert_composition";
+export type FertilizationIndicatorCode =
+  | "fert_calendar"
+  | "fert_plan"
+  | "fert_first_split"
+  | "fert_composition"
+  // Conditions d'épandage (lot AJ) : gel, sol détrempé, cours d'eau, pente.
+  | "fert_frost"
+  | "fert_wet"
+  | "fert_water"
+  | "fert_slope";
 export interface FertilizationIndicator {
   code: FertilizationIndicatorCode;
   level: "ok" | "info" | "warning" | "danger";
@@ -435,6 +448,10 @@ export interface RecordParcel {
   interculture: { date: string; label: string }[];
   /** Couvert d'interculture saisi (espèces, dates, exporté ou non). */
   cover: CoverCrop | null;
+  /** Couverture des sols en interculture (lot AJ), en zone vulnérable seulement. */
+  soilCover: SoilCoverStatus | null;
+  /** Mesures de pilotage de la campagne (lot AJ). */
+  steering: SteeringMeasurement[];
   /** Techniques culturales simplifiées : aucun labour sur la campagne et les deux précédentes. */
   noPlowing: boolean | null;
   applications: RecordApplication[];
@@ -452,6 +469,15 @@ export interface FertilizationRecord {
   /** Apports à compléter (teneur inconnue) et saisis en retard. */
   toComplete: number;
   late: number;
+  /** Épandages enregistrés en période d'interdiction, avec leur motif (lot AJ). */
+  forced: { interventionId: string; date: string; parcels: string[]; reason: string | null }[];
+}
+
+/** Couverture des sols d'une parcelle (FR-FERT-27). */
+export interface SoilCoverStatus {
+  level: "ok" | "info" | "warning";
+  situation: "long" | "short_after_rapeseed" | "none";
+  messages: string[];
 }
 
 // --- Lot AI : couverts d'interculture, justificatifs, contrôle enregistré ----------------
@@ -467,10 +493,12 @@ export const COVER_FAMILY_LABELS = {
 } as const;
 export type CoverFamilyKey = keyof typeof COVER_FAMILY_LABELS;
 
+export const COVER_KIND_LABELS = { sown: "Couvert semé", regrowth_cereal: "Repousses de céréales", regrowth_rapeseed: "Repousses de colza" } as const;
 export const coverCropWrite = z
   .object({
     campaign: z.number().int().min(2000).max(2100),
-    family: z.enum(Object.keys(COVER_FAMILY_LABELS) as [CoverFamilyKey, ...CoverFamilyKey[]]),
+    kind: z.enum(["sown", "regrowth_cereal", "regrowth_rapeseed"]).default("sown"),
+    family: z.enum(Object.keys(COVER_FAMILY_LABELS) as [CoverFamilyKey, ...CoverFamilyKey[]]).nullable().default(null),
     species: z.string().trim().min(1).max(200),
     sownOn: isoDate,
     destroyedOn: isoDate.nullable().default(null),
@@ -479,14 +507,15 @@ export const coverCropWrite = z
     destructionMode: z.enum(["mechanical", "chemical", "frost", "harvest", "grazing"]).nullable().default(null),
     notes: z.string().trim().max(1000).nullable().default(null),
   })
-  .refine((c) => !c.destroyedOn || c.destroyedOn >= c.sownOn, { message: "La destruction suit le semis." });
+  .refine((c) => !c.destroyedOn || c.destroyedOn >= c.sownOn, { message: "La destruction suit le semis." })
+  .refine((c) => (c.kind === "sown") === (c.family !== null), { message: "Un couvert semé a une famille ; des repousses n'en ont pas." });
 export type CoverCropWrite = z.infer<typeof coverCropWrite>;
 export type CoverCrop = CoverCropWrite & { id: string; parcelId: string };
 
 export const COVER_BIOMASS_LABELS = { le_1: "1 t MS/ha ou moins", "1_3": "1 à 3 t MS/ha", ge_3: "3 t MS/ha ou plus" } as const;
 export const DESTRUCTION_MODE_LABELS = { mechanical: "Mécanique (broyage, labour)", chemical: "Chimique", frost: "Gel", harvest: "Récolte ou fauche", grazing: "Pâturage" } as const;
 
-export const DOCUMENT_OWNER_TYPES = ["plan", "soil_analysis", "water_source", "product_analysis", "cover_crop"] as const;
+export const DOCUMENT_OWNER_TYPES = ["plan", "soil_analysis", "water_source", "product_analysis", "cover_crop", "steering"] as const;
 export type DocumentOwnerType = (typeof DOCUMENT_OWNER_TYPES)[number];
 export const DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
 export const DOCUMENT_TYPES = ["application/pdf", "image/jpeg", "image/png"] as const;
@@ -504,3 +533,18 @@ export interface RegulatoryDocument {
 
 /** Contrôle nitrates enregistré avec une intervention réalisée, et le motif d'un passage outre. */
 export type NitrateCheckRecord = FertilizationCheck & { reason: string | null; checkedAt: string };
+
+// --- Lot AJ : pilotage en cours de saison ---------------------------------------------------------
+
+export const steeringWrite = z.object({
+  measuredOn: isoDate,
+  stage: z.string().trim().max(80).nullable().default(null),
+  /** Outil : N-Tester, Jubil, Hydro N-Sensor, satellite (Farmstar…). */
+  tool: z.string().trim().min(1).max(120),
+  value: z.string().trim().max(120).nullable().default(null),
+  /** Dose conseillée pour l'apport de pilotage (kg N efficace/ha). */
+  advisedKgNHa: z.number().min(0).max(300),
+  notes: z.string().trim().max(1000).nullable().default(null),
+});
+export type SteeringWrite = z.infer<typeof steeringWrite>;
+export type SteeringMeasurement = SteeringWrite & { id: string; planId: string; createdAt: string };
