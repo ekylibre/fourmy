@@ -370,4 +370,32 @@ describe.skipIf(!url)("plans de fumure (intégration)", () => {
     await sql`DELETE FROM stock_movements WHERE intervention_id = ${spread}`;
     await sql`DELETE FROM interventions WHERE id = ${spread}`;
   });
+
+  it("efficacité d'un apport d'urée : grille du COMIFER d'après le sol et la météo du jour (lot AL)", async () => {
+    await sql`INSERT INTO soil_analyses (id, farm_id, land_parcel_id, sampled_on, kind, soil_values) VALUES (${crypto.randomUUID()}, ${farmId}, ${p2026}, '2025-03-01', 'soil', ${sql.json({ ph: 7.8, cecMeq: 10 })})`;
+    for (const [day, rain] of [["2026-05-20", 0], ["2026-05-21", 2], ["2026-05-22", 1]] as const) {
+      await sql`INSERT INTO daily_weather (farm_id, day, tmin_c, tmax_c, rain_mm, et0_mm, wind_max_kmh, with_wind, source) VALUES (${farmId}, ${day}, 10, 20, ${rain}, 4, 25, true, 'archive')
+                ON CONFLICT (farm_id, day) DO UPDATE SET tmin_c = 10, tmax_c = 20, rain_mm = excluded.rain_mm, wind_max_kmh = 25, with_wind = true, source = 'archive'`;
+    }
+    const r = (await (
+      await app.request(`${base()}/fertilization/check`, {
+        method: "POST",
+        headers: worker.headers,
+        body: JSON.stringify({ startedAt: "2026-05-20T09:00:00+02:00", parcelIds: [p2026], inputs: [{ articleId: urea, quantity: 100, per: "hectare" }] }),
+      })
+    ).json()) as FertilizationCheck;
+    // pH 7,8 : 3 ; CEC 10 : 2 ; pluie 3 mm sur 3 jours : 4 ; vent 25 km/h : 2 ; 15 °C : 6 ; couverture inconnue : -2 à 0.
+    expect(r.indicators.find((i) => i.code === "fert_efficiency")).toEqual({
+      code: "fert_efficiency",
+      level: "warning",
+      parcelName: "Champ Maïs 2026",
+      message:
+        "Efficacité de l'apport (urée solide, grille COMIFER 2022) : note entre 15 et 17, conditions limites, risque de pertes d'efficacité significatives. D'après : pH du sol 7,8, CEC 10 meq/100 g, pluie prévue à 3 jours 3 mm, vent 25 km/h, température du jour 15 °C. Inconnu : couverture du sol par la culture.",
+    });
+    // Cahier : l'apport d'urée du 12/05 (sans contrôle enregistré) est noté d'après le cache météo
+    // (simulé : 0 mm du 12 au 14, 8 à 18 °C, vent inconnu) : 3 + 2 + 4 + 3, couverture et vent inconnus.
+    const record = (await (await app.request(`${base()}/fertilization/record?campaign=2026`, { headers: worker.headers })).json()) as FertilizationRecord;
+    const may12 = record.parcels.find((x) => x.parcelId === p2026)!.applications.find((a) => a.date === "2026-05-12")!;
+    expect(may12.efficiency).toEqual({ level: "info", message: expect.stringContaining("note entre 10 et 14, de « conditions moyennes, pertes d'efficacité possibles » à « conditions limites") });
+  });
 });

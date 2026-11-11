@@ -161,6 +161,8 @@ export interface WeatherDay {
   precipitationMm: number | null;
   /** Évapotranspiration de référence FAO-56 (Penman-Monteith). */
   et0Mm: number | null;
+  /** Vent maximal du jour à 10 m (km/h). */
+  windMaxKmh?: number | null;
 }
 
 /**
@@ -177,8 +179,9 @@ export async function openMeteoDays(
   const params = new URLSearchParams({
     latitude: lat.toFixed(5),
     longitude: lon.toFixed(5),
-    daily: "temperature_2m_min,temperature_2m_max,precipitation_sum,et0_fao_evapotranspiration",
+    daily: "temperature_2m_min,temperature_2m_max,precipitation_sum,et0_fao_evapotranspiration,wind_speed_10m_max",
     timezone: "Europe/Paris",
+    wind_speed_unit: "kmh",
   });
   if (range.source === "archive") {
     params.set("start_date", range.from);
@@ -198,6 +201,7 @@ export async function openMeteoDays(
     temperatureMaxC: num(d.temperature_2m_max?.[i]),
     precipitationMm: num(d.precipitation_sum?.[i]),
     et0Mm: num(d.et0_fao_evapotranspiration?.[i]),
+    windMaxKmh: num(d.wind_speed_10m_max?.[i]),
   }));
 }
 

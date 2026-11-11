@@ -211,7 +211,7 @@ describe("éditions de la directive nitrates", () => {
               interculture: [{ date: "2026-03-01", label: "Labour" }],
               noPlowing: false,
               applications: [
-                { interventionId: "i1", date: "2026-05-12", recordedOn: "2026-05-12", late: false, procedure: "fertilizing", areaHa: 4, product: "Urée 46", content: "46 % N", nitrateType: "III", doseLabel: "150 kilogram/ha", nTotalKgHa: 69, nEfficientKgHa: 69, missing: null },
+                { interventionId: "i1", date: "2026-05-12", recordedOn: "2026-05-12", late: false, procedure: "fertilizing", areaHa: 4, product: "Urée 46", content: "46 % N", nitrateType: "III", doseLabel: "150 kilogram/ha", nTotalKgHa: 69, nEfficientKgHa: 69, missing: null, efficiency: { level: "warning", message: "Efficacité de l'apport (urée solide, grille COMIFER 2022) : note 14, conditions limites, risque de pertes d'efficacité significatives. D'après : pH du sol 7,8." } },
               ],
               soilCover: { level: "warning", situation: "long", messages: ["Couverture implantée le 05/10/2025, après la date limite du 30/09/2025."] },
               aplsh: { from: "2025-09-20", to: "2025-12-10", kgNHa: 90, ceiling: 70, over: true, missing: [] },
@@ -230,6 +230,7 @@ describe("éditions de la directive nitrates", () => {
     const block = screen.getByLabelText("Cahier Champ Maïs 2026");
     expect(block).toHaveTextContent("En zone vulnérable · sol : Sols limoneux · culture : Maïs grain (DKC5432) · semis 09/04/2026");
     expect(within(block).getByRole("row", { name: /Urée 46/ })).toHaveTextContent("12/05/2026");
+    expect(within(block).getByRole("row", { name: /Urée 46/ })).toHaveTextContent("note 14, conditions limites, risque de pertes d'efficacité significatives");
     expect(block).toHaveTextContent("Couvert d'interculture : Moutarde blanche (Crucifères (moutarde, radis…)), semé le 05/09/2025, détruit le 10/12/2025 (mécanique (broyage, labour))");
     expect(block).toHaveTextContent("couverture des sols : à vérifier (Couverture implantée le 05/10/2025, après la date limite du 30/09/2025.)");
     expect(block).toHaveTextContent("Azote potentiellement libéré jusqu'en sortie d'hiver sur le couvert, du 20/09/2025 au 10/12/2025 : 90 kg N/ha pour un plafond de 70 kg (dépassé).");

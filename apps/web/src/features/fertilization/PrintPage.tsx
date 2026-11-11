@@ -143,12 +143,13 @@ function RecordDoc({ farmId, farmName, campaign }: { farmId: string; farmName: s
                 <Table.Th>Dose</Table.Th>
                 <Table.Th>N total (kg/ha)</Table.Th>
                 <Table.Th>N efficace (kg/ha)</Table.Th>
+                <Table.Th>Conditions d'apport (COMIFER)</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
               {p.applications.length === 0 ? (
                 <Table.Tr>
-                  <Table.Td colSpan={8}>Aucun apport d'azote.</Table.Td>
+                  <Table.Td colSpan={9}>Aucun apport d'azote.</Table.Td>
                 </Table.Tr>
               ) : (
                 p.applications.map((a, k) => (
@@ -161,6 +162,7 @@ function RecordDoc({ farmId, farmName, campaign }: { farmId: string; farmName: s
                     <Table.Td>{a.doseLabel}</Table.Td>
                     <Table.Td>{a.nTotalKgHa === null ? (a.missing ?? "—") : n(a.nTotalKgHa)}</Table.Td>
                     <Table.Td>{n(a.nEfficientKgHa)}</Table.Td>
+                    <Table.Td title={a.efficiency?.message}>{a.efficiency ? efficiencyShort(a.efficiency.message) : "—"}</Table.Td>
                   </Table.Tr>
                 ))
               )}
@@ -285,3 +287,6 @@ function PlansDoc({ farmId, farmName, campaign }: { farmId: string; farmName: st
     </>
   );
 }
+
+/** « note 11, conditions limites… » : la note et la qualité, sans le détail des critères. */
+const efficiencyShort = (message: string) => message.replace(/^Efficacité de l'apport \([^)]*\) : /, "").split(". D'après")[0]!.split(". Inconnu")[0]!;

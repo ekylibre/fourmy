@@ -551,7 +551,46 @@ Migration `0039_fertilization_aj.sql` :
 - le plafond de 20 kg des effluents peu chargés ;
 - les plans d'épandage (100 kg, note 1).
 
-**Reste à faire** : grille d'efficacité, colza et Keq des organiques, lien avec la modulation, rôle conseiller, mobile, autres régions.
+**Reste à faire** (après le lot AK) : grille d'efficacité, colza et Keq des organiques, lien avec la modulation, rôle conseiller, mobile, autres régions.
+
+### 5.7 Réalisation du lot AL : efficacité des apports minéraux (2026-11-11)
+
+**Source** : grille d'évaluation du risque de perte d'efficacité des apports d'azote minéral, COMIFER et RMT Bouclage, septembre 2022 (et sa note).
+- La qualité par forme et par classe de note a été relevée sur le rendu de la page : le texte extrait du PDF perd les couleurs.
+- La grille vaut pour un apport en surface. Elle ne change pas la dose : le COMIFER déconseille de majorer.
+
+**Note** (`packages/domain/src/fertilization/efficiency.ts`) : de -2 à 17.
+- pH : moins de 7 → 0 ; de 7 à 7,5 → 2 ; plus de 7,5 → 3.
+- CEC : moins de 12 meq/100 g → 2.
+- Couverture par la culture : plus de 50 % → -2.
+- Pluie à 3 jours : moins de 10 mm → 4.
+- Vent : plus de 19 km/h → 2.
+- Température du jour : de 6 à 13 °C → 3 ; plus de 13 °C → 6.
+
+**Qualité** selon la forme, pour les classes < 4, 4-8, 9-13 et > 13 :
+- ammonitrate et urée avec inhibiteur d'uréase : bonne, bonne, bonne, moyenne ;
+- solution azotée : bonne, moyenne, limite, à éviter ;
+- urée solide : bonne, bonne, moyenne, limite.
+
+La forme vient du nom ou du code Lexicon de l'engrais. Les NPK, le sulfate d'ammoniaque et le nitrate de calcium sont hors grille.
+
+**Données et lectures retenues par Fourmy** :
+- pH et CEC : dernière analyse de terre de la parcelle.
+- Couverture : dernier NDVI Sentinel-2 de moins de 15 jours ; un NDVI moyen d'au moins 0,5 vaut plus de 50 % de couverture. C'est une approximation.
+- Pluie : jour de l'apport et deux jours suivants.
+- Vent : maximal du jour.
+- Température : moyenne du jour, prise comme (minimum + maximum) / 2.
+- Météo : cache Open-Meteo de la ferme (`daily_weather`). La migration 0041 y ajoute le vent ; la dernière année d'archive est rechargée une fois pour l'obtenir (`with_wind`).
+- Une donnée inconnue n'est pas supposée : la note devient une fourchette (« note entre 8 et 13 ») et la qualité aussi. Le niveau affiché suit le meilleur cas, pour ne pas alarmer à tort.
+
+**Où elle apparaît** :
+- Saisie d'une intervention : le contrôle rafraîchit d'abord le cache météo, puis note chaque forme d'engrais minéral, sur toutes les parcelles et pas seulement en zone vulnérable. La note s'affiche même bonne.
+- Elle est enregistrée avec l'intervention (`nitrate_check`) et visible sur sa fiche.
+- Cahier : colonne « conditions d'apport ». C'est la note enregistrée à la saisie, sinon une note recalculée d'après le cache, pour les apports anciens ou repris d'Ekylibre.
+
+**Sur la ferme de Pierre** : ses apports de solution azotée du 27/05/2026 (0 mm de pluie dans les 3 jours, 26,5 °C) et du 21/06/2026 (28,8 °C) sont notés « limites » à « à éviter ». Il n'a pas d'analyse de terre : pH et CEC restent inconnus.
+
+**Reste à faire** : colza et Keq des organiques, plafonds du tableau 4 en azote efficace, lien avec la modulation, rôle conseiller, mobile, autres régions.
 
 ## 6. Contrats (`@fourmy/contracts`, `fertilization.ts`)
 
@@ -643,7 +682,8 @@ Les termes encore **manquants** sont listés (« à compléter ») sur le tablea
 | **AI — Interdictions, couverts, justificatifs** | Interdiction d'épandage bloquante avec motif, couverts d'interculture (MrCi, cahier), justificatifs joints, date d'ouverture et période d'implantation, analyse de sol annuelle | FR-FERT-19, 23, 25, 28 |
 | **AJ — Conditions, couverture des sols, pilotage** | Conditions d'épandage (gel, pluie, cours d'eau, pente), couverture des sols en interculture, repousses, pilotage et dose permise, tableau de bord de la campagne | FR-FERT-17, 26, 27, 36 |
 | **AK — APLSH** | Références APLSH du COMIFER (5 zones), référence d'un fertilisant organique, zone climatique de la ferme, plafond de 70 kg au contrôle et au cahier | FR-FERT-28 |
-| AL — ensuite | Grille d'efficacité, colza et Keq, lien avec la modulation, rôle conseiller, mobile | FR-FERT-18, 29, 35, 40 ; NFR-FERT-7 |
+| **AL — Efficacité des apports** | Grille du COMIFER 2022 à la saisie, sur la fiche et au cahier ; vent dans le cache météo | FR-FERT-29 |
+| AM — ensuite | Colza et Keq, plafonds du tableau 4, lien avec la modulation, rôle conseiller, mobile | FR-FERT-18, 35, 40 ; NFR-FERT-7 |
 
 ## 11. Tests
 

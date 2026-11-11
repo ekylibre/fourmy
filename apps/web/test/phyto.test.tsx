@@ -168,7 +168,10 @@ describe("fiche : contrôle et IFT", () => {
           nitrateCheck: {
             level: "danger",
             nitrogen: { totalKgHa: 46, efficientKgHa: 46 },
-            indicators: [{ code: "fert_calendar", level: "danger", parcelName: "Les Rouffiats", message: "Période d'interdiction d'épandage : du 01/07 au 15/02 pour un fertilisant de type III sur cette culture." }],
+            indicators: [
+              { code: "fert_calendar", level: "danger", parcelName: "Les Rouffiats", message: "Période d'interdiction d'épandage : du 01/07 au 15/02 pour un fertilisant de type III sur cette culture." },
+              { code: "fert_efficiency", level: "ok", parcelName: "Les Rouffiats", message: "Efficacité de l'apport (urée solide, grille COMIFER 2022) : note 1, bonnes conditions d'apport, efficacité optimale." },
+            ],
             reason: "Dérogation préfectorale",
             checkedAt: "2026-01-12T10:00:00.000Z",
           },
@@ -181,6 +184,8 @@ describe("fiche : contrôle et IFT", () => {
     expect(nitrates).toHaveTextContent("Azote apporté : 46 kg N/ha.");
     expect(nitrates).toHaveTextContent("Les Rouffiats : Période d'interdiction d'épandage");
     expect(nitrates).toHaveTextContent("Motif : « Dérogation préfectorale »");
+    // L'efficacité s'affiche même bonne : c'est un repère pour les apports suivants.
+    expect(nitrates).toHaveTextContent("note 1, bonnes conditions d'apport");
   });
 });
 
