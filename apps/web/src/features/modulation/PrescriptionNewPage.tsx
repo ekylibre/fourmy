@@ -65,8 +65,9 @@ export function PrescriptionNewPage() {
   const [strategy, setStrategy] = useState<ModulationStrategy>("compensate");
   const [baseRate, setBaseRate] = useState<number>(fromPlan?.targetRate ?? DEFAULTS.kg_ha.base);
   const [modulationPct, setModulationPct] = useState<number>(20);
-  const [minRate, setMinRate] = useState<number>(DEFAULTS.kg_ha.min);
-  const [maxRate, setMaxRate] = useState<number>(DEFAULTS.kg_ha.max);
+  // Depuis le plan : bornes de la machine autour de la dose de l'apport (la moitié, une fois et demie), à ajuster.
+  const [minRate, setMinRate] = useState<number>(fromPlan ? Math.round(fromPlan.targetRate * 0.5) : DEFAULTS.kg_ha.min);
+  const [maxRate, setMaxRate] = useState<number>(fromPlan ? Math.round(fromPlan.targetRate * 1.5) : DEFAULTS.kg_ha.max);
   const [widthM, setWidthM] = useState<number>(24);
   // Doses saisies à la main (null : calculées).
   const [edited, setEdited] = useState<(number | null)[]>([]);
@@ -321,6 +322,12 @@ export function PrescriptionNewPage() {
             <Text mt="md" size="sm">
               Quantité totale : <b>{qty(total)} {quantityUnit}</b> sur {ha(area)} ha, soit {qty(area > 0 ? total / (area / 10_000) : 0)} {unitLabel} en moyenne.
             </Text>
+            {fromPlan && keepMean && area > 0 && Math.abs(total / (area / 10_000) - fromPlan.targetRate) > fromPlan.targetRate * 0.02 && (
+              <Alert color="paille" mt="xs" aria-label="Écart à la dose du plan">
+                La moyenne de la carte ({qty(total / (area / 10_000))} {unitLabel}) s'écarte de la dose du plan ({qty(fromPlan.targetRate)} {unitLabel}) : les doses
+                minimale ou maximale de la machine la bornent. Élargissez-les ou corrigez les doses des zones.
+              </Alert>
+            )}
             {save.error && <ErrorAlert error={save.error} />}
             <Group mt="md">
               <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!name.trim() || !product.trim() || tooWide || !(baseRate > 0) || !(widthM >= 1)}>

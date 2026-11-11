@@ -42,6 +42,22 @@ import { coversInTx } from "./cover-crops.js";
 import { farmDailyWeather } from "./crop-model.js";
 import { steeringInTx } from "./steering.js";
 
+/** Unité d'une dose telle qu'on l'écrit (cahier, CSV) : kg, L, t, m³… */
+const UNIT_SHORT: Record<string, string> = {
+  kilogram: "kg",
+  gram: "g",
+  ton: "t",
+  tonne: "t",
+  quintal: "q",
+  liter: "L",
+  litre: "L",
+  hectoliter: "hL",
+  cubic_meter: "m³",
+  unity: "unité",
+  unit: "unité",
+};
+const unitShort = (u: string) => UNIT_SHORT[u.toLowerCase()] ?? u;
+
 const fr = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 
 /**
@@ -751,7 +767,7 @@ export async function fertilizationRecord(db: Database, farmId: string, campaign
             product: f.name,
             content: "missing" in n ? null : contentLabel(n.composition),
             nitrateType: "missing" in n ? null : n.composition.nitrateType,
-            doseLabel: `${Number(e.quantity).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ${(e.unit ?? "").replace(/_per_hectare$/, "")}${per ? "/ha" : " au total"}`,
+            doseLabel: `${Number(e.quantity).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ${unitShort((e.unit ?? "").replace(/_per_hectare$/, ""))}${per ? "/ha" : " au total"}`,
             nTotalKgHa: "missing" in n ? null : n.totalKgHa,
             nEfficientKgHa: "missing" in n ? null : n.efficientKgHa,
             missing: "missing" in n ? (n.missing ?? null) : null,

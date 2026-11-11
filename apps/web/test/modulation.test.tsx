@@ -124,6 +124,10 @@ describe("cartes de modulation", () => {
     const zones = await screen.findByRole("table", { name: "Zones" });
     // 180, 150, 120 donneraient 142,5 en moyenne ; décalées de 7,5 → arrondies : 188, 158, 128 (ou à 1 kg près).
     expect(screen.getByText(/Quantité totale/)).toHaveTextContent("soit 150 kg/ha en moyenne");
+    // Bornes de la machine autour de la dose du plan (recette du 11/11 : 400 kg/ha par défaut bornait un apport de 643 kg/ha).
+    expect(screen.getByRole("textbox", { name: "Dose minimale de la machine (kg/ha)" })).toHaveValue("75");
+    expect(screen.getByRole("textbox", { name: "Dose maximale de la machine (kg/ha)" })).toHaveValue("225");
+    expect(screen.queryByLabelText("Écart à la dose du plan")).not.toBeInTheDocument();
     expect(within(zones).getByRole("textbox", { name: "Dose zone 1" })).not.toHaveValue("180");
     await user.click(screen.getByRole("button", { name: "Enregistrer la carte" }));
     await waitFor(() => expect(posted).toMatchObject({ planLink: { planId: "p1", stage: "6 feuilles", targetRate: 150 }, product: "Ammonitrate 33,5", baseRate: 150 }));
