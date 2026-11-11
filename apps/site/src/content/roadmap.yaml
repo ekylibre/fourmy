@@ -34,6 +34,17 @@ roadmap:
       Serres fermées et locaux de stockage, semences traitées, prestations de service et
       délai de rentrée : les cas restants de l'arrêté de décembre 2025.
     status: prochainement
+  - title: Outil de dose azotée labellisé
+    text: >-
+      Labellisation COMIFER du calcul de dose, exigée en Nouvelle-Aquitaine après la période
+      de tolérance qui se termine en août 2027.
+    status: prochainement
+    horizon: Été 2027
+  - title: Fertilisation dans les autres régions
+    text: >-
+      Référentiels régionaux des autres régions, rôle conseiller pour proposer les plans,
+      contrôles de l'épandage sur le mobile hors ligne.
+    status: plus-tard
   - title: Sondes et pièges connectés
     text: De nouvelles intégrations sur le modèle des traceurs GPS et des stations météo.
     status: plus-tard

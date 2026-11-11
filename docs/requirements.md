@@ -218,13 +218,16 @@ conception : [`teledetection-design.md`](teledetection-design.md).
   d'enregistrement, notamment en zone vulnérable nitrates.
   Exigences détaillées (2026-11-11) :
   [`fertilisation-exigences.md`](fertilisation-exigences.md). *Réalisé (lots AE
-  à AL, [`fertilisation-design.md`](fertilisation-design.md)) pour la
-  Nouvelle-Aquitaine : composition des fertilisants, zonage, référentiel
-  régional, plan prévisionnel de fumure calculé et versionné, cahier
+  à AQ et recette du 2026-11-11, [`fertilisation-design.md`](fertilisation-design.md),
+  guide [`fertilisation.md`](fertilisation.md)) pour la Nouvelle-Aquitaine :
+  composition des fertilisants, zonage, référentiel régional, plan
+  prévisionnel de fumure calculé et versionné (maïs, céréales, colza, dose
+  plafond ; produits organiques), plan d'un couvert exporté, cahier
   d'enregistrement, contrôles à la saisie, interdiction d'épandage bloquante
   avec motif, conditions d'épandage, couverture des sols, couverts
-  d'interculture, plafond APLSH, efficacité des apports minéraux, pilotage,
-  justificatifs joints, tableau de bord, éditions.*
+  d'interculture, plafonds APLSH et du tableau 4, efficacité des apports
+  minéraux, pilotage, carte de modulation d'un apport, justificatifs joints,
+  saisies à compléter, éditions.*
 - **FR-REG-4 (S)** Indicateurs HVE (repris de `ekylibre-hve`).
 
 ### 4.11 Migration depuis Ekylibre

@@ -46,6 +46,16 @@ Seul le responsable de la ferme peut créer une carte. Le zonage consomme des re
 
 3. **Enregistrer la carte.**
 
+### Depuis un apport du plan de fumure (lot AN)
+
+Sur le plan de fumure d'une parcelle, chaque apport dont le produit a une teneur connue a un bouton « Moduler » (voir [`fertilisation.md`](fertilisation.md)). Il ouvre la création de carte déjà remplie :
+- parcelle, produit et unité ;
+- dose de produit déduite de l'azote de l'apport : % de la masse en kg/ha, kg/m³ en L/ha ;
+- doses minimale et maximale de la machine à la moitié et à une fois et demie de cette dose ;
+- image : celle qui précède de plus près la date prévue de l'apport, sinon la plus récente.
+
+Un bandeau rappelle l'apport. La case « Garder la dose du plan en moyenne pondérée » (cochée) recale les doses des zones sur cette dose. Si les bornes de la machine empêchent d'y arriver, un avertissement le dit. La fiche de la carte rappelle l'apport et compare la dose prévue à la moyenne réelle ; le plan liste ses cartes.
+
 ### Fiche d'une carte
 
 - La carte des zones, le tableau des zones et leurs doses. Le responsable peut corriger les doses.
@@ -108,6 +118,7 @@ Les statistiques d'une zone (moyenne, minimum, maximum) portent sur les seuls pi
 - Les doses sont bornées par les doses minimale et maximale de la machine.
 - Elles sont arrondies au pas de l'unité : 1 kg/ha, 1 L/ha, 1 000 grains/ha.
 - Les zones ayant la même surface, la dose moyenne reste la dose de base, hors bornes et arrondis.
+- **Carte partie d'un apport du plan de fumure** (lot AN, `conserveMean`) : les doses sont décalées d'une même quantité, dans les bornes, pour que la moyenne pondérée par la surface des zones égale la dose de l'apport. L'écart entre zones voulu par la stratégie est gardé.
 - Des doses saisies zone par zone remplacent le calcul.
 - La quantité totale est la somme des doses × surfaces.
 
@@ -285,3 +296,4 @@ Les réessais suivent la règle d'agrirouter : attente croissante sur 429 et 5xx
 - **Réception**, non faite : TimeLogs, doses réellement appliquées, retours de tâches. agrirouter les fournit par un flux SSE (`GET /events`) et une confirmation des messages (`POST /confirmations`). Il faudra un abonnement et un processus d'écoute permanent dans le worker.
 - **Zonage sur une seule image.** Un zonage pluriannuel (médiane de plusieurs dates ou de plusieurs saisons) serait plus stable pour les cartes de sol ou de semis.
 - **Pas de lien** entre une carte et l'intervention qui l'applique. Les doses moyennes et la quantité ne pré-remplissent pas encore la saisie.
+- Le lien avec le plan de fumure existe dans l'autre sens : voir ci-dessous.

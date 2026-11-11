@@ -496,7 +496,8 @@ flowchart LR
 | **NATS** | Remplace `LISTEN/NOTIFY` comme transport de l'outbox, sans changer le format des événements. |
 | **Capteurs** | Hypertable `measurements` sur le modèle de `positions`, standard OGC SensorThings pour l'exposition. |
 | **Élevage N1** | Tables `herds` / `herd_versions` (effectifs), mouvements agrégés comme journal, pâturage = intervention ciblant une parcelle. |
-| **PAC, fertilisation** | Vues et exports, comme le registre phyto. |
+| **PAC** | Vues et exports, comme le registre phyto. |
+| **Fertilisation** | *Réalisée le 2026-11-11 (lots AE à AQ)* : référentiels en données TypeScript sourcées (`packages/fertilization-refs`), moteur du bilan et contrôles dans `packages/domain`, plans versionnés et cahier calculé depuis les interventions. Le bilan reste en TypeScript plutôt que dans `services/agro` : il tient en calculs purs et testables. Détail : [`fertilisation-design.md`](fertilisation-design.md), guide [`fertilisation.md`](fertilisation.md). |
 | **Géométrie 3D serveur** | SFCGAL dans PostGIS (`CG_*`) pour extruder les bâtiments et construire les solides de cuves ; diffusion en 3D Tiles (py3dtiles). Remplace la fabrication côté client d'ADR-10 et reste lisible par Cesium comme par Giro3D. |
 
 ## 9. Exigences non fonctionnelles : comment elles sont tenues
