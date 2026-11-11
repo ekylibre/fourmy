@@ -27,6 +27,30 @@ features:
     status: disponible
     capture: plan-3d
     since: 0.18.0
+  - id: satellite
+    title: Suivi des cultures par satellite
+    text: >-
+      NDVI, NDRE et NDMI de chaque parcelle d'après les images Sentinel-2, avec votre compte
+      Copernicus : courbe de la saison comparée aux années passées, image sur la carte, et
+      signalement des parcelles probablement récoltées sans intervention saisie.
+    status: en-test
+    since: 0.68.0
+  - id: croissance
+    title: Stades et besoins en eau des cultures
+    text: >-
+      Les stades du maïs et des céréales prévus d'après les degrés-jours depuis le semis, et
+      la réserve en eau de chaque parcelle jour après jour. Les irrigations se saisissent en
+      millimètres et entrent dans le bilan.
+    status: en-test
+    since: 0.72.0
+  - id: modulation
+    title: Cartes de modulation pour la console du tracteur
+    text: >-
+      Des zones tirées de l'image satellite, une dose par zone, puis l'export ISO-XML ou
+      Shapefile, ou l'envoi par agrirouter. Depuis le plan de fumure, la carte garde la dose
+      prévue en moyenne sur la parcelle.
+    status: en-test
+    since: 0.74.0
   - id: interventions
     title: Toutes les interventions, un seul formulaire
     text: >-
@@ -117,6 +141,26 @@ features:
     status: disponible
     capture: registre-reglementaire
     since: 0.66.0
+  - id: plan-fumure
+    title: Plan prévisionnel de fumure calculé
+    text: >-
+      La dose d'azote de chaque parcelle selon le référentiel régional, terme par terme et
+      sources citées : besoin de la culture, reliquat, minéralisation, produits organiques.
+      Maïs, céréales à paille et colza ; dose plafond pour les autres cultures. Un terme
+      manquant est nommé, rien n'est supposé. La dose d'un outil ou d'un conseiller peut
+      la remplacer, et chaque version établie reste figée. Nouvelle-Aquitaine pour commencer.
+    status: en-test
+    since: 0.77.0
+  - id: cahier-fertilisation
+    title: Cahier de fertilisation et directive nitrates
+    text: >-
+      Le cahier d'enregistrement se déduit des interventions, prêt à imprimer ou en CSV. À la
+      saisie d'un épandage, Fourmy vérifie le calendrier d'interdiction, le plan, les
+      couverts d'interculture, l'azote libéré avant l'hiver et les conditions du jour ; un
+      épandage interdit demande un motif, conservé avec l'intervention. Une liste vous dit
+      ce qu'il reste à saisir, avec un lien vers chaque écran.
+    status: en-test
+    since: 0.78.0
   - id: traces
     title: Traces GPS des tracteurs
     text: >-
