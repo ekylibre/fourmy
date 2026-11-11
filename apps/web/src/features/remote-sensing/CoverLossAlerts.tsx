@@ -6,7 +6,7 @@ import { Satellite } from "lucide-react";
 import { COVER_LOSS, type CoverLossAnomaly } from "@fourmy/contracts";
 import { api, farmPath } from "../../app/api";
 import { formatDate } from "../../app/labels";
-import { formatNdvi, useRemoteSensingStatus } from "./remote-sensing";
+import { formatIndex, useRemoteSensingStatus } from "./remote-sensing";
 
 /**
  * Interventions probablement manquantes (lot Z) : le satellite voit le couvert
@@ -47,7 +47,7 @@ export function harvestLink(farmId: string, a: CoverLossAnomaly, search: string)
 }
 
 const why = (a: CoverLossAnomaly) =>
-  `NDVI ${formatNdvi(a.high)} le ${formatDate(a.from)}, ${formatNdvi(a.low)} le ${formatDate(a.to)}${a.confirmed ? "" : " (une seule mesure basse)"}`;
+  `NDVI ${formatIndex(a.high)} le ${formatDate(a.from)}, ${formatIndex(a.low)} le ${formatDate(a.to)}${a.confirmed ? "" : " (une seule mesure basse)"}`;
 
 /** Widget du tableau de bord : parcelles probablement récoltées sans intervention saisie, sur les 12 derniers mois. */
 export function CoverLossWidget({ farmId, day }: { farmId: string; day: string }) {

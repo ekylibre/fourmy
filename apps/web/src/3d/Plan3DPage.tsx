@@ -17,8 +17,8 @@ import { ErrorPanel } from "../components/RouteError";
 import { TankContents } from "../features/cellar/CellarPage";
 import { FarmScene, TERRAIN_TILE_BYTES, type PlanData } from "./FarmScene";
 import { placementFromClick } from "./geometry";
-import { ndviColor } from "@fourmy/contracts";
-import { imageFor, useParcelIndicesAt, useRemoteSensingStatus, useSatelliteLayer } from "../features/remote-sensing/remote-sensing";
+import { indexColor } from "@fourmy/contracts";
+import { imageFor, useParcelIndicesAt, useRemoteSensingStatus, useSatelliteLayer, useVegetationIndex } from "../features/remote-sensing/remote-sensing";
 import { SatelliteControl } from "../features/remote-sensing/SatelliteControl";
 import type { Vegetation3dAt } from "@fourmy/contracts";
 import { weatherLook } from "./weather-look";
@@ -131,11 +131,13 @@ export function Plan3DPage() {
   useEffect(() => scene.current?.setWeather(weatherOn ? look : null), [weatherOn, look]);
   const phases = (vegetation.data?.parcels ?? []).reduce<Record<string, number>>((m, p) => ({ ...m, [p.canopy.phase]: (m[p.canopy.phase] ?? 0) + 1 }), {});
 
-  // Télédétection (FR-TWIN-5) : image Sentinel-2 drapée sur le relief, ou parcelles teintées par leur NDVI.
+  // Télédétection (FR-TWIN-5) : image Sentinel-2 drapée sur le relief, ou parcelles teintées par l'indice choisi.
   const [sat, setSat] = useSatelliteLayer();
   const rsStatus = useRemoteSensingStatus(farm.id);
   const rsEnabled = rsStatus.data?.enabled ?? false;
-  const rs = useParcelIndicesAt(farm.id, day, rsEnabled && sat !== "none");
+  const [idx, setIdx] = useVegetationIndex();
+  const index = sat === "parcels" ? idx : "ndvi";
+  const rs = useParcelIndicesAt(farm.id, day, rsEnabled && sat !== "none", index);
   const satImage = imageFor(rs.data, sat);
   useEffect(() => {
     scene.current?.setSatellite(satImage ? { href: satImage.href, bbox: satImage.bbox } : null).catch((e) => console.warn("Image satellite non chargée", e));
@@ -144,10 +146,10 @@ export function Plan3DPage() {
   useEffect(() => {
     const tint =
       sat === "parcels" && rs.data
-        ? new Map(rs.data.items.filter((i) => i.mean !== null && (i.status === "ok" || i.status === "stale")).map((i) => [i.parcelId, ndviColor(i.mean!)]))
+        ? new Map(rs.data.items.filter((i) => i.mean !== null && (i.status === "ok" || i.status === "stale")).map((i) => [i.parcelId, indexColor(index, i.mean!)]))
         : null;
     scene.current?.setParcelStyle(tint, satImage ? 0.05 : sat === "parcels" ? 0.7 : 0.4);
-  }, [sat, rs.data, satImage, plan.data]);
+  }, [sat, index, rs.data, satImage, plan.data]);
 
   // Placement manuel : cuve choisie, puis clic dans son bâtiment.
   const place = useMutation({
@@ -259,7 +261,7 @@ export function Plan3DPage() {
                 Hauteur et couleur des rangs d'après le NDVI Sentinel-2 et les interventions saisies ; orientation des rangs : grand axe de la parcelle, à corriger dans sa fiche.
               </Text>
             </Paper>
-            <SatelliteControl farmId={farm.id} enabled={rsEnabled} data={rs.data} layer={sat} onChange={setSat} />
+            <SatelliteControl farmId={farm.id} enabled={rsEnabled} data={rs.data} layer={sat} onChange={setSat} index={idx} onIndexChange={setIdx} />
             <Paper p="md">
               <Group justify="space-between">
                 <Title order={4}>Cuverie</Title>

@@ -15,9 +15,9 @@ import { ErrorAlert, Loading } from "../../components/states";
 import { MapBoundary } from "../../components/MapBoundary";
 import { ParcelMap, type Basemap } from "./ParcelMap";
 import { ParcelDelays } from "./ParcelDelays";
-import { ndviColor } from "@fourmy/contracts";
-import { byParcel, imageFor, useParcelIndicesAt, useRemoteSensingStatus, useSatelliteLayer } from "../remote-sensing/remote-sensing";
-import { ParcelNdvi, SatelliteControl } from "../remote-sensing/SatelliteControl";
+import { indexColor } from "@fourmy/contracts";
+import { byParcel, imageFor, useParcelIndicesAt, useRemoteSensingStatus, useSatelliteLayer, useVegetationIndex } from "../remote-sensing/remote-sensing";
+import { ParcelIndex, SatelliteControl } from "../remote-sensing/SatelliteControl";
 
 /** Carte 2D : parcellaire à la date de la frise, bâtiments, trace GPS du jour (US-1). */
 export function MapPage() {
@@ -32,7 +32,10 @@ export function MapPage() {
   const [sat, setSat] = useSatelliteLayer();
   const rsStatus = useRemoteSensingStatus(farm.id);
   const rsEnabled = rsStatus.data?.enabled ?? false;
-  const rs = useParcelIndicesAt(farm.id, day, rsEnabled);
+  const [idx, setIdx] = useVegetationIndex();
+  // L'indice choisi colore les parcelles ; l'image drapée reste celle du NDVI.
+  const index = sat === "parcels" ? idx : "ndvi";
+  const rs = useParcelIndicesAt(farm.id, day, rsEnabled, index);
 
   const from = new Date(`${day}T00:00:00`).toISOString();
   const to = new Date(Date.parse(`${day}T00:00:00`) + 86_400_000).toISOString();
@@ -53,11 +56,11 @@ export function MapPage() {
     if (!s) return null;
     const nature = new Map(s.productions.map((p) => [p.landParcelId, p.nature]));
     const ndvi = byParcel(rs.data);
-    // « Par parcelle » : couleur de son dernier NDVI exploitable ; gris sans mesure.
+    // « Par parcelle » : couleur de sa dernière valeur exploitable de l'indice ; gris sans mesure.
     const colorOf = (id: string) => {
       if (sat !== "parcels") return NATURE_COLORS[nature.get(id) ?? "none"];
       const v = ndvi.get(id);
-      return v && v.mean !== null && (v.status === "ok" || v.status === "stale") ? ndviColor(v.mean) : "#8A948E";
+      return v && v.mean !== null && (v.status === "ok" || v.status === "stale") ? indexColor(index, v.mean) : "#8A948E";
     };
     const parcels: FeatureCollection = {
       type: "FeatureCollection",
@@ -81,9 +84,9 @@ export function MapPage() {
         .map((p) => ({ type: "Feature", geometry: p.version.footprint as unknown as Geometry, properties: { name: p.name } })),
     };
     return { parcels, places };
-  }, [snap.data, rs.data, sat]);
+  }, [snap.data, rs.data, sat, index]);
   const satellite = imageFor(rs.data, sat);
-  const selectedNdvi = selected ? byParcel(rs.data).get(String(selected.id)) : undefined;
+  const selectedIndex = selected ? byParcel(rs.data).get(String(selected.id)) : undefined;
 
   const trackLayer = useMemo<FeatureCollection>(() => {
     const samples = showTrack ? (track.data?.samples ?? []) : [];
@@ -152,14 +155,14 @@ export function MapPage() {
                 {s.landParcels.length} parcelles · {formatHa(s.landParcels.reduce((a, p) => a + p.version.areaM2, 0))}
               </Text>
             </Paper>
-            <SatelliteControl farmId={farm.id} enabled={rsEnabled} data={rs.data} layer={sat} onChange={setSat} />
+            <SatelliteControl farmId={farm.id} enabled={rsEnabled} data={rs.data} layer={sat} onChange={setSat} index={idx} onIndexChange={setIdx} />
             {selected && (
               <Paper p="md">
                 <Title order={4}>{String(selected.name)}</Title>
                 <Text>{formatHa(Number(selected.areaM2))}</Text>
                 <Text c="dimmed">{NATURE_LABELS[String(selected.nature)] ?? "Sans production cette campagne"}</Text>
                 {typeof selected.variety === "string" && selected.variety !== "null" && <Badge color="lichen">{selected.variety}</Badge>}
-                {rsEnabled && <ParcelNdvi item={selectedNdvi} />}
+                {rsEnabled && <ParcelIndex item={selectedIndex} index={index} />}
                 <ParcelDelays farmId={farm.id} parcelId={String(selected.id)} at={at} />
                 <Button component={Link} to={`/f/${farm.id}/land-parcels/${String(selected.id)}${location.search}`} variant="light" size="xs" w="fit-content">
                   Fiche de la parcelle

@@ -1,31 +1,47 @@
 import { Link, useLocation } from "react-router";
 import { Anchor, Badge, Group, Paper, SegmentedControl, Stack, Text, Title } from "@mantine/core";
-import { NDVI_PALETTE, STALE_AFTER_DAYS, type ParcelIndexAt, type ParcelIndicesAt } from "@fourmy/contracts";
+import { INDEX_SCALES, STALE_AFTER_DAYS, VEGETATION_INDICES, type ParcelIndexAt, type ParcelIndicesAt, type VegetationIndex } from "@fourmy/contracts";
 import { formatDate } from "../../app/labels";
-import { ageLabel, formatNdvi, imageFor, type SatelliteLayer } from "./remote-sensing";
+import { ageLabel, formatIndex, imageFor, type SatelliteLayer } from "./remote-sensing";
 
-/** Légende du NDVI : la même palette que l'image rendue et la coloration des parcelles. */
-export function NdviLegend() {
+/** Légende d'un indice : la même palette que l'image rendue (NDVI), la coloration des parcelles et la courbe. */
+export function IndexLegend({ index = "ndvi" }: { index?: VegetationIndex }) {
+  const { label, palette, domain, legend } = INDEX_SCALES[index];
+  const [lo, hi] = domain;
   return (
-    <Stack gap={2} aria-label="Légende du NDVI">
+    <Stack gap={2} aria-label={`Légende du ${label}`}>
       <div
         style={{
           height: 10,
           borderRadius: 4,
-          background: `linear-gradient(to right, ${NDVI_PALETTE.map((p) => `${p.color} ${(p.value / 0.9) * 100}%`).join(", ")})`,
+          background: `linear-gradient(to right, ${palette.map((p) => `${p.color} ${((p.value - lo) / (hi - lo)) * 100}%`).join(", ")})`,
         }}
       />
       <Group justify="space-between">
-        <Text size="xs" c="dimmed">
-          0 · sol nu
-        </Text>
-        <Text size="xs" c="dimmed">
-          0,5
-        </Text>
-        <Text size="xs" c="dimmed">
-          0,9 · couvert dense
-        </Text>
+        {legend.map((l) => (
+          <Text key={l} size="xs" c="dimmed">
+            {l}
+          </Text>
+        ))}
       </Group>
+    </Stack>
+  );
+}
+
+/** Choix de l'indice (NDVI, NDRE, NDMI), avec l'aide d'une ligne de l'indice choisi. */
+export function IndexPicker({ value, onChange }: { value: VegetationIndex; onChange: (i: VegetationIndex) => void }) {
+  return (
+    <Stack gap={4}>
+      <SegmentedControl
+        size="xs"
+        aria-label="Indice"
+        value={value}
+        onChange={(v) => onChange(v as VegetationIndex)}
+        data={VEGETATION_INDICES.map((i) => ({ value: i, label: INDEX_SCALES[i].label }))}
+      />
+      <Text size="xs" c="dimmed">
+        {INDEX_SCALES[value].help}
+      </Text>
     </Stack>
   );
 }
@@ -40,12 +56,17 @@ export function SatelliteControl({
   data,
   layer,
   onChange,
+  index,
+  onIndexChange,
 }: {
   farmId: string;
   enabled: boolean;
   data: ParcelIndicesAt | undefined;
   layer: SatelliteLayer;
   onChange: (l: SatelliteLayer) => void;
+  /** Indice de la coloration « Par parcelle » (l'image reste celle du NDVI). */
+  index: VegetationIndex;
+  onIndexChange: (i: VegetationIndex) => void;
 }) {
   const location = useLocation();
   if (!enabled) {
@@ -97,9 +118,14 @@ export function SatelliteControl({
           )}
         </Group>
       )}
+      {layer === "parcels" && (
+        <Stack mt="xs" gap={4}>
+          <IndexPicker value={index} onChange={onIndexChange} />
+        </Stack>
+      )}
       {(layer === "ndvi" || layer === "parcels") && (
         <Stack mt="xs" gap={4}>
-          <NdviLegend />
+          <IndexLegend index={layer === "parcels" ? index : "ndvi"} />
         </Stack>
       )}
       {layer !== "none" && data && (
@@ -111,9 +137,10 @@ export function SatelliteControl({
   );
 }
 
-/** Ligne « NDVI » d'une parcelle sélectionnée. */
-export function ParcelNdvi({ item }: { item: ParcelIndexAt | undefined }) {
+/** Ligne « NDVI » (ou de l'indice choisi) d'une parcelle sélectionnée. */
+export function ParcelIndex({ item, index = "ndvi" }: { item: ParcelIndexAt | undefined; index?: VegetationIndex }) {
   if (!item) return null;
+  const label = INDEX_SCALES[index].label;
   if (item.status === "too_small")
     return (
       <Text size="sm" c="dimmed">
@@ -123,14 +150,14 @@ export function ParcelNdvi({ item }: { item: ParcelIndexAt | undefined }) {
   if (item.status === "none")
     return (
       <Text size="sm" c="dimmed">
-        NDVI : pas encore de mesure exploitable.
+        {label} : pas encore de mesure exploitable.
       </Text>
     );
   return (
     <Text size="sm">
-      NDVI <b className="lv-num">{formatNdvi(item.mean)}</b>{" "}
+      {label} <b className="lv-num">{formatIndex(item.mean)}</b>{" "}
       <Text span size="xs" c="dimmed">
-        (p10–p90 {formatNdvi(item.p10)}–{formatNdvi(item.p90)}, {formatDate(item.date!)}, {ageLabel(item.ageDays)}
+        (p10–p90 {formatIndex(item.p10)}–{formatIndex(item.p90)}, {formatDate(item.date!)}, {ageLabel(item.ageDays)}
         {item.status === "stale" ? ", ancienne" : ""})
       </Text>
     </Text>

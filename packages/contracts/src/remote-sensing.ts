@@ -30,9 +30,9 @@ export const NDVI_PALETTE: { value: number; color: string }[] = [
   { value: 0.9, color: "#006837" },
 ];
 
-/** Couleur d'une valeur de NDVI (interpolée entre les paliers de la palette). */
-export function ndviColor(value: number): string {
-  const p = NDVI_PALETTE;
+/** Couleur interpolée entre les paliers d'une palette (valeurs croissantes). */
+export function paletteColor(palette: { value: number; color: string }[], value: number): string {
+  const p = palette;
   if (!(value > p[0]!.value)) return p[0]!.color;
   for (let i = 1; i < p.length; i++) {
     const hi = p[i]!;
@@ -48,6 +48,62 @@ export function ndviColor(value: number): string {
   }
   return p[p.length - 1]!.color;
 }
+
+/** Couleur d'une valeur de NDVI (interpolée entre les paliers de la palette). */
+export const ndviColor = (value: number) => paletteColor(NDVI_PALETTE, value);
+
+/** Échelle d'affichage d'un indice : libellé, aide d'une ligne, domaine fixe et palette. */
+export interface IndexScale {
+  label: string;
+  /** Ce que l'indice mesure, en une ligne pour l'agriculteur. */
+  help: string;
+  domain: [number, number];
+  palette: { value: number; color: string }[];
+  /** Repères de la légende : bas, milieu, haut. */
+  legend: [string, string, string];
+}
+
+/**
+ * Échelles des trois indices. Domaines fixés d'après les valeurs mesurées sur
+ * la ferme de Pierre (2025-2026, p2 à p98) : NDVI 0,14 à 0,87, NDRE 0,09 à
+ * 0,71, NDMI −0,31 à 0,44. Le NDRE reprend la palette du NDVI étirée sur son
+ * domaine ; le NDMI, qui parle d'eau, a une palette brun → bleu.
+ */
+export const INDEX_SCALES: Record<VegetationIndex, IndexScale> = {
+  ndvi: {
+    label: "NDVI",
+    help: "Couvert vert : quantité de feuillage. Sature quand le couvert est dense.",
+    domain: [0, 0.9],
+    palette: NDVI_PALETTE,
+    legend: ["0 · sol nu", "0,5", "0,9 · couvert dense"],
+  },
+  ndre: {
+    label: "NDRE",
+    help: "Chlorophylle (bande « red edge ») : reste sensible quand le NDVI sature ; suit l'état azoté d'un couvert dense.",
+    domain: [0, 0.8],
+    palette: NDVI_PALETTE.map((p) => ({ value: (p.value / 0.9) * 0.8, color: p.color })),
+    legend: ["0 · sol nu", "0,4", "0,8 · très chlorophyllien"],
+  },
+  ndmi: {
+    label: "NDMI",
+    help: "Eau dans les feuilles : baisse quand la culture manque d'eau ou sèche ; négatif sur sol nu ou couvert sec.",
+    domain: [-0.4, 0.6],
+    palette: [
+      { value: -0.4, color: "#8c510a" },
+      { value: -0.2, color: "#bf812d" },
+      { value: -0.05, color: "#dfc27d" },
+      { value: 0.05, color: "#f6e8c3" },
+      { value: 0.15, color: "#c7eae5" },
+      { value: 0.3, color: "#80cdc1" },
+      { value: 0.45, color: "#35978f" },
+      { value: 0.6, color: "#01665e" },
+    ],
+    legend: ["−0,4 · sec", "0", "0,6 · feuillage gorgé d'eau"],
+  },
+};
+
+/** Couleur d'une valeur d'un indice sur son échelle. */
+export const indexColor = (index: VegetationIndex, value: number) => paletteColor(INDEX_SCALES[index].palette, value);
 
 /** Une date est exploitable pour une parcelle si au moins 80 % de ses pixels sont valides. */
 export const USABLE_VALID_RATIO = 0.8;

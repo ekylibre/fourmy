@@ -1,15 +1,18 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
+import { INDEX_SCALES, indexColor, ndviColor } from "@fourmy/contracts";
 import { demoParcelSeries } from "@fourmy/mocks";
 import { chartRows } from "../src/features/remote-sensing/VegetationTab";
+import { formatIndex } from "../src/features/remote-sensing/remote-sensing";
 import { server } from "./setup";
 import { FARM, renderApp } from "./render";
 
 /**
  * Télédétection (lot Y) : onglet Végétation de la fiche parcelle (graphique,
  * parcelle trop petite, intégration absente). Récoltes probables non saisies
- * (lot Z) : widget du tableau de bord, bandeau, saisie pré-remplie.
+ * (lot Z) : widget du tableau de bord, bandeau, saisie pré-remplie. Choix
+ * de l'indice NDVI, NDRE ou NDMI.
  */
 const PARCEL = "00000000-0000-7000-8000-0000000000a0";
 const shape = { type: "MultiPolygon", coordinates: [[[[0.5, 44.8], [0.501, 44.8], [0.501, 44.801], [0.5, 44.8]]]] };
@@ -49,6 +52,57 @@ describe("télédétection", () => {
     expect(screen.getByText(/mesures exploitables sur \d+ passages/)).toBeInTheDocument();
     expect(screen.getByLabelText("Légende du NDVI")).toBeInTheDocument();
     expect(screen.getByText(/Contient des données Copernicus Sentinel modifiées/)).toBeInTheDocument();
+  });
+
+  it("onglet Végétation : passer au NDMI recharge la série, l'échelle et l'aide de l'indice", async () => {
+    const user = userEvent.setup();
+    const asked: string[] = [];
+    server.use(http.get("*/land-parcels/:id/sheet", () => HttpResponse.json(sheet)));
+    server.events.on("request:start", ({ request }) => {
+      if (request.url.includes("/indices?")) asked.push(new URL(request.url).searchParams.get("index") ?? "");
+    });
+    renderApp(`/f/${FARM}/land-parcels/${PARCEL}?at=2026-06-10`);
+    await user.click(await screen.findByRole("tab", { name: "Végétation" }));
+    await screen.findByRole("heading", { name: /NDVI du/ });
+    await user.click(screen.getByRole("radio", { name: "NDMI" }));
+    expect(await screen.findByRole("heading", { name: /NDMI du 11\/06\/2025 au 10\/06\/2026/ })).toBeInTheDocument();
+    expect(screen.getByLabelText("Légende du NDMI")).toBeInTheDocument();
+    expect(screen.getByText(/Eau dans les feuilles/)).toBeInTheDocument();
+    expect(asked).toEqual(["ndvi", "ndmi"]);
+    server.events.removeAllListeners();
+  });
+
+  it("carte, « Par parcelle » : l'indice choisi colore les parcelles et reste dans l'URL", async () => {
+    const user = userEvent.setup();
+    const asked: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      if (request.url.includes("/remote-sensing/parcels?")) asked.push(new URL(request.url).searchParams.get("index") ?? "");
+    });
+    const { router } = renderApp(`/f/${FARM}/map?at=2026-06-10&sat=parcels`);
+    await user.click(await screen.findByRole("radio", { name: "NDRE" }));
+    expect(await screen.findByLabelText("Légende du NDRE")).toBeInTheDocument();
+    expect(screen.getByText(/Chlorophylle/)).toBeInTheDocument();
+    expect(router.state.location.search).toContain("idx=ndre");
+    await vi.waitFor(() => expect(asked.at(-1)).toBe("ndre"));
+    // L'image drapée reste celle du NDVI : pas de choix d'indice sur cette couche.
+    await user.click(screen.getByRole("radio", { name: "Couleurs" }));
+    expect(screen.queryByRole("radio", { name: "NDRE" })).toBeNull();
+    server.events.removeAllListeners();
+  });
+
+  it("échelles des indices : palettes, domaines, valeurs négatives", () => {
+    // Le NDRE reprend la palette du NDVI étirée sur 0 à 0,8.
+    expect(indexColor("ndre", 0.8)).toBe(ndviColor(0.9));
+    expect(indexColor("ndvi", 0.42)).toBe(ndviColor(0.42));
+    // Le NDMI va du brun (sec) au bleu-vert (gorgé d'eau).
+    expect(indexColor("ndmi", -0.5)).toBe("#8c510a");
+    expect(indexColor("ndmi", 0.7)).toBe("#01665e");
+    for (const s of Object.values(INDEX_SCALES)) {
+      expect(s.palette[0]!.value).toBeCloseTo(s.domain[0], 9);
+      expect(s.palette[s.palette.length - 1]!.value).toBeCloseTo(s.domain[1], 9);
+    }
+    expect(formatIndex(-0.25)).toBe("−0,25");
+    expect(formatIndex(-0.001)).toBe("0,00");
   });
 
   it("parcelle trop petite : explique pourquoi il n'y a pas de mesure", async () => {

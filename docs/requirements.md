@@ -174,7 +174,7 @@ conception : [`teledetection-design.md`](teledetection-design.md).
   la frise : NDVI Sentinel-2, avec la date d'acquisition et la part de
   pixels valides. Si aucune donnée n'est exploitable, l'interface le dit
   (pas de mesure, ancienne, parcelle trop petite) et n'invente jamais de
-  valeur. *Réalisé (lot Y).*
+  valeur. *Réalisé (lot Y) ; NDRE et NDMI au choix depuis le 2026-11-11.*
 - **FR-TWIN-2 (M)** Série temporelle de l'indice par parcelle, brute et
   lissée, comparée aux années précédentes, avec les interventions en
   repères. *Réalisé (lot Y).*

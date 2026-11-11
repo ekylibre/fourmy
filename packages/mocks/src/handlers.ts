@@ -1,5 +1,5 @@
 import { http, HttpResponse } from "msw";
-import { INTEGRATION_PROVIDERS } from "@fourmy/contracts";
+import { INTEGRATION_PROVIDERS, VEGETATION_INDICES, type VegetationIndex } from "@fourmy/contracts";
 import {
   demoSnapshot,
   demoActivities,
@@ -31,6 +31,10 @@ import {
  */
 const base = `/api/v1/farms/${DEMO_FARM_ID}`;
 const page = <T>(items: T[]) => HttpResponse.json({ items, nextCursor: null });
+const demoIndexParam = (q: URLSearchParams): VegetationIndex => {
+  const i = q.get("index") as VegetationIndex | null;
+  return i && VEGETATION_INDICES.includes(i) ? i : "ndvi";
+};
 
 /** Session simulée (better-auth) : connectée par défaut ; les tests la pilotent. */
 let signedIn = true;
@@ -75,9 +79,10 @@ export const handlers = [
   http.get(`*${base}/remote-sensing/status`, () =>
     HttpResponse.json({ enabled: true, lastSceneOn: "2026-05-29", usage: { month: "2026-06-01", requests: 42, pu: 3.5, budget: 3000 } }),
   ),
-  http.get(`*${base}/remote-sensing/parcels`, ({ request }) =>
-    HttpResponse.json(demoParcelIndicesAt(new URL(request.url).searchParams.get("at") ?? "2026-06-01")),
-  ),
+  http.get(`*${base}/remote-sensing/parcels`, ({ request }) => {
+    const q = new URL(request.url).searchParams;
+    return HttpResponse.json(demoParcelIndicesAt(q.get("at") ?? "2026-06-01", demoIndexParam(q)));
+  }),
   http.get(`*${base}/remote-sensing/scenes`, () => HttpResponse.json({ items: [] })),
   http.get(`*${base}/remote-sensing/anomalies`, () => HttpResponse.json({ items: [] })),
   // Végétation et météo du plan 3D (lot AA).
@@ -87,7 +92,7 @@ export const handlers = [
   http.post(`*${base}/remote-sensing/anomalies/dismiss`, () => new HttpResponse(null, { status: 204 })),
   http.get(`*${base}/land-parcels/:id/indices`, ({ request, params }) => {
     const q = new URL(request.url).searchParams;
-    return HttpResponse.json(demoParcelSeries(String(params.id), q.get("from") ?? "2025-06-02", q.get("to") ?? "2026-06-01"));
+    return HttpResponse.json(demoParcelSeries(String(params.id), q.get("from") ?? "2025-06-02", q.get("to") ?? "2026-06-01", demoIndexParam(q)));
   }),
   http.get("*/health", () => HttpResponse.json({ status: "ok", service: "mock" })),
   http.get("*/api/v1/me/farms", () => HttpResponse.json({ userId: "mock", items: demoMyFarms })),
