@@ -678,6 +678,22 @@ La forme vient du nom ou du code Lexicon de l'engrais. Les NPK, le sulfate d'amm
 - Plan : section « Produits organiques » (réalisés et prévus, Xa et part dans le reliquat, « prévoir un apport ») ; saisies propres au colza.
 - Plan imprimé : liste des produits organiques avec leur Xa.
 
+### 5.11 Réalisation du lot AP : démarrage (2026-11-11)
+
+Encadré « À compléter pour la campagne » en tête de la page Fertilisation azotée (`SetupChecklist`), dès qu'une parcelle est en zone vulnérable. Il est calculé dans le navigateur à partir des requêtes déjà faites par la page (parcelles, fertilisants, plans, cahier) : aucun appel en plus.
+
+Six étapes, chacune avec sa raison et un lien vers chaque saisie :
+1. **Type de sol** des parcelles en zone vulnérable : onglet Sol de chaque parcelle.
+2. **Analyse de terre** de la campagne, au-delà de 3 ha : onglet Sol.
+3. **Composition** des fertilisants utilisés, quand la teneur ou le type manque : page Fertilisants.
+4. **Références des organiques** utilisés (ligne de l'annexe 5 ; dénomination COMIFER ou C/N) : page Fertilisants.
+5. **Plans de la campagne** non établis auxquels il manque des données : le plan.
+6. **Couverture des sols** à vérifier. Le lien ouvre une intervention de broyage des résidus, réalisée, sur la parcelle du précédent et à la date de sa récolte. Le cahier donne pour cela `soilCover.previousParcelId` et `harvestedOn`.
+
+Une fois tout saisi, l'encadré se réduit à une ligne.
+
+Sur la ferme de Pierre, il listera les 11 types de sol, l'analyse de terre, 6 fertilisants (le 14-48 liquide sans type ; Magnolac, trois produits au zinc et Zintrac 850 sans composition), les 11 plans et 8 broyages de cannes.
+
 ## 6. Contrats (`@fourmy/contracts`, `fertilization.ts`)
 
 - `FertilizerComposition`, `ArticleFertilizerWrite` : zod, unités explicites.
@@ -772,7 +788,8 @@ Les termes encore **manquants** sont listés (« à compléter ») sur le tablea
 | **AM — Épandage sur les couverts** | Interdictions et plafonds d'azote efficace du tableau 4 du PAR 7 NA | FR-FERT-25 (PAR) |
 | **AN — Modulation d'un apport du plan** | Carte partie d'un apport, moyenne pondérée conservée, liens entre plan et cartes | FR-FERT-18 |
 | **AO — Organiques et colza** | Keq de l'annexe 5 dans Xa et l'APL, apports organiques prévus, colza (annexe 2.4) | FR-FERT-10, 11 |
-| AP — ensuite | Plan de fumure d'un couvert exporté, rôle conseiller, mobile, autres régions | FR-FERT-35, 40 ; NFR-FERT-7 |
+| **AP — Démarrage** | Liste des saisies qui manquent, avec un lien vers chacune | — |
+| AQ — ensuite | Plan de fumure d'un couvert exporté, rôle conseiller, mobile, autres régions | FR-FERT-35, 40 ; NFR-FERT-7 |
 
 ## 11. Tests
 

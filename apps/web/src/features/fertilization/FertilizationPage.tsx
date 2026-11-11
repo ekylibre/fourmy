@@ -21,6 +21,7 @@ import { NA_SOIL_TYPE_LABELS, isNaSoilType } from "@fourmy/fertilization-refs";
 import { APLSH_ZONES } from "@fourmy/fertilization-refs";
 import { api, farmPath } from "../../app/api";
 import { Documents } from "./Documents";
+import { SetupChecklist } from "./SetupChecklist";
 import { useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
 import { formatDate } from "../../app/labels";
@@ -119,6 +120,8 @@ export function FertilizationPage() {
             : `Analyse de sol de la campagne ${analysis.campaign} à faire : un reliquat sortie d'hiver, un reliquat post-récolte ou une analyse de terre (matière organique) sur une parcelle en zone vulnérable, entre le ${formatDate(analysis.from)} et le ${formatDate(analysis.to)}.`}
         </Alert>
       )}
+
+      <SetupChecklist farmId={farm.id} campaign={Number(day.slice(0, 4))} parcels={items} analysisDone={areaInZone > 30_000 ? !!analysis.done : null} />
 
       <Plans farmId={farm.id} owner={owner} year={Number(day.slice(0, 4))} />
 
