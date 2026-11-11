@@ -216,6 +216,8 @@ conception : [`teledetection-design.md`](teledetection-design.md).
 - **FR-REG-2 (M)** **PAC** : parcellaire et assolement déclaratifs.
 - **FR-REG-3 (M)** **Fertilisation** : plan prévisionnel et cahier
   d'enregistrement, notamment en zone vulnérable nitrates.
+  Exigences détaillées (2026-11-11) :
+  [`fertilisation-exigences.md`](fertilisation-exigences.md).
 - **FR-REG-4 (S)** Indicateurs HVE (repris de `ekylibre-hve`).
 
 ### 4.11 Migration depuis Ekylibre
