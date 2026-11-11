@@ -622,6 +622,29 @@ La forme vient du nom ou du code Lexicon de l'engrais. Les NPK, le sulfate d'amm
 
 **Pas encore traités** : la mention « dans les limites des besoins de la culture » n'est que rappelée ; le second plan de fumure propre à un couvert exporté (encadré de la page 15) n'existe pas.
 
+### 5.9 Réalisation du lot AN : carte de modulation d'un apport du plan (2026-11-11)
+
+**FR-FERT-18** : une carte de modulation peut partir de la dose d'un apport du plan de fumure. La moyenne pondérée de ses doses reste égale à cette dose.
+
+**Dose de produit** : l'azote de l'apport, converti avec la composition du produit.
+- Teneur en % : kg/ha.
+- Teneur en kg/m³ : L/ha.
+- Teneur en kg/t : kg/ha.
+
+**Doses des zones** (`conserveMean`, `packages/domain/src/modulation.ts`) :
+- La stratégie (compenser, valoriser, uniforme) donne les doses autour de la dose de base. Avec des zones de surfaces inégales, leur moyenne pondérée s'écarte de la dose de base.
+- Les doses sont donc décalées d'une même quantité, cherchée par dichotomie et bornée par les doses minimale et maximale, jusqu'à ce que la moyenne pondérée égale la dose du plan. L'écart voulu entre les zones est gardé.
+- Les doses sont ensuite arrondies au pas de l'unité. La plus grande zone corrige l'arrondi si cela rapproche la moyenne de la cible.
+- Des doses corrigées à la main sont gardées telles quelles.
+
+**Données** : migration 0042, colonnes `prescriptions.fertilization_plan_id`, `plan_stage` et `target_rate`. Le plan doit être celui de la parcelle de la carte.
+
+**Écrans** :
+- Plan de fumure : bouton « Moduler » sur chaque apport dont le produit a une teneur. Il ouvre la création de carte, pré-remplie : parcelle, produit, dose, unité.
+- Création de carte : rappel de l'apport, case « garder la dose du plan en moyenne pondérée » (cochée), doses décalées dès le zonage calculé.
+- Fiche de la carte : rappel de l'apport et de la dose moyenne réelle.
+- Plan : liste des cartes parties de ses apports, avec leur moyenne.
+
 ## 6. Contrats (`@fourmy/contracts`, `fertilization.ts`)
 
 - `FertilizerComposition`, `ArticleFertilizerWrite` : zod, unités explicites.
@@ -714,7 +737,8 @@ Les termes encore **manquants** sont listés (« à compléter ») sur le tablea
 | **AK — APLSH** | Références APLSH du COMIFER (5 zones), référence d'un fertilisant organique, zone climatique de la ferme, plafond de 70 kg au contrôle et au cahier | FR-FERT-28 |
 | **AL — Efficacité des apports** | Grille du COMIFER 2022 à la saisie, sur la fiche et au cahier ; vent dans le cache météo | FR-FERT-29 |
 | **AM — Épandage sur les couverts** | Interdictions et plafonds d'azote efficace du tableau 4 du PAR 7 NA | FR-FERT-25 (PAR) |
-| AN — ensuite | Colza et Keq, plan de fumure d'un couvert exporté, lien avec la modulation, rôle conseiller, mobile | FR-FERT-18, 35, 40 ; NFR-FERT-7 |
+| **AN — Modulation d'un apport du plan** | Carte partie d'un apport, moyenne pondérée conservée, liens entre plan et cartes | FR-FERT-18 |
+| AO — ensuite | Colza et Keq, plan de fumure d'un couvert exporté, rôle conseiller, mobile | FR-FERT-35, 40 ; NFR-FERT-7 |
 
 ## 11. Tests
 

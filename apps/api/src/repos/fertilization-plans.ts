@@ -456,6 +456,14 @@ export async function getPlan(db: Database, farmId: string, planId: string, fetc
   });
   const dose = row.draft.external?.doseKgNHa ?? result.dose;
   const measurements = (await withFarm(db, farmId, (tx) => steeringInTx(tx, [planId]))).get(planId) ?? [];
+  const prescriptions = await withFarm(db, farmId, (tx) =>
+    rows<{ id: string; name: string; plan_stage: string | null; product: string; unit: string; target_rate: number; mean: number | null; created_at: string | Date }>(
+      tx,
+      sql`SELECT p.id, p.name, p.plan_stage, p.product, p.unit, p.target_rate, p.created_at,
+                 (SELECT sum(z.rate * z.area_m2) / nullif(sum(z.area_m2), 0) FROM prescription_zones z WHERE z.prescription_id = p.id) AS mean
+          FROM prescriptions p WHERE p.fertilization_plan_id = ${planId} ORDER BY p.created_at`,
+    ),
+  );
   const current = versions.find((v) => v.version === row.current_version) ?? null;
   const reserved = (current?.applications ?? []).filter((a) => a.reservedForSteering).reduce((sum, a) => sum + a.nKgHa, 0);
   return {
@@ -469,6 +477,16 @@ export async function getPlan(db: Database, farmId: string, planId: string, fetc
     result,
     proposedApplications: dose !== null ? splitDose(dose, context.crop as CropGroup, { nBefore4Leaves: row.draft.nBefore4Leaves ?? 0 }) : [],
     versions,
+    prescriptions: prescriptions.map((x) => ({
+      id: x.id,
+      name: x.name,
+      stage: x.plan_stage,
+      product: x.product,
+      unit: x.unit,
+      targetRate: x.target_rate,
+      meanRate: Math.round(Number(x.mean ?? 0) * 10) / 10,
+      createdAt: new Date(x.created_at).toISOString(),
+    })),
     steering: {
       measurements,
       reservedKgNHa: Math.round(reserved),

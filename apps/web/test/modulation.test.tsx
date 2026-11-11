@@ -53,6 +53,7 @@ const prescription: Prescription = {
   maxRate: 200,
   widthM: 24,
   totalQuantity: 930,
+  plan: null,
   createdAt: "2026-06-11T08:00:00Z",
   zones: zoning.zones.map((z, k) => ({ ...z, rate: [130, 100, 80][k]! })),
   sends: [],
@@ -99,6 +100,36 @@ describe("cartes de modulation", () => {
     await user.click(screen.getByRole("button", { name: "Enregistrer la carte" }));
     await screen.findByRole("heading", { name: "Azote 3e apport" });
     expect(posted).toMatchObject({ parcelId: PARCEL, date: "2026-06-10", index: "ndvi", zoneCount: 3, unit: "kg_ha", strategy: "compensate", rates: [200, 150, 120] });
+  });
+
+  it("depuis un apport du plan de fumure : dose du plan gardée en moyenne pondérée (lot AN)", async () => {
+    let posted: Record<string, unknown> | null = null;
+    // Zones inégales : la zone 3 (la plus forte) couvre la moitié de la parcelle.
+    const unequal: Zoning = { ...zoning, zones: zoning.zones.map((z, k) => ({ ...z, areaM2: [22_500, 22_500, 45_000][k]! })) };
+    server.use(
+      http.get("*/land-parcels/:id/modulation-dates", () => HttpResponse.json({ items: [{ date: "2026-06-10", mean: 0.52, validRatio: 0.98 }] })),
+      http.post("*/prescriptions/zoning", () => HttpResponse.json(unequal)),
+      http.post("*/prescriptions", async ({ request }) => {
+        posted = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...prescription, plan: { planId: "p1", stage: "6 feuilles", targetRate: 300 } }, { status: 201 });
+      }),
+      http.get("*/prescriptions/:id", () => HttpResponse.json({ ...prescription, plan: { planId: "p1", stage: "6 feuilles", targetRate: 300 } })),
+      http.get("*/prescriptions/recipients", () => HttpResponse.json(recipients)),
+    );
+    renderApp(`/f/${FARM}/prescriptions/new?parcel=${PARCEL}&plan=p1&stage=6+feuilles&product=Ammonitrate+33%2C5&rate=150&unit=kg_ha`);
+    expect(await screen.findByLabelText("Apport du plan de fumure")).toHaveTextContent("Carte partie de l'apport « 6 feuilles » du plan de fumure : 150 kg/ha de Ammonitrate 33,5.");
+    const user = userEvent.setup();
+    await screen.findByDisplayValue("10/06/2026 · NDVI 0,52");
+    await user.click(screen.getByRole("button", { name: "Calculer les zones" }));
+    const zones = await screen.findByRole("table", { name: "Zones" });
+    // 180, 150, 120 donneraient 142,5 en moyenne ; décalées de 7,5 → arrondies : 188, 158, 128 (ou à 1 kg près).
+    expect(screen.getByText(/Quantité totale/)).toHaveTextContent("soit 150 kg/ha en moyenne");
+    expect(within(zones).getByRole("textbox", { name: "Dose zone 1" })).not.toHaveValue("180");
+    await user.click(screen.getByRole("button", { name: "Enregistrer la carte" }));
+    await waitFor(() => expect(posted).toMatchObject({ planLink: { planId: "p1", stage: "6 feuilles", targetRate: 150 }, product: "Ammonitrate 33,5", baseRate: 150 }));
+    expect(posted!.rates).toBeUndefined();
+    await screen.findByRole("heading", { name: "Azote 3e apport" });
+    expect(screen.getByLabelText("Apport du plan de fumure")).toHaveTextContent("300 kg/ha prévus, 103 kg/ha en moyenne sur la carte");
   });
 
   it("fiche : téléchargements, envoi par agrirouter aux seules machines qui acceptent le format", async () => {

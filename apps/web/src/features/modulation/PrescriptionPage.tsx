@@ -73,6 +73,15 @@ export function PrescriptionPage() {
           </Anchor>{" "}
           · {p.product} · {INDEX_SCALES[p.index].label} du {formatDate(p.date)} · {MODULATION_STRATEGY_LABELS[p.strategy]} · largeur {p.widthM} m
         </Text>
+        {p.plan && (
+          <Text size="sm" mt={4} aria-label="Apport du plan de fumure">
+            Partie de l'apport « {p.plan.stage ?? "sans stade"} » du{" "}
+            <Anchor component={Link} to={`/f/${farm.id}/fertilization/plans/${p.plan.planId}`}>
+              plan de fumure
+            </Anchor>{" "}
+            : {qty(p.plan.targetRate)} {PRESCRIPTION_UNIT_LABELS[p.unit]} prévus, {qty(meanRate(p.zones))} {PRESCRIPTION_UNIT_LABELS[p.unit]} en moyenne sur la carte.
+          </Text>
+        )}
       </div>
 
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
@@ -286,3 +295,9 @@ function SendHistory({ sends }: { sends: PrescriptionSend[] }) {
     </Table>
   );
 }
+
+/** Dose moyenne pondérée par la surface des zones. */
+const meanRate = (zones: { rate: number; areaM2: number }[]) => {
+  const area = zones.reduce((s, z) => s + z.areaM2, 0);
+  return area > 0 ? zones.reduce((s, z) => s + z.rate * z.areaM2, 0) / area : 0;
+};

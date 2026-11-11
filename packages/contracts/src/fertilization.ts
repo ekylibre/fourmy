@@ -361,6 +361,8 @@ export interface FertilizationPlan {
   versions: PlanVersion[];
   /** Mesures de pilotage (lot AJ) et dose de l'apport de pilotage qu'elles autorisent. */
   steering: { measurements: SteeringMeasurement[]; reservedKgNHa: number; allowedDose: number | null };
+  /** Cartes de modulation parties d'un apport du plan (lot AN), avec leur moyenne pondérée. */
+  prescriptions: { id: string; name: string; stage: string | null; product: string; unit: string; targetRate: number; meanRate: number; createdAt: string }[];
 }
 
 export interface FertilizationPlanSummary {

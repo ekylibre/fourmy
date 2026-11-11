@@ -56,6 +56,7 @@ const plan = (patch: Partial<FertilizationPlan> = {}): FertilizationPlan => ({
   ],
   versions: [],
   steering: { measurements: [], reservedKgNHa: 0, allowedDose: null },
+  prescriptions: [],
   ...patch,
 });
 
@@ -150,6 +151,30 @@ describe("plan de fumure", () => {
     await user.click(within(section).getByRole("button", { name: "Enregistrer la mesure" }));
     await waitFor(() => expect(posted).toMatchObject({ tool: "N-Tester", advisedKgNHa: 40 }));
     expect(await within(section).findByText(/Dose permise après la dernière mesure : 220 kg N\/ha \(plan : 180 kg\)/)).toBeInTheDocument();
+  });
+
+  it("apport du plan : lien « Moduler » vers une carte de modulation, cartes liées (lot AN)", async () => {
+    const UREA = "00000000-0000-7000-8000-00000000f201";
+    server.use(
+      http.get("*/fertilization/plans/:id", () =>
+        HttpResponse.json(
+          plan({
+            draft: { applications: [{ stage: "6 feuilles", plannedOn: null, articleId: UREA, nKgHa: 69, reservedForSteering: false }] },
+            prescriptions: [{ id: "m1", name: "Azote 6 feuilles", stage: "6 feuilles", product: "Urée 46", unit: "kg_ha", targetRate: 150, meanRate: 150.2, createdAt: "2026-05-01T08:00:00Z" }],
+          }),
+        ),
+      ),
+      http.get("*/fertilizers", () =>
+        HttpResponse.json({
+          items: [{ id: UREA, name: "Urée 46", kind: "fertilizer", unit: "Kilogramme", lexiconRef: null, composition: { basis: "mass_percent", nTotal: 46, nMineralShare: 1, p2o5: null, k2o: null, so3: null, density: null, nitrateType: "III", foliar: false }, origin: "confirmed", source: null, proposal: null, analyses: [], usage: 0 }],
+        }),
+      ),
+    );
+    renderApp(`/f/${FARM}/fertilization/plans/${PLAN}`);
+    const link = await screen.findByRole("link", { name: "Moduler l'apport 6 feuilles" });
+    // 69 kg N / 46 % = 150 kg d'urée par hectare.
+    expect(link.getAttribute("href")).toBe(`/f/${FARM}/prescriptions/new?parcel=${plan().parcel.id}&plan=${PLAN}&stage=6+feuilles&product=Ur%C3%A9e+46&rate=150&unit=kg_ha`);
+    expect(screen.getByLabelText("Cartes de modulation du plan")).toHaveTextContent("Carte Azote 6 feuilles (6 feuilles, Urée 46) : moyenne 150,2 kg/ha pour 150 prévus.");
   });
 
   it("ouverture du bilan, période d'implantation et couvert d'interculture", async () => {
