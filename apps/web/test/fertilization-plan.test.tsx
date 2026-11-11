@@ -55,6 +55,7 @@ const plan = (patch: Partial<FertilizationPlan> = {}): FertilizationPlan => ({
     { stage: "4 à 8 feuilles", plannedOn: null, articleId: null, nKgHa: 173, reservedForSteering: false },
   ],
   versions: [],
+  steering: { measurements: [], reservedKgNHa: 0, allowedDose: null },
   ...patch,
 });
 
@@ -65,12 +66,25 @@ describe("plan de fumure", () => {
       http.get("*/fertilization/plans", () => HttpResponse.json({ items: [summary] })),
       http.get("*/fertilization/parcels", () => HttpResponse.json({ items: [] })),
       http.get("*/water-sources", () => HttpResponse.json({ items: [] })),
+      http.get("*/fertilization/record", () =>
+        HttpResponse.json({
+          campaign: 2026,
+          from: "2025-09-01",
+          to: "2026-09-01",
+          toComplete: 0,
+          late: 0,
+          forced: [],
+          parcels: [{ parcelId: "x", name: "Champ Maïs 2026", areaHa: 4, soilType: null, zone: "in", crop: "Maïs grain", variety: null, sownOn: null, harvestedOn: [], yieldQHa: null, interculture: [], cover: null, soilCover: { level: "warning", situation: "long", messages: [] }, steering: [], noPlowing: null, applications: [], totalNKgHa: 230, plannedDose: 180, planVersion: 1 }],
+        }),
+      ),
     );
     renderApp(`/f/${FARM}/fertilization?at=2026-06-01`);
     const table = await screen.findByRole("table", { name: "Plans de la campagne" });
     expect(within(table).getByRole("link", { name: "Champ Maïs 2026" })).toHaveAttribute("href", expect.stringContaining(`/fertilization/plans/${PLAN}`));
     expect(within(table).getByText("223 kg N/ha")).toBeInTheDocument();
     expect(screen.getByText("1 plan à établir.")).toBeInTheDocument();
+    expect(await within(screen.getByLabelText("Suivi de la campagne")).findByText("Couverture des sols à vérifier : Champ Maïs 2026.")).toBeInTheDocument();
+    expect(screen.getByText("Champ Maïs 2026 : 230 kg N apportés pour 180 kg prévus, sans mesure de pilotage.")).toBeInTheDocument();
   });
 
   it("fiche : données, bilan sourcé, apports proposés ; établir le plan", async () => {
@@ -102,6 +116,40 @@ describe("plan de fumure", () => {
     await waitFor(() => expect(established).toBe(true));
   });
 
+  it("pilotage : mesure enregistrée, dose permise", async () => {
+    let posted: unknown = null;
+    const established = plan({
+      status: "established",
+      currentVersion: 1,
+      versions: [{ version: 1, establishedAt: "2026-03-01T08:00:00Z", establishedBy: "Pierre", reason: null, referential: "NA 2025", method: "bilan_cau_two_phase", external: null, doseEfficient: 180, applications: [], snapshot: { context: plan().context, result: plan().result, draft: {} } }],
+    });
+    server.use(
+      http.get("*/fertilization/plans/:id", () =>
+        HttpResponse.json(
+          posted
+            ? { ...established, steering: { measurements: [{ id: "s1", planId: PLAN, measuredOn: "2026-06-10", stage: null, tool: "N-Tester", value: null, advisedKgNHa: 40, notes: null, createdAt: "2026-06-10T08:00:00Z" }], reservedKgNHa: 0, allowedDose: 220 } }
+            : established,
+        ),
+      ),
+      http.get("*/fertilizers", () => HttpResponse.json({ items: [] })),
+      http.post("*/fertilization/plans/:id/steering", async ({ request }) => {
+        posted = await request.json();
+        return HttpResponse.json({ id: "s1" }, { status: 201 });
+      }),
+    );
+    renderApp(`/f/${FARM}/fertilization/plans/${PLAN}`);
+    const section = await screen.findByLabelText("Pilotage");
+    const user = userEvent.setup();
+    await user.click(within(section).getByRole("button", { name: "Ajouter une mesure" }));
+    await user.type(within(section).getByLabelText("Outil"), "N-Tester");
+    const advised = within(section).getByLabelText("Dose conseillée (kg N/ha)");
+    await user.clear(advised);
+    await user.type(advised, "40");
+    await user.click(within(section).getByRole("button", { name: "Enregistrer la mesure" }));
+    await waitFor(() => expect(posted).toMatchObject({ tool: "N-Tester", advisedKgNHa: 40 }));
+    expect(await within(section).findByText(/Dose permise après la dernière mesure : 220 kg N\/ha \(plan : 180 kg\)/)).toBeInTheDocument();
+  });
+
   it("ouverture du bilan, période d'implantation et couvert d'interculture", async () => {
     let draft: unknown = null;
     let cover: unknown = null;
@@ -131,7 +179,7 @@ describe("plan de fumure", () => {
     await user.click(within(section).getByRole("button", { name: "Saisir un couvert" }));
     await user.type(within(section).getByLabelText("Espèces"), "Moutarde blanche");
     await user.click(within(section).getByRole("button", { name: "Enregistrer le couvert" }));
-    await waitFor(() => expect(cover).toMatchObject({ campaign: 2026, family: "cruciferes", species: "Moutarde blanche", sownOn: "2025-09-01" }));
+    await waitFor(() => expect(cover).toMatchObject({ campaign: 2026, kind: "sown", family: "cruciferes", species: "Moutarde blanche", sownOn: "2025-09-01" }));
   });
 });
 
@@ -145,6 +193,7 @@ describe("éditions de la directive nitrates", () => {
           to: "2026-09-01",
           toComplete: 0,
           late: 0,
+          forced: [{ interventionId: "i9", date: "2026-01-20", parcels: ["Champ Maïs 2026"], reason: "Dérogation préfectorale" }],
           parcels: [
             {
               parcelId: "00000000-0000-7000-8000-0000000000a1",
@@ -162,7 +211,9 @@ describe("éditions de la directive nitrates", () => {
               applications: [
                 { interventionId: "i1", date: "2026-05-12", recordedOn: "2026-05-12", late: false, procedure: "fertilizing", areaHa: 4, product: "Urée 46", content: "46 % N", nitrateType: "III", doseLabel: "150 kilogram/ha", nTotalKgHa: 69, nEfficientKgHa: 69, missing: null },
               ],
-              cover: { id: "c1", parcelId: "00000000-0000-7000-8000-0000000000a1", campaign: 2026, family: "cruciferes", species: "Moutarde blanche", sownOn: "2025-09-05", destroyedOn: "2025-12-10", exported: false, biomass: "1_3", destructionMode: "mechanical", notes: null },
+              soilCover: { level: "warning", situation: "long", messages: ["Couverture implantée le 05/10/2025, après la date limite du 30/09/2025."] },
+              steering: [{ id: "s1", planId: "p", measuredOn: "2026-06-10", stage: "10 feuilles", tool: "N-Tester", value: "580", advisedKgNHa: 40, notes: null, createdAt: "2026-06-10T08:00:00Z" }],
+              cover: { id: "c1", parcelId: "00000000-0000-7000-8000-0000000000a1", campaign: 2026, kind: "sown", family: "cruciferes", species: "Moutarde blanche", sownOn: "2025-09-05", destroyedOn: "2025-12-10", exported: false, biomass: "1_3", destructionMode: "mechanical", notes: null },
               totalNKgHa: 69,
               plannedDose: 180,
               planVersion: 3,
@@ -177,6 +228,9 @@ describe("éditions de la directive nitrates", () => {
     expect(block).toHaveTextContent("En zone vulnérable · sol : Sols limoneux · culture : Maïs grain (DKC5432) · semis 09/04/2026");
     expect(within(block).getByRole("row", { name: /Urée 46/ })).toHaveTextContent("12/05/2026");
     expect(block).toHaveTextContent("Couvert d'interculture : Moutarde blanche (Crucifères (moutarde, radis…)), semé le 05/09/2025, détruit le 10/12/2025 (mécanique (broyage, labour))");
+    expect(block).toHaveTextContent("couverture des sols : à vérifier (Couverture implantée le 05/10/2025, après la date limite du 30/09/2025.)");
+    expect(block).toHaveTextContent("Pilotage : N-Tester 580 le 10/06/2026 (10 feuilles), 40 kg N/ha conseillés");
+    expect(screen.getByLabelText("Épandages en période d'interdiction")).toHaveTextContent("20/01/2026 (Champ Maïs 2026) — motif : Dérogation préfectorale");
     expect(block).toHaveTextContent("Total : 69 kg N efficace/ha pour 180 kg prévus au plan (version 3).");
     expect(screen.getByRole("link", { name: "CSV" })).toHaveAttribute("href", expect.stringContaining("/fertilization/record?campaign=2026&format=csv"));
     expect(screen.getByRole("button", { name: "Imprimer ou enregistrer en PDF" })).toBeInTheDocument();

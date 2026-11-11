@@ -1,7 +1,7 @@
 import { Alert, Badge, Group, List, Loader, Paper, Text } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
-import type { FertilizationCheck, FertilizationCheckRequest, NitrateCheckRecord } from "@fourmy/contracts";
+import type { FertilizationCheck, FertilizationCheckRequest, InterventionWeather, NitrateCheckRecord } from "@fourmy/contracts";
 import { api, farmPath } from "../../app/api";
 
 const LEVELS: Record<FertilizationCheck["level"], { label: string; color: string }> = {
@@ -10,6 +10,12 @@ const LEVELS: Record<FertilizationCheck["level"], { label: string; color: string
   warning: { label: "À vérifier", color: "paille" },
   danger: { label: "Interdit", color: "brique" },
 };
+
+/** Température la plus basse et pluie de la météo saisie (conditions d'épandage, lot AJ). */
+export function weatherExtremes(w: InterventionWeather): { minTemperatureC: number | null; precipitationMm: number | null } {
+  const temps = [w.temperatureC, ...(w.hours ?? []).map((h) => h.temperatureC)].filter((t): t is number => typeof t === "number");
+  return { minTemperatureC: temps.length ? Math.min(...temps) : null, precipitationMm: w.precipitationMm };
+}
 
 /** Contrôles d'un apport d'azote pendant la saisie (lot AH) : appel debounced à POST /fertilization/check. */
 export function useFertilizationCheck(farmId: string, draft: FertilizationCheckRequest | null) {

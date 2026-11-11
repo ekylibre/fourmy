@@ -21,6 +21,7 @@ import {
   isStrawCereal,
   nitrogenOfInput,
   splitDose,
+  steeringAllowance,
   SPRING_CROPS,
   yieldTarget as olympicYield,
   type BalanceInput,
@@ -30,6 +31,7 @@ import { BadRequest, NotFound } from "../routes/helpers.js";
 import { farmDailyWeather } from "./crop-model.js";
 import { listFertilizers } from "./fertilizers.js";
 import { coversInTx } from "./cover-crops.js";
+import { steeringInTx } from "./steering.js";
 
 /**
  * Plans prévisionnels de fumure (lot AG, docs/fertilisation-design.md §4.2,
@@ -146,7 +148,7 @@ async function productionsByYear(tx: Tx, farmId: string, from: number, to: numbe
 }
 
 /** Précédent : production de la campagne précédente sur la parcelle qui recouvre au moins la moitié de celle-ci. */
-async function previousOf(tx: Tx, farmId: string, parcelId: string, campaign: number) {
+export async function previousOf(tx: Tx, farmId: string, parcelId: string, campaign: number) {
   const [r] = await rows<{ parcel_id: string; name: string; reference: string | null; cultivation: string | null; share: number }>(
     tx,
     sql`WITH cur AS (
@@ -333,7 +335,8 @@ async function contextOf(db: Database, farmId: string, plan: PlanRow, fertilizer
     tillers: d.tillers ?? null,
     previous: prevCrop ? { crop: prevCrop, strawReturned: isStrawCereal(prevCrop) ? strawReturned : null, yieldRealized: prevYield, xMineral: prevN?.total ?? null } : null,
     opening: openingClass,
-    cover: cover
+    // Repousses : pas de référence MrCi, comptées nulles.
+    cover: cover?.family
       ? {
           family: cover.family,
           biomass: cover.biomass,
@@ -452,6 +455,9 @@ export async function getPlan(db: Database, farmId: string, planId: string, fetc
     );
   });
   const dose = row.draft.external?.doseKgNHa ?? result.dose;
+  const measurements = (await withFarm(db, farmId, (tx) => steeringInTx(tx, [planId]))).get(planId) ?? [];
+  const current = versions.find((v) => v.version === row.current_version) ?? null;
+  const reserved = (current?.applications ?? []).filter((a) => a.reservedForSteering).reduce((sum, a) => sum + a.nKgHa, 0);
   return {
     id: row.id,
     campaign: row.campaign,
@@ -463,6 +469,11 @@ export async function getPlan(db: Database, farmId: string, planId: string, fetc
     result,
     proposedApplications: dose !== null ? splitDose(dose, context.crop as CropGroup, { nBefore4Leaves: row.draft.nBefore4Leaves ?? 0 }) : [],
     versions,
+    steering: {
+      measurements,
+      reservedKgNHa: Math.round(reserved),
+      allowedDose: current?.doseEfficient != null ? steeringAllowance(current.doseEfficient, reserved, measurements) : null,
+    },
   };
 }
 

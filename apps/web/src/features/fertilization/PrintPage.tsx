@@ -5,6 +5,7 @@ import {
   BALANCE_TERM_LABELS,
   BALANCE_TERMS,
   COVER_FAMILY_LABELS,
+  COVER_KIND_LABELS,
   DESTRUCTION_MODE_LABELS,
   NITRATE_ZONE_LABELS,
   type FertilizationPlan,
@@ -85,6 +86,12 @@ function RecordDoc({ farmId, farmName, campaign }: { farmId: string; farmName: s
           {r.late ? `${r.late} apport(s) saisi(s) plus de 30 jours après l'épandage.` : ""}
         </Text>
       )}
+      {(r.forced ?? []).length > 0 && (
+        <Text size="sm" mb="sm" aria-label="Épandages en période d'interdiction">
+          Épandages enregistrés en période d'interdiction :{" "}
+          {r.forced.map((f) => `${formatDate(f.date)} (${f.parcels.join(", ")}) — motif : ${f.reason ?? "aucun (saisie mobile)"}`).join(" ; ")}.
+        </Text>
+      )}
       {r.parcels.map((p) => (
         <section key={p.parcelId} className="print-block" aria-label={`Cahier ${p.name}`}>
           <Title order={2} size="h4">
@@ -102,9 +109,22 @@ function RecordDoc({ farmId, farmName, campaign }: { farmId: string; farmName: s
           <Text size="sm">
             Couvert d'interculture :{" "}
             {p.cover
-              ? `${p.cover.species} (${COVER_FAMILY_LABELS[p.cover.family]}), semé le ${formatDate(p.cover.sownOn)}, ${p.cover.destroyedOn ? `détruit le ${formatDate(p.cover.destroyedOn)}` : "destruction non saisie"}${p.cover.destructionMode ? ` (${DESTRUCTION_MODE_LABELS[p.cover.destructionMode].toLowerCase()})` : ""}${p.cover.exported ? ", exporté" : ""}`
+              ? `${p.cover.species} (${p.cover.family ? COVER_FAMILY_LABELS[p.cover.family] : COVER_KIND_LABELS[p.cover.kind].toLowerCase()}), ${p.cover.kind === "sown" ? "semé" : "levées"} le ${formatDate(p.cover.sownOn)}, ${p.cover.destroyedOn ? `détruit le ${formatDate(p.cover.destroyedOn)}` : "destruction non saisie"}${p.cover.destructionMode ? ` (${DESTRUCTION_MODE_LABELS[p.cover.destructionMode].toLowerCase()})` : ""}${p.cover.exported ? ", exporté" : ""}`
               : "aucun saisi"}
+            {p.soilCover && p.soilCover.situation !== "none" && (
+              <Text span size="sm" c={p.soilCover.level === "warning" ? "brique.7" : undefined}>
+                {" "}
+                · couverture des sols : {p.soilCover.level === "ok" ? "conforme" : p.soilCover.level === "warning" ? "à vérifier" : "non vérifiée"}
+                {p.soilCover.messages.length ? ` (${p.soilCover.messages.join(" ")})` : ""}
+              </Text>
+            )}
           </Text>
+          {(p.steering ?? []).length > 0 && (
+            <Text size="sm">
+              Pilotage :{" "}
+              {p.steering.map((m) => `${m.tool}${m.value ? ` ${m.value}` : ""} le ${formatDate(m.measuredOn)}${m.stage ? ` (${m.stage})` : ""}, ${m.advisedKgNHa} kg N/ha conseillés`).join(" ; ")}
+            </Text>
+          )}
           <Table fz="xs" mt={4} withTableBorder>
             <Table.Thead>
               <Table.Tr>

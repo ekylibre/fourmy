@@ -15,6 +15,7 @@ type Row = {
   id: string;
   land_parcel_id: string;
   campaign: number;
+  kind: CoverCrop["kind"];
   family: CoverCrop["family"];
   species: string;
   sown_on: string;
@@ -28,6 +29,7 @@ const view = (r: Row): CoverCrop => ({
   id: r.id,
   parcelId: r.land_parcel_id,
   campaign: r.campaign,
+  kind: r.kind,
   family: r.family,
   species: r.species,
   sownOn: r.sown_on,
@@ -37,7 +39,7 @@ const view = (r: Row): CoverCrop => ({
   destructionMode: r.destruction_mode,
   notes: r.notes,
 });
-const SELECT = sql`SELECT id, land_parcel_id, campaign, family, species, sown_on::text, destroyed_on::text, exported, biomass, destruction_mode, notes FROM cover_crops`;
+const SELECT = sql`SELECT id, land_parcel_id, campaign, kind, family, species, sown_on::text, destroyed_on::text, exported, biomass, destruction_mode, notes FROM cover_crops`;
 
 export async function coversInTx(tx: Tx, parcelIds: string[], campaign: number): Promise<Map<string, CoverCrop>> {
   if (!parcelIds.length) return new Map();
@@ -51,13 +53,13 @@ export async function saveCoverCrop(db: Database, farmId: string, parcelId: stri
     if (!p) throw new NotFound("Parcelle introuvable.");
     const [r] = await rows<Row>(
       tx,
-      sql`INSERT INTO cover_crops (id, farm_id, land_parcel_id, campaign, family, species, sown_on, destroyed_on, exported, biomass, destruction_mode, notes)
-          VALUES (${crypto.randomUUID()}, ${farmId}, ${parcelId}, ${w.campaign}, ${w.family}, ${w.species}, ${w.sownOn}::date, ${w.destroyedOn}::date,
+      sql`INSERT INTO cover_crops (id, farm_id, land_parcel_id, campaign, kind, family, species, sown_on, destroyed_on, exported, biomass, destruction_mode, notes)
+          VALUES (${crypto.randomUUID()}, ${farmId}, ${parcelId}, ${w.campaign}, ${w.kind}, ${w.family}, ${w.species}, ${w.sownOn}::date, ${w.destroyedOn}::date,
                   ${w.exported}, ${w.biomass}, ${w.destructionMode}, ${w.notes})
-          ON CONFLICT (land_parcel_id, campaign) DO UPDATE SET family = excluded.family, species = excluded.species, sown_on = excluded.sown_on,
+          ON CONFLICT (land_parcel_id, campaign) DO UPDATE SET kind = excluded.kind, family = excluded.family, species = excluded.species, sown_on = excluded.sown_on,
             destroyed_on = excluded.destroyed_on, exported = excluded.exported, biomass = excluded.biomass,
             destruction_mode = excluded.destruction_mode, notes = excluded.notes, updated_at = now()
-          RETURNING id, land_parcel_id, campaign, family, species, sown_on::text, destroyed_on::text, exported, biomass, destruction_mode, notes`,
+          RETURNING id, land_parcel_id, campaign, kind, family, species, sown_on::text, destroyed_on::text, exported, biomass, destruction_mode, notes`,
     );
     return view(r!);
   });

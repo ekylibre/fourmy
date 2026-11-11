@@ -79,6 +79,10 @@ export const handlers = [
   // Fertilisation azotée (lots AF, AI) : paramètres par défaut, aucun justificatif.
   http.get(`*${base}/fertilization/settings`, () => HttpResponse.json({ region: "nouvelle-aquitaine", campaignStartMmdd: "09-01" })),
   http.get(`*${base}/fertilization/documents`, () => HttpResponse.json({ items: [] })),
+  http.get(`*${base}/fertilization/record`, ({ request }) => {
+    const campaign = Number(new URL(request.url).searchParams.get("campaign") ?? new Date().getFullYear());
+    return HttpResponse.json({ campaign, from: `${campaign - 1}-09-01`, to: `${campaign}-09-01`, parcels: [], toComplete: 0, late: 0, forced: [] });
+  }),
   // Cartes de modulation (lot AD) : aucune dans la démo, aucune image à zoner.
   http.get(`*${base}/prescriptions`, () => HttpResponse.json({ items: [] })),
   http.get(`*${base}/land-parcels/:id/modulation-dates`, () => HttpResponse.json({ items: [] })),

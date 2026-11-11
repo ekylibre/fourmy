@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import postgres from "postgres";
-import type { CoverCrop, FertilizationCheck, FertilizationPlan, FertilizationPlanSummary, FertilizationRecord, RegulatoryDocument } from "@fourmy/contracts";
+import type { CoverCrop, FertilizationCheck, SteeringMeasurement, FertilizationPlan, FertilizationPlanSummary, FertilizationRecord, RegulatoryDocument } from "@fourmy/contracts";
 import { createApp } from "../src/app.js";
 import { fertilizationDeps } from "../src/routes/fertilization.js";
 import { addMember, setupFarm, teardown } from "./helpers.js";
@@ -274,5 +274,62 @@ describe.skipIf(!url)("plans de fumure (intégration)", () => {
 
     expect((await app.request(`${base()}/land-parcels/${p2026}/cover-crop?campaign=2026`, { method: "DELETE", headers })).status).toBe(204);
     expect((await app.request(`${base()}/fertilization/documents/${doc.id}`, { headers })).status).toBe(404);
+  });
+
+  it("pilotage : une mesure fixe l'apport de pilotage et justifie le dépassement (lot AJ)", async () => {
+    const check = async (startedAt: string, quantity: number, weather: object | null = null) =>
+      (await (
+        await app.request(`${base()}/fertilization/check`, {
+          method: "POST",
+          headers: worker.headers,
+          body: JSON.stringify({ startedAt, parcelIds: [p2026], inputs: [{ articleId: urea, quantity, per: "hectare" }], weather }),
+        })
+      ).json()) as FertilizationCheck;
+    // 450 kg d'urée : 207 kg N pour 180 prévus (version 3, sans apport réservé).
+    expect((await check("2026-05-10T09:00:00+02:00", 450)).indicators.find((i) => i.code === "fert_plan")).toMatchObject({ level: "warning", message: expect.stringContaining("Justifiez-le par une mesure de pilotage") });
+    const body = { measuredOn: "2026-05-05", stage: "8 feuilles", tool: "N-Tester", value: "620", advisedKgNHa: 30 };
+    expect((await app.request(`${base()}/fertilization/plans/${planId}/steering`, { method: "POST", headers: worker.headers, body: JSON.stringify(body) })).status).toBe(403);
+    const m = (await (await app.request(`${base()}/fertilization/plans/${planId}/steering`, { method: "POST", headers, body: JSON.stringify(body) })).json()) as SteeringMeasurement;
+    expect(m).toMatchObject({ tool: "N-Tester", advisedKgNHa: 30 });
+    expect((await plan()).steering).toMatchObject({ reservedKgNHa: 0, allowedDose: 210, measurements: [expect.objectContaining({ id: m.id })] });
+    expect((await check("2026-05-10T09:00:00+02:00", 450)).indicators.find((i) => i.code === "fert_plan")).toMatchObject({
+      level: "info",
+      message: "207 kg N apportés pour 180 kg prévus : dépassement justifié par la mesure N-Tester du 05/05/2026 (210 kg permis).",
+    });
+    expect((await check("2026-05-10T09:00:00+02:00", 500)).indicators.find((i) => i.code === "fert_plan")?.level).toBe("warning");
+
+    // Conditions d'épandage : gel annoncé, ruisseau à une vingtaine de mètres.
+    await sql`INSERT INTO water_items (id, farm_id, kind, name, ditch, geom) VALUES ('test-luy', ${farmId}, 'line', 'Le Luy', false, ST_GeomFromText('LINESTRING(-0.21 43.3811, -0.19 43.3811)', 4326))`;
+    const frost = await check("2026-05-10T07:00:00+02:00", 100, { minTemperatureC: -3, precipitationMm: 0 });
+    expect(frost.indicators.find((i) => i.code === "fert_frost")).toMatchObject({ level: "warning", parcelName: "Champ Maïs 2026" });
+    expect(frost.indicators.find((i) => i.code === "fert_slope")).toMatchObject({ level: "info", message: expect.stringContaining("« Le Luy » à moins de 100 m") });
+    expect(frost.indicators.some((i) => i.code === "fert_water")).toBe(false); // type III : 2 m seulement
+    await sql`DELETE FROM water_items WHERE farm_id = ${farmId}`;
+    expect((await app.request(`${base()}/fertilization/steering/${m.id}`, { method: "DELETE", headers })).status).toBe(204);
+  });
+
+  it("cahier : couverture des sols après le précédent, épandages forcés (lot AJ)", async () => {
+    // Précédent : le maïs grain 2025 de la parcelle qui recouvre celle de 2026, récolté le 15/10/2025.
+    const forced = crypto.randomUUID();
+    await sql`INSERT INTO interventions (id, farm_id, procedure, status, origin, started_at, stopped_at, nitrate_check) VALUES (${forced}, ${farmId}, 'fertilizing', 'done', 'web', '2026-01-20T08:00:00Z', '2026-01-20T09:00:00Z', ${sql.json({ level: "danger", indicators: [], nitrogen: null, reason: "Dérogation", checkedAt: "2026-01-20T10:00:00Z" })})`;
+    await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id) VALUES (${crypto.randomUUID()}, ${forced}, 'target', 'land_parcel', ${p2026})`;
+    const record = async () => (await (await app.request(`${base()}/fertilization/record?campaign=2026`, { headers: worker.headers })).json()) as FertilizationRecord;
+
+    const r = await record();
+    expect(r.forced).toEqual([{ interventionId: forced, date: "2026-01-20", parcels: ["Champ Maïs 2026"], reason: "Dérogation" }]);
+    expect(r.parcels[0]!.soilCover).toMatchObject({ level: "warning", situation: "long", messages: [expect.stringContaining("cannes à broyer finement et enfouir dans les 15 jours (au plus tard le 30/10/2025)")] });
+
+    const grind = crypto.randomUUID();
+    await sql`INSERT INTO interventions (id, farm_id, procedure, status, origin, started_at, stopped_at) VALUES (${grind}, ${farmId}, 'crop_residues_grinding', 'done', 'web', '2025-10-20T08:00:00Z', '2025-10-20T12:00:00Z')`;
+    await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id) VALUES (${crypto.randomUUID()}, ${grind}, 'target', 'land_parcel', ${p2025})`;
+    expect((await record()).parcels[0]!.soilCover).toMatchObject({ level: "ok", messages: ["Cannes broyées ou enfouies le 20/10/2025, dans les 15 jours suivant la récolte."] });
+
+    // Repousses : sans famille ; pas de référence MrCi, le terme reste à 0.
+    const regrowth = { campaign: 2026, kind: "regrowth_cereal", species: "Repousses de blé", sownOn: "2025-10-25", destroyedOn: null };
+    expect((await app.request(`${base()}/land-parcels/${p2026}/cover-crop`, { method: "PUT", headers, body: JSON.stringify({ ...regrowth, family: "cruciferes" }) })).status).toBe(400);
+    const saved = (await (await app.request(`${base()}/land-parcels/${p2026}/cover-crop`, { method: "PUT", headers, body: JSON.stringify(regrowth) })).json()) as CoverCrop;
+    expect(saved).toMatchObject({ kind: "regrowth_cereal", family: null });
+    expect((await plan()).result.terms.MrCi).toMatchObject({ value: 0 });
+    await sql`DELETE FROM interventions WHERE id IN (${forced}, ${grind})`;
   });
 });

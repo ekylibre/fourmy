@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { coverCropWrite, DOCUMENT_OWNER_TYPES, type DocumentOwnerType } from "@fourmy/contracts";
+import { coverCropWrite, DOCUMENT_OWNER_TYPES, steeringWrite, type DocumentOwnerType } from "@fourmy/contracts";
 import { fertilizationCheckRequest, fertilizationSettingsWrite, nitrateZoneWrite, planDraft, planEstablish, soilAnalysisWrite, soilProfileWrite, waterSourceWrite } from "@fourmy/contracts";
 import { establishPlan, getPlan, listPlans, preparePlans, saveDraft } from "../repos/fertilization-plans.js";
 import { checkApplication, fertilizationRecord } from "../repos/fertilization-record.js";
@@ -20,6 +20,7 @@ import {
   saveWaterSource,
 } from "../repos/fertilization-context.js";
 import { deleteCoverCrop, saveCoverCrop } from "../repos/cover-crops.js";
+import { addSteering, deleteSteering } from "../repos/steering.js";
 import { addDocument, deleteDocument, listDocuments, readDocument } from "../repos/regulatory-documents.js";
 import { BadRequest, problem, uuidParam } from "./helpers.js";
 
@@ -117,6 +118,16 @@ export const fertilizationRoutes = new Hono<Env>()
       "content-type": "text/csv; charset=utf-8",
       "content-disposition": `attachment; filename="cahier-fertilisation-${record.campaign}.csv"`,
     });
+  })
+  // Pilotage en cours de saison (lot AJ)
+  .post("/fertilization/plans/:id/steering", requireOwner, async (c) => {
+    const parsed = steeringWrite.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", invalid(parsed.error.issues));
+    return c.json(await addSteering(db(), c.get("farmId"), c.get("userId"), uuidParam(c, "id"), parsed.data), 201);
+  })
+  .delete("/fertilization/steering/:id", requireOwner, async (c) => {
+    await deleteSteering(db(), c.get("farmId"), uuidParam(c, "id"));
+    return c.body(null, 204);
   })
   // Couverts d'interculture (lot AI)
   .put("/land-parcels/:id/cover-crop", requireOwner, async (c) => {
