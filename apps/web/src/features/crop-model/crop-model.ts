@@ -34,3 +34,18 @@ export function stageWhen(s: CropStageDate, day: string): string {
   const past = s.on <= day && s.basis === "observed";
   return past ? formatDate(s.on) : `vers le ${formatDate(s.on)}`;
 }
+
+/**
+ * Saisie d'une irrigation sur la parcelle (lot AC), datée du jour donné ;
+ * réalisée ou planifiée selon la date. Dose proposée par le modèle, si connue.
+ */
+export function irrigationLink(farmId: string, parcelId: string, on: string, search: string, doseMm?: number) {
+  const params = new URLSearchParams(search);
+  params.set("at", on);
+  params.set("procedure", "watering");
+  params.set("parcels", parcelId);
+  params.delete("status");
+  if (doseMm) params.set("dose", String(Math.round(doseMm)));
+  else params.delete("dose");
+  return `/f/${farmId}/interventions/new?${params}`;
+}

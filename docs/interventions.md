@@ -109,7 +109,7 @@ courantes absentes des données (binage, roulage, irrigation…). Extrait :
 
 | Catégorie | Forme `work` | Forme spécifique |
 |---|---|---|
-| Cultures | labour, déchaumage, hersage, binage, roulage, broyage des résidus | pulvérisation, désherbage chimique (`treatment`) · fertilisation (`fertilization`) · semis « tout-en-un », semis (`sowing`) · récolte (`harvest`) |
+| Cultures | labour, déchaumage, hersage, binage, roulage, broyage des résidus, irrigation (dose d'eau) | pulvérisation, désherbage chimique (`treatment`) · fertilisation (`fertilization`) · semis « tout-en-un », semis (`sowing`) · récolte (`harvest`) |
 | Vigne | taille, épamprage, écimage-rognage, relevage, pliage, tirage des bois, tonte, entretien intercep, chaussage, déchaussage, construction du palissage | pulvérisation avec/sans fertilisation (`treatment`) · épandage engrais (`fertilization`) · plantation, complantation (`sowing`) · vendange (`harvest`, destination cuve) |
 | Matériel, bâtiments | — | réparation et maintenance, entretien des installations (`maintenance`) |
 
@@ -133,6 +133,8 @@ Intervention {
                      //   workingZone?   (géométrie, ex. tirée de la trace GPS) }
   inputs[]           // { articleId, quantity, per: "total" | "hectare", lotId?, from? }
   outputs[]          // { articleId, quantity, per: "total" | "hectare", to (lieu/cuve) }
+  irrigation?        // irrigations : { depthMm (mm sur les cibles, obligatoire à la
+                     //   réalisation), method? } — bilan hydrique (docs/modele-croissance.md)
   staffing           // free | crews — mode de déclaration des moyens (2026-11-09)
   crews[]            // mode crews : { id, label?, templateId?, tools[] ≥ 1,
                      //   doers[] (0..n), periods[] ≥ 1 } — un attelage par

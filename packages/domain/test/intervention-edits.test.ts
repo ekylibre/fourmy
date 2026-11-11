@@ -20,6 +20,15 @@ const base: EditableIntervention = {
 };
 
 describe("diffIntervention", () => {
+  it("irrigation : la dose se compare, absente égale à null", () => {
+    const w = { ...base, procedure: "watering", inputs: [], purposes: [], irrigation: { depthMm: 30, method: "reel" } };
+    expect(diffIntervention(w, { ...w, irrigation: { depthMm: 25, method: "reel" } }).irrigation).toEqual({
+      before: { depthMm: 30, method: "reel" },
+      after: { depthMm: 25, method: "reel" },
+    });
+    expect(() => diffIntervention({ ...w, irrigation: null }, { ...w, irrigation: undefined })).toThrow(/ne change rien/);
+  });
+
   it("ne retient que les champs modifiés, avec l'avant et l'après", () => {
     const changes = diffIntervention(base, { ...base, inputs: [{ articleId: PHYTO, quantity: 1.5, per: "hectare" }] });
     expect(Object.keys(changes)).toEqual(["inputs"]);

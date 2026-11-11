@@ -5,7 +5,7 @@ import type {
   ProcedureDefinition,
   TargetKind,
 } from "@fourmy/contracts";
-import { SHAPE_LABELS } from "@fourmy/contracts";
+import { isIrrigation, SHAPE_LABELS } from "@fourmy/contracts";
 
 /**
  * Règles de forme d'une intervention (docs/interventions.md §4.3). Fonction
@@ -21,7 +21,7 @@ export interface RuleContext {
 }
 
 type Body = Pick<InterventionCompleteWrite, "periods" | "targets" | "inputs" | "outputs" | "purposes"> &
-  Partial<Pick<InterventionPlanWrite, "procedure" | "maintenance" | "tools">>;
+  Partial<Pick<InterventionPlanWrite, "procedure" | "maintenance" | "tools" | "irrigation">>;
 
 const MIN_INPUT_KIND: Partial<Record<ProcedureDefinition["shape"], ArticleKind>> = {
   treatment: "phyto",
@@ -90,6 +90,13 @@ export function validateIntervention(
   }
 
   errors.push(...validateMaintenance(procedure.shape, body, mode));
+
+  // Irrigation : la dose d'eau nourrit le bilan hydrique du modèle de croissance.
+  if (isIrrigation(procedure.code)) {
+    if (mode === "complete" && !body.irrigation) errors.push("Indiquez la dose d'eau apportée (mm).");
+  } else if (body.irrigation) {
+    errors.push("La dose d'eau ne concerne que les irrigations.");
+  }
 
   // Motifs : réservés aux traitements.
   if (body.purposes.length > 0 && procedure.shape !== "treatment") {

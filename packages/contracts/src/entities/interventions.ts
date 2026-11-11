@@ -142,6 +142,27 @@ export const maintenanceBlock = z.object({
 });
 export type MaintenanceBlock = z.infer<typeof maintenanceBlock>;
 
+/**
+ * Irrigation (procédures `IRRIGATION_PROCEDURES`) : dose d'eau apportée,
+ * en mm sur la surface ciblée (1 mm = 10 m³/ha), et matériel d'irrigation.
+ * La dose alimente le bilan hydrique du modèle de croissance.
+ */
+export const irrigationMethod = z.enum(["reel", "pivot", "sprinkler", "drip", "other"]);
+export type IrrigationMethod = z.infer<typeof irrigationMethod>;
+export const IRRIGATION_METHOD_LABELS: Record<IrrigationMethod, string> = {
+  reel: "Enrouleur",
+  pivot: "Pivot ou rampe",
+  sprinkler: "Couverture intégrale",
+  drip: "Goutte-à-goutte",
+  other: "Autre",
+};
+export const IRRIGATION_DEPTH_MAX_MM = 100;
+export const irrigationBlock = z.object({
+  depthMm: z.number().positive("La dose d'eau doit être positive.").max(IRRIGATION_DEPTH_MAX_MM, `Dose d'eau de ${IRRIGATION_DEPTH_MAX_MM} mm au plus.`),
+  method: irrigationMethod.nullable().optional(),
+});
+export type IrrigationBlock = z.infer<typeof irrigationBlock>;
+
 /** Corps commun de saisie (planification ou réalisation). */
 const interventionBody = z.object({
   procedure: z.string().min(1),
@@ -165,6 +186,8 @@ const interventionBody = z.object({
   weather: interventionWeather.optional(),
   /** Forme `maintenance` : nature, problème, atelier, opérations du plan. */
   maintenance: maintenanceBlock.optional(),
+  /** Procédures d'irrigation : dose d'eau (obligatoire à la réalisation) et matériel. */
+  irrigation: irrigationBlock.optional(),
   /**
    * Parcours GPS à rattacher à l'enregistrement (FR-GPS-23), en plus de ceux
    * déjà rattachés : absent ou vide, les rattachements existants restent.
@@ -254,6 +277,8 @@ export const intervention = z
     weather: interventionWeather.nullable().optional(),
     /** Entretien : nature, problème, atelier, opérations réalisées (libellés compris). */
     maintenance: maintenanceRead.nullable().optional(),
+    /** Irrigation : dose d'eau et matériel. */
+    irrigation: z.object({ depthMm: z.number(), method: irrigationMethod.nullable() }).nullable().optional(),
   })
   .merge(auditFields);
 export type Intervention = z.infer<typeof intervention>;

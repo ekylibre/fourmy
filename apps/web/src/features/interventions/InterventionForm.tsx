@@ -38,6 +38,8 @@ import type {
   TreatmentPurpose,
 } from "@fourmy/contracts";
 import { formatHa } from "@fourmy/ui-lyvre";
+import { isIrrigation } from "@fourmy/contracts";
+import { irrigationBody, irrigationDraft, IrrigationFields, type IrrigationDraft } from "./IrrigationFields";
 import { api, ApiError, farmPath } from "../../app/api";
 import { unitLabel } from "../../app/labels";
 import { invalidateAfterIntervention, useActivities, useCrewTemplates, useEquipments, usePhytoArticles } from "../../app/queries";
@@ -94,6 +96,8 @@ export interface InterventionFormProps {
 
 export interface FormInitial {
   procedure?: string;
+  /** Irrigation : dose proposée (mm), depuis le modèle de croissance. */
+  depthMm?: number;
   equipmentId?: string;
   operationIds?: string[];
   mode?: "planned" | "done";
@@ -181,6 +185,10 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   );
   // Entretien (lot K) : relevés, opérations du plan, nature, problème, atelier.
   const [maint, setMaint] = useState<MaintenanceDraft>(() => draftFrom(planned, initial));
+  // Irrigation (lot AC) : dose d'eau et matériel.
+  const [irrigation, setIrrigation] = useState<IrrigationDraft>(() =>
+    planned?.irrigation ? irrigationDraft(planned.irrigation) : irrigationDraft(initial?.depthMm ? { depthMm: initial.depthMm } : null),
+  );
   const equipmentList = useEquipments(farmId);
   const farmRole = useFarm().role;
   const crewTemplates = useCrewTemplates(farmId);
@@ -346,6 +354,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       })),
       tools: shape === "maintenance" || inCrews ? [] : tools.map((equipmentId) => ({ equipmentId })),
       ...(shape === "maintenance" ? { maintenance: maintenanceBody(maint, maintained) } : {}),
+      ...(code && isIrrigation(code) && irrigationBody(irrigation) ? { irrigation: irrigationBody(irrigation) } : {}),
       doers: inCrews ? [] : doers.map((personId) => ({ personId })),
       staffing: inCrews ? "crews" : "free",
       crews: inCrews ? crewsBody(crews) : [],
@@ -660,6 +669,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         if (inCrews ? crews.some((c) => c.periods.some((p) => !p.startedAt || !p.stoppedAt)) : periods.some((p) => !p.startedAt || (completing && !p.stoppedAt))) {
           return setError("Renseignez les dates.");
         }
+        if (code && isIrrigation(code) && completing && !irrigationBody(irrigation)) return setError("Indiquez la dose d'eau apportée (mm).");
         if (shape === "maintenance" && completing && draftNature(maint) === "corrective" && !maint.problem.trim()) {
           return setError("Une réparation (entretien curatif) demande la description du problème.");
         }
@@ -851,6 +861,13 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
                   )}
                 </Stack>
               ))}
+
+            {code && isIrrigation(code) && (
+              <>
+                <Divider label="Irrigation" labelPosition="left" />
+                <IrrigationFields value={irrigation} onChange={setIrrigation} areaM2={treatedM2} required={completing} />
+              </>
+            )}
 
             {inputKinds.length > 0 && (
               <>

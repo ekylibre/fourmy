@@ -147,8 +147,10 @@ export interface SimDay {
   reserve: number;
   /** Coefficient de stress hydrique FAO-56 (1 : pas de stress). */
   ks: number;
-  /** Irrigation simulée ce jour (parcelle irriguée), mm. */
+  /** Irrigation simulée ce jour (parcelle irriguée, pilotage idéal), mm. */
   irrigationMm: number;
+  /** Irrigation saisie ce jour (interventions réalisées), mm. */
+  appliedMm: number;
 }
 
 export interface SimStage extends StageDef {
@@ -172,6 +174,12 @@ export interface Simulation {
  * la réserve facilement utilisable est épuisée (de la levée à la maturité),
  * un apport la remplit (pilotage FAO-56) ; on obtient le besoin d'irrigation
  * au lieu d'un stress.
+ *
+ * Irrigations saisies (`applied`) : ajoutées comme une pluie le jour de
+ * l'intervention, que la parcelle soit déclarée irriguée ou non. Avec
+ * `autoFrom`, le pilotage idéal ne commence qu'à cette date : avant, seules
+ * les doses saisies comptent, et un stress peut apparaître (irrigation trop
+ * tardive ou trop faible, ou non saisie).
  */
 export function simulateSeason(input: {
   model: CropModelDef;
@@ -182,6 +190,10 @@ export function simulateSeason(input: {
   /** Récolte (ou destruction) saisie : la simulation s'arrête ce jour. */
   endOn?: string | null;
   irrigated?: boolean;
+  /** Irrigations saisies : dose (mm) par jour. */
+  applied?: ReadonlyMap<string, number>;
+  /** Parcelle irriguée : premier jour du pilotage simulé (absent : toute la saison). */
+  autoFrom?: string | null;
 }): Simulation {
   const { model, sownOn, tawMm } = input;
   const rootFull = model.stages.find((s) => s.code === model.rootFullAt)!.gdd;
@@ -201,8 +213,11 @@ export function simulateSeason(input: {
     const raw = model.p * taw;
     const kc = kcAt(model, gdd);
     depletion = Math.min(depletion, taw);
+    const applied = input.applied?.get(w.day) ?? 0;
+    depletion = Math.max(0, depletion - applied);
     let irrigation = 0;
-    if (input.irrigated && depletion > raw && gdd >= emergence && gdd < maturity) {
+    const auto = input.irrigated && (!input.autoFrom || w.day >= input.autoFrom);
+    if (auto && depletion > raw && gdd >= emergence && gdd < maturity) {
       irrigation = depletion;
       depletion = 0;
     }
@@ -220,6 +235,7 @@ export function simulateSeason(input: {
       reserve: taw > 0 ? Math.round(((taw - depletion) / taw) * 1000) / 1000 : 1,
       ks: Math.round(ks * 1000) / 1000,
       irrigationMm: Math.round(irrigation * 10) / 10,
+      appliedMm: applied,
     });
   }
   return { model, sownOn, days, stages };
@@ -235,6 +251,10 @@ export interface StateAt {
   floweringStressDays: number;
   /** Irrigation simulée depuis le semis jusqu'au jour (mm). */
   irrigationMm: number;
+  /** Irrigations saisies depuis le semis jusqu'au jour : total (mm), nombre de jours, dernier jour. */
+  appliedMm: number;
+  appliedDays: number;
+  lastAppliedOn: string | null;
 }
 
 /** État de la simulation à une date. */
@@ -257,6 +277,9 @@ export function stateAt(sim: Simulation, date: string): StateAt {
     stressDays: growing.filter((d) => d.ks < 1).length,
     floweringStressDays: growing.filter((d) => d.ks < 1 && d.gdd >= flowering - before && d.gdd <= flowering + after).length,
     irrigationMm: Math.round(upTo.reduce((s, d) => s + d.irrigationMm, 0)),
+    appliedMm: Math.round(upTo.reduce((s, d) => s + d.appliedMm, 0)),
+    appliedDays: upTo.filter((d) => d.appliedMm > 0).length,
+    lastAppliedOn: upTo.filter((d) => d.appliedMm > 0).at(-1)?.date ?? null,
   };
 }
 

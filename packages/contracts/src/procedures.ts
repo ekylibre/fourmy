@@ -93,6 +93,7 @@ const DEFINITIONS: Def[] = [
   ["plant_mowing", "work", "crops"],
   ["hand_weeding", "work", "crops"],
   ["plant_watering", "work", "crops", ["other"]],
+  ["watering", "work", "crops"],
   // --- Cultures : traitements, fertilisation, semis, récolte ---
   ["spraying", "treatment", "crops", ["phyto"]],
   ["generic_spraying", "treatment", "crops", ["phyto"]],
@@ -178,6 +179,14 @@ export function getProcedure(code: string): ProcedureDefinition {
 }
 
 export { PROCEDURE_LABELS };
+
+/**
+ * Procédures d'irrigation (docs/modele-croissance.md) : leur dose d'eau
+ * (bloc `irrigation` de l'intervention) alimente le bilan hydrique des
+ * parcelles ciblées.
+ */
+export const IRRIGATION_PROCEDURES = ["watering", "plant_watering", "vine_watering"] as const;
+export const isIrrigation = (code: string): boolean => (IRRIGATION_PROCEDURES as readonly string[]).includes(code);
 
 /** Réponse de GET /procedures : catalogue + usage et suggestions de la ferme (3 dernières années). */
 export type ProcedureCatalogueItem = ProcedureDefinition & {

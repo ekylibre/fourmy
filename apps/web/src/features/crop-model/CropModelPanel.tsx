@@ -1,5 +1,6 @@
 import "@mantine/charts/styles.css";
 import { useMemo, useState } from "react";
+import { Link, useLocation } from "react-router";
 import { Badge, Button, Group, NumberInput, Paper, SimpleGrid, Stack, Switch, Text, Title } from "@mantine/core";
 import { LineChart } from "@mantine/charts";
 import { notifications } from "@mantine/notifications";
@@ -9,7 +10,7 @@ import { api, farmPath } from "../../app/api";
 import { useAt } from "../../app/at";
 import { formatDate } from "../../app/labels";
 import { ErrorAlert, Loading } from "../../components/states";
-import { BASIS_LABELS, stageWhen, useParcelCropModel } from "./crop-model";
+import { BASIS_LABELS, irrigationLink, stageWhen, useParcelCropModel } from "./crop-model";
 
 const MONTH = new Intl.DateTimeFormat("fr-FR", { month: "short", timeZone: "UTC" });
 const DAY = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short", timeZone: "UTC" });
@@ -94,6 +95,7 @@ export function CropModelPanel({ farmId, parcelId, owner }: { farmId: string; pa
       </SimpleGrid>
 
       {s.water && <WaterSummary state={s} />}
+      {s.water && <IrrigateButton farmId={farmId} parcelId={parcelId} day={day} />}
 
       {rows.length > 1 && (
         <LineChart
@@ -110,6 +112,8 @@ export function CropModelPanel({ farmId, parcelId, owner }: { farmId: string; pa
           valueFormatter={(v) => `${v} %`}
           tooltipProps={{ labelFormatter: (d) => (typeof d === "string" ? DAY.format(new Date(`${d}T00:00:00Z`)) : d) }}
           referenceLines={[
+            // Irrigations saisies : un trait par apport.
+            ...(data.days.filter((d) => d.appliedMm > 0).map((d) => ({ x: d.date, color: "ardoise.3", strokeDasharray: "2 3" }))),
             ...(s.water ? [{ y: Math.round(s.water.stressBelow * 100), label: "Seuil de stress", color: "brique.5", labelPosition: "insideTopRight" as const }] : []),
             { x: day, label: "Date de la frise", color: "ardoise.5" },
           ]}
@@ -125,19 +129,39 @@ export function CropModelPanel({ farmId, parcelId, owner }: { farmId: string; pa
   );
 }
 
+function IrrigateButton({ farmId, parcelId, day }: { farmId: string; parcelId: string; day: string }) {
+  const location = useLocation();
+  return (
+    <Button component={Link} to={irrigationLink(farmId, parcelId, day, location.search)} size="compact-sm" variant="light" mt="xs">
+      Saisir une irrigation
+    </Button>
+  );
+}
+
 function WaterSummary({ state: s }: { state: ParcelCropState }) {
   const w = s.water!;
-  if (s.soil.irrigated) {
+  if (s.waterSupply === "ideal") {
     return (
-      <Text size="sm">
-        Parcelle irriguée : besoin d'irrigation simulé depuis le semis <b>{w.irrigationMm} mm</b> (apport dès que la réserve facilement utilisable est épuisée).
-        Eau disponible : {pct(w.reserve)} de {w.tawMm} mm.
-      </Text>
+      <Stack gap={4}>
+        <Text size="sm">
+          Parcelle irriguée : besoin d'irrigation simulé depuis le semis <b>{w.irrigationMm} mm</b> (apport dès que la réserve facilement utilisable est
+          épuisée). Eau disponible : {pct(w.reserve)} de {w.tawMm} mm.
+        </Text>
+        <Text size="xs" c="dimmed">
+          Aucune irrigation saisie cette saison : le modèle suppose un pilotage idéal. Saisissez vos irrigations pour qu'il suive les apports réels.
+        </Text>
+      </Stack>
     );
   }
   const stressed = w.ks < 1;
   return (
     <Stack gap={4}>
+      {s.waterSupply === "recorded" && (
+        <Text size="sm">
+          Irrigations saisies : <b>{w.appliedMm} mm</b> en {w.appliedDays} apport{w.appliedDays > 1 ? "s" : ""}
+          {w.lastAppliedOn ? `, le dernier le ${formatDate(w.lastAppliedOn)}` : ""}.
+        </Text>
+      )}
       <Text size="sm">
         Eau disponible : <b>{pct(w.reserve)}</b> de la réserve accessible aux racines ({w.tawMm} mm){stressed ? " : la culture est en stress hydrique" : ""}.{" "}
         {w.stressDays > 0 && (
@@ -147,9 +171,16 @@ function WaterSummary({ state: s }: { state: ParcelCropState }) {
           </>
         )}
       </Text>
-      {w.stressDays > 0 && (
+      {w.stressDays > 0 && s.waterSupply === "rainfed" && (
         <Text size="xs" c="dimmed">
-          Calcul en sec, sans irrigation. Si la parcelle est irriguée, indiquez-le : le modèle estimera le besoin d'irrigation au lieu d'un stress.
+          Calcul en sec, sans irrigation saisie. Si la parcelle est irriguée, saisissez vos irrigations, ou déclarez-la irriguée : le modèle estimera alors le
+          besoin d'irrigation au lieu d'un stress.
+        </Text>
+      )}
+      {w.stressDays > 0 && s.waterSupply === "recorded" && (
+        <Text size="xs" c="dimmed">
+          Le stress tient compte de la pluie et des seules irrigations saisies : un apport oublié le fait apparaître à tort.
+          {s.soil.irrigated ? " Au-delà d'aujourd'hui, le modèle prévoit les apports d'un pilotage idéal." : ""}
         </Text>
       )}
     </Stack>

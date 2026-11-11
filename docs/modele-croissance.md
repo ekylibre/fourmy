@@ -11,6 +11,10 @@ Lot AB, réalisé le 2026-11-11 : FR-TWIN-8 en version simple
 - affichage dans la fiche parcelle, le plan 3D et le tableau de bord ;
 - réserve utile par défaut (100 mm), corrigeable par parcelle, comme les rangs.
 
+**Lot AC, irrigation (2026-11-11)** : procédure « Irrigation » (`watering`)
+avec une dose d'eau en mm. Les irrigations réalisées entrent dans le bilan
+hydrique des parcelles ciblées (voir « Irrigations saisies »).
+
 ## Ce que voit l'utilisateur
 
 - **Fiche parcelle, onglet Végétation, encadré « Modèle de croissance »**
@@ -22,11 +26,15 @@ Lot AB, réalisé le 2026-11-11 : FR-TWIN-8 en version simple
     irriguée, le besoin d'irrigation simulé remplace le stress ;
   - la courbe de l'eau disponible, avec le seuil de stress et la date de la
     frise ;
-  - le sol : réserve utile et irrigation, modifiables par le responsable.
+  - le sol : réserve utile et irrigation, modifiables par le responsable ;
+  - les irrigations saisies de la saison (total, nombre, dernière) et un
+    bouton « Saisir une irrigation ». Sur la courbe, un trait pointillé marque
+    chaque apport.
 - **Tableau de bord, widget « Cultures : ce que prévoit le modèle »** :
   signalements à la date de la frise, regroupés par sorte :
-  - stress hydrique (en sec) ;
-  - irrigation à prévoir dans les 3 jours (parcelle irriguée) ;
+  - stress hydrique (en sec, ou malgré les irrigations saisies) ;
+  - irrigation à prévoir dans les 3 jours (parcelle irriguée), avec un bouton
+    « Saisir l'irrigation » pré-rempli (parcelle, date, dose simulée) ;
   - floraison dans les 10 jours ;
   - récoltable dans les 15 jours.
 - **Plan 3D** : sans NDVI récent (nuages, satellite pas encore repassé, date
@@ -90,6 +98,33 @@ Open-Meteo du centre de la ferme) :
   réservoir dès que la réserve facilement utilisable est épuisée. On obtient
   le besoin d'irrigation au lieu d'un stress.
 
+**Irrigations saisies** (lot AC, migration 0033)
+- **Saisie** : procédure « Irrigation » (`watering`). « Arrosage des plants »
+  et « Arrosage des vignes » comptent aussi. Bloc `irrigation` de
+  l'intervention : dose en mm sur les parcelles ciblées (1 mm = 10 m³/ha),
+  obligatoire à la réalisation, de 100 mm au plus, et matériel facultatif
+  (enrouleur, pivot ou rampe, couverture intégrale, goutte-à-goutte, autre).
+  Le formulaire affiche le volume. La dose est refusée sur une autre
+  procédure, et sa correction est tracée.
+- **Bilan** : une irrigation réalisée entre le semis et la fin de saison
+  s'ajoute comme une pluie le jour de son début. Deux irrigations le même
+  jour s'additionnent.
+- **Apports de la saison** (`waterSupply`) :
+  - `rainfed` : pas d'irrigation saisie, parcelle en sec ;
+  - `ideal` : pas d'irrigation saisie, parcelle déclarée irriguée. Pilotage
+    idéal simulé toute la saison, comme au lot AB ;
+  - `recorded` : au moins une irrigation saisie. Jusqu'à aujourd'hui, seules
+    la pluie et les doses saisies comptent : un stress peut apparaître
+    (apport trop tardif, trop faible, ou oublié). À partir de demain, une
+    parcelle déclarée irriguée reprend le pilotage idéal, qui prévoit les
+    prochains apports.
+- **Signalements** : le stress hydrique est signalé sauf en pilotage idéal ;
+  son texte donne la dernière irrigation saisie. « Irrigation à prévoir »
+  porte la dose simulée, et compte aussi l'apport du jour.
+- **Exemple** (test d'intégration) : deux doses de 30 mm sur un maïs déjà en
+  stress profond relèvent la réserve sans lever le stress. 30 mm ne suffisent
+  pas à repasser au-dessus du seuil.
+
 **Météo** (`daily_weather`, migration 0032)
 - **Point** : un seul, au centre de la ferme.
 - **Archive ERA5 d'Open-Meteo** :
@@ -127,7 +162,9 @@ date s'affiche « vers le … ».
   de 285 à 335 mm par saison, avec une ETc de 510 à 580 mm. Ce sont des
   ordres de grandeur réalistes pour un maïs grain du Sud-Ouest.
 - **À faire** : déclarer les parcelles irriguées de Pierre (fiche parcelle →
-  « Modifier le sol »). Ekylibre ne stocke ni irrigation ni réserve utile.
+  « Modifier le sol »), ou saisir ses irrigations. Ekylibre ne stocke ni
+  réserve utile, ni irrigation sur la ferme de Pierre (aucune intervention
+  d'arrosage dans ses données).
 
 ## API
 
@@ -135,6 +172,7 @@ date s'affiche « vers le … ».
 |---|---|
 | `GET /crop-model?at=AAAA-MM-JJ` | `{ at, items: ParcelCropState[], alerts: CropAlert[], weatherMissing }` : parcelles semées, avec un modèle |
 | `GET /land-parcels/:id/crop-model?at=` | `{ at, state, days, reason }` : série journalière (degrés-jours, eau, Ks, pluie, ETc, irrigation) jusqu'à la récolte saisie, ou 15 jours après « récoltable » ; `reason` : `no_sowing`, `no_model`, `weather_missing` |
+| `POST /interventions`, `…/complete`, `PUT /interventions/:id` | Bloc `irrigation` `{ depthMm, method }` des procédures d'irrigation (lot AC) |
 | `PUT /land-parcels/:id/soil` | `{ tawMm, irrigated }` (responsable), réserve de 10 à 400 mm |
 | `DELETE /land-parcels/:id/soil` | Retour aux valeurs par défaut (responsable) |
 
@@ -151,6 +189,8 @@ floraison, avec la même puissance 1,5 que pour le NDVI.
 | `packages/domain/src/vegetation3d.ts` | `canopyFromModel` : couvert du plan 3D d'après le modèle |
 | `packages/weather` | `openMeteoDays` : archive et prévision journalières (ET0 FAO) |
 | `packages/contracts/src/crop-model.ts` | Types, bornes de la réserve utile |
+| `packages/db/migrations/0033_irrigation.sql` | `interventions.irrigation` (dose et matériel) |
+| `apps/web/src/features/interventions/IrrigationFields.tsx` | Dose, matériel et volume dans le formulaire d'intervention |
 | `packages/db/migrations/0032_crop_model.sql` | `daily_weather` (cache), `parcel_soils` (réserve et irrigation saisies), RLS |
 | `apps/api/src/repos/crop-model.ts` | Cache météo, saisons, simulation, signalements, sol |
 | `apps/web/src/features/crop-model/` | Encadré de la fiche (`CropModelPanel`), widget du tableau de bord (`CropModelWidget`) |
@@ -163,6 +203,7 @@ floraison, avec la même puissance 1,5 que pour le NDVI.
   - dates des stades et arrêt à la récolte ;
   - état à une date ;
   - stress en sec et irrigation ;
+  - doses saisies, pilotage idéal après `autoFrom` ;
   - enracinement ;
   - normales et météo continue.
 - `packages/weather/test/weather.test.ts` : requêtes journalières d'archive et
@@ -172,13 +213,19 @@ floraison, avec la même puissance 1,5 que pour le NDVI.
   - cache sans second téléchargement, 5 ans de normales ;
   - série de la fiche ; parcelle sans semis ;
   - sol saisi (refusé à un ouvrier), irrigué : plus de stress ;
+  - irrigations saisies : dose obligatoire, relue, refusée hors irrigation,
+    correction tracée ; doses comptées dans le bilan ;
   - récolte saisie : saison close ;
   - plan 3D sans NDVI : couvert d'après le modèle.
 - `apps/web/test/crop-model.test.tsx` :
   - courbe d'eau observée puis prévue ;
   - encadré de la fiche et déclaration « irriguée » ;
   - culture sans modèle ;
-  - widget regroupé par sorte.
+  - widget regroupé par sorte, lien « Saisir l'irrigation » ;
+  - saisie d'une irrigation (dose proposée, volume, dose obligatoire) et
+    fiche de l'intervention.
+- `packages/domain/test/intervention-rules.test.ts`,
+  `intervention-edits.test.ts` : règle de la dose, comparaison des doses.
 
 ## Limites et suite
 
@@ -187,9 +234,13 @@ floraison, avec la même puissance 1,5 que pour le NDVI.
   groupe de précocité, voire calés sur le NDVI de chaque parcelle.
 - **Céréales** : ni vernalisation ni photopériode. En hiver doux, les stades
   précoces (épi 1 cm) peuvent être prévus trop tôt.
-- **Irrigation** : Fourmy n'a pas encore de procédure d'irrigation à saisir.
-  « Irriguée » suppose un pilotage parfait : le besoin calculé est un
-  besoin, pas l'irrigation réalisée.
+- **Irrigation** :
+  - la dose s'applique à toute la parcelle, le jour du début de
+    l'intervention. Un tour d'eau sur plusieurs jours se saisit en plusieurs
+    interventions ;
+  - pas d'efficience d'application (pertes par évaporation ou dérive) ;
+  - pas de suivi des volumes prélevés par point de prélèvement, ni de quota.
+    Les volumes sont calculables, mais aucun rapport n'existe encore.
 - **Sol** :
   - un réservoir unique, plein au semis ;
   - pas de remontées capillaires ni de ruissellement ;

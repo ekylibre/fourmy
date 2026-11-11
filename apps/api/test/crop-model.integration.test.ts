@@ -122,6 +122,59 @@ describe.skipIf(!url)("modèle de croissance (intégration)", () => {
     expect((await get<CropModelAt>("/crop-model?at=2026-07-20")).items[0]!.soil.auto).toBe(true);
   });
 
+  it("irrigations saisies (lot AC) : dose obligatoire, relue, corrigeable ; le bilan hydrique les compte", async () => {
+    const send = (method: string, path: string, body: unknown) =>
+      app.request(`/api/v1/farms/${farmId}${path}`, { method, headers, body: JSON.stringify(body) });
+    const dry = (await get<CropModelAt>("/crop-model?at=2026-07-20")).items[0]!;
+    expect(dry.waterSupply).toBe("rainfed");
+    const drySeries = await get<ParcelCropSeries>(`/land-parcels/${maize}/crop-model?at=2026-07-20`);
+    const ids: string[] = [];
+    for (const day of ["2026-06-20", "2026-07-10"]) {
+      const plan = { procedure: "watering", targets: [{ kind: "land_parcel", id: maize }], plannedAt: `${day}T06:00:00Z` };
+      const created = await send("POST", "/interventions", plan);
+      expect(created.status).toBe(201);
+      const { id } = (await created.json()) as { id: string };
+      ids.push(id);
+      const periods = [{ startedAt: `${day}T06:00:00Z`, stoppedAt: `${day}T10:00:00Z` }];
+      const refused = await send("POST", `/interventions/${id}/complete`, { targets: plan.targets, periods });
+      expect(refused.status).toBe(422);
+      expect(await refused.text()).toContain("dose d'eau");
+      const done = await send("POST", `/interventions/${id}/complete`, { targets: plan.targets, periods, irrigation: { depthMm: 30, method: "reel" } });
+      expect(done.status).toBe(200);
+    }
+    const read = await get<{ irrigation: unknown; history: { action: string }[] }>(`/interventions/${ids[0]}`);
+    expect(read.irrigation).toEqual({ depthMm: 30, method: "reel" });
+    // Dose sur une autre procédure : refusée.
+    expect((await send("POST", "/interventions", { procedure: "plowing", targets: [{ kind: "land_parcel", id: maize }], irrigation: { depthMm: 10 } })).status).toBe(422);
+
+    const body = await get<CropModelAt>("/crop-model?at=2026-07-20");
+    const s = body.items[0]!;
+    expect(s.waterSupply).toBe("recorded");
+    expect(s.water).toMatchObject({ appliedMm: 60, appliedDays: 2, lastAppliedOn: "2026-07-10", irrigationMm: 0 });
+    expect(s.water!.stressDays).toBeLessThanOrEqual(dry.water!.stressDays);
+    const stress = body.alerts.find((a) => a.kind === "water_stress");
+    if (stress) expect(stress.text).toContain("dernière irrigation le 10/07");
+    const series = await get<ParcelCropSeries>(`/land-parcels/${maize}/crop-model?at=2026-07-20`);
+    expect(series.days.find((d) => d.date === "2026-06-20")!.appliedMm).toBe(30);
+    // 30 mm de plus dans le réservoir le jour de l'apport (réserve accessible de 100 mm à cette date).
+    const reserveOn = (x: ParcelCropSeries, d: string) => x.days.find((y) => y.date === d)!.reserve;
+    expect(reserveOn(series, "2026-07-10") - reserveOn(drySeries, "2026-07-10")).toBeGreaterThan(0.25);
+
+    // Correction de la seule dose : tracée, et prise en compte.
+    const current = await get<Record<string, unknown>>(`/interventions/${ids[1]}`);
+    const fix = await send("PUT", `/interventions/${ids[1]}`, {
+      procedure: "watering",
+      targets: current.targets,
+      periods: current.periods,
+      irrigation: { depthMm: 45, method: "reel" },
+      reason: "Compteur relu",
+    });
+    expect(fix.status).toBe(200);
+    expect((await get<CropModelAt>("/crop-model?at=2026-07-20")).items[0]!.water!.appliedMm).toBe(75);
+    const history = (await get<{ history: { action: string; changes: Record<string, unknown> | null }[] }>(`/interventions/${ids[1]}`)).history;
+    expect(history.find((h) => h.action === "corrected")!.changes).toHaveProperty("irrigation");
+  });
+
   it("récolte saisie : saison close ; plan 3D sans NDVI : couvert d'après le modèle", async () => {
     const veg = await get<Vegetation3dAt>("/vegetation3d?at=2026-06-01");
     const p = veg.parcels.find((x) => x.parcelId === maize)!;
