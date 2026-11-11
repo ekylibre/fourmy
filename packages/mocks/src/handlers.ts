@@ -21,6 +21,8 @@ import {
   DEMO_USER_ID,
   demoParcelIndicesAt,
   demoParcelSeries,
+  demoCropModel,
+  demoParcelCropModel,
   demoVegetation3d,
 } from "./fixtures.js";
 
@@ -89,6 +91,13 @@ export const handlers = [
   http.get(`*${base}/vegetation3d`, ({ request }) => HttpResponse.json(demoVegetation3d(new URL(request.url).searchParams.get("at") ?? "2026-06-01"))),
   http.put(`*${base}/land-parcels/:id/rows`, () => new HttpResponse(null, { status: 204 })),
   http.delete(`*${base}/land-parcels/:id/rows`, () => new HttpResponse(null, { status: 204 })),
+  // Modèle de croissance (lot AB).
+  http.get(`*${base}/crop-model`, ({ request }) => HttpResponse.json(demoCropModel(new URL(request.url).searchParams.get("at") ?? "2026-06-20"))),
+  http.get(`*${base}/land-parcels/:id/crop-model`, ({ request, params }) =>
+    HttpResponse.json(demoParcelCropModel(String(params.id), new URL(request.url).searchParams.get("at") ?? "2026-06-20")),
+  ),
+  http.put(`*${base}/land-parcels/:id/soil`, () => new HttpResponse(null, { status: 204 })),
+  http.delete(`*${base}/land-parcels/:id/soil`, () => new HttpResponse(null, { status: 204 })),
   http.post(`*${base}/remote-sensing/anomalies/dismiss`, () => new HttpResponse(null, { status: 204 })),
   http.get(`*${base}/land-parcels/:id/indices`, ({ request, params }) => {
     const q = new URL(request.url).searchParams;

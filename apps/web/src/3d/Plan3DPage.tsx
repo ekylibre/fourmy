@@ -129,6 +129,7 @@ export function Plan3DPage() {
       .catch((e) => console.warn("Végétation 3D non construite", e));
   }, [plan.data, vegetation.data, vegOn, weatherOn, look?.frost]);
   useEffect(() => scene.current?.setWeather(weatherOn ? look : null), [weatherOn, look]);
+  const fromModel = (vegetation.data?.parcels ?? []).filter((p) => p.canopy.source === "model").length;
   const phases = (vegetation.data?.parcels ?? []).reduce<Record<string, number>>((m, p) => ({ ...m, [p.canopy.phase]: (m[p.canopy.phase] ?? 0) + 1 }), {});
 
   // Télédétection (FR-TWIN-5) : image Sentinel-2 drapée sur le relief, ou parcelles teintées par l'indice choisi.
@@ -243,12 +244,13 @@ export function Plan3DPage() {
               <Title order={4} mb="xs">
                 Jumeau : végétation et météo
               </Title>
-              <Switch label="Rangs de végétation (état observé)" checked={vegOn} onChange={(e) => setVegOn(e.currentTarget.checked)} />
+              <Switch label="Rangs de végétation (état observé ou simulé)" checked={vegOn} onChange={(e) => setVegOn(e.currentTarget.checked)} />
               {vegOn && vegetation.data && (
                 <Text size="xs" c="dimmed" mt={4} aria-label="Phases des parcelles">
                   {Object.entries(phases)
                     .map(([phase, n]) => `${n} ${PHASE_LABELS[phase as keyof typeof PHASE_LABELS]}`)
                     .join(" · ") || "Aucune parcelle"}
+                  {fromModel > 0 && ` · dont ${fromModel} d'après le modèle de croissance (pas de NDVI récent)`}
                 </Text>
               )}
               <Switch mt="xs" label="Météo du jour" checked={weatherOn} onChange={(e) => setWeatherOn(e.currentTarget.checked)} />

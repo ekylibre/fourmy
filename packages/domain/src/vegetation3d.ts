@@ -92,6 +92,7 @@ export function canopyAt(input: CanopyInput): ParcelCanopy {
     density: round(clamp01(density)),
     ndvi,
     observedOn,
+    source: "ndvi",
   });
 
   if (input.nature === "vine") {
@@ -200,4 +201,43 @@ export function localFrame(lon0: number, lat0: number) {
     toLocal: (lon: number, lat: number): [number, number] => [((lon - lon0) * Math.PI * R * k) / 180, ((lat - lat0) * Math.PI * R) / 180],
     toLonLat: (x: number, y: number): [number, number] => [lon0 + (x * 180) / (Math.PI * R * k), lat0 + (y * 180) / (Math.PI * R)],
   };
+}
+
+/**
+ * Couvert d'après le modèle de croissance (lot AB), quand le NDVI manque
+ * (nuages, satellite pas encore repassé, date à venir) : hauteur selon les
+ * degrés-jours entre la levée et la floraison (même puissance 1,5 que pour le
+ * NDVI), pleine hauteur ensuite, plante qui sèche à l'approche de la
+ * maturité.
+ */
+export function canopyFromModel(input: {
+  species: string | null;
+  nature: string | null;
+  gdd: number | null;
+  /** Seuils des stades du modèle (levée en premier). */
+  stages: { code: string; gdd: number }[];
+  floweringCode: string;
+  maturityCode: string;
+  ended: boolean;
+}): ParcelCanopy {
+  const profile = cropProfile(input.species, input.nature);
+  const out = (phase: CanopyPhase, heightM: number, density: number): ParcelCanopy => ({
+    phase,
+    heightM: round(heightM),
+    density: round(clamp01(density)),
+    ndvi: null,
+    observedOn: null,
+    source: "model",
+  });
+  if (input.ended) return out("harvested", 0.12, 0.3);
+  const gdd = input.gdd ?? 0;
+  const emergence = input.stages[0]!.gdd;
+  const flowering = input.stages.find((s) => s.code === input.floweringCode)!.gdd;
+  const maturity = input.stages.find((s) => s.code === input.maturityCode)!.gdd;
+  if (gdd < emergence) return out("bare", 0, 0);
+  const growth = clamp01((gdd - emergence) / (flowering - emergence));
+  // La sénescence commence environ 300 °Cj avant la maturité physiologique.
+  if (gdd >= maturity - 300) return out("senescent", profile.maxHeightM, Math.max(0.3, 0.9 - (0.6 * (gdd - (maturity - 300))) / 600));
+  if (growth < 0.05) return out("bare", 0, 0);
+  return out("growing", profile.maxHeightM * growth ** GROWTH_EXPONENT, 0.2 + 0.7 * growth);
 }

@@ -24,3 +24,4 @@ export * from "./tracks.js";
 export * from "./register.js";
 export * from "./remote-sensing.js";
 export * from "./vegetation3d.js";
+export * from "./crop-model.js";

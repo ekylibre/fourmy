@@ -25,6 +25,7 @@ const TABS = ["general", "crops", "cadastre", "water", "vegetation", "weather", 
 
 // Le graphique (recharts) n'est chargé qu'à l'ouverture de l'onglet.
 const VegetationTab = lazy(() => import("../remote-sensing/VegetationTab").then((m) => ({ default: m.VegetationTab })));
+const CropModelPanel = lazy(() => import("../crop-model/CropModelPanel").then((m) => ({ default: m.CropModelPanel })));
 
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 const STATUS: Record<string, string> = { done: "Réalisée", planned: "Planifiée", in_progress: "En cours" };
@@ -292,7 +293,10 @@ function Sheet({ sheet: s }: { sheet: ParcelSheet }) {
 
         <Tabs.Panel value="vegetation" pt="md">
           <Suspense fallback={<Loading />}>
-            <VegetationTab farmId={farm.id} parcelId={s.id} />
+            <Stack>
+              <CropModelPanel farmId={farm.id} parcelId={s.id} owner={owner} />
+              <VegetationTab farmId={farm.id} parcelId={s.id} />
+            </Stack>
           </Suspense>
         </Tabs.Panel>
 

@@ -9,6 +9,7 @@ import { ErrorAlert, Loading } from "../../components/states";
 import { SprayingConditions } from "../weather/Weather";
 import { TrackSummaryWidget } from "./TrackSummaryWidget";
 import { CoverLossWidget } from "../remote-sensing/CoverLossAlerts";
+import { CropModelWidget } from "../crop-model/CropModelWidget";
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -74,6 +75,8 @@ export function DashboardPage() {
 
       {/* Prévisions : seulement quand la frise est sur aujourd'hui. */}
       {isToday && <SprayingConditions farmId={farm.id} />}
+
+      <CropModelWidget farmId={farm.id} day={day} />
 
       <CoverLossWidget farmId={farm.id} day={day} />
 

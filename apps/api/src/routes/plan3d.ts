@@ -7,6 +7,8 @@ import { atOrNow, BadRequest, domainCtx } from "./helpers.js";
 import { HEIGHTMAP_SIZE, terrainTile } from "../terrain.js";
 import { setParcelRows, vegetationAt } from "../repos/vegetation3d.js";
 import { dayWeather } from "../repos/weather.js";
+import { cropModelAt } from "../repos/crop-model.js";
+import { CROP_MODELS, canopyFromModel } from "@fourmy/domain";
 import { uuidParam } from "./helpers.js";
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -37,14 +39,37 @@ export const plan3dRoutes = new Hono<Env>()
     const at = c.req.query("at") ?? new Date().toISOString().slice(0, 10);
     if (!DAY.test(at) || Number.isNaN(Date.parse(at))) throw new BadRequest("at : date AAAA-MM-JJ attendue.");
     const farmId = c.get("farmId");
-    const [parcels, weather] = await Promise.all([
+    const [parcels, weather, model] = await Promise.all([
       vegetationAt(db(), farmId, at),
       dayWeather(db(), farmId, at, weatherDeps.fetch).catch((e: unknown) => {
         console.warn(`[vegetation3d] météo indisponible : ${e instanceof Error ? e.message : e}`);
         return null;
       }),
+      // Modèle de croissance (lot AB) : relaie le NDVI quand il manque (nuages, date à venir).
+      cropModelAt(db(), farmId, at, weatherDeps.fetch).catch((e: unknown) => {
+        console.warn(`[vegetation3d] modèle de croissance indisponible : ${e instanceof Error ? e.message : e}`);
+        return null;
+      }),
     ]);
-    return c.json({ at, parcels, weather });
+    const states = new Map((model?.items ?? []).map((s) => [s.parcelId, s]));
+    const merged = parcels.map((p) => {
+      const s = states.get(p.parcelId);
+      if (p.canopy.phase !== "unknown" || !s) return p;
+      const def = CROP_MODELS[s.model];
+      return {
+        ...p,
+        canopy: canopyFromModel({
+          species: p.species,
+          nature: p.nature,
+          gdd: s.gdd,
+          stages: s.stages,
+          floweringCode: def.flowering,
+          maturityCode: def.maturity,
+          ended: s.stage?.code === "ended",
+        }),
+      };
+    });
+    return c.json({ at, parcels: merged, weather });
   })
   .put("/land-parcels/:id/rows", requireOwner, async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { bearingDeg?: unknown; spacingM?: unknown };

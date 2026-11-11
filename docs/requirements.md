@@ -191,8 +191,14 @@ conception : [`teledetection-design.md`](teledetection-design.md).
   (lot AA, [`jumeau-3d.md`](jumeau-3d.md)).*
 - **FR-TWIN-4 (S)** **Météo visible** : ciel, brume, pluie ou neige, sol
   mouillé et gelée d'après la météo du jour de la frise. *Réalisé (lot AA).*
-- **FR-TWIN-6 à 9** (modulation ISO-XML, ISOBUS, modèle de culture,
-  capteurs) : voir l'étude, lots ultérieurs.
+- **FR-TWIN-8 (S)** **Modèle de culture** : stade phénologique de chaque
+  parcelle semée, dates prévues des stades, réserve en eau du sol et stress
+  hydrique (ou besoin d'irrigation), d'après le semis saisi et la météo.
+  *Réalisé (lot AB) en version simple : degrés-jours et bilan FAO-56, maïs et
+  céréales à paille ([`modele-croissance.md`](modele-croissance.md)).
+  WOFOST et l'assimilation du LAI restent à faire.*
+- **FR-TWIN-6, 7 et 9** (modulation ISO-XML, ISOBUS, capteurs) : voir
+  l'étude, lots ultérieurs.
 
 ### 4.10 Réglementaire
 - **FR-REG-1 (M)** **Registre phytosanitaire** produit à partir des

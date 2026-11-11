@@ -13,7 +13,7 @@ import type {
   TrackCoverage,
 } from "@fourmy/contracts";
 import { PROCEDURES, SHAPE_LABELS, TREATMENT_PURPOSE_LABELS, copernicusAttribution } from "@fourmy/contracts";
-import type { ParcelIndexSeries, ParcelIndicesAt, Vegetation3dAt, VegetationIndex } from "@fourmy/contracts";
+import type { CropModelAt, CropModelDay, ParcelCropSeries, ParcelCropState, ParcelIndexSeries, ParcelIndicesAt, Vegetation3dAt, VegetationIndex } from "@fourmy/contracts";
 import type { Activity, Article, Intervention, Person, PhytoRegisterEntry, ProcedureCatalogue, StockLevel } from "@fourmy/contracts";
 
 /**
@@ -380,8 +380,78 @@ export function demoVegetation3d(at: string): Vegetation3dAt {
       species: i === 0 ? "Malbec" : "zea_mays",
       nature: i === 0 ? "vine" : "field_crop",
       rows: { bearingDeg: 35 + i * 40, spacingM: i === 0 ? 2 : 0.75, auto: true },
-      canopy: { phase: "growing", heightM: i === 0 ? 1.6 : 1.9, density: 0.8, ndvi: demoNdvi(at), observedOn: isoAdd(at, -3) },
+      canopy: { phase: "growing", heightM: i === 0 ? 1.6 : 1.9, density: 0.8, ndvi: demoNdvi(at), observedOn: isoAdd(at, -3), source: "ndvi" },
     })),
     weather: { day: at, source: "open_meteo", kind: "observed", icon: "02d", precipitationMm: 0, precipitation48hMm: 0, temperatureMinC: 11, temperatureMaxC: 24, windMaxKmh: 18 },
   };
+}
+
+// --- Modèle de croissance (démo, lot AB) ---------------------------------------
+
+/** Maïs semé le 7 avril, 13 °Cj par jour : stades datés, réserve qui baisse l'été. */
+function demoMaize(parcelId: string, parcelName: string, at: string): { state: ParcelCropState; days: CropModelDay[] } {
+  const year = at.slice(0, 4);
+  const sownOn = `${year}-04-07`;
+  const stages = [
+    ["emergence", "Levée", 100],
+    ["v6", "6 feuilles", 380],
+    ["v10", "10 feuilles", 580],
+    ["flowering", "Floraison", 950],
+    ["maturity", "Maturité physiologique", 1850],
+    ["harvestable", "Récoltable (grain)", 2050],
+  ] as const;
+  const days: CropModelDay[] = [];
+  for (let i = 0; i < 175; i++) {
+    const date = isoAdd(sownOn, i);
+    const reserve = Math.max(0.1, 1 - Math.max(0, i - 40) * 0.008);
+    days.push({ date, basis: date <= at ? "observed" : "forecast", gdd: i * 13, reserve, ks: reserve < 0.45 ? reserve / 0.45 : 1, rainMm: i % 9 === 0 ? 12 : 0, etcMm: 4, irrigationMm: 0 });
+  }
+  const dated = stages.map(([code, label, gdd]) => {
+    const on = isoAdd(sownOn, Math.ceil(gdd / 13));
+    return { code, label, gdd, on, basis: on <= at ? ("observed" as const) : ("forecast" as const) };
+  });
+  const today = days.filter((d) => d.date <= at).at(-1);
+  const reached = dated.filter((s) => s.on <= at).at(-1);
+  return {
+    state: {
+      parcelId,
+      parcelName,
+      species: "zea_mays",
+      model: "maize",
+      modelLabel: "Maïs",
+      sownOn,
+      endedOn: null,
+      stage: reached ? { code: reached.code, label: reached.label } : null,
+      next: dated.find((s) => s.on > at) ?? null,
+      gdd: today?.gdd ?? null,
+      stages: dated,
+      soil: { tawMm: 100, irrigated: false, auto: true },
+      water: today
+        ? { reserve: today.reserve, tawMm: 100, ks: today.ks, stressBelow: 0.45, stressDays: days.filter((d) => d.date <= at && d.ks < 1).length, floweringStressDays: 0, irrigationMm: 0 }
+        : null,
+      weatherUntil: isoAdd(at, 15),
+    },
+    days,
+  };
+}
+
+export function demoCropModel(at: string): CropModelAt {
+  const items = demoLandParcelsAt.slice(1).map((p) => demoMaize(p.id, p.name, at).state);
+  return {
+    at,
+    items,
+    alerts: items.flatMap((s) => {
+      const flowering = s.stages.find((x) => x.code === "flowering")!;
+      return flowering.on! > at && flowering.on! <= isoAdd(at, 10)
+        ? [{ parcelId: s.parcelId, parcelName: s.parcelName, kind: "flowering_soon" as const, on: flowering.on, text: `vers le ${flowering.on!.slice(8, 10)}/${flowering.on!.slice(5, 7)}` }]
+        : [];
+    }),
+    weatherMissing: false,
+  };
+}
+
+export function demoParcelCropModel(parcelId: string, at: string): ParcelCropSeries {
+  const parcel = demoLandParcelsAt.find((p) => p.id === parcelId);
+  const { state, days } = demoMaize(parcelId, parcel?.name ?? "Parcelle", at);
+  return { at, state, days, reason: null };
 }
