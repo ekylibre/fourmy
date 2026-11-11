@@ -225,7 +225,8 @@ async function seasons(tx: Tx, farmId: string, at: string, parcelId?: string): P
           species: r.species,
           sownOn: r.sown_on,
           endedOn: r.ended_on,
-          soil: r.taw === null ? { tawMm: DEFAULT_TAW_MM, irrigated: false, auto: true } : { tawMm: r.taw, irrigated: !!r.irrigated, auto: false },
+          // Fiche sol sans réserve utile (type de sol seul, lot AF) : réserve par défaut, irrigation saisie.
+          soil: { tawMm: r.taw ?? DEFAULT_TAW_MM, irrigated: !!r.irrigated, auto: r.taw === null && !r.irrigated },
           applied: new Map((r.applied ?? []).map((a) => [a.day, a.mm])),
         }
       : null,
@@ -376,7 +377,8 @@ export async function setParcelSoil(db: Database, farmId: string, userId: string
     const [parcel] = await rows<{ id: string }>(tx, sql`SELECT id FROM land_parcels WHERE id = ${parcelId} AND farm_id = ${farmId}`);
     if (!parcel) throw new NotFound("Parcelle introuvable.");
     if (input === null) {
-      await tx.execute(sql`DELETE FROM parcel_soils WHERE land_parcel_id = ${parcelId}`);
+      // Retour aux valeurs par défaut du modèle ; le type de sol et le point d'eau (lot AF) restent.
+      await tx.execute(sql`UPDATE parcel_soils SET taw_mm = NULL, irrigated = false, updated_by = ${userId}, updated_at = now() WHERE land_parcel_id = ${parcelId}`);
       return;
     }
     await tx.execute(sql`

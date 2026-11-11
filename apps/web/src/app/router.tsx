@@ -12,6 +12,8 @@ import { ImportsPage } from "../features/imports/ImportsPage";
 import { InterventionsPage } from "../features/interventions/InterventionsPage";
 import { InterventionCompletePage, InterventionEditPage, InterventionNewPage } from "../features/interventions/InterventionEditPage";
 import { PhytoProductsPage } from "../features/phyto/PhytoProductsPage";
+import { FertilizersPage } from "../features/fertilization/FertilizersPage";
+import { FertilizationPage } from "../features/fertilization/FertilizationPage";
 import { ActivitiesPage } from "../features/activities/ActivitiesPage";
 import { EquipmentsPage } from "../features/equipments/EquipmentsPage";
 import { EquipmentSheetPage } from "../features/equipments/EquipmentSheetPage";
@@ -35,6 +37,8 @@ const MapPage = lazy(() => import("../features/map/MapPage").then((m) => ({ defa
 // Cesium (plusieurs Mo) : le plan 3D n'est chargé que s'il est ouvert.
 const InterventionPage = lazy(() => import("../features/interventions/InterventionPage").then((m) => ({ default: m.InterventionPage })));
 const CartoLabPage = lazy(() => import("../carto/CartoLabPage").then((m) => ({ default: m.CartoLabPage })));
+const PrintPage = lazy(() => import("../features/fertilization/PrintPage").then((m) => ({ default: m.PrintPage })));
+const PlanPage = lazy(() => import("../features/fertilization/PlanPage").then((m) => ({ default: m.PlanPage })));
 const PrescriptionNewPage = lazy(() => import("../features/modulation/PrescriptionNewPage").then((m) => ({ default: m.PrescriptionNewPage })));
 const PrescriptionPage = lazy(() => import("../features/modulation/PrescriptionPage").then((m) => ({ default: m.PrescriptionPage })));
 const Plan3DPage = lazy(() => import("../3d/Plan3DPage").then((m) => ({ default: m.Plan3DPage })));
@@ -114,6 +118,19 @@ export const routes = [
   { path: "/agrirouter/callback", element: <RequireAuth><AgrirouterCallbackPage /></RequireAuth> },
   legacy("/connexion"),
   legacy("/fermes"),
+  // Éditions imprimables (sans menu) : cahier d'enregistrement, plans de fumure.
+  {
+    path: "/f/:farmId/print/fertilization/:doc",
+    element: (
+      <RequireAuth>
+        <FarmProvider fallback={<FarmFallback />}>
+          <Suspense fallback={<Loading />}>
+            <PrintPage />
+          </Suspense>
+        </FarmProvider>
+      </RequireAuth>
+    ),
+  },
   {
     path: "/f/:farmId",
     element: (
@@ -138,6 +155,9 @@ export const routes = [
       { path: "cellar", element: <CellarPage /> },
       { path: "register", element: <RegisterPage /> },
       { path: "phyto", element: <PhytoProductsPage /> },
+      { path: "fertilizers", element: <FertilizersPage /> },
+      { path: "fertilization", element: <FertilizationPage /> },
+      { path: "fertilization/plans/:planId", element: <Suspense fallback={<Loading />}><PlanPage /></Suspense> },
       { path: "activities", element: <ActivitiesPage /> },
       { path: "equipments", element: <EquipmentsPage /> },
       { path: "equipments/crew-templates", element: <CrewTemplatesPage /> },

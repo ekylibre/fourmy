@@ -17,6 +17,7 @@
     "@fourmy/carto": "workspace:*",
     "@fourmy/contracts": "workspace:*",
     "@fourmy/domain": "workspace:*",
+    "@fourmy/fertilization-refs": "workspace:*",
     "@fourmy/equipment-3d": "workspace:*",
     "@fourmy/ui-lyvre": "workspace:*",
     "@mantine/charts": "9.7.3",

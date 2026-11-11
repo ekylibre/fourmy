@@ -1,5 +1,5 @@
 import postgres, { type Sql } from "postgres";
-import { signedQuantity, buildEvent, type DomainCtx } from "@fourmy/domain";
+import { signedQuantity, buildEvent, proposeComposition, type DomainCtx } from "@fourmy/domain";
 import { idsFor, uuidv5 } from "./ids.js";
 import * as x from "./extract.js";
 import {
@@ -102,6 +102,7 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
       containers: await x.containers(s),
       equipments: await x.equipments(s),
       matters: await x.matters(s),
+      nutrients: await x.nutrientReadings(s),
       interventions: await x.interventions(s),
       parameters: await x.parameters(s),
       workingPeriods: await x.workingPeriods(s),
@@ -457,6 +458,7 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
                 unit = excluded.unit, amm = excluded.amm, updated_at = now()`;
             articles.add(m.variant_id);
             inc("articles");
+            await migrateNutrients(tx, farmId, aid, { name: m.variant_name, lexiconRef: m.reference_name }, data.nutrients.filter((r) => r.variant_id === m.variant_id), inc);
           }
           const lid = id("products", m.id);
           await tx`
@@ -831,4 +833,38 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
     await source.end();
     await target.end();
   }
+}
+
+/**
+ * Teneurs N, P, K d'une variante (relevés Ekylibre en %) → composition du
+ * fertilisant (lot AE). Une composition confirmée ou issue d'une analyse dans
+ * Fourmy n'est jamais écrasée. P et K sont lus comme P2O5 et K2O, convention
+ * des étiquettes d'engrais (« 9,5-15-30 »).
+ */
+async function migrateNutrients(
+  tx: Sql,
+  farmId: string,
+  articleId: string,
+  article: { name: string; lexiconRef: string | null },
+  readings: x.NutrientReadingRow[],
+  inc: (k: string) => void,
+): Promise<void> {
+  const percent = (name: string) => {
+    const r = readings.find((x) => x.indicator_name === name && (x.unit === "percent" || x.unit === "mass_percent"));
+    return r ? Number(r.value) : null;
+  };
+  const nTotal = percent("nitrogen_concentration");
+  if (nTotal === null) return;
+  // Ekylibre ne dit pas si le produit est minéral : seul le nom ou le code Lexicon le dit.
+  const proposal = proposeComposition(article);
+  const mineral = nTotal > 0 && proposal?.nitrateType === "III";
+  await tx`
+    INSERT INTO article_fertilizers (article_id, farm_id, basis, n_total, n_mineral_share, p2o5, k2o, nitrate_type, density, origin, source)
+    VALUES (${articleId}, ${farmId}, 'mass_percent', ${nTotal}, ${mineral ? 1 : null},
+            ${percent("phosphorus_concentration")}, ${percent("potassium_concentration")}, ${mineral ? "III" : null},
+            ${proposal?.density ?? null}, 'migrated', 'Ekylibre (relevés de la variante)')
+    ON CONFLICT (article_id) DO UPDATE SET n_total = excluded.n_total, p2o5 = excluded.p2o5, k2o = excluded.k2o,
+      n_mineral_share = excluded.n_mineral_share, nitrate_type = excluded.nitrate_type, density = excluded.density, updated_at = now()
+    WHERE article_fertilizers.origin IN ('migrated', 'proposed')`;
+  inc("fertilizer_compositions");
 }

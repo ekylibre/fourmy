@@ -5,13 +5,23 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b",
     "test": "vitest run",
     "lint": "eslint src"
   },
-  "dependencies": { "@fourmy/contracts": "workspace:*" },
-  "devDependencies": { "vitest": "2.1.8" }
+  "dependencies": {
+    "@fourmy/contracts": "workspace:*",
+    "@fourmy/fertilization-refs": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "2.1.8"
+  }
 }

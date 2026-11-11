@@ -1,0 +1,592 @@
+import { useEffect, useState } from "react";
+import { Link, useLocation, useParams } from "react-router";
+import {
+  ActionIcon,
+  Alert,
+  Anchor,
+  Badge,
+  Button,
+  Group,
+  Modal,
+  NumberInput,
+  Paper,
+  Select,
+  SimpleGrid,
+  Stack,
+  Switch,
+  Table,
+  Text,
+  TextInput,
+  Textarea,
+  Title,
+} from "@mantine/core";
+import { notifications } from "@mantine/notifications";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  BALANCE_TERM_LABELS,
+  BALANCE_TERMS,
+  type BalanceTerm,
+  type FertilizationPlan,
+  type PlanDraft,
+  type PlannedApplication,
+  type PlanTermValue,
+} from "@fourmy/contracts";
+import { NA_SOIL_TYPE_LABELS, isNaSoilType } from "@fourmy/fertilization-refs";
+import { api, farmPath } from "../../app/api";
+import { useFarm } from "../../app/farm";
+import { formatDate, formatDateTime } from "../../app/labels";
+import { ErrorAlert, Loading } from "../../components/states";
+import { useFertilizers } from "./fertilization";
+
+const ORIGIN: Record<string, { label: string; color: string }> = {
+  computed: { label: "calculé", color: "ardoise" },
+  measured: { label: "mesuré", color: "lichen" },
+  reference: { label: "référentiel", color: "gray" },
+  entered: { label: "saisi", color: "lichen" },
+  override: { label: "valeur de la ferme", color: "paille" },
+};
+const STATUS: Record<FertilizationPlan["status"], { label: string; color: string }> = {
+  draft: { label: "Brouillon", color: "paille" },
+  established: { label: "Établi", color: "lichen" },
+  revised: { label: "Révisé", color: "lichen" },
+};
+const fmt = (v: number) => v.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+
+export function usePlan(farmId: string, planId: string) {
+  return useQuery({ queryKey: ["fertilization-plan", farmId, planId], queryFn: () => api.get<FertilizationPlan>(farmPath(farmId, `/fertilization/plans/${planId}`)) });
+}
+
+/**
+ * Plan prévisionnel de fumure d'une parcelle (lot AG, FR-FERT-9 à 15) : ce que
+ * Fourmy a rassemblé, les saisies qui manquent, le bilan terme par terme avec
+ * ses sources, les apports prévus, la dose d'un outil ou d'un conseiller,
+ * l'établissement et les versions.
+ */
+export function PlanPage() {
+  const farm = useFarm();
+  const owner = farm.role === "owner";
+  const { planId = "" } = useParams();
+  const location = useLocation();
+  const client = useQueryClient();
+  const q = usePlan(farm.id, planId);
+  const [draft, setDraft] = useState<PlanDraft | null>(null);
+  const [overriding, setOverriding] = useState<BalanceTerm | null>(null);
+  const [establishing, setEstablishing] = useState(false);
+  useEffect(() => {
+    if (q.data && draft === null) setDraft(q.data.draft);
+  }, [q.data, draft]);
+  const save = useMutation({
+    mutationFn: (d: PlanDraft) => api.put<FertilizationPlan>(farmPath(farm.id, `/fertilization/plans/${planId}/draft`), d),
+    onSuccess: (p) => {
+      client.setQueryData(["fertilization-plan", farm.id, planId], p);
+      setDraft(p.draft);
+      void client.invalidateQueries({ queryKey: ["fertilization-plans", farm.id] });
+    },
+  });
+  if (q.isLoading || !draft) return <Loading />;
+  if (q.error) return <ErrorAlert error={q.error} />;
+  const p = q.data!;
+  const c = p.context;
+  const r = p.result;
+  const update = (patch: Partial<PlanDraft>) => {
+    const next = { ...draft, ...patch };
+    setDraft(next);
+    save.mutate(next);
+  };
+  const dose = draft.external?.doseKgNHa ?? r.dose;
+  const applications = draft.applications?.length ? draft.applications : p.proposedApplications;
+
+  return (
+    <Stack>
+      <div>
+        <Anchor component={Link} to={`/f/${farm.id}/fertilization${location.search}`} size="sm">
+          ← Fertilisation azotée
+        </Anchor>
+        <Group justify="space-between" align="flex-start">
+          <div>
+            <Title order={1}>Plan de fumure {p.campaign} : {p.parcel.name}</Title>
+            <Text size="sm" c="dimmed">
+              {c.cropLabel}
+              {c.variety ? ` (${c.variety})` : ""} · {(p.parcel.areaM2 / 10_000).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ha · {r.annex ? `méthode de l'annexe ${r.annex} du référentiel régional` : "méthode à déterminer"}
+            </Text>
+          </div>
+          <Badge size="lg" variant="light" color={STATUS[p.status].color}>
+            {STATUS[p.status].label}
+            {p.currentVersion ? ` · version ${p.currentVersion}` : ""}
+          </Badge>
+        </Group>
+      </div>
+
+      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+        <Paper withBorder p="md" aria-label="Données de la parcelle">
+          <Title order={4} mb="xs">
+            Ce que Fourmy sait
+          </Title>
+          <Table fz="sm">
+            <Table.Tbody>
+              <Row label="Sol">
+                {c.soilType && isNaSoilType(c.soilType) ? NA_SOIL_TYPE_LABELS[c.soilType].split(" (")[0] : <Missing>à renseigner dans l'onglet Sol de la parcelle</Missing>}
+                {c.irrigated ? " · irriguée" : " · en sec"}
+              </Row>
+              <Row label="Précédent">
+                {c.previous ? (
+                  <>
+                    {c.previous.label} ({c.previous.parcelName}) : {c.previous.yieldRealized !== null ? `${fmt(c.previous.yieldRealized)} q/ha récoltés` : "rendement non saisi"},{" "}
+                    {c.previous.xMineral !== null ? `${c.previous.xMineral} kg N minéral apportés` : "apports inconnus"}
+                  </>
+                ) : (
+                  <Missing>aucune culture l'an passé sur cette surface</Missing>
+                )}
+              </Row>
+              <Row label="Objectif de rendement">{c.yieldTarget ? `${fmt(c.yieldTarget.value)} q/ha (${c.yieldTarget.detail})` : <Missing>à saisir</Missing>}</Row>
+              <Row label="Reliquat mesuré">{c.rsh ? `${c.rsh.kgNHa} kg N/ha le ${formatDate(c.rsh.sampledOn)}` : "aucun : estimé d'après le précédent et la pluie"}</Row>
+              <Row label="Pluie depuis le 1er octobre">
+                {c.rain ? `${c.rain.mm} mm jusqu'au ${formatDate(c.rain.to)}${c.rain.normalsFrom ? ` (normales à partir du ${formatDate(c.rain.normalsFrom)})` : ""}` : <Missing>météo indisponible</Missing>}
+              </Row>
+              {c.irrigated && (
+                <Row label="Eau d'irrigation">
+                  {c.water.name ?? "point d'eau non choisi"}
+                  {c.water.no3MgL !== null ? ` · ${c.water.no3MgL} mg NO3/L mesurés` : c.water.origin ? ` · teneur de référence (${c.water.origin === "surface" ? "25" : "40"} mg/L)` : ""}
+                </Row>
+              )}
+            </Table.Tbody>
+          </Table>
+        </Paper>
+
+        <Paper withBorder p="md" aria-label="Saisies du plan">
+          <Title order={4} mb="xs">
+            Saisies
+          </Title>
+          <SimpleGrid cols={2}>
+            <NumberInput
+              label="Objectif de rendement (q/ha)"
+              description={c.yieldTarget && c.yieldTarget.origin !== "entered" ? `Calculé : ${fmt(c.yieldTarget.value)}` : undefined}
+              placeholder={c.yieldTarget ? fmt(c.yieldTarget.value) : undefined}
+              disabled={!owner}
+              min={0}
+              decimalSeparator=","
+              value={draft.yieldTarget ?? ""}
+              onBlur={(e) => {
+                const v = e.currentTarget.value.replace(",", ".").replace(/[^\d.]/g, "");
+                update({ yieldTarget: v ? Number(v) : null });
+              }}
+            />
+            {c.irrigated && (
+              <NumberInput
+                label="Irrigation prévue (mm)"
+                description={c.irrigationMm && draft.irrigationMm == null ? c.irrigationMm.detail : undefined}
+                placeholder={c.irrigationMm ? String(c.irrigationMm.value) : undefined}
+                disabled={!owner}
+                min={0}
+                value={draft.irrigationMm ?? ""}
+                onBlur={(e) => {
+                  const v = e.currentTarget.value.replace(/\D/g, "");
+                  update({ irrigationMm: v ? Number(v) : null });
+                }}
+              />
+            )}
+            {c.crop.startsWith("maize") && (
+              <NumberInput
+                label="Azote minéral avant 4 feuilles (kg N/ha)"
+                description="Starter au semis : 50 kg au plus (PAR 7)"
+                disabled={!owner}
+                min={0}
+                max={50}
+                value={draft.nBefore4Leaves ?? ""}
+                onBlur={(e) => {
+                  const v = e.currentTarget.value.replace(/\D/g, "");
+                  update({ nBefore4Leaves: v ? Number(v) : null });
+                }}
+              />
+            )}
+            {c.previous && ["oat", "soft_wheat", "durum_wheat", "improver_wheat", "barley_winter", "barley_spring", "rye", "triticale", "spelt"].includes(c.previous.crop) && (
+              <Select
+                label="Pailles du précédent"
+                data={[
+                  { value: "returned", label: "Enfouies (restituées)" },
+                  { value: "removed", label: "Enlevées" },
+                ]}
+                disabled={!owner}
+                value={draft.strawReturned == null ? null : draft.strawReturned ? "returned" : "removed"}
+                onChange={(v) => update({ strawReturned: v === null ? null : v === "returned" })}
+              />
+            )}
+            {["soft_wheat", "durum_wheat", "improver_wheat", "barley_winter", "rye", "triticale", "oat"].includes(c.crop) && c.rsh && (
+              <NumberInput
+                label="Nombre de talles à l'ouverture"
+                disabled={!owner}
+                min={0}
+                value={draft.tillers ?? ""}
+                onBlur={(e) => {
+                  const v = e.currentTarget.value.replace(/\D/g, "");
+                  update({ tillers: v ? Number(v) : null });
+                }}
+              />
+            )}
+          </SimpleGrid>
+          {["soft_wheat", "durum_wheat", "improver_wheat", "barley_winter", "rye", "triticale", "oat"].includes(c.crop) && (
+            <Switch
+              mt="sm"
+              disabled={!owner}
+              label="Conditions défavorables (CAU 0,8, sur justificatif)"
+              checked={!!draft.unfavourable}
+              onChange={(e) => update({ unfavourable: e.currentTarget.checked })}
+            />
+          )}
+          {save.error && <ErrorAlert error={save.error} />}
+        </Paper>
+      </SimpleGrid>
+
+      <Paper withBorder p="md" aria-label="Bilan azoté">
+        <Group justify="space-between" mb={4}>
+          <Title order={4}>Bilan azoté</Title>
+          {r.dose !== null && (
+            <Text fw={700} className="lv-num" aria-label="Dose calculée">
+              {r.method === "ceiling" ? "Dose plafond" : "Dose calculée"} : {r.dose} kg N/ha
+            </Text>
+          )}
+        </Group>
+        <Text size="sm" c="dimmed" mb="xs" className="lv-num">
+          {r.equation}
+        </Text>
+        {r.missing.length > 0 && (
+          <Alert color="paille" mb="xs" title="Pour calculer la dose, il manque">
+            {r.missing.join(" ; ")}.
+          </Alert>
+        )}
+        {r.warnings.map((w) => (
+          <Alert key={w} color="brique" variant="light" mb="xs">
+            {w}
+          </Alert>
+        ))}
+        {Object.keys(r.terms).length > 0 && (
+          <Table aria-label="Termes du bilan" fz="sm">
+            <Table.Tbody>
+              {BALANCE_TERMS.filter((t) => r.terms[t]).map((t) => (
+                <TermRow key={t} term={t} value={r.terms[t]!} owner={owner} overridden={!!draft.overrides?.[t]} onEdit={() => setOverriding(t)} onReset={() => {
+                  const { [t]: _drop, ...rest } = draft.overrides ?? {};
+                  update({ overrides: rest });
+                }} />
+              ))}
+            </Table.Tbody>
+          </Table>
+        )}
+        {r.floor30 && <Text size="sm" mt="xs">Dose inférieure à 30 kg : le forfait de 30 kg est possible si l'apport ne peut pas être plus précis (article 12).</Text>}
+      </Paper>
+
+      <ExternalDose farmId={farm.id} owner={owner} draft={draft} fourmyDose={r.dose} onChange={(external) => update({ external })} />
+
+      <Applications farmId={farm.id} owner={owner} dose={dose} applications={applications} proposed={!draft.applications?.length} onChange={(apps) => update({ applications: apps })} />
+
+      {owner && (
+        <Group>
+          <Button onClick={() => setEstablishing(true)} disabled={dose === null}>
+            {p.currentVersion ? "Réviser le plan" : "Établir le plan"}
+          </Button>
+          {dose === null && <Text size="sm" c="dimmed">Il faut une dose : calculée par Fourmy ou venue d'un outil ou d'un conseiller.</Text>}
+        </Group>
+      )}
+
+      {p.versions.length > 0 && (
+        <Paper withBorder p="md" aria-label="Versions">
+          <Title order={4} mb="xs">
+            Versions établies
+          </Title>
+          <Table fz="sm">
+            <Table.Tbody>
+              {p.versions.map((v) => (
+                <Table.Tr key={v.version}>
+                  <Table.Td>Version {v.version}</Table.Td>
+                  <Table.Td className="lv-num">{formatDateTime(v.establishedAt)}</Table.Td>
+                  <Table.Td>{v.establishedBy ?? ""}</Table.Td>
+                  <Table.Td className="lv-num">{v.doseEfficient} kg N/ha {v.external ? `(${v.external.tool})` : "(calcul Fourmy)"}</Table.Td>
+                  <Table.Td>{v.reason ?? ""}</Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+          <Text size="xs" c="dimmed" mt={4}>
+            Chaque version garde les données, les termes et le référentiel de sa date ({p.versions[0]!.referential}).
+          </Text>
+        </Paper>
+      )}
+
+      {overriding && (
+        <OverrideModal
+          term={overriding}
+          current={r.terms[overriding]}
+          onClose={() => setOverriding(null)}
+          onSave={(value, reason) => {
+            update({ overrides: { ...(draft.overrides ?? {}), [overriding]: { value, reason } } });
+            setOverriding(null);
+          }}
+        />
+      )}
+      {establishing && (
+        <EstablishModal
+          farmId={farm.id}
+          planId={planId}
+          revision={!!p.currentVersion}
+          dose={dose!}
+          onClose={() => setEstablishing(false)}
+          onDone={(np) => {
+            client.setQueryData(["fertilization-plan", farm.id, planId], np);
+            void client.invalidateQueries({ queryKey: ["fertilization-plans", farm.id] });
+            setEstablishing(false);
+            notifications.show({ color: "lichen", message: `Plan établi (version ${np.currentVersion}).` });
+          }}
+        />
+      )}
+    </Stack>
+  );
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <Table.Tr>
+      <Table.Td c="dimmed" w={180}>
+        {label}
+      </Table.Td>
+      <Table.Td>{children}</Table.Td>
+    </Table.Tr>
+  );
+}
+const Missing = ({ children }: { children: React.ReactNode }) => (
+  <Text span size="sm" c="paille.8">
+    {children}
+  </Text>
+);
+
+function TermRow({ term, value, owner, overridden, onEdit, onReset }: { term: BalanceTerm; value: PlanTermValue; owner: boolean; overridden: boolean; onEdit: () => void; onReset: () => void }) {
+  const missing = "missing" in value;
+  return (
+    <Table.Tr aria-label={BALANCE_TERM_LABELS[term]}>
+      <Table.Td>{BALANCE_TERM_LABELS[term]}</Table.Td>
+      <Table.Td className="lv-num" ta="right" fw={600}>
+        {missing ? "—" : term === "CAU" ? fmt(value.value) : `${value.value} kg`}
+      </Table.Td>
+      <Table.Td>
+        {missing ? (
+          <Missing>{value.missing}</Missing>
+        ) : (
+          <>
+            <Badge size="xs" variant="light" color={ORIGIN[value.origin]?.color ?? "gray"}>
+              {ORIGIN[value.origin]?.label ?? value.origin}
+            </Badge>{" "}
+            <Text span size="xs" c="dimmed">
+              {value.detail ? `${value.detail} · ` : ""}
+              {value.source}
+            </Text>
+          </>
+        )}
+      </Table.Td>
+      <Table.Td w={70}>
+        {owner && term !== "CAU" && term !== "Nbefore4" && (
+          <Group gap={2} wrap="nowrap">
+            <ActionIcon variant="subtle" size="sm" aria-label={`Remplacer ${term}`} onClick={onEdit}>
+              <Pencil size={13} />
+            </ActionIcon>
+            {overridden && (
+              <ActionIcon variant="subtle" size="sm" color="gray" aria-label={`Revenir à la valeur de Fourmy pour ${term}`} onClick={onReset}>
+                <Trash2 size={13} />
+              </ActionIcon>
+            )}
+          </Group>
+        )}
+      </Table.Td>
+    </Table.Tr>
+  );
+}
+
+function OverrideModal({ term, current, onClose, onSave }: { term: BalanceTerm; current: PlanTermValue | undefined; onClose: () => void; onSave: (value: number, reason: string) => void }) {
+  const [value, setValue] = useState<number | "">(current && !("missing" in current) ? current.value : "");
+  const [reason, setReason] = useState("");
+  return (
+    <Modal opened onClose={onClose} title={BALANCE_TERM_LABELS[term]}>
+      <Stack>
+        <Text size="sm" c="dimmed">
+          Une valeur de la ferme (mesure, référence locale) remplace celle du référentiel. Le référentiel exige d'en garder le justificatif.
+        </Text>
+        <NumberInput label="Valeur (kg N/ha)" value={value} onChange={(v) => setValue(v === "" ? "" : Number(v))} decimalSeparator="," />
+        <TextInput label="Motif et justificatif" placeholder="Référence locale chambre d'agriculture 2026…" value={reason} onChange={(e) => setReason(e.currentTarget.value)} required />
+        <Group>
+          <Button onClick={() => onSave(Number(value), reason.trim())} disabled={value === "" || reason.trim().length < 3}>
+            Enregistrer
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
+  );
+}
+
+function ExternalDose({ farmId, owner, draft, fourmyDose, onChange }: { farmId: string; owner: boolean; draft: PlanDraft; fourmyDose: number | null; onChange: (e: PlanDraft["external"]) => void }) {
+  const [editing, setEditing] = useState(false);
+  const e = draft.external;
+  const [form, setForm] = useState({ doseKgNHa: e?.doseKgNHa ?? 0, tool: e?.tool ?? "", advisor: e?.advisor ?? "", computedOn: e?.computedOn ?? new Date().toISOString().slice(0, 10) });
+  void farmId;
+  return (
+    <Paper withBorder p="md" aria-label="Dose d'un outil ou d'un conseiller">
+      <Group justify="space-between">
+        <div>
+          <Title order={4}>Dose d'un outil ou d'un conseiller</Title>
+          <Text size="sm" c="dimmed">
+            Une dose calculée par un outil labellisé COMIFER ou par votre conseiller peut être retenue à la place de celle de Fourmy ; gardez sa sortie.
+          </Text>
+        </div>
+        {owner && !editing && (
+          <Button size="compact-sm" variant="light" leftSection={e ? <Pencil size={14} /> : <Plus size={14} />} onClick={() => setEditing(true)}>
+            {e ? "Modifier" : "Saisir"}
+          </Button>
+        )}
+      </Group>
+      {e && !editing && (
+        <Text size="sm" mt="xs">
+          <b>{e.doseKgNHa} kg N/ha</b> retenus : {e.tool}
+          {e.advisor ? `, ${e.advisor}` : ""}, calculée le {formatDate(e.computedOn)}.
+          {fourmyDose !== null ? ` Fourmy calcule ${fourmyDose} kg (écart ${e.doseKgNHa - fourmyDose > 0 ? "+" : ""}${e.doseKgNHa - fourmyDose} kg).` : ""}
+          {owner && (
+            <Anchor component="button" size="sm" ml="xs" onClick={() => onChange(null)}>
+              Retirer
+            </Anchor>
+          )}
+        </Text>
+      )}
+      {editing && (
+        <Stack mt="xs">
+          <SimpleGrid cols={{ base: 1, sm: 4 }}>
+            <NumberInput label="Dose (kg N/ha)" min={0} value={form.doseKgNHa} onChange={(v) => setForm({ ...form, doseKgNHa: Number(v) || 0 })} />
+            <TextInput label="Outil" placeholder="AzoFert, Epiclès…" value={form.tool} onChange={(ev) => setForm({ ...form, tool: ev.currentTarget.value })} />
+            <TextInput label="Conseiller" value={form.advisor} onChange={(ev) => setForm({ ...form, advisor: ev.currentTarget.value })} />
+            <TextInput label="Calculée le" type="date" value={form.computedOn} onChange={(ev) => setForm({ ...form, computedOn: ev.currentTarget.value })} />
+          </SimpleGrid>
+          <Group>
+            <Button
+              size="xs"
+              disabled={!form.tool.trim()}
+              onClick={() => {
+                onChange({ doseKgNHa: form.doseKgNHa, tool: form.tool.trim(), advisor: form.advisor.trim() || null, computedOn: form.computedOn });
+                setEditing(false);
+              }}
+            >
+              Retenir cette dose
+            </Button>
+            <Button size="xs" variant="subtle" onClick={() => setEditing(false)}>
+              Annuler
+            </Button>
+          </Group>
+        </Stack>
+      )}
+    </Paper>
+  );
+}
+
+function Applications({ farmId, owner, dose, applications, proposed, onChange }: { farmId: string; owner: boolean; dose: number | null; applications: PlannedApplication[]; proposed: boolean; onChange: (a: PlannedApplication[]) => void }) {
+  const fertilizers = useFertilizers(farmId);
+  const options = [...(fertilizers.data?.values() ?? [])].filter((f) => (f.composition ?? f.proposal)?.nTotal).map((f) => ({ value: f.id, label: f.name }));
+  const [apps, setApps] = useState(applications);
+  useEffect(() => setApps(applications), [applications]);
+  const sum = apps.reduce((s, a) => s + a.nKgHa, 0);
+  const set = (k: number, patch: Partial<PlannedApplication>) => setApps(apps.map((a, j) => (j === k ? { ...a, ...patch } : a)));
+  const productDose = (a: PlannedApplication) => {
+    const f = a.articleId ? fertilizers.data?.get(a.articleId) : undefined;
+    const c = f?.composition ?? f?.proposal;
+    if (!c || !c.nTotal) return null;
+    if (c.basis === "mass_percent") return `${Math.round((a.nKgHa * 100) / c.nTotal)} kg/ha`;
+    return `${fmt(a.nKgHa / c.nTotal)} ${c.basis === "kg_per_t" ? "t" : "m³"}/ha`;
+  };
+  return (
+    <Paper withBorder p="md" aria-label="Apports prévus">
+      <Group justify="space-between" mb="xs">
+        <div>
+          <Title order={4}>Apports prévus</Title>
+          <Text size="sm" c="dimmed">
+            {proposed ? "Proposition de Fourmy selon les règles de fractionnement du programme régional ; modifiable." : "Apports saisis."} Total {Math.round(sum)} kg N/ha
+            {dose !== null ? ` pour une dose de ${dose} kg` : ""}.
+          </Text>
+        </div>
+      </Group>
+      {dose !== null && sum > dose + 0.5 && <Alert color="brique" mb="xs">Les apports dépassent la dose retenue.</Alert>}
+      <Table fz="sm">
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>Stade</Table.Th>
+            <Table.Th>Date prévue</Table.Th>
+            <Table.Th>Produit</Table.Th>
+            <Table.Th>Azote (kg N/ha)</Table.Th>
+            <Table.Th>Dose de produit</Table.Th>
+            <Table.Th />
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
+          {apps.map((a, k) => (
+            <Table.Tr key={k}>
+              <Table.Td>
+                <TextInput size="xs" aria-label="Stade" disabled={!owner} value={a.stage} onChange={(e) => set(k, { stage: e.currentTarget.value })} />
+                {a.reservedForSteering && (
+                  <Badge size="xs" variant="light" mt={2}>
+                    pilotage
+                  </Badge>
+                )}
+              </Table.Td>
+              <Table.Td>
+                <TextInput size="xs" type="date" aria-label="Date prévue" disabled={!owner} value={a.plannedOn ?? ""} onChange={(e) => set(k, { plannedOn: e.currentTarget.value || null })} />
+              </Table.Td>
+              <Table.Td>
+                <Select size="xs" aria-label="Produit" disabled={!owner} data={options} value={a.articleId} clearable searchable onChange={(v) => set(k, { articleId: v })} />
+              </Table.Td>
+              <Table.Td>
+                <NumberInput size="xs" aria-label="Azote" disabled={!owner} min={0} value={a.nKgHa} onChange={(v) => set(k, { nKgHa: Number(v) || 0 })} />
+              </Table.Td>
+              <Table.Td className="lv-num">{productDose(a) ?? "—"}</Table.Td>
+              <Table.Td>
+                {owner && (
+                  <ActionIcon variant="subtle" color="brique" aria-label="Retirer l'apport" onClick={() => setApps(apps.filter((_, j) => j !== k))}>
+                    <Trash2 size={14} />
+                  </ActionIcon>
+                )}
+              </Table.Td>
+            </Table.Tr>
+          ))}
+        </Table.Tbody>
+      </Table>
+      {owner && (
+        <Group mt="xs">
+          <Button size="xs" variant="subtle" leftSection={<Plus size={14} />} onClick={() => setApps([...apps, { stage: "", plannedOn: null, articleId: null, nKgHa: 0, reservedForSteering: false }])}>
+            Ajouter un apport
+          </Button>
+          <Button size="xs" variant="light" onClick={() => onChange(apps)}>
+            Enregistrer les apports
+          </Button>
+          {!proposed && (
+            <Button size="xs" variant="subtle" color="gray" onClick={() => onChange([])}>
+              Revenir à la proposition
+            </Button>
+          )}
+        </Group>
+      )}
+    </Paper>
+  );
+}
+
+function EstablishModal({ farmId, planId, revision, dose, onClose, onDone }: { farmId: string; planId: string; revision: boolean; dose: number; onClose: () => void; onDone: (p: FertilizationPlan) => void }) {
+  const [reason, setReason] = useState("");
+  const go = useMutation({ mutationFn: () => api.post<FertilizationPlan>(farmPath(farmId, `/fertilization/plans/${planId}/establish`), { reason: revision ? reason.trim() : null }), onSuccess: onDone });
+  return (
+    <Modal opened onClose={onClose} title={revision ? "Réviser le plan" : "Établir le plan"}>
+      <Stack>
+        <Text size="sm">
+          Dose retenue : <b>{dose} kg N/ha</b>. Le plan est figé avec ses données et ses sources : il ne change plus, même si le sol ou les références évoluent. Il
+          doit être établi avant le premier apport de sortie d'hiver.
+        </Text>
+        {revision && <Textarea label="Motif de la révision" placeholder="Reliquat mesuré reçu, objectif revu, pilotage…" value={reason} onChange={(e) => setReason(e.currentTarget.value)} required />}
+        {go.error && <ErrorAlert error={go.error} />}
+        <Group>
+          <Button onClick={() => go.mutate()} loading={go.isPending} disabled={revision && reason.trim().length < 3}>
+            {revision ? "Réviser" : "Établir"}
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
+  );
+}
