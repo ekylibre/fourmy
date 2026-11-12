@@ -84,12 +84,13 @@ describe.skipIf(!url)("autorisations (intégration)", () => {
     expect(me.items.map((f: { id: string }) => f.id)).toContain(farmId);
   });
 
-  it("une personne se rattache à un compte membre (un seul par ferme), jamais à un compte extérieur", async () => {
+  it("un compte ajouté reçoit sa personne (une seule par ferme) ; jamais de compte extérieur", async () => {
     const people = (body: unknown) => app.request(`${base()}/people`, { method: "POST", headers: owner.headers, body: JSON.stringify(body) });
     expect((await people({ name: "Voisin", userId: outsider.userId })).status).toBe(400);
-    const res = await people({ name: "Nouvelle recrue", userId: newcomer.userId });
-    expect(res.status).toBe(201);
-    expect((await res.json()).userId).toBe(newcomer.userId);
+    // Tout membre a une personne (docs/equipe-personnes-design.md §1) : créée à l'ajout du compte.
+    const [p] = await sql`SELECT name FROM people WHERE farm_id = ${farmId} AND user_id = ${newcomer.userId}`;
+    expect(p).toBeDefined();
+    await sql`UPDATE people SET name = 'Nouvelle recrue' WHERE farm_id = ${farmId} AND user_id = ${newcomer.userId}`;
     expect((await people({ name: "Doublon", userId: newcomer.userId })).status).toBe(409);
   });
 

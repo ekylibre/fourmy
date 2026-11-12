@@ -195,7 +195,8 @@ describe.skipIf(!url)("interventions (intégration)", () => {
     const planned = await post("/interventions", { procedure: "plowing", targets: [{ kind: "land_parcel", id: parcelId }], doers: [{ personId: person.id }] });
     expect(planned.status).toBe(201);
     expect((await planned.json()).doers).toEqual([{ personId: person.id }]);
-    expect((await get("/people")).items.map((p: { name: string }) => p.name)).toEqual(["Camille"]);
+    // Les comptes membres ont aussi leur personne : on regarde les personnes sans compte.
+    expect((await get("/people")).items.filter((p: { userId: string | null }) => !p.userId).map((p: { name: string }) => p.name)).toEqual(["Camille"]);
   });
 
   it("annuler une intervention réalisée contre-passe ses mouvements et la retire du registre", async () => {

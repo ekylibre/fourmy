@@ -35,7 +35,13 @@ export async function loadFixture(sql: Sql, fixture: FixtureFile): Promise<void>
     for (const [table, given] of Object.entries(fixture.tables)) {
       // json_populate_recordset ignore les valeurs par défaut : une fixture
       // antérieure aux attelages (0022) déclare ses moyens en mode libre.
-      const rows = table === "interventions" ? given.map((r) => ("staffing" in r ? r : { ...r, staffing: "free" })) : given;
+      // Fixture antérieure à la fiche personne (0045) : identifiants externes vides.
+      const rows =
+        table === "interventions"
+          ? given.map((r) => ("staffing" in r ? r : { ...r, staffing: "free" }))
+          : table === "people"
+            ? given.map((r) => (r.external_ids ? r : { ...r, external_ids: {} }))
+            : given;
       if (!/^[a-z_]+$/.test(table)) throw new Error(`table invalide : ${table}`);
       if (rows.length === 0) continue;
       const cols = await tx<{ c: string }[]>`

@@ -26,6 +26,7 @@ import { LoginPage } from "../features/login/LoginPage";
 import { RegisterPage } from "../features/register/RegisterPage";
 import { StockPage } from "../features/stock/StockPage";
 import { TeamPage } from "../features/team/TeamPage";
+import { PersonSheetPage } from "../features/team/PersonSheetPage";
 import { IntegrationsPage } from "../features/integrations/IntegrationsPage";
 import { AgrirouterCallbackPage } from "../features/integrations/AgrirouterCallbackPage";
 import { PrescriptionsPage } from "../features/modulation/PrescriptionsPage";
@@ -168,6 +169,7 @@ export const routes = [
       { path: "land-parcels/:parcelId", element: <Suspense fallback={<Loading />}><ParcelSheetPage /></Suspense> },
       { path: "imports", element: <ImportsPage /> },
       { path: "team", element: <TeamPage /> },
+      { path: "team/:personId", element: <PersonSheetPage /> },
       { path: "integrations", element: <IntegrationsPage /> },
       { path: "prescriptions", element: <PrescriptionsPage /> },
       { path: "prescriptions/new", element: <Suspense fallback={<Loading />}><PrescriptionNewPage /></Suspense> },

@@ -555,3 +555,41 @@ en parallèle de P2 et P3.
   vérifié. On met `email_verified = true`, puisque le lien reçu fait foi.
 - **Courriels** : le bouton « Inviter » reste disponible sans SMTP (mode
   lien). L'interface dit clairement quel mode s'applique.
+
+## 12. Réalisation
+
+### Lot P1 (2026-11-12)
+
+- **Base** : migration `0045_people_profile.sql`.
+  - Profil, Certiphyto et `external_ids` sur `people`.
+  - Tables `person_private` et `person_photos`, avec RLS.
+  - Rôle `reader`.
+  - Un compte, une personne par ferme : index unique, doublons résolus.
+  - Personnes créées pour les comptes qui n'en avaient pas.
+- **Tout membre a une personne**, garanti aussi à la lecture
+  (`ensureMemberPeople`) : comptes de tests, `seed-dev`, fermes importées.
+  `POST /members` crée la personne, ou relie celle de la fiche
+  (`personId`).
+- **API** :
+  - `apps/api/src/repos/people.ts` et `routes/people.ts` : grille, fiche,
+    création, modification selon les droits, photo, rôle et retrait de
+    l'accès ;
+  - garde « lecture seule » central dans `context.ts` ;
+  - l'ancien format `POST /people` (`name`, `role`, `userId`) reste
+    accepté.
+- **Contrats** : `packages/contracts/src/people.ts`.
+- **Web** :
+  - `features/team/` : grille de pavés, fiche (Identité, Coordonnées,
+    Certiphyto, Compte Fourmy), formulaire selon les droits, photo
+    recadrée dans le navigateur ;
+  - route `/team/:personId`.
+- **Tests** :
+  - `apps/api/test/people.integration.test.ts` : droits sur les données
+    personnelles, lecture seule, photo, compte ;
+  - `apps/web/test/team.test.tsx`.
+- **En attente** :
+  - heures et dernière intervention (lot P2), pour l'instant à `null` ;
+  - invitations (lot P3) : en attendant, la fiche rattache un compte
+    existant par son email ;
+  - masquage des boutons de saisie pour un lecteur dans le reste de
+    l'application (`useCanWrite`, prêt). L'API refuse déjà ces écritures.

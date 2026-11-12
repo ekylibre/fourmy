@@ -29,3 +29,4 @@ export * from "./vegetation3d.js";
 export * from "./crop-model.js";
 export * from "./modulation.js";
 export * from "./fertilization.js";
+export * from "./people.js";

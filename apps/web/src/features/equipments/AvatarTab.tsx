@@ -72,7 +72,7 @@ export function AvatarTab({ sheet: s }: { sheet: EquipmentSheet }) {
     const clean: AvatarInput = Object.fromEntries(Object.entries(saved).filter(([k, v]) => v !== null && v !== undefined && k !== "colors")) as AvatarInput;
     if (saved.colors) clean.colors = Object.fromEntries(Object.entries(saved.colors).filter(([, v]) => v)) as AvatarInput["colors"];
     return resolveAvatar({ kind: s.kind, type: s.type, name: s.name, technical: s.technical, brandColor: s.brandInfo?.color ?? null, saved: clean });
-  }, [saved, s.kind, s.technical, s.brandInfo?.color]);
+  }, [saved, s.kind, s.type, s.name, s.technical, s.brandInfo?.color]);
 
   // Aperçu : modèle importé, sinon avatar recalculé dans le navigateur.
   useEffect(() => {

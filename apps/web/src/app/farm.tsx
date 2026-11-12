@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router";
 import { api } from "./api";
 
-export type Role = "owner" | "worker";
+export type Role = "owner" | "worker" | "reader";
 export interface MyFarm {
   id: string;
   name: string;
@@ -32,4 +32,9 @@ export function useFarm(): MyFarm {
   const farm = useContext(FarmContext);
   if (!farm) throw new Error("useFarm hors d'une ferme");
   return farm;
+}
+
+/** Le compte peut-il saisir sur la ferme ? Non en lecture seule (l'API le refuse de toute façon). */
+export function useCanWrite(): boolean {
+  return useFarm().role !== "reader";
 }

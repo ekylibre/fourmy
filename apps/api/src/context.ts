@@ -5,7 +5,7 @@ import { withFarm } from "@fourmy/db";
 import { db } from "./db.js";
 import { getAuth } from "./auth.js";
 
-export type Role = "owner" | "worker";
+export type Role = "owner" | "worker" | "reader";
 
 /** Variables de contexte posées par les middlewares et lues par les routes. */
 export type Env = {
@@ -57,8 +57,16 @@ export const farmScope: MiddlewareHandler<Env> = createMiddleware<Env>(async (c,
   if (!role) return deny(403, "Accès refusé", "Vous n'êtes pas membre de cette ferme.");
   c.set("farmId", farmId);
   c.set("role", role);
+  // Lecture seule (conseiller, comptable) : aucune écriture, sauf sur sa propre
+  // fiche (coordonnées, photo), que la route vérifie (docs/equipe-personnes-design.md §3.2).
+  if (role === "reader" && !READ_METHODS.has(c.req.method) && !OWN_PROFILE_RE.test(c.req.path)) {
+    return deny(403, "Accès refusé", "Compte en lecture seule : consultation et exports seulement.");
+  }
   await next();
 });
+
+const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const OWN_PROFILE_RE = /\/people\/[0-9a-f-]{36}(\/photo)?$/i;
 
 /** Réserve une route au rôle `owner` (parcellaire, corrections, imports…). */
 export const requireOwner: MiddlewareHandler<Env> = createMiddleware<Env>(async (c, next) => {

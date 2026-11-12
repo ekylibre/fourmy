@@ -154,7 +154,7 @@ test("conditions de pulvérisation (tableau de bord du jour)", async ({ page }) 
 
 test("équipe et intégrations", async ({ page }) => {
   await page.getByRole("link", { name: "Équipe" }).click();
-  await expect(page.getByRole("heading", { name: "Personnes" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Équipe" })).toBeVisible();
   await snap(page, "equipe");
   await navTo(page, "Intégrations", "Interopérabilité");
   await expect(page.getByRole("heading", { name: /Traccar/ })).toBeVisible();
