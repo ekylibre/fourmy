@@ -653,7 +653,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   const peopleOptions = withSuggestions(
     people
       .filter((p) => p.active || doers.includes(p.id) || crews.some((c) => c.doers.includes(p.id)))
-      .map((p) => ({ value: p.id, label: p.role ? `${p.name} (${p.role})` : p.name })),
+      .map((p) => ({ value: p.id, label: p.name })),
     procedure?.suggestions.doers ?? [],
   );
   /** Libre → attelages : un attelage avec tous les moyens et toutes les périodes (FR-ATT-4). */

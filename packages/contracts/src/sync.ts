@@ -94,7 +94,13 @@ export const syncMeterReading = z.object({
 export const syncPerson = z.object({
   id: uuid,
   name: z.string(),
+  /** Rôle libre retiré (lot P5) : toujours null, gardé pour le schéma mobile v5. */
   role: z.string().nullable(),
+  first_name: z.string().nullable(),
+  last_name: z.string().nullable(),
+  /** Photo : GET /farms/:farm/people/:id/photo?v=<photo_hash>. Jamais de coordonnées dans la synchro. */
+  photo_hash: z.string().nullable(),
+  certiphyto_status: z.enum(["none", "valid", "expiring", "expired"]),
   active: z.boolean(),
   /** Compte rattaché : le mobile propose la personne de l'utilisateur connecté. */
   user_id: uuid.nullable(),

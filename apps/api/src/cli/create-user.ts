@@ -9,7 +9,7 @@ import { upsertLocalUser } from "../users.js";
  * Le mot de passe est lu sur l'entrée standard (jamais en argument : il
  * finirait dans l'historique du shell). Si le compte existe, son mot de passe
  * est remplacé. Le rattachement à une ferme se fait ensuite par son
- * responsable (POST /api/v1/farms/:id/members).
+ * responsable : invitation depuis la fiche de la personne (page Équipe).
  */
 const { values } = parseArgs({ options: { email: { type: "string" }, name: { type: "string" } } });
 if (!values.email) {

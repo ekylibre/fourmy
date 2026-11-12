@@ -64,47 +64,51 @@ describe.skipIf(!url)("autorisations (intégration)", () => {
     expect((await app.request("/api/v1/farms/f1/snapshot", { headers: owner.headers })).status).toBe(400);
   });
 
-  it("le responsable ajoute un compte existant par e-mail ; le salarié ne gère pas les membres", async () => {
+  it("le responsable invite un compte existant ; le salarié ne gère pas les accès", async () => {
     newcomer.email = `${crypto.randomUUID()}@test.fourmy`;
     newcomer.userId = await upsertLocalUser(db(), { email: newcomer.email, password: TEST_PASSWORD });
-    const post = (headers: Record<string, string>, body: unknown) =>
-      app.request(`${base()}/members`, { method: "POST", headers, body: JSON.stringify(body) });
-
-    expect((await post(worker.headers, { email: newcomer.email, role: "worker" })).status).toBe(403);
-    expect((await post(owner.headers, { email: "inconnu@test.fourmy", role: "worker" })).status).toBe(404);
-    const res = await post(owner.headers, { email: newcomer.email.toUpperCase(), role: "worker" });
+    const created = await app.request(`${base()}/people`, { method: "POST", headers: owner.headers, body: JSON.stringify({ name: "Nouvelle recrue" }) });
+    const personId = ((await created.json()) as { id: string }).id;
+    const invite = (headers: Record<string, string>) =>
+      app.request(`${base()}/people/${personId}/invitations`, { method: "POST", headers, body: JSON.stringify({ email: newcomer.email.toUpperCase(), role: "worker" }) });
+    expect((await invite(worker.headers)).status).toBe(403);
+    const res = await invite(owner.headers);
     expect(res.status).toBe(201);
-    expect((await res.json()).items.map((m: { email: string }) => m.email)).toContain(newcomer.email);
-    expect((await post(owner.headers, { email: newcomer.email, role: "worker" })).status).toBe(409);
+    const token = ((await res.json()) as { link: string }).link.split("/invitation/")[1]!;
 
-    // Le nouveau membre se connecte et voit la ferme.
-    const token = await signIn(newcomer.email);
-    const me = await (await app.request("/api/v1/me/farms", { headers: { authorization: `Bearer ${token}` } })).json();
+    // Le compte existant se connecte et accepte : même email, il rejoint la ferme sur cette fiche.
+    const bearer = await signIn(newcomer.email);
+    const auth = { authorization: `Bearer ${bearer}`, "content-type": "application/json" };
+    expect((await app.request(`/api/v1/invitations/${token}/accept`, { method: "POST", headers: auth, body: "{}" })).status).toBe(200);
+    const me = await (await app.request("/api/v1/me/farms", { headers: auth })).json();
     expect(me.user.email).toBe(newcomer.email);
     expect(me.items.map((f: { id: string }) => f.id)).toContain(farmId);
+    const [p] = await sql`SELECT user_id FROM people WHERE id = ${personId}`;
+    expect(p!.user_id).toBe(newcomer.userId);
   });
 
-  it("un compte ajouté reçoit sa personne (une seule par ferme) ; jamais de compte extérieur", async () => {
+  it("une personne par compte sur la ferme ; jamais de compte extérieur", async () => {
     const people = (body: unknown) => app.request(`${base()}/people`, { method: "POST", headers: owner.headers, body: JSON.stringify(body) });
     expect((await people({ name: "Voisin", userId: outsider.userId })).status).toBe(400);
-    // Tout membre a une personne (docs/equipe-personnes-design.md §1) : créée à l'ajout du compte.
-    const [p] = await sql`SELECT name FROM people WHERE farm_id = ${farmId} AND user_id = ${newcomer.userId}`;
-    expect(p).toBeDefined();
-    await sql`UPDATE people SET name = 'Nouvelle recrue' WHERE farm_id = ${farmId} AND user_id = ${newcomer.userId}`;
     expect((await people({ name: "Doublon", userId: newcomer.userId })).status).toBe(409);
   });
 
-  it("la ferme garde toujours un responsable ; retirer un membre détache sa personne", async () => {
-    const del = (userId: string) => app.request(`${base()}/members/${userId}`, { method: "DELETE", headers: owner.headers });
-    const patch = (userId: string, role: string) =>
-      app.request(`${base()}/members/${userId}`, { method: "PATCH", headers: owner.headers, body: JSON.stringify({ role }) });
-    expect((await patch(owner.userId, "worker")).status).toBe(409);
-    expect((await del(owner.userId)).status).toBe(409);
-    expect((await del(newcomer.userId)).status).toBe(200);
-    const [p] = await sql`SELECT user_id FROM people WHERE farm_id = ${farmId} AND name = 'Nouvelle recrue'`;
+  it("la ferme garde toujours un responsable ; retirer un accès garde la personne", async () => {
+    const personOf = async (userId: string) => (await sql<{ id: string }[]>`SELECT id FROM people WHERE farm_id = ${farmId} AND user_id = ${userId}`)[0]!.id;
+    await app.request(`${base()}/people`, { headers: owner.headers }); // tout membre a sa personne (créée à la lecture)
+    const ownerPerson = await personOf(owner.userId);
+    const newcomerPerson = await personOf(newcomer.userId);
+    const account = (id: string, method: "PATCH" | "DELETE", body?: unknown) =>
+      app.request(`${base()}/people/${id}/account`, { method, headers: owner.headers, body: body ? JSON.stringify(body) : undefined });
+    expect((await account(ownerPerson, "PATCH", { role: "worker" })).status).toBe(409);
+    expect((await account(ownerPerson, "DELETE")).status).toBe(409);
+    expect((await account(newcomerPerson, "DELETE")).status).toBe(204);
+    const [p] = await sql`SELECT user_id FROM people WHERE id = ${newcomerPerson}`;
     expect(p?.user_id).toBeNull();
     const token = await signIn(newcomer.email);
     expect((await app.request(`${base()}/snapshot`, { headers: { authorization: `Bearer ${token}` } })).status).toBe(403);
+    // Les anciennes routes d'écriture des membres n'existent plus (lot P5).
+    expect((await app.request(`${base()}/members`, { method: "POST", headers: owner.headers, body: "{}" })).status).toBe(404);
   });
 
   it("la déconnexion révoque le jeton", async () => {
