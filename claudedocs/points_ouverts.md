@@ -1,6 +1,6 @@
 # Points ouverts de Fourmy
 
-*Recensés le 2026-11-12 dans toute la documentation (`docs/`, `claudedocs/`, README, historique Git) et dans le journal de recette. Cette liste alimente la roadmap du projet GitHub.*
+*Recensés le 2026-11-12 dans toute la documentation (`docs/`, `claudedocs/`, README, historique Git) et dans le journal de recette. Cette liste alimente la roadmap du projet GitHub [Fourmy — Roadmap](https://github.com/orgs/ekylibre/projects/2) : les points P1 et P2 y sont les issues n° 1 à 37 du dépôt, dans l'ordre de cette liste (jalons « Envoi ferme pilote » et « Fin 2026 ») ; les points P3 y sont des brouillons. Le suivi se fait désormais dans le projet GitHub.*
 
 Chaque point se lit ainsi : **titre** : description. *nature · priorité · source*.
 
