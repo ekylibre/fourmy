@@ -1,3 +1,4 @@
+import { whenStyleLoaded } from "../../carto/when-style-loaded";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActionIcon, Button, Group, Paper, Stack, Text, Tooltip } from "@mantine/core";
 import { Map as MlMap, NavigationControl, ScaleControl, type GeoJSONSource, type LngLatBoundsLike, type MapMouseEvent } from "maplibre-gl";
@@ -117,7 +118,8 @@ export function ParcelPicker({ parcels, selected, zones, onSelect, onZones, onCl
     });
     m.addControl(new NavigationControl({ showCompass: false }), "top-right");
     m.addControl(new ScaleControl({ unit: "metric" }), "bottom-left");
-    m.on("load", () => {
+    // Prête dès que le style est chargé, sans attendre les tuiles IGN (lentes en CI, ou hors ligne).
+    whenStyleLoaded(m, () => {
       editor.current = new CartoEditor(m, {
         onChange: (features: Feature<Polygon>[]) => {
           const drawn = features.at(-1);

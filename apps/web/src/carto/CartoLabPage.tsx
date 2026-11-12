@@ -1,3 +1,4 @@
+import { whenStyleLoaded } from "./when-style-loaded";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { Alert, Button, Grid, Group, Paper, ScrollArea, Stack, Table, Text, Title } from "@mantine/core";
@@ -53,7 +54,7 @@ export function CartoLabPage() {
     });
     m.addControl(new NavigationControl({ showCompass: false }), "top-right");
     m.addControl(new ScaleControl({ unit: "metric" }), "bottom-left");
-    m.on("load", () => setMap(m));
+    whenStyleLoaded(m, () => setMap(m));
     return () => {
       setMap(null);
       m.remove();
