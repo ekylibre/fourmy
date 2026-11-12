@@ -61,7 +61,11 @@ Lot Y, réalisé le 2026-11-10 : FR-TWIN-1, FR-TWIN-2 et FR-TWIN-5
    éventuellement un budget mensuel de requêtes (3 000 par défaut ; le compte
    gratuit en permet 10 000).
 3. **Vérification à l'enregistrement** : le test obtient un jeton et compte
-   les acquisitions des 30 derniers jours sur les parcelles.
+   les acquisitions des 30 derniers jours sur les parcelles ; l'écran
+   l'affiche (« Connexion réussie : 14 acquisition(s) Sentinel-2… la
+   dernière le 10/11/2026 »). Champ secret laissé vide : le secret
+   enregistré est repris (indice des 4 derniers caractères). Le nombre
+   d'images exploitables n'est pas encore donné par ce test.
 4. **Premier passage du worker** : il charge l'historique depuis le
    1er janvier de l'année précédente, puis vérifie toutes les 6 heures.
 5. **Historique plus ancien** : `POST /remote-sensing/history` avec `{ from }`

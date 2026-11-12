@@ -105,6 +105,8 @@ Une intervention réalisée pendant une période d'interdiction, ou interdite su
 
   Le cahier liste aussi les épandages enregistrés en période d'interdiction, avec leur motif. Il s'exporte en CSV.
 
+  Un apport fait pendant la campagne sur une parcelle qui n'a pas de production de cette campagne (après la récolte, avant que la culture suivante soit saisie) y figure aussi, avec « aucune culture saisie pour cette campagne ». Si la parcelle de la campagne suivante existe déjà et recouvre celle-ci, l'apport est compté comme apport du précédent (couvert, APLSH), pas en ligne d'apport. La campagne s'affiche du 01/09 au 31/08.
+
 ### Suppressions
 
 Avant de retirer un justificatif, un couvert, une mesure de pilotage, une analyse de sol ou de produit, ou de supprimer un point d'eau, une fenêtre dit ce qui va être supprimé et demande de confirmer.

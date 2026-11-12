@@ -419,7 +419,24 @@ produit (nom ou n° AMM), matériel, intervenant, motif, notes. Insensible aux
 accents et à la casse ; tous les mots tapés doivent se retrouver
 (« monassut semis »). La requête est dans l'adresse (`?q=`), donc partageable.
 Filtrage côté client (`search.ts`) : 2 000 interventions indexées et filtrées
-en moins de 200 ms (test).
+en moins de 200 ms (test). Le champ garde sa propre valeur et l'adresse suit
+après 250 ms de pause : lu directement dans l'adresse, il perdait des lettres
+en frappe rapide ou avec la saisie prédictive d'un téléphone (recette du
+12/11/2026).
+
+### Envoi du formulaire (recette du 12/11/2026)
+
+- **Un identifiant par formulaire** : tiré à l'ouverture, il part avec chaque
+  envoi. Un second envoi (double clic, Entrée répétée) retombe sur la même
+  intervention ; un envoi en cours bloque le suivant. Deux Entrée dans la
+  liste des matériels créaient deux interventions.
+- **Entrée** dans un champ n'envoie pas le formulaire ; dans une liste, elle
+  choisit la première proposition.
+- **Sans réseau** : l'envoi est mis en attente et part au retour de la
+  connexion ; un encadré « Pas de réseau » le dit (garder la page ouverte).
+  Une intervention réalisée d'emblée est créée puis réalisée : une coupure
+  entre les deux laisse une intervention planifiée, qu'un nouvel envoi
+  complète.
 
 ## 14. Saisie sur carte (2026-11-08)
 

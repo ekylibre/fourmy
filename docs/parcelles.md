@@ -16,7 +16,14 @@ l'IGN, sans clé) :
   d'après cette production ;
 - les **parcelles cadastrales** du point (IDU, section, numéro, commune,
   contenance) ;
-- la parcelle de la ferme déjà présente, le cas échéant.
+- la parcelle de la ferme déjà présente, le cas échéant : celle dont une
+  version vaut pour l'année de la campagne (les parcelles reprises
+  d'Ekylibre ont une version close, une par campagne), sinon une version
+  ouverte.
+
+Si l'API Carto ne répond pas (panne du 12/11/2026 : tout `apicarto.ign.fr`
+en 404), l'écran le signale (« injoignable en partie ») et ne propose que la
+parcelle de la ferme.
 
 On choisit la forme (PAC ou cadastrale), on valide les champs pré-remplis
 (nom : lieu-dit, section ou culture, campagne ; campagne ; activité) :

@@ -86,7 +86,10 @@ E-Phy (migration 0013, `GET /phyto/articles`).
 règle d'Ekylibre `mix_category_code_validator.rb`, `checkMixture`) : un
 produit de catégorie 5 ne se mélange avec aucun autre ; deux produits d'une
 même catégorie 2, 3 ou 4 ne se mélangent pas. Un mélange interdit est un
-feu rouge (`compliance.mixture`) : motif obligatoire pour enregistrer.
+feu rouge (`compliance.mixture`) : motif obligatoire pour enregistrer. Le
+message nomme les produits comme à la ferme (nom de l'article), pas comme le
+référentiel : une même AMM couvre plusieurs noms commerciaux (« Taste » et
+« Carakol 3 »).
 
 ## Activités
 
