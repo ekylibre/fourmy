@@ -14,7 +14,9 @@ test("connexion, cuverie dans le temps, carte, intervention jusqu'au registre", 
   page.on("pageerror", (e) => !ign(e.message) && errors.push(e.message));
   page.on("console", (m) => m.type() === "error" && !m.text().startsWith("Failed to load resource") && !ign(m.text()) && errors.push(m.text()));
   // Ressources en échec : on veut l'URL (la console ne la donne pas).
-  page.on("response", (r) => r.status() >= 400 && !ign(r.url()) && errors.push(`HTTP ${r.status()} ${r.url()}`));
+  // 502 de la météo : le fournisseur externe (Open-Meteo) n'a pas répondu, pas Fourmy.
+  const weatherDown = (r: { status(): number; url(): string }) => r.status() === 502 && r.url().includes("/weather/");
+  page.on("response", (r) => r.status() >= 400 && !ign(r.url()) && !weatherDown(r) && errors.push(`HTTP ${r.status()} ${r.url()}`));
 
   // Connexion de développement puis choix de la ferme.
   await login(page);
