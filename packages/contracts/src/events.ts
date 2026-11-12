@@ -28,7 +28,7 @@ export const cloudEvent = z.object({
   time: isoDateTime,
   farmid: farmId,
   datacontenttype: z.literal("application/json").default("application/json"),
-  data: z.record(z.unknown()),
+  data: z.record(z.string(), z.unknown()),
 });
 export type CloudEvent = z.infer<typeof cloudEvent>;
 

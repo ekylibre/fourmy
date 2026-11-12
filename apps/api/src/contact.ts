@@ -18,7 +18,7 @@ const contactInput = z.object({
   profile: z.enum(PROFILES).default("autre"),
   message: z.string().trim().min(10, "Message trop court.").max(5000),
   consent: z.union([z.literal(true), z.literal("on"), z.literal("true")], {
-    errorMap: () => ({ message: "Accord requis pour être recontacté." }),
+    error: "Accord requis pour être recontacté.",
   }),
   /** Piège : champ masqué, rempli seulement par les robots. */
   website: z.string().max(200).optional(),

@@ -171,7 +171,7 @@ export const integrationStatus = z.enum(["pending", "ok", "error"]);
 export const integration = z.object({
   id: uuid,
   provider: integrationProvider,
-  settings: z.record(z.string()),
+  settings: z.record(z.string(), z.string()),
   /** Un secret est enregistré ; ses 4 derniers caractères pour le reconnaître. */
   hasSecret: z.boolean(),
   secretHint: z.string().nullable(),
@@ -180,13 +180,13 @@ export const integration = z.object({
   running: z.boolean(),
   lastSyncAt: isoDateTime.nullable(),
   lastError: z.string().nullable(),
-  lastReport: z.record(z.unknown()).nullable(),
+  lastReport: z.record(z.string(), z.unknown()).nullable(),
 });
 export type Integration = z.infer<typeof integration>;
 
 /** Configuration : paramètres + secret (facultatif s'il est déjà enregistré). */
 export const integrationWrite = z.object({
-  settings: z.record(z.string().trim().max(500)).default({}),
+  settings: z.record(z.string(), z.string().trim().max(500)).default({}),
   secret: z.string().trim().min(8).max(500).optional(),
   enabled: z.boolean().optional(),
 });

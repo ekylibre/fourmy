@@ -39,7 +39,7 @@ export const position = z.object({
   point: geoJsonGeometry, // Point EPSG:4326
   speed: z.number().nullable(),
   heading: z.number().nullable(),
-  attrs: z.record(z.unknown()).optional(),
+  attrs: z.record(z.string(), z.unknown()).optional(),
 });
 export type Position = z.infer<typeof position>;
 
@@ -52,7 +52,7 @@ export const auditLog = z.object({
   entity: z.string(),
   entityId: uuid,
   action: z.string(),
-  diff: z.record(z.unknown()),
+  diff: z.record(z.string(), z.unknown()),
   at: isoDateTime,
 });
 export type AuditLog = z.infer<typeof auditLog>;
@@ -67,7 +67,7 @@ export const importRun = z.object({
   status: z.enum(["running", "completed", "failed"]),
   report: z
     .object({
-      counts: z.record(z.number()),
+      counts: z.record(z.string(), z.number()),
       rejected: z.array(
         z.object({ entity: z.string(), id: z.string(), reason: z.string() }),
       ),

@@ -215,10 +215,10 @@ export type InterventionPlanWrite = z.infer<typeof interventionPlanWrite>;
  */
 export const interventionCompleteWrite = interventionBody.omit({ procedure: true }).superRefine((b, ctx) => {
   if (b.staffing === "free" && b.periods.length === 0) {
-    ctx.addIssue({ code: z.ZodIssueCode.too_small, minimum: 1, type: "array", inclusive: true, path: ["periods"], message: "Au moins une période de travail." });
+    ctx.addIssue({ code: "too_small", minimum: 1, origin: "array", inclusive: true, input: b.periods, path: ["periods"], message: "Au moins une période de travail." });
   }
   if (b.staffing === "crews" && b.crews.length === 0) {
-    ctx.addIssue({ code: z.ZodIssueCode.too_small, minimum: 1, type: "array", inclusive: true, path: ["crews"], message: "Au moins un attelage." });
+    ctx.addIssue({ code: "too_small", minimum: 1, origin: "array", inclusive: true, input: b.crews, path: ["crews"], message: "Au moins un attelage." });
   }
 });
 export type InterventionCompleteWrite = z.infer<typeof interventionCompleteWrite>;
@@ -301,7 +301,7 @@ export const interventionHistoryEntry = z.object({
   origin: z.string(),
   reason: z.string().nullable(),
   /** Champ modifié → valeur avant / après (modifications et corrections). */
-  changes: z.record(z.object({ before: z.unknown(), after: z.unknown() })).nullable(),
+  changes: z.record(z.string(), z.object({ before: z.unknown(), after: z.unknown() })).nullable(),
 });
 export type InterventionHistoryEntry = z.infer<typeof interventionHistoryEntry>;
 

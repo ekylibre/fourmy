@@ -35,13 +35,13 @@ export type SyncCollection = z.infer<typeof syncCollection>;
 
 /** Jeu de changements WatermelonDB pour une collection. */
 const changeSet = z.object({
-  created: z.array(z.record(z.unknown())),
-  updated: z.array(z.record(z.unknown())),
+  created: z.array(z.record(z.string(), z.unknown())),
+  updated: z.array(z.record(z.string(), z.unknown())),
   deleted: z.array(z.string()),
 });
 export type ChangeSet = z.infer<typeof changeSet>;
 
-export const syncChanges = z.record(syncCollection, changeSet);
+export const syncChanges = z.partialRecord(syncCollection, changeSet);
 export type SyncChanges = z.infer<typeof syncChanges>;
 
 // --- Enregistrements tirés (pull) -------------------------------------------
@@ -181,15 +181,15 @@ export const syncMeterReadingPushed = z.object({
 export const syncPushRequest = z.object({
   changes: z.object({
     interventions: z.object({
-      created: z.array(z.record(z.unknown())).default([]),
-      updated: z.array(z.record(z.unknown())).default([]),
+      created: z.array(z.record(z.string(), z.unknown())).default([]),
+      updated: z.array(z.record(z.string(), z.unknown())).default([]),
       deleted: z.array(z.string()).default([]),
     }),
     /** Relevés saisis hors ligne (création seulement, idempotents par `id`). */
     meter_readings: z
       .object({
-        created: z.array(z.record(z.unknown())).default([]),
-        updated: z.array(z.record(z.unknown())).default([]),
+        created: z.array(z.record(z.string(), z.unknown())).default([]),
+        updated: z.array(z.record(z.string(), z.unknown())).default([]),
         deleted: z.array(z.string()).default([]),
       })
       .optional(),
