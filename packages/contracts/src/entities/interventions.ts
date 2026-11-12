@@ -341,7 +341,6 @@ export const person = z
     id: uuid,
     farmId,
     name: z.string().min(1),
-    role: z.string().nullable(),
     userId: uuid.nullable(),
     active: z.boolean(),
   })

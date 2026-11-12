@@ -98,6 +98,15 @@ describe.skipIf(!url)("personnes (intégration)", () => {
     expect(own.status).toBe(200);
   });
 
+  it("ma fiche et mes heures (application mobile) : GET /people/me, coordonnées comprises", async () => {
+    const res = await app.request(`${base()}/people/me?at=2026-10-05`, { headers: worker.headers });
+    expect(res.status).toBe(200);
+    const me = (await res.json()) as { sheet: { userId: string; private?: { email: string } }; work: { periods: { month: { hours: number } } } };
+    expect(me.sheet.userId).toBe(worker.userId);
+    expect(me.sheet.private?.email).toBe("moi@exemple.fr");
+    expect(me.work.periods.month.hours).toBe(0);
+  });
+
   it("photo : PNG ou JPEG, visible de tous, avec ETag ; changée par la personne elle-même", async () => {
     const me = await personOf(worker.userId);
     const put = (body: BodyInit, headers = worker.headers) =>

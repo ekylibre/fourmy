@@ -3,7 +3,7 @@ import { z } from "zod";
 import { memberRole, personInvite, personProfileWrite, uuid } from "@fourmy/contracts";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
-import { createPerson, erasePerson, getPhoto, listPeople, personSheet, removeAccount, setAccountRole, setPhoto, updatePerson, PHOTO_MAX_BYTES, type Viewer } from "../repos/people.js";
+import { createPerson, erasePerson, getPhoto, personOfUser, listPeople, personSheet, removeAccount, setAccountRole, setPhoto, updatePerson, PHOTO_MAX_BYTES, type Viewer } from "../repos/people.js";
 import { BadRequest, domainCtx, problem, uuidParam } from "./helpers.js";
 import { personInterventions, personWork } from "../repos/people-work.js";
 import { invitePerson, revokeInvitation } from "../repos/invitations.js";
@@ -27,6 +27,14 @@ const personCreate = personProfileWrite.extend({ id: uuid.optional(), role: z.st
  */
 export const peopleRoutes = new Hono<Env>()
   .get("/people", async (c) => c.json({ items: await listPeople(db(), c.get("farmId"), atDay(c.req.query("at"))), nextCursor: null }))
+  // Ma fiche et mes heures (lot P5, application mobile) : la personne du compte connecté.
+  .get("/people/me", async (c) => {
+    const day = atDay(c.req.query("at"));
+    const id = await personOfUser(db(), c.get("farmId"), c.get("userId"));
+    const viewer: Viewer = { userId: c.get("userId"), role: c.get("role") };
+    const [sheet, work] = await Promise.all([personSheet(db(), c.get("farmId"), id, day, viewer), personWork(db(), c.get("farmId"), id, day)]);
+    return c.json({ sheet, work });
+  })
   .get("/people/:id", async (c) => {
     const viewer: Viewer = { userId: c.get("userId"), role: c.get("role") };
     return c.json(await personSheet(db(), c.get("farmId"), uuidParam(c, "id"), atDay(c.req.query("at")), viewer));

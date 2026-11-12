@@ -36,6 +36,7 @@ describe.skipIf(!url)("synchro mobile (intégration)", () => {
               10000, tstzrange('2020-01-01', NULL))`;
     await sql`INSERT INTO articles (id, farm_id, name, kind, unit, amm) VALUES (${articleId}, ${farmId}, 'Herbicide Y', 'phyto', 'liter', '2000123')`;
     await sql`INSERT INTO people (id, farm_id, name, user_id) VALUES (${personId}, ${farmId}, 'Dominique', ${mobile.userId})`;
+    await sql`INSERT INTO person_private (person_id, farm_id, email) VALUES (${personId}, ${farmId}, 'dominique@exemple.fr')`;
     await sql`INSERT INTO places (id, farm_id, name) VALUES (${placeId}, ${farmId}, 'Chai')`;
     await sql`INSERT INTO place_versions (id, place_id, kind, source, valid) VALUES (${crypto.randomUUID()}, ${placeId}, 'building', 'manual', tstzrange('2000-01-01', NULL))`;
     await sql`INSERT INTO containers (id, farm_id, place_id, name) VALUES (${tankId}, ${farmId}, ${placeId}, 'Cuve 1')`;
@@ -73,8 +74,10 @@ describe.skipIf(!url)("synchro mobile (intégration)", () => {
     expect(r.changes.articles.created).toHaveLength(1);
     expect(r.changes.equipments.created).toHaveLength(1);
     expect(r.changes.people.created).toEqual([
-      expect.objectContaining({ id: personId, name: "Dominique", active: true, user_id: mobile.userId }),
+      expect.objectContaining({ id: personId, name: "Dominique", active: true, user_id: mobile.userId, role: null, photo_hash: null, certiphyto_status: "none" }),
     ]);
+    // Jamais de coordonnées dans la synchro (lot P5), même quand la fiche en a.
+    expect(JSON.stringify(r.changes.people)).not.toContain("dominique@exemple.fr");
     expect(r.changes.places.created).toEqual([expect.objectContaining({ id: placeId, name: "Chai" })]);
     expect(r.changes.containers.created).toEqual([
       expect.objectContaining({ id: tankId, name: "Cuve 1", place_id: placeId, capacity_l: 5000 }),

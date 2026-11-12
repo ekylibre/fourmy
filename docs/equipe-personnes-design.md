@@ -494,7 +494,10 @@ récente (`updated_at`).
   - `photo_hash`, pour aller chercher la photo par
     `GET /people/:id/photo` ;
   - `certiphyto_status`.
-- **Nouveau** bucket `me`, envoyé au seul compte connecté :
+- ~~Nouveau bucket `me`~~ — **remplacé au lot P5** par la route
+  `GET /people/me` (WatermelonDB prend chaque clé de `changes` pour une
+  table locale : une clé `me` ferait échouer le pull). Elle renvoie, au seul
+  compte connecté :
   - sa fiche, `private` compris ;
   - son `PersonWork` à la date du pull (semaine, mois, campagne).
 - Côté zero-mobile (dépôt séparé, branche `fourmy-backend`) : un écran
@@ -688,3 +691,27 @@ en parallèle de P2 et P3.
   complétée, sans doublon. Un utilisateur qui est aussi intervenant garde
   la fiche de l'intervenant (son historique) : s'il a aussi un compte
   Fourmy, invitez cette fiche pour relier les deux.
+
+### Lot P5 (2026-11-12)
+
+- **Synchro mobile** : la collection `people` porte `first_name`,
+  `last_name`, `photo_hash` et `certiphyto_status`, sans aucune
+  coordonnée. `role` reste dans le format, toujours `null`, pour le schéma
+  mobile v5.
+- **`GET /people/me?at=`** : la fiche du compte connecté (coordonnées
+  comprises) et ses heures (`{ sheet, work }`), pour l'écran « Ma fiche »
+  de zero-mobile.
+- **Nettoyage** :
+  - migration `0047_people_drop_role.sql` : le rôle libre des personnes
+    est supprimé ;
+  - routes `POST|PATCH|DELETE /members` retirées : les accès se gèrent sur
+    la fiche (invitation, rôle, retrait) ;
+  - `GET /members` reste, pour les destinataires des alertes d'entretien ;
+  - la décision §7.1 de `interventions.md` est revue (lot P4).
+- **Tests** :
+  - synchro : aucune coordonnée, nouveaux champs ;
+  - `/people/me` ;
+  - autorisations réécrites sur les invitations et les routes de compte.
+- **Reste, hors de ce dépôt** : l'écran « Ma fiche » de zero-mobile
+  (branche `fourmy-backend`), qui lit `GET /people/me` et affiche les
+  nouveaux champs de `people`.

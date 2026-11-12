@@ -45,7 +45,6 @@ type CardRow = {
   id: string;
   farm_id: string;
   name: string;
-  role: string | null;
   user_id: string | null;
   active: boolean;
   created_at: string;
@@ -62,7 +61,7 @@ type CardRow = {
 };
 
 const CARD = sql`
-  SELECT p.id, p.farm_id, p.name, p.role, p.user_id, p.active, p.created_at, p.updated_at,
+  SELECT p.id, p.farm_id, p.name, p.user_id, p.active, p.created_at, p.updated_at,
          p.first_name, p.last_name, ph.sha256 AS photo_hash, m.role AS member_role,
          p.certiphyto_category, p.certiphyto_number, p.certiphyto_valid_until, p.external_ids,
          EXISTS (SELECT 1 FROM person_invitations iv WHERE iv.person_id = p.id AND iv.accepted_at IS NULL
@@ -77,7 +76,6 @@ function toCard(r: CardRow, at: string): PersonCard {
     id: r.id,
     farmId: r.farm_id,
     name: r.name,
-    role: r.role,
     userId: r.user_id,
     active: r.active,
     createdAt: iso(r.created_at)!,
@@ -214,9 +212,9 @@ export async function createPerson(
     }
     const c = body.certiphyto;
     await tx.execute(sql`
-      INSERT INTO people (id, farm_id, name, first_name, last_name, role, user_id, active,
+      INSERT INTO people (id, farm_id, name, first_name, last_name, user_id, active,
                           certiphyto_category, certiphyto_number, certiphyto_valid_until)
-      VALUES (${id}, ${farmId}, ${name}, ${body.firstName ?? null}, ${body.lastName ?? null}, ${body.role ?? null},
+      VALUES (${id}, ${farmId}, ${name}, ${body.firstName ?? null}, ${body.lastName ?? null},
               ${body.userId ?? null}, ${body.active ?? true}, ${c?.category ?? null}, ${c?.number ?? null}, ${c?.validUntil ?? null})
       ON CONFLICT (id) DO NOTHING`);
     if (body.private) await writePrivate(tx, farmId, id, body.private);
@@ -385,7 +383,7 @@ export async function erasePerson(db: Database, farmId: string, ctx: DomainCtx, 
     }
     const [n] = await rows<{ n: number }>(tx, sql`SELECT count(*)::int + 1 AS n FROM people WHERE name LIKE 'Personne anonymisée %'`);
     await tx.execute(sql`
-      UPDATE people SET name = ${`Personne anonymisée ${n!.n}`}, first_name = NULL, last_name = NULL, role = NULL, user_id = NULL,
+      UPDATE people SET name = ${`Personne anonymisée ${n!.n}`}, first_name = NULL, last_name = NULL, user_id = NULL,
         active = false, photo_id = NULL, certiphyto_category = NULL, certiphyto_number = NULL, certiphyto_valid_until = NULL,
         external_ids = '{}'::jsonb, updated_at = now()
       WHERE id = ${id}`);
@@ -393,5 +391,15 @@ export async function erasePerson(db: Database, farmId: string, ctx: DomainCtx, 
     if (p.photo_id) await tx.execute(sql`DELETE FROM person_photos WHERE id = ${p.photo_id}`);
     await audit(tx, farmId, ctx, id, "anonymize");
     return "anonymized";
+  });
+}
+
+/** Personne du compte connecté sur la ferme (créée si besoin, comme pour tout membre). */
+export async function personOfUser(db: Database, farmId: string, userId: string): Promise<string> {
+  return withFarm(db, farmId, async (tx) => {
+    await ensureMemberPeople(tx);
+    const [p] = await rows<{ id: string }>(tx, sql`SELECT id FROM people WHERE user_id = ${userId}`);
+    if (!p) throw new NotFound("Aucune fiche pour ce compte sur la ferme.");
+    return p.id;
   });
 }

@@ -2,6 +2,7 @@ import { sql, type SQL } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
 import { DomainError, type DomainCtx } from "@fourmy/domain";
 import {
+  certiphytoStatusAt,
   syncInterventionPushed,
   syncMeterReadingPushed,
   type SyncChanges,
@@ -29,6 +30,7 @@ export async function pull(db: Database, farmId: string, lastPulledAt: string | 
     // Le pilote peut rendre un timestamptz en chaîne ou en Date : on normalise.
     const [{ now }] = (await rows<{ now: Date | string }>(tx, sql`SELECT now() AS now`)) as [{ now: Date | string }];
     const since = lastPulledAt ?? "-infinity";
+    const today = new Date(now).toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" });
     const first = lastPulledAt === null;
 
     const parcels = await rows<Record<string, unknown>>(
@@ -52,7 +54,11 @@ export async function pull(db: Database, farmId: string, lastPulledAt: string | 
     );
     const people = await rows<Record<string, unknown>>(
       tx,
-      sql`SELECT id, name, role, active, user_id, updated_at FROM people WHERE updated_at > ${since}::timestamptz`,
+      // Jamais de coordonnées ici (lot P5) : elles passent par GET /people/me, pour la personne elle-même.
+      sql`SELECT p.id, p.name, p.first_name, p.last_name, p.active, p.user_id, p.updated_at,
+                 left(ph.sha256, 16) AS photo_hash, p.certiphyto_valid_until::text AS certiphyto_valid_until
+          FROM people p LEFT JOIN person_photos ph ON ph.id = p.photo_id
+          WHERE p.updated_at > ${since}::timestamptz`,
     );
     // Lieux et cuves : destinations des récoltes. « current » = encore en service aujourd'hui.
     const places = await rows<Record<string, unknown>>(
@@ -140,7 +146,12 @@ export async function pull(db: Database, farmId: string, lastPulledAt: string | 
       put("people", {
         id: p.id,
         name: p.name,
-        role: p.role ?? null,
+        // Rôle libre retiré (lot P5) : toujours null, gardé pour le schéma mobile v5.
+        role: null,
+        first_name: p.first_name ?? null,
+        last_name: p.last_name ?? null,
+        photo_hash: p.photo_hash ?? null,
+        certiphyto_status: certiphytoStatusAt(p.certiphyto_valid_until as string | null, today),
         active: p.active,
         user_id: p.user_id ?? null,
         updated_at_server: ms(p.updated_at),
