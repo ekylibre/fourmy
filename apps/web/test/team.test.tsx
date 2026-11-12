@@ -61,3 +61,18 @@ describe("équipe (responsable)", () => {
     expect(screen.queryByRole("button", { name: "Modifier" })).not.toBeInTheDocument();
   });
 });
+
+describe("temps de travaux d'une personne", () => {
+  it("quatre totaux, barres par mois (et en texte), répartitions, interventions", async () => {
+    const user = userEvent.setup();
+    renderApp(`/f/${FARM}/team/00000000-0000-7000-8000-000000000601?at=2026-06-30`);
+    await user.click(await screen.findByRole("tab", { name: "Temps de travaux" }));
+    expect(await screen.findByText("21,5 h")).toBeInTheDocument();
+    expect(screen.getByText("Campagne 2026")).toBeInTheDocument();
+    expect(screen.getByLabelText("Heures par mois (texte)")).toHaveTextContent("juin 26 : 21,5 h");
+    expect(screen.getByText("Vigne")).toBeInTheDocument();
+    expect(screen.getByText("81 %")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Pulvérisation" })).toHaveAttribute("href", expect.stringContaining("/interventions/00000000-0000-7000-8000-000000000401"));
+    expect(screen.getByText("Les Rouffiats")).toBeInTheDocument();
+  });
+});

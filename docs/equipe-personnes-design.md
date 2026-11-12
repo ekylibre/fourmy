@@ -588,8 +588,35 @@ en parallèle de P2 et P3.
     personnelles, lecture seule, photo, compte ;
   - `apps/web/test/team.test.tsx`.
 - **En attente** :
-  - heures et dernière intervention (lot P2), pour l'instant à `null` ;
   - invitations (lot P3) : en attendant, la fiche rattache un compte
     existant par son email ;
   - masquage des boutons de saisie pour un lecteur dans le reste de
     l'application (`useCanWrite`, prêt). L'API refuse déjà ces écritures.
+
+### Lot P2 (2026-11-12)
+
+- **Domaine** : `packages/domain/src/work-time.ts`.
+  - `workTime` : union des plages, part de chaque intervention.
+  - Fenêtres en heure de Paris : semaine, mois, 12 mois, campagne.
+  - Tests dans `test/work-time.test.ts` : chevauchements, mois à cheval,
+    passage à l'heure d'hiver.
+- **API** : `apps/api/src/repos/people-work.ts`.
+  - `GET /people/:id/work?at=` : totaux, mois, activités, procédures.
+  - `GET /people/:id/interventions?from=&to=&cursor=&limit=` : la liste
+    paginée.
+  - Les pavés reçoivent les heures du mois et la dernière intervention
+    réalisée.
+  - Visibles de tous les membres.
+- **Web** : onglet « Temps de travaux » de la fiche (`PersonWorkTab.tsx`).
+  - Quatre totaux.
+  - Barres par mois, avec leurs valeurs aussi en texte.
+  - Répartitions par activité et par type de travail.
+  - Liste des interventions (mois, campagne ou 12 mois), avec un lien vers
+    chacune.
+- **Vérifié** sur la ferme de Pierre : 148,9 h sur la campagne 2026, dont
+  128 h en avril. Le broyage du 05/10 compte pour 1,4 h.
+- **Tests** :
+  - `apps/api/test/people-work.integration.test.ts` : chevauchement
+    partagé, prorata par activité, sommes égales au total, pavés,
+    pagination ;
+  - `apps/web/test/team.test.tsx`.
