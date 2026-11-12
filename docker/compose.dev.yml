@@ -17,5 +17,18 @@ services:
       timeout: 5s
       retries: 20
 
+  # Routage tracteur (OSRM) : recalage des trajets sur la route, itinéraires.
+  # Données à préparer une fois : docker/osrm/prepare.sh (carte Geofabrik, profil tracteur).
+  osrm:
+    image: osrm/osrm-backend:v5.25.0
+    command: osrm-routed --algorithm mld --max-matching-size 500 /data/map.osrm
+    ports:
+      - "${FOURMY_OSRM_PORT:-5000}:5000"
+    volumes:
+      - fourmy_osrm:/data:ro
+    profiles: ["osrm"]
+
 volumes:
   fourmy_pgdata:
+  fourmy_osrm:
+    external: true

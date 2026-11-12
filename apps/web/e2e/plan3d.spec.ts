@@ -23,20 +23,31 @@ test("plan 3D : cuverie placée, remplissage qui suit la frise", async ({ page }
   await page.getByLabel("Date de la frise").fill("2021-12-31");
   await navTo(page, "Plan 3D", "Cartes");
   await expect(page.locator(".cesium-widget canvas")).toBeVisible({ timeout: 30_000 });
+  // Couches en barre d'icônes (la vue d'abord) : la cuverie s'ouvre à côté de son icône.
+  await expect(page.getByLabel(/^Rejeu du/)).toBeVisible();
+  const tanks = page.getByRole("button", { name: "Cuverie", exact: true });
+  await tanks.click();
   await expect(page.getByText("5 cuve(s) placée(s) · 1 non localisée(s)")).toBeVisible({ timeout: 30_000 });
   const cuve1 = page.getByRole("button", { name: "Cuve 1", exact: true }).locator("xpath=../..");
   await expect(cuve1).toContainText("60 %");
 
   // Un an plus tôt : la Cuve 1 n'a pas encore reçu de vendange.
+  // (La frise est hors de la fenêtre : elle se ferme, on la rouvre.)
   await page.getByLabel("Date de la frise").fill("2020-12-31");
   await expect(page.getByRole("heading", { name: "Plan 3D au 31/12/2020" })).toBeVisible();
+  await tanks.click();
   await expect(cuve1).toContainText("0 %");
 
   // Clic sur une cuve dans le panneau : son contenu s'affiche.
   await page.getByLabel("Date de la frise").fill("2021-12-31");
+  await expect(page.getByRole("heading", { name: "Plan 3D au 31/12/2021" })).toBeVisible();
+  await tanks.click();
   await page.getByRole("button", { name: "Cuve 1", exact: true }).click();
   await expect(page.getByText("30 hL", { exact: true })).toBeVisible();
+  // Échap ferme la fenêtre : la cuverie disparaît, la barre de rejeu reste.
   await page.keyboard.press("Escape");
+  await expect(page.getByText("5 cuve(s) placée(s) · 1 non localisée(s)")).toBeHidden();
+  await expect(page.getByRole("combobox", { name: "Matériel" })).toBeVisible();
 
   // Zoom au plus près : le relief s'arrête au niveau 22 (au-delà, l'API
   // répond 400 ; lue comme une grille, l'erreur arrêtait le rendu Cesium).

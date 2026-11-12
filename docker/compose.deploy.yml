@@ -40,6 +40,8 @@ services:
       # La perdre rend les secrets illisibles (à ressaisir dans Intégrations).
       FOURMY_SECRETS_KEY: ${FOURMY_SECRETS_KEY:?FOURMY_SECRETS_KEY requis (openssl rand -base64 32)}
       FOURMY_IFT_API_URL: ${FOURMY_IFT_API_URL:-https://ecoagri-pprd.api.agriculture.gouv.fr/ift/v5/api}
+      # Routage tracteur (docs/routage-osrm.md) : vide, la trace du rejeu reste brute.
+      FOURMY_OSRM_URL: ${FOURMY_OSRM_URL:-}
       # Formulaire de contact de fourmy.org (désactivé sans FOURMY_SMTP_HOST).
       FOURMY_SMTP_HOST: ${FOURMY_SMTP_HOST:-}
       FOURMY_SMTP_PORT: ${FOURMY_SMTP_PORT:-587}
