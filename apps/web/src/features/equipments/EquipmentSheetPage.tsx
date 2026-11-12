@@ -4,7 +4,7 @@ import { ActionIcon, Alert, Badge, Button, ColorInput, FileButton, Grid, Group, 
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Gauge, ImageUp, Pencil, Plus, Trash2 } from "lucide-react";
-import { METER_ORIGIN_LABELS, equipmentKindLabel, equipmentStateLabel, type EquipmentSheet, type FarmBrand, type MeterReading } from "@fourmy/contracts";
+import { METER_ORIGIN_LABELS, equipmentKindLabel, equipmentTypeLabel, equipmentStateLabel, type EquipmentSheet, type FarmBrand, type MeterReading } from "@fourmy/contracts";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { formatDate, formatDateTime, procedureLabel } from "../../app/labels";
@@ -68,7 +68,7 @@ function Sheet({ sheet: s }: { sheet: EquipmentSheet }) {
           <Stack gap={4}>
             <Title order={1}>{s.name}</Title>
             <Group gap="xs">
-              <Badge variant="light">{equipmentKindLabel(s.kind)}</Badge>
+              <Badge variant="light">{equipmentTypeLabel(s.type) ?? equipmentKindLabel(s.kind)}</Badge>
               <Badge variant="light" color={!s.state || s.state === "active" ? "lichen" : "gray"}>
                 {equipmentStateLabel(s.state)}
               </Badge>
@@ -186,7 +186,7 @@ function General({ sheet: s }: { sheet: EquipmentSheet }) {
                 <Row label="Mise en service">{s.commissionedAt ? formatDate(s.commissionedAt) : null}</Row>
                 <Row label="Compteur">{s.meterUnit ? "Heures moteur" : "Sans compteur"}</Row>
                 {Object.entries(s.externalIds).map(([k, v]) => (
-                  <Row key={k} label={`Identifiant ${k === "traccar" ? "Traccar" : k}`}>
+                  <Row key={k} label={k === "traccar" ? "Identifiant Traccar" : k === "traccarTool" ? "Outil annoncé par Traccar" : `Identifiant ${k}`}>
                     {v}
                   </Row>
                 ))}

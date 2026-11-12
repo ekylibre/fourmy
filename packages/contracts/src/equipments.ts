@@ -17,6 +17,34 @@ export const EQUIPMENT_KIND_LABELS: Record<string, string> = {
 };
 export const equipmentKindLabel = (kind: string) => EQUIPMENT_KIND_LABELS[kind] ?? kind;
 
+/**
+ * Types de matériel (fiche) : plus fins que la nature Ekylibre. Chacun porte
+ * sa nature et, dans @fourmy/equipment-3d (TEMPLATE_FOR_TYPE), son avatar 3D
+ * de base. Ajouter un type ici impose de lui donner un gabarit là-bas
+ * (test apps/api/test/equipment-types.test.ts).
+ */
+export const EQUIPMENT_TYPES = {
+  tractor: { label: "Tracteur", kind: "tractor" },
+  self_propelled: { label: "Automoteur", kind: "self_propelled_equipment" },
+  sower: { label: "Semoir", kind: "trailed_equipment" },
+  rotary_harrow: { label: "Herse rotative", kind: "trailed_equipment" },
+  plough: { label: "Charrue", kind: "trailed_equipment" },
+  disc_harrow: { label: "Déchaumeur à disques", kind: "trailed_equipment" },
+  cultivator: { label: "Cultivateur, vibroculteur", kind: "trailed_equipment" },
+  roller: { label: "Rouleau", kind: "trailed_equipment" },
+  shredder: { label: "Broyeur", kind: "trailed_equipment" },
+  mounted_sprayer: { label: "Pulvérisateur porté", kind: "trailed_equipment" },
+  trailed_sprayer: { label: "Pulvérisateur traîné", kind: "trailed_equipment" },
+  fertilizer_spreader: { label: "Épandeur d'engrais", kind: "trailed_equipment" },
+  trailer: { label: "Remorque", kind: "trailed_equipment" },
+  other_tool: { label: "Autre outil", kind: "trailed_equipment" },
+  fixed_equipment: { label: "Équipement fixe", kind: "fixed_equipment" },
+  connected_object: { label: "Objet connecté", kind: "connected_object" },
+} as const satisfies Record<string, { label: string; kind: keyof typeof EQUIPMENT_KIND_LABELS }>;
+export type EquipmentType = keyof typeof EQUIPMENT_TYPES;
+export const equipmentType = z.enum(Object.keys(EQUIPMENT_TYPES) as [EquipmentType, ...EquipmentType[]]);
+export const equipmentTypeLabel = (type: string | null | undefined) => (type ? (EQUIPMENT_TYPES[type as EquipmentType]?.label ?? type) : null);
+
 export const EQUIPMENT_STATE_LABELS: Record<string, string> = { active: "En service", retired: "Réformé", sold: "Vendu" };
 export const equipmentStateLabel = (state: string | null | undefined) => (state ? (EQUIPMENT_STATE_LABELS[state] ?? state) : "En service");
 
@@ -67,6 +95,8 @@ const externalIds = z.record(z.string().max(120)).default({});
 export const equipmentWrite = z.object({
   name: z.string().trim().min(1).max(120),
   kind: z.string().trim().min(1).max(60),
+  /** Type de matériel : il porte l'avatar 3D de base. */
+  type: equipmentType.nullable().optional(),
   state: z.string().trim().max(30).nullable().optional(),
   brand: z.string().trim().max(80).nullable().optional(),
   model: z.string().trim().max(120).nullable().optional(),
@@ -88,6 +118,8 @@ export const equipmentSummary = z.object({
   id: uuid,
   name: z.string(),
   kind: z.string(),
+  /** Type saisi ; null : non renseigné (l'avatar se déduit alors du nom). */
+  type: equipmentType.nullable().optional(),
   state: z.string().nullable(),
   brand: z.string().nullable(),
   brandId: uuid.nullable(),
@@ -183,7 +215,23 @@ export type EquipmentSheet = z.infer<typeof equipmentSheet>;
 // Avatar 3D (lot M)
 // ---------------------------------------------------------------------------
 
-export const avatarTemplate = z.enum(["tractor", "self_propelled", "trailed_tool", "trailed_sprayer", "mounted_tool", "trailer", "box"]);
+/** Gabarits d'avatar : la liste AVATAR_TEMPLATES de @fourmy/equipment-3d (même test). */
+export const avatarTemplate = z.enum([
+  "tractor",
+  "self_propelled",
+  "sower",
+  "rotary_harrow",
+  "plough",
+  "mounted_sprayer",
+  "fertilizer_spreader",
+  "disc_harrow",
+  "roller",
+  "mounted_tool",
+  "trailed_tool",
+  "trailed_sprayer",
+  "trailer",
+  "box",
+]);
 const meters = z.number().positive().max(60).nullable().optional();
 const color = z.string().regex(/^#[0-9A-Fa-f]{6}$/).nullable().optional();
 

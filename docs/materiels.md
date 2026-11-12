@@ -371,6 +371,22 @@ d'intervention s'adapte à cette forme.
   - pulvérisateur traîné, avec sa rampe dépliée à la largeur de travail ;
   - remorque ;
   - équipement fixe.
+- **Type de matériel → avatar de base** (2026-11-12) : la fiche porte un
+  **type** (tracteur, automoteur, semoir, herse rotative, charrue,
+  déchaumeur à disques, cultivateur, rouleau, broyeur, pulvérisateur porté
+  ou traîné, épandeur d'engrais, remorque, autre outil, équipement fixe,
+  objet connecté ; colonne `equipment_type`). Le type fixe la nature
+  Ekylibre (un semoir est un outil traîné) et le gabarit de l'avatar
+  (`TEMPLATE_FOR_TYPE`, `@fourmy/equipment-3d`). Choisir ou changer le type
+  change donc l'avatar.
+  - Ordre : gabarit choisi dans l'onglet 3D > type > nom > nature.
+  - Ajouter un type : `EQUIPMENT_TYPES` (contrats) et son gabarit dans
+    `TEMPLATE_FOR_TYPE` ; `apps/api/test/equipment-types.test.ts` échoue
+    tant qu'il en manque un, ou si le contrat ne connaît pas un gabarit.
+  - Sans type (fiches reprises d'Ekylibre), le formulaire propose celui du
+    nom (« D'après le nom : Pulvérisateur porté. Appliquer »).
+  - Les broyeurs, l'autre outil, et l'automoteur n'ont pas encore de
+    silhouette propre : outil traîné générique, automoteur générique.
 - **Gabarit proposé d'après le nom** : la reprise d'Ekylibre ne donne
   souvent que « outil traîné » (`trailed_equipment`). Le nom propose alors
   un gabarit d'outil (« Monosem » → semoir, « Tigre » → herse rotative,
@@ -441,6 +457,10 @@ d'intervention s'adapte à cette forme.
   attelage comptent, sur les périodes de cet attelage : deux tracteurs du
   même chantier ne tirent plus chacun les outils de l'autre. Ils sont reculés de la distance d'attelage du
   tracteur, le long du cap (`GET /tracks/hitches`).
+  Hors de ces périodes, l'outil que le boîtier annonce sur ses parcours
+  (attribut `tool`) est attelé, s'il est relié à un matériel (champ « Outil
+  annoncé par Traccar » de la fiche de l'outil). L'intervention saisie prime
+  sur le boîtier là où les deux se chevauchent (retours du 2026-11-12).
 - **« Tous les matériels suivis »** : la dernière position connue de chaque
   matériel rattaché à un boîtier, à la date de la frise, sur 30 jours au
   plus (`GET /tracks/latest`).

@@ -16,6 +16,7 @@ import type {
   MeterReadingResult,
   MeterReadingWrite,
 } from "@fourmy/contracts";
+import { EQUIPMENT_TYPES } from "@fourmy/contracts";
 import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
 
 /**
@@ -44,7 +45,7 @@ async function audit(tx: Tx, farmId: string, ctx: DomainCtx, entity: string, ent
 // ---------------------------------------------------------------------------
 
 const SUMMARY = sql`
-  SELECT e.id, e.name, e.kind, e.state, e.brand, e.brand_id AS "brandId", e.model,
+  SELECT e.id, e.name, e.kind, e.equipment_type AS type, e.state, e.brand, e.brand_id AS "brandId", e.model,
          e.serial_number AS "serialNumber", e.year, e.meter_unit AS "meterUnit",
          coalesce(e.logo_asset_id, b.logo_asset_id) AS "logoAssetId",
          CASE WHEN e.logo_asset_id IS NOT NULL THEN 'equipment' WHEN b.logo_asset_id IS NOT NULL THEN 'brand' END AS "logoSource",
@@ -169,18 +170,22 @@ async function ensureBrand(tx: Tx, farmId: string, name: string | null | undefin
   return b!.id;
 }
 
+/** Nature Ekylibre : celle du type quand il est donné (un semoir est un outil traîné), sinon la saisie. */
+const kindOf = (body: EquipmentWrite) => (body.type ? EQUIPMENT_TYPES[body.type].kind : body.kind);
+
 export async function createEquipment(db: Database, farmId: string, ctx: DomainCtx, body: EquipmentWrite): Promise<{ id: string }> {
   return withFarm(db, farmId, async (tx) => {
     const id = ctx.newId();
     const brandId = await ensureBrand(tx, farmId, body.brand);
-    const meterUnit = body.meterUnit === undefined ? (["tractor", "self_propelled_equipment"].includes(body.kind) ? "hours" : null) : body.meterUnit;
+    const meterUnit = body.meterUnit === undefined ? (["tractor", "self_propelled_equipment"].includes(kindOf(body)) ? "hours" : null) : body.meterUnit;
     await tx.execute(sql`
-      INSERT INTO equipments (id, farm_id, name, kind, state, brand, brand_id, model, serial_number, manufacturer_type, year,
+      INSERT INTO equipments (id, farm_id, name, kind, equipment_type, state, brand, brand_id, model, serial_number, manufacturer_type, year,
                               meter_unit, commissioned_at, aggregates, external_ids, notes)
-      VALUES (${id}, ${farmId}, ${body.name}, ${body.kind}, ${body.state ?? "active"}, ${body.brand || null}, ${brandId},
+      VALUES (${id}, ${farmId}, ${body.name}, ${kindOf(body)}, ${body.type ?? null}, ${body.state ?? "active"}, ${body.brand || null}, ${brandId},
               ${body.model || null}, ${body.serialNumber || null}, ${body.manufacturerType || null}, ${body.year ?? null},
               ${meterUnit}, ${body.commissionedAt ?? null}, ${JSON.stringify(body.aggregates)}::jsonb,
               ${JSON.stringify(body.externalIds)}::jsonb, ${body.notes || null})`);
+    await linkTraccarTool(tx, id, body.externalIds.traccarTool);
     await audit(tx, farmId, ctx, "equipment", id, "create", body);
     return { id };
   });
@@ -191,7 +196,7 @@ export async function updateEquipment(db: Database, farmId: string, ctx: DomainC
     const brandId = await ensureBrand(tx, farmId, body.brand);
     const done = await rows<{ id: string }>(
       tx,
-      sql`UPDATE equipments SET name = ${body.name}, kind = ${body.kind}, state = ${body.state ?? "active"},
+      sql`UPDATE equipments SET name = ${body.name}, kind = ${kindOf(body)}, equipment_type = ${body.type === undefined ? sql`equipment_type` : (body.type ?? null)}, state = ${body.state ?? "active"},
             brand = ${body.brand || null}, brand_id = ${brandId}, model = ${body.model || null},
             serial_number = ${body.serialNumber || null}, manufacturer_type = ${body.manufacturerType || null},
             year = ${body.year ?? null}, meter_unit = ${body.meterUnit ?? null}, commissioned_at = ${body.commissionedAt ?? null},
@@ -200,8 +205,23 @@ export async function updateEquipment(db: Database, farmId: string, ctx: DomainC
           WHERE id = ${id} RETURNING id`,
     );
     if (!done.length) throw new NotFound("Matériel introuvable");
+    await linkTraccarTool(tx, id, body.externalIds.traccarTool);
     await audit(tx, farmId, ctx, "equipment", id, "update", body);
   });
+}
+
+/**
+ * Lien posé à la main entre l'outil annoncé par le boîtier (attribut `tool`)
+ * et ce matériel (FR-GPS-17) : les parcours libres qui l'annoncent, sans
+ * outil résolu, le prennent tout de suite, sans attendre un recalcul.
+ */
+async function linkTraccarTool(tx: Tx, id: string, tool: string | undefined) {
+  if (!tool?.trim()) return;
+  await tx.execute(sql`
+    UPDATE track_sessions SET tool_equipment_id = ${id}
+    WHERE intervention_id IS NULL AND tool_equipment_id IS NULL AND equipment_id <> ${id}
+      AND lower(trim(tool_hint)) = lower(trim(${tool}))
+      AND EXISTS (SELECT 1 FROM equipments e WHERE e.id = ${id} AND e.kind NOT IN ('tractor', 'self_propelled_equipment'))`);
 }
 
 export async function addOption(db: Database, farmId: string, ctx: DomainCtx, equipmentId: string, body: EquipmentOptionWrite): Promise<EquipmentOption> {

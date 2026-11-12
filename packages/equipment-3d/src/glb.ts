@@ -1,7 +1,7 @@
 import { Document, WebIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS, KHRMaterialsUnlit } from "@gltf-transform/extensions";
 import type { AvatarParams } from "./params.js";
-import { beam, discHarrow, fertilizerSpreader, mountedSprayer, plough, rollerTool, rotaryHarrow, sower, tineCultivator } from "./tools.js";
+import { beam, discHarrow, fertilizerSpreader, mountedSprayer, plough, rollerTool, rotaryHarrow, sower, SPRAYER_BODY_MAX_M, tineCultivator } from "./tools.js";
 
 /**
  * Avatar 3D (glTF binaire) d'un matériel, à l'échelle réelle. Repère local :
@@ -391,6 +391,7 @@ function shape(p: AvatarParams, m: Mesh): Zone | undefined {
       return { x: -hitch - depth / 2, side: ww / 2 + 0.005, z: 0.35 + Math.max(0.2, H * 0.25) / 2, h: 0.15 };
     }
     case "trailed_sprayer": {
+      const W = Math.min(p.widthM, SPRAYER_BODY_MAX_M + 0.5); // cuve et voie au gabarit, la rampe seule s'élargit
       const hitch = p.hitchOffsetM;
       const body = Math.max(1.5, L - hitch);
       m.box("chassis", -hitch / 2, 0, 0.6, hitch, 0.14, 0.14);

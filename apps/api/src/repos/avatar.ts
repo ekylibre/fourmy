@@ -17,6 +17,7 @@ const iso = (v: unknown) => (v ? new Date(v as string).toISOString() : null);
 type Row = {
   name?: string | null;
   kind: string;
+  equipment_type?: string | null;
   technical: unknown;
   avatar: AvatarWrite | null;
   model_asset_id: string | null;
@@ -32,7 +33,7 @@ const LOGO_PNG = sql`
 async function load(tx: Tx, id: string): Promise<Row> {
   const [r] = await rows<Row>(
     tx,
-    sql`SELECT e.name, e.kind, e.technical, e.avatar, e.model_asset_id, b.color AS brand_color, ${LOGO_PNG} AS logo_id
+    sql`SELECT e.name, e.kind, e.equipment_type, e.technical, e.avatar, e.model_asset_id, b.color AS brand_color, ${LOGO_PNG} AS logo_id
         FROM equipments e LEFT JOIN farm_brands b ON b.id = e.brand_id WHERE e.id = ${id}`,
   );
   if (!r) throw new NotFound("Matériel introuvable");
@@ -47,7 +48,7 @@ const strip = (w: AvatarWrite | null): AvatarInput => {
   return out as AvatarInput;
 };
 
-const resolve = (r: Row): ResolvedAvatar => resolveAvatar({ kind: r.kind, name: r.name, technical: r.technical, brandColor: r.brand_color, saved: strip(r.avatar), logoId: r.logo_id });
+const resolve = (r: Row): ResolvedAvatar => resolveAvatar({ kind: r.kind, type: r.equipment_type, name: r.name, technical: r.technical, brandColor: r.brand_color, saved: strip(r.avatar), logoId: r.logo_id });
 
 export async function avatarInfo(db: Database, farmId: string, id: string): Promise<AvatarInfo> {
   return withFarm(db, farmId, async (tx) => {
@@ -124,7 +125,7 @@ export async function latestPositions(db: Database, farmId: string, at: string):
   return withFarm(db, farmId, async (tx) => {
     const list = await rows<Record<string, unknown> & Row & { id: string; name: string }>(
       tx,
-      sql`SELECT DISTINCT ON (e.id) e.id, e.name, e.kind, e.technical, e.avatar, e.model_asset_id, b.color AS brand_color, ${LOGO_PNG} AS logo_id,
+      sql`SELECT DISTINCT ON (e.id) e.id, e.name, e.kind, e.equipment_type, e.technical, e.avatar, e.model_asset_id, b.color AS brand_color, ${LOGO_PNG} AS logo_id,
                  p.time, ST_X(p.point) AS lon, ST_Y(p.point) AS lat, p.heading, p.speed
           FROM tracker_bindings t
           JOIN equipments e ON e.id = t.equipment_id
@@ -151,7 +152,8 @@ export async function latestPositions(db: Database, farmId: string, at: string):
 /**
  * Outils attelés à un matériel entre deux dates (FR-MAT-85) : les autres
  * matériels des interventions réalisées qui l'utilisent, sur leurs périodes
- * de travail. L'attribut `tool` de Traccar viendra s'y ajouter.
+ * de travail ; ailleurs, l'outil que le boîtier Traccar annonce sur ses
+ * parcours (attribut `tool`), quand il est relié à un matériel.
  */
 export async function hitches(db: Database, farmId: string, equipmentId: string, from: string, to: string): Promise<Hitch[]> {
   return withFarm(db, farmId, async (tx) => {
@@ -160,7 +162,7 @@ export async function hitches(db: Database, farmId: string, equipmentId: string,
       // Attelages (lot N3) : outils du même attelage que le matériel, sur les
       // périodes de cet attelage. Mode libre : tous les outils de
       // l'intervention, sur toutes ses périodes (déduction d'avant).
-      sql`SELECT e.id AS tool_id, e.name, e.kind, e.technical, e.avatar, e.model_asset_id, b.color AS brand_color, ${LOGO_PNG} AS logo_id,
+      sql`SELECT e.id AS tool_id, e.name, e.kind, e.equipment_type, e.technical, e.avatar, e.model_asset_id, b.color AS brand_color, ${LOGO_PNG} AS logo_id,
                  w.started_at, w.stopped_at
           FROM interventions i
           JOIN intervention_parameters me ON me.intervention_id = i.id AND me.role = 'tool' AND me.ref_id = ${equipmentId}
@@ -173,16 +175,40 @@ export async function hitches(db: Database, farmId: string, equipmentId: string,
             AND e.kind NOT IN ('tractor', 'self_propelled_equipment')
           ORDER BY w.started_at`,
     );
-    return list.map((r) => {
-      const a = resolve(r);
-      return {
-        toolId: r.tool_id,
-        toolName: r.name,
-        from: iso(r.started_at)!,
-        to: iso(r.stopped_at)!,
-        hitchOffsetM: a.params.hitchOffsetM,
-        avatarHash: r.model_asset_id ? `m${r.model_asset_id.slice(0, 8)}` : a.hash,
-      };
+    // Parcours du boîtier : outil résolu au calcul, sinon lien `traccarTool` posé depuis.
+    const announced = await rows<Record<string, unknown> & Row & { tool_id: string; name: string; started_at: string; stopped_at: string }>(
+      tx,
+      sql`SELECT e.id AS tool_id, e.name, e.kind, e.equipment_type, e.technical, e.avatar, e.model_asset_id, b.color AS brand_color, ${LOGO_PNG} AS logo_id,
+                 s.started_at, s.stopped_at
+          FROM track_sessions s
+          JOIN equipments e ON e.id = coalesce(s.tool_equipment_id,
+            (SELECT t.id FROM equipments t
+              WHERE s.tool_hint IS NOT NULL AND t.id <> s.equipment_id
+                AND lower(trim(t.external_ids->>'traccarTool')) = lower(trim(s.tool_hint))
+              ORDER BY t.id LIMIT 1))
+          LEFT JOIN farm_brands b ON b.id = e.brand_id
+          WHERE s.equipment_id = ${equipmentId} AND s.stopped_at > ${from}::timestamptz AND s.started_at < ${to}::timestamptz
+            AND e.kind NOT IN ('tractor', 'self_propelled_equipment')
+          ORDER BY s.started_at`,
+    );
+    // L'intervention saisie prime : un parcours qui chevauche un attelage déclaré est écarté.
+    const declared = list.map((r) => [Date.parse(iso(r.started_at)!), Date.parse(iso(r.stopped_at)!)] as const);
+    const free = announced.filter((r) => {
+      const [f, t] = [Date.parse(iso(r.started_at)!), Date.parse(iso(r.stopped_at)!)];
+      return !declared.some(([df, dt]) => f < dt && t > df);
     });
+    return [...list, ...free]
+      .map((r) => {
+        const a = resolve(r);
+        return {
+          toolId: r.tool_id,
+          toolName: r.name,
+          from: iso(r.started_at)!,
+          to: iso(r.stopped_at)!,
+          hitchOffsetM: a.params.hitchOffsetM,
+          avatarHash: r.model_asset_id ? `m${r.model_asset_id.slice(0, 8)}` : a.hash,
+        };
+      })
+      .sort((x, y) => x.from.localeCompare(y.from));
   });
 }

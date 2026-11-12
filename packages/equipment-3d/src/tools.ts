@@ -169,7 +169,8 @@ export function plough(p: AvatarParams, m: Mesh): Zone {
 
 /** Pulvérisateur porté : cuve à pans coupés, rampe dépliée à la largeur de travail. */
 export function mountedSprayer(p: AvatarParams, m: Mesh): Zone {
-  const W = p.widthM;
+  // Cuve au gabarit routier : la largeur de travail ne déploie que la rampe.
+  const W = Math.min(p.widthM, SPRAYER_BODY_MAX_M);
   const H = p.heightM;
   const depth = Math.max(0.9, p.lengthM - 0.4);
   headstock(m, -0.05, 1.2);
@@ -192,6 +193,9 @@ export function mountedSprayer(p: AvatarParams, m: Mesh): Zone {
   beam(m, "light", [xb - 0.05, -ww / 2, 0.62], [xb - 0.05, ww / 2, 0.62], 0.03, 0.03); // porte-buses
   return { x: (x0 + x1) / 2, side: (W - 0.4) / 2 + 0.006, z: (zb + zt) / 2, h: Math.min(0.35, (zt - zb) * 0.3) };
 }
+
+/** Largeur maximale d'une cuve de pulvérisateur (gabarit routier), même si la largeur saisie est celle de la rampe. */
+export const SPRAYER_BODY_MAX_M = 3;
 
 /** Distributeur d'engrais porté : trémie en V, deux disques d'épandage. */
 export function fertilizerSpreader(p: AvatarParams, m: Mesh): Zone {

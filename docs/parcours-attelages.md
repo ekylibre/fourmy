@@ -333,7 +333,7 @@ Légende : ✅ fait, 🟡 en partie, ⏳ à faire.
 | FR-GPS-14 | 🟡 | Mini-carte de la sélection (trace, couverture, parcelles) ✅. Le lien vers le rejeu sur la période reste à faire. |
 | FR-GPS-15 | ✅ | Parcours rattaché figé ; la dérive recalculée s'affiche (« trace modifiée ») sur l'onglet et la fiche. |
 | FR-GPS-16 | ✅ | Réglages par ferme sur la page Entretien ; seuls les parcours libres sont recalculés. |
-| FR-GPS-17 | ✅ | Outil résolu : attelage déclaré, puis `tool` Traccar relié à la main (`external_ids.traccarTool`), puis seul outil d'une intervention libre. Un nom approchant n'est qu'un indice. |
+| FR-GPS-17 | ✅ | Outil résolu : attelage déclaré, puis `tool` Traccar relié à la main (`external_ids.traccarTool`, champ « Outil annoncé par Traccar » de la fiche de l'outil ; les parcours libres qui l'annoncent sont reliés dès l'enregistrement), puis seul outil d'une intervention libre. Un nom approchant n'est qu'un indice. |
 | FR-GPS-20 à 23 | ✅ | Sélection, brouillon (attelage, conducteur habituel, périodes fusionnées, parcelles et zones, procédures suggérées, indices), rien n'est enregistré avant validation, rattachement à l'enregistrement (409 si déjà pris). |
 | FR-GPS-24 | ✅ | Ajout à une intervention du même jour, correction tracée si elle est réalisée. |
 | FR-GPS-25 | ⏳ | Plusieurs matériels suivis dans une même sélection : hors v1. |
