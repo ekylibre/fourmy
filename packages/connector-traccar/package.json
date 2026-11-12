@@ -18,5 +18,5 @@
     "@fourmy/domain": "workspace:*",
     "postgres": "3.4.5"
   },
-  "devDependencies": { "vitest": "2.1.8" }
+  "devDependencies": { "vitest": "4.1.12" }
 }

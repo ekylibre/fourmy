@@ -16,5 +16,5 @@
     "@fourmy/contracts": "workspace:*",
     "msw": "2.7.0"
   },
-  "devDependencies": { "vitest": "2.1.8" }
+  "devDependencies": { "vitest": "4.1.12" }
 }

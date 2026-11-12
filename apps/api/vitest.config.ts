@@ -7,5 +7,5 @@ import { defineConfig } from "vitest/config";
  * (« sorry, too many clients already ») sur une machine à 32 cœurs.
  */
 export default defineConfig({
-  test: { maxWorkers: 4, minWorkers: 1 },
+  test: { maxWorkers: 4 },
 });

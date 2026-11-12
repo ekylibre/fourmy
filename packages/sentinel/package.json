@@ -19,7 +19,7 @@
     "lint": "eslint src"
   },
   "devDependencies": {
-    "vitest": "2.1.8"
+    "vitest": "4.1.12"
   },
   "dependencies": {
     "@fourmy/contracts": "workspace:*"

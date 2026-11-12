@@ -23,5 +23,5 @@
     "@turf/union": "7.4.0",
     "geographiclib-geodesic": "2.2.0"
   },
-  "devDependencies": { "@types/geojson": "7946.0.16", "vitest": "2.1.8" }
+  "devDependencies": { "@types/geojson": "7946.0.16", "vitest": "4.1.12" }
 }

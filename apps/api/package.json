@@ -28,11 +28,11 @@
     "@fourmy/isoxml": "workspace:*",
     "@fourmy/sentinel": "workspace:*",
     "@fourmy/weather": "workspace:*",
-    "@hono/node-server": "1.13.8",
+    "@hono/node-server": "1.19.19",
     "@hono/zod-openapi": "0.18.3",
     "better-auth": "1.7.12",
     "drizzle-orm": "0.38.3",
-    "hono": "4.6.15",
+    "hono": "4.13.18",
     "nodemailer": "10.2.1",
     "pg": "8.23.1",
     "postgres": "3.4.5",
@@ -43,6 +43,6 @@
     "@types/pg": "8.23.1",
     "@types/smtp-server": "3.5.13",
     "smtp-server": "3.21.1",
-    "vitest": "2.1.8"
+    "vitest": "4.1.12"
   }
 }
