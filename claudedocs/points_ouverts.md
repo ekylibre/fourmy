@@ -161,11 +161,11 @@ Chaque point se lit ainsi : **titre** : description. *nature · priorité · sou
 
 79. **Documentation OpenAPI**. *doc · P2 · FR-API-1*
 80. **Figer les rôles** : qui lance les imports (`owner` ou admin), le droit d'un salarié d'écarter une récolte probable. *décision · P2 · specs §23.5*
-81. **Garder les documents d'état à jour** (README, requirements) à chaque lot. *doc · P2*
+81. **Garder les documents d'état à jour** (README, requirements) à chaque lot. *doc · P2 · recensement du 12/11*
 82. **RGPD** : export complet et suppression d'une ferme. *évolution · P3 · NFR-SEC-2*
 83. **SSO/OIDC en SaaS**, multi-exploitation annoncée. *évolution · P3 · FR-ACC-2/4*
 84. **Compression Timescale compatible avec la RLS** ; NATS. *dette · P3 · architecture §11*
-85. **Tests web sous Node 25 sans `NODE_OPTIONS`**. *dette · P3*
+85. **Tests web sous Node 25 sans `NODE_OPTIONS`**. *dette · P3 · mémoire du poste de dev*
 86. **Recette à rejouer** : modulation depuis le plan, fertilisation complète, plusieurs matériels. *qualité · P3 · plan_de_test §8*
 87. **i18n et procédure d'auto-hébergement**. *évolution · P3 · NFR-UX-2, NFR-OSS-1*
 
