@@ -1008,6 +1008,11 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
                 onChange={(e) => setReason(e.currentTarget.value)}
               />
             )}
+            {submit.isPaused && (
+              <Alert color="paille" role="status" title="Pas de réseau">
+                L'enregistrement partira dès le retour de la connexion. Gardez cette page ouverte d'ici là.
+              </Alert>
+            )}
             <Button type="submit" loading={submit.isPending}>
               {editing ? (correcting ? "Enregistrer la correction" : "Enregistrer les modifications") : planned ? "Enregistrer la réalisation" : mode === "planned" ? "Planifier" : "Enregistrer"}
             </Button>

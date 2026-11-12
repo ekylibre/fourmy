@@ -87,6 +87,11 @@ describe.skipIf(!url)("parcelles depuis la carte (intégration)", () => {
     expect(cad.overlapM2! / sheet.areaM2).toBeCloseTo(0.5, 1);
     // Un point de la parcelle : signalée comme existante.
     expect((await identifyPoint(db, farmId, 44.80045, 0.50065, 2026, fake.fetchImpl)).existing).toMatchObject({ id, name: "Le Grand Champ Maïs 2026" });
+    // Version close (parcelle reprise d'Ekylibre, une par campagne) : trouvée pour sa campagne, pas après.
+    await sql`UPDATE land_parcel_versions SET valid = tstzrange(lower(valid), '2026-12-31') WHERE land_parcel_id = ${id}`;
+    expect((await identifyPoint(db, farmId, 44.80045, 0.50065, 2026, fake.fetchImpl)).existing).toMatchObject({ id });
+    expect((await identifyPoint(db, farmId, 44.80045, 0.50065, 2027, fake.fetchImpl)).existing).toBeNull();
+    await sql`UPDATE land_parcel_versions SET valid = tstzrange(lower(valid), NULL) WHERE land_parcel_id = ${id}`;
     // Routes : fiche, et identification refusée sans coordonnées.
     expect((await app.request(`/api/v1/farms/${farmId}/land-parcels/${id}/sheet`, { headers })).status).toBe(200);
     expect((await app.request(`/api/v1/farms/${farmId}/land-parcels/identify?lat=x`, { headers })).status).toBe(400);

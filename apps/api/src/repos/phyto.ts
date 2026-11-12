@@ -292,7 +292,7 @@ export async function checkCompliance(tx: Tx, body: CheckableBody, selfId: strin
       result.level = worstLevel(result.indicators.map((i) => i.level));
     }
     checks.push({ articleId: input.articleId, ...result });
-    if (product && !mixable.some((m) => m.articleId === input.articleId)) mixable.push({ articleId: input.articleId, name: product.ref.name, mixCodes: product.mixCodes });
+    if (product && !mixable.some((m) => m.articleId === input.articleId)) mixable.push({ articleId: input.articleId, name: articles.find((a) => a.id === input.articleId)?.name ?? product.ref.name, mixCodes: product.mixCodes });
   }
   // Mélange des produits de la bouillie (arrêté de 2015) : un feu rouge de plus.
   const mixture = checkMixture(mixable);

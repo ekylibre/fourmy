@@ -63,7 +63,10 @@ export async function identifyPoint(db: Database, farmId: string, lat: number, l
     const [existing] = await rows<{ id: string; name: string }>(
       tx,
       sql`SELECT lp.id, lp.name FROM land_parcels lp JOIN land_parcel_versions v ON v.land_parcel_id = lp.id
-          WHERE upper_inf(v.valid) AND ST_Intersects(v.shape, ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326)) LIMIT 1`,
+          WHERE (upper_inf(v.valid) OR v.valid @> make_date(${year}, 6, 1)::timestamptz)
+            AND ST_Intersects(v.shape, ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326))
+          -- Version de la campagne d'abord : les parcelles reprises d'Ekylibre ont une fin (une par campagne).
+          ORDER BY (v.valid @> make_date(${year}, 6, 1)::timestamptz) DESC LIMIT 1`,
     );
     return { cap: capResult, cadastre: cadastral, capYear, unavailable: cap === null || cadastre === null, existing: existing ?? null };
   });
