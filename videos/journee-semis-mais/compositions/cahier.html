@@ -1,0 +1,65 @@
+<template>
+  <style>
+
+    @font-face { font-family: "Bricolage Grotesque"; font-weight: 700; src: url("assets/fonts/bricolage-grotesque-latin-700-normal.woff2") format("woff2"); }
+    @font-face { font-family: "Bricolage Grotesque"; font-weight: 800; src: url("assets/fonts/bricolage-grotesque-latin-800-normal.woff2") format("woff2"); }
+    @font-face { font-family: "IBM Plex Sans"; font-weight: 400; src: url("assets/fonts/ibm-plex-sans-latin-400-normal.woff2") format("woff2"); }
+    @font-face { font-family: "IBM Plex Sans"; font-weight: 600; src: url("assets/fonts/ibm-plex-sans-latin-600-normal.woff2") format("woff2"); }
+
+    #cahier {
+
+      --paper: #F6F4EE; --ink: #1E2421; --muted: #4E5A54; --lichen: #2F6B4F; --lichen-strong: #1E4A36;
+      --paille: #D9A441; --paille-ink: #6B4A0E; --paille-tint: #F6E7C3;
+
+      position: absolute; inset: 0; background: var(--paper); overflow: hidden;
+      font-family: "IBM Plex Sans", sans-serif; color: var(--ink);
+    }
+    #cahier .frame {
+      position: absolute; left: 120px; top: 64px; width: 1680px; height: 840px; border-radius: 18px;
+      background: #fff; overflow: hidden; box-shadow: 0 8px 24px rgba(30, 36, 33, 0.12);
+    }
+    #cahier .shot { position: absolute; inset: 0; }
+    #cahier .shot img { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+    #cahier .say { position: absolute; left: 120px; top: 942px; width: 1680px; }
+    #cahier .say span {
+      display: block; font-family: "Bricolage Grotesque", sans-serif; font-weight: 700; font-size: 44px;
+      line-height: 1.15; letter-spacing: -0.01em;
+    }
+    #cahier .cursor { position: absolute; left: 0; top: 0; width: 34px; height: 34px; z-index: 5; transform-origin: 4px 3px; }
+
+    #cahier .sheet { transform-origin: 50% 70%; position: absolute; left: 60px; top: 250px; width: 1560px; height: 416px; overflow: hidden; }
+    #cahier .sheet img { position: absolute; left: 0; top: -273px; width: 2777px; max-width: none; }
+    #cahier .mark { position: absolute; left: 0; top: 276px; width: 1560px; height: 138px; background: var(--paille); opacity: 0.28; transform-origin: 0 50%; mix-blend-mode: multiply; }
+    #cahier .doc { position: absolute; left: 60px; top: 80px; font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; font-size: 52px; letter-spacing: -0.01em; }
+    #cahier .sub { position: absolute; left: 60px; top: 156px; font-size: 32px; color: var(--muted); }
+
+  </style>
+  <div id="cahier" data-composition-id="cahier" data-width="1920" data-height="1080">
+    <div class="frame">
+      <div class="doc">Cahier d'enregistrement 2026</div>
+      <div class="sub">Lespourcy Maïs 2026 · 7,8 ha · zone vulnérable · sols limoneux</div>
+      <div class="sheet"><img src="assets/screens/06-cahier-lespourcy.png" alt="" />
+        <div class="shot clip" id="cahier-mw" data-start="1.2" data-duration="6.3"><div class="mark" id="cahier-m"></div></div>
+      </div>
+    </div>
+    <div class="say clip" id="cahier-s0" data-start="0.3" data-duration="7.2"><span>Et le cahier de fertilisation s'est rempli tout seul.</span></div>
+  </div>
+  <script>
+    (() => {
+      const tl = gsap.timeline({ paused: true });
+
+      const FW = 1680, FH = 840;
+      // Cadrage : le point (cx, cy) de la page capturée au centre du cadre, à l'échelle s.
+      const at = (cx, cy, s) => ({ x: FW / 2 - cx * s, y: FH / 2 - cy * s, scale: s });
+      // Position dans le cadre d'un point de la page, pour un cadrage donné.
+      const pt = (f, px, py) => ({ x: f.x + px * f.scale, y: f.y + py * f.scale });
+      const wipe = (tl, sel, t) => tl.fromTo(sel, { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.47, ease: "power3.out" }, t);
+
+      wipe(tl, "#cahier-s0 span", 0.35);
+      tl.fromTo("#cahier-m", { scaleX: 0 }, { scaleX: 1, duration: 0.53, ease: "power2.out" }, 1.2);
+      tl.fromTo("#cahier .sheet", { scale: 1 }, { scale: 1.04, duration: 5.7, ease: "none" }, 1.8);
+      tl.set({}, {}, 7.5);
+      window.__timelines["cahier"] = tl;
+    })();
+  </script>
+</template>

@@ -204,7 +204,7 @@ function tractor(p: AvatarParams, m: Mesh): Zone {
   const front = Math.max(0.35, (L - wb) * 0.62);
   const rear = Math.max(0.25, L - wb - front);
   const tr = Math.min(0.62, Math.max(0.3, W * 0.21)); // largeur des pneus arrière
-  const tf = tr * 0.78;
+  const tf = tr * 0.88;
   const yr = W / 2 - tr / 2;
   const yf = Math.max(W * 0.4 - tf / 2, 0.45);
 
@@ -237,18 +237,33 @@ function tractor(p: AvatarParams, m: Mesh): Zone {
   wheel(wb, yf, df, tf);
   wheel(wb, -yf, df, tf);
 
+  // Proportions d'un tracteur standard (Claas Arion, John Deere 6R…) :
+  // capot étroit et haut, au niveau du haut des roues arrière, cabine posée
+  // au-dessus du pont arrière, grandes vitres, masse de lestage à l'avant.
+  const cabL = Math.min(1.85, Math.max(1.4, wb * 0.66));
+  const cx0 = -cabL * 0.25; // lunette arrière, un peu derrière l'essieu
+  const cx1 = cx0 + cabL; // pare-brise
+  const cabW = Math.min(1.75, W * 0.72);
+  const innerW = Math.max(0.8, 2 * (yr - tr / 2) - 0.06); // entre les pneus arrière
+  const zf = Math.max(dr * 0.62, 0.8); // plancher
+  const zr = H - 0.14; // sous le toit
+  const zw = Math.min(Math.max(dr * 1.02, zf + 0.3), zr - 0.8); // bas des vitres
+
   // Châssis et pont avant.
-  const hoodW = Math.min(1.2, W * 0.5);
-  const zb = Math.max(df * 0.42, 0.5); // bas du capot
-  const ztRear = Math.max(dr * 0.86, zb + 0.65); // haut du capot côté cabine
-  const ztFront = ztRear - Math.min(0.15, (ztRear - zb) * 0.2);
-  const xf = wb + front - 0.08; // nez
-  m.box("chassis", (0.2 + xf) / 2, 0, Math.max(0.3, df * 0.25), xf - 0.2, hoodW * 0.8, zb - Math.max(0.3, df * 0.25));
+  const hoodW = Math.min(0.95, W * 0.42);
+  const zb = Math.max(df * 0.6, 0.55); // bas du capot
+  const ztRear = Math.min(Math.max(dr * 1.1, zb + 0.75), zw + 0.15); // haut du capot côté cabine
+  const ztFront = ztRear - Math.min(0.14, (ztRear - zb) * 0.15);
+  const xf = Math.max(wb + front * 0.8, wb + 0.6); // nez
+  m.box("chassis", (0.2 + xf) / 2, 0, Math.max(0.3, df * 0.25), xf - 0.2, hoodW * 0.75, zb - Math.max(0.3, df * 0.25));
   m.box("chassis", wb, 0, df / 2 - 0.08, 0.22, 2 * yf - tf, 0.16); // essieu avant
   m.box("chassis", 0, 0, dr / 2 - 0.1, 0.3, 2 * yr - tr, 0.2); // pont arrière
+  // Masse de lestage et son support, devant le nez.
+  const xw = xf + Math.min(0.3, Math.max(0.15, L - wb - front * 0.8 - rear * 0.5));
+  m.box("dark", (xf + xw) / 2 + 0.02, 0, zb - 0.32, xw - xf + 0.04, hoodW * 1.05, 0.36);
 
   // Capot effilé : côtés teinte de base, dessus plus clair, nez arrondi.
-  const x0 = 0.5;
+  const x0 = cx1 - 0.04;
   const hood: V2[] = [
     [x0, zb],
     [xf, zb],
@@ -276,17 +291,10 @@ function tractor(p: AvatarParams, m: Mesh): Zone {
   const grilleH = (ztFront - zb) * 0.7;
   m.box("dark", xf + 0.02, 0, zb + 0.02, 0.06, hoodW * 0.86, grilleH);
   for (const s of [1, -1]) m.box("light", xf + 0.055, s * hoodW * 0.28, zb + grilleH * 0.45, 0.02, hoodW * 0.18, grilleH * 0.22);
-  m.box("bodyDark", xf + 0.04, 0, zb - 0.12, 0.12, hoodW * 0.95, 0.14); // pare-chocs
 
-  // Cabine : soubassement, montants, vitres teintées, toit blanc, gyrophare.
-  const cabL = Math.min(1.9, Math.max(1.3, wb * 0.6));
-  const cx0 = -cabL * 0.42;
-  const cx1 = cx0 + cabL;
-  const cabW = Math.min(W - 2 * tr + 0.3, 1.85);
-  const zf = dr * 0.6; // plancher
-  const zr = H - 0.12; // sous le toit
-  const zw = zf + 0.45; // bas des vitres
-  m.box("body", (cx0 + cx1) / 2, 0, zf, cabL, cabW, zw - zf);
+  // Cabine : caisson entre les pneus, puis montants et grandes vitres au-dessus des ailes.
+  m.box("body", (cx0 + cx1) / 2, 0, zf, cabL, Math.min(cabW, innerW), zw - zf);
+  m.box("body", (cx0 + cx1) / 2, 0, zw - 0.06, cabL, cabW, 0.06); // ceinture de caisse
   const post = 0.07;
   for (const x of [cx0 + post / 2, cx1 - post / 2]) for (const s of [1, -1]) m.box("body", x, s * (cabW / 2 - post / 2), zw, post, post, zr - zw);
   m.box("glass", cx1 - 0.02, 0, zw, 0.02, cabW - 2 * post, zr - zw); // pare-brise
@@ -317,14 +325,14 @@ function tractor(p: AvatarParams, m: Mesh): Zone {
     m.arcBand("body", wb, df / 2, df / 2 + 0.05, df / 2 + 0.1, Math.PI * 0.2, Math.PI * 0.85, Math.min(fIn, fOut), Math.max(fIn, fOut), 8);
   }
 
-  // Échappement (à droite, devant la cabine) et rétroviseurs.
-  m.cylinderZ("exhaust", cx1 + 0.18, -(hoodW / 2 - 0.12), 0.055, ztRear - 0.05, Math.min(H - 0.05, ztRear + (H - ztRear) * 0.85));
+  // Échappement vertical (à droite, contre le montant avant) et rétroviseurs.
+  m.cylinderZ("exhaust", cx1 + 0.12, -(cabW / 2 - 0.1), 0.06, ztRear - 0.1, zr);
   for (const s of [1, -1]) {
     m.box("dark", cx1 - 0.05, s * (cabW / 2 + 0.17), zr - 0.18, 0.03, 0.34, 0.03); // bras
     m.box("dark", cx1 - 0.02, s * (cabW / 2 + 0.36), zr - 0.55, 0.05, 0.13, 0.32); // miroir
   }
   // Marchepied et attelage arrière.
-  m.box("dark", cx0 + cabL * 0.55, cabW / 2 - 0.05, zf - 0.32, 0.35, 0.2, 0.06);
+  m.box("dark", cx0 + cabL * 0.55, Math.min(cabW, innerW) / 2 - 0.05, zf - 0.32, 0.35, 0.2, 0.06);
   m.box("chassis", -rear / 2 - 0.15, 0, dr * 0.32, rear, 0.62, 0.2);
   return { x: x0 + (xf - x0) * 0.55, side: hoodW / 2 + 0.006, z: zb + (ztRear - zb) * 0.62, h: Math.min(0.26, (ztRear - zb) * 0.32) };
 }

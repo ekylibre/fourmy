@@ -1,0 +1,61 @@
+<template>
+  <style>
+
+    @font-face { font-family: "Bricolage Grotesque"; font-weight: 700; src: url("assets/fonts/bricolage-grotesque-latin-700-normal.woff2") format("woff2"); }
+    @font-face { font-family: "Bricolage Grotesque"; font-weight: 800; src: url("assets/fonts/bricolage-grotesque-latin-800-normal.woff2") format("woff2"); }
+    @font-face { font-family: "IBM Plex Sans"; font-weight: 400; src: url("assets/fonts/ibm-plex-sans-latin-400-normal.woff2") format("woff2"); }
+    @font-face { font-family: "IBM Plex Sans"; font-weight: 600; src: url("assets/fonts/ibm-plex-sans-latin-600-normal.woff2") format("woff2"); }
+
+    #matin {
+
+      --paper: #F6F4EE; --ink: #1E2421; --muted: #4E5A54; --lichen: #2F6B4F; --lichen-strong: #1E4A36;
+      --paille: #D9A441; --paille-ink: #6B4A0E; --paille-tint: #F6E7C3;
+
+      position: absolute; inset: 0; background: var(--paper); overflow: hidden;
+      font-family: "IBM Plex Sans", sans-serif; color: var(--ink);
+    }
+    #matin .frame {
+      position: absolute; left: 120px; top: 64px; width: 1680px; height: 840px; border-radius: 18px;
+      background: #fff; overflow: hidden; box-shadow: 0 8px 24px rgba(30, 36, 33, 0.12);
+    }
+    #matin .shot { position: absolute; inset: 0; }
+    #matin .shot img { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+    #matin .say { position: absolute; left: 120px; top: 942px; width: 1680px; }
+    #matin .say span {
+      display: block; font-family: "Bricolage Grotesque", sans-serif; font-weight: 700; font-size: 44px;
+      line-height: 1.15; letter-spacing: -0.01em;
+    }
+    #matin .cursor { position: absolute; left: 0; top: 0; width: 34px; height: 34px; z-index: 5; transform-origin: 4px 3px; }
+
+    #matin .block { position: absolute; left: 160px; top: 50%; transform: translateY(-50%); width: 1600px; }
+    #matin .hour span { display: block; font-weight: 600; font-size: 56px; color: var(--paille-ink); font-variant-numeric: tabular-nums; margin-bottom: 18px; }
+    #matin .line span { display: block; font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; font-size: 120px; line-height: 1.04; letter-spacing: -0.02em; }
+    #matin .line span.accent { color: var(--lichen); }
+    #matin .hour, #matin .line { position: relative; }
+
+  </style>
+  <div id="matin" data-composition-id="matin" data-width="1920" data-height="1080">
+    <div class="block" data-hold="true">
+      <div class="hour clip" id="matin-h" data-start="0" data-duration="4.5"><span>7 h 10</span></div>
+      <div class="line clip" id="matin-l0" data-start="0" data-duration="4.5"><span>Aujourd'hui,</span></div>
+      <div class="line clip" id="matin-l1" data-start="0.80" data-duration="3.70"><span>je sème mon maïs.</span></div>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const tl = gsap.timeline({ paused: true });
+
+      const FW = 1680, FH = 840;
+      // Cadrage : le point (cx, cy) de la page capturée au centre du cadre, à l'échelle s.
+      const at = (cx, cy, s) => ({ x: FW / 2 - cx * s, y: FH / 2 - cy * s, scale: s });
+      // Position dans le cadre d'un point de la page, pour un cadrage donné.
+      const pt = (f, px, py) => ({ x: f.x + px * f.scale, y: f.y + py * f.scale });
+      const wipe = (tl, sel, t) => tl.fromTo(sel, { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.47, ease: "power3.out" }, t);
+
+      wipe(tl, "#matin-l1 span", 0.80);
+      tl.set({}, {}, 4.5);
+
+      window.__timelines["matin"] = tl;
+    })();
+  </script>
+</template>
