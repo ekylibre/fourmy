@@ -1,17 +1,63 @@
 ---
+import { Image } from "astro:assets";
 import Base from "../layouts/Base.astro";
 import FeatureFigure from "../components/FeatureFigure.astro";
-import { APP_URL, features, STATUS_LABELS } from "../lib/site";
+import { APP_URL } from "../lib/site";
+import { captures } from "../lib/captures";
 import { catalogue } from "../lib/catalogue";
 import { release, formatDate } from "../lib/release";
 
-const highlights = features.filter((f) => f.status === "disponible").slice(0, 6);
 const latest = release.entries.slice(0, 3);
+const drone = captures.get("accueil-3d")!;
+const attelage = captures.get("accueil-3d-attelage")!;
+
+/** Les trois domaines de la page d'accueil : une capture, et ce que chacun couvre. */
+const pillars = [
+  {
+    id: "interoperabilite",
+    title: "Interopérabilité",
+    text: "Fourmy lit ce que vos machines et vos capteurs savent déjà, et le range dans la ferme.",
+    capture: "accueil-interoperabilite",
+    alt: "Fiche d'une intervention : attelage tracteur et herse, parcours GPS rattaché, trace sur la photo aérienne",
+    items: [
+      ["GPS", "Les boîtiers des tracteurs découpent la journée en parcours, avec la surface travaillée, l'outil attelé et sa largeur ; deux clics en font une intervention."],
+      ["Météo", "Chaque intervention garde sa météo, et le tableau de bord dit quand pulvériser. Open-Meteo, OpenWeather, meteoblue ; vos stations Weenat et Sencrop en test."],
+      ["Isobus", "Cartes de modulation tirées du satellite, en ISO-XML ou Shapefile pour la console, ou envoyées par agrirouter (en test)."],
+    ],
+  },
+  {
+    id: "reglementaire",
+    title: "Réglementaire",
+    text: "Les contrôles se font à la saisie, et les registres se remplissent tout seuls.",
+    capture: "accueil-reglementaire",
+    alt: "Fiche d'un traitement : produits, pictogrammes, ZNT et délais, contrôle réglementaire des doses et des usages",
+    items: [
+      ["Dose et registre phyto", "Dose, usage autorisé, ZNT et délais vérifiés produit par produit ; registre phytosanitaire au format réglementaire 2027."],
+      ["IFT", "Calculé pour chaque traitement par le service du ministère de l'Agriculture."],
+      ["Plan de fumure", "Bilan azoté prévisionnel et cahier d'enregistrement en zone vulnérable nitrates."],
+      ["PAC", "Îlots et parcelles du registre parcellaire graphique repris, actualisés d'un clic."],
+    ],
+  },
+  {
+    id: "parcellaire",
+    title: "Parcellaire",
+    text: "Chaque parcelle a son histoire : on la découpe sans perdre ce qui s'y est fait.",
+    capture: "accueil-parcellaire",
+    alt: "Fiche d'une parcelle de maïs sur la photo aérienne, avec ses onglets cultures, cadastre, eau, végétation, sol et météo",
+    items: [
+      ["Activités", "Une culture par parcelle et par campagne, qui règle les usages phyto, l'IFT et la fertilisation."],
+      ["Découpe", "Découper, fusionner, dessiner : les surfaces restent justes et l'ancienne parcelle reste datée."],
+      ["Zonage", "Zone réellement travaillée dessinée sur la carte, zones vulnérables, cours d'eau à proximité."],
+      ["Cadastre", "Les parcelles cadastrales sous chaque parcelle culturale."],
+      ["IGN", "Photo aérienne, carte, relief et bâtiments de la Géoplateforme de l'IGN."],
+    ],
+  },
+] as const;
 ---
 
 <Base title="Fourmy" description="Fourmy, le jumeau numérique de la ferme : parcelles, interventions, stocks, cuverie et traces GPS, à n'importe quelle date. Logiciel libre, nouvelle génération d'Ekylibre.">
-  <section class="wrap hero">
-    <div>
+  <section class="home-hero">
+    <div class="wrap home-hero-head">
       <h1>Le jumeau numérique de votre ferme</h1>
       <p class="lead">
         Parcelles, interventions, stocks, cuves, tracteurs : Fourmy tient la ferme à jour, au champ comme au bureau, et vous
@@ -21,65 +67,93 @@ const latest = release.entries.slice(0, 3);
         <a class="btn btn-primary" href="/fonctionnalites/">Découvrir les fonctionnalités</a>
         <a class="btn btn-secondary" href="/contact/">Nous écrire</a>
       </div>
-      <div class="facts">
-        <div><strong>{catalogue.procedures}</strong> procédures prêtes à saisir</div>
-        <div><strong>{catalogue.shapes.length}</strong> formes d'intervention</div>
-        <div><strong>{release.version}</strong> version actuelle</div>
+    </div>
+
+    <figure class="field">
+      <div class="field-frame">
+        <Image
+          class="field-drone"
+          src={drone}
+          alt="Plan 3D vu du ciel : les parcelles de maïs teintées par l'indice de végétation, le trajet du tracteur sur la route et son étiquette au champ"
+          widths={[800, 1200, 1600]}
+          sizes="(max-width: 80rem) 100vw, 80rem"
+          format="webp"
+          loading="eager"
+        />
+        <figure class="field-inset">
+          <Image src={attelage} alt="Le même instant, caméra derrière le tracteur : la herse rotative attelée travaille dans les rangs de chaumes" widths={[300, 600]} sizes="18rem" format="webp" loading="eager" />
+          <figcaption>Même instant, caméra derrière l'attelage</figcaption>
+        </figure>
       </div>
-    </div>
-    <FeatureFigure capture="tableau-de-bord" alt="Tableau de bord de Fourmy sur une ferme de test" eager />
+      <figcaption class="field-caption">
+        Rejeu du 5 octobre 2026 à 16 h 48, ferme de grandes cultures du Béarn. Un tracteur et sa herse rotative dans le maïs ;
+        parcelles teintées par le NDVI Sentinel-2 du 24 septembre ; trajet sur route recalé sur la carte.
+      </figcaption>
+    </figure>
+
+    <dl class="wrap facts">
+      <div><dt>{catalogue.procedures}</dt><dd>procédures prêtes à saisir</dd></div>
+      <div><dt>{catalogue.shapes.length}</dt><dd>formes d'intervention</dd></div>
+      <div><dt>{release.version}</dt><dd>version actuelle</dd></div>
+    </dl>
   </section>
 
-  <section class="section wrap">
-    <h2>Ce que Fourmy fait déjà</h2>
-    <div class="grid">
-      {
-        highlights.map((f) => (
-          <article class="card">
-            <span class={`badge badge-${f.status}`}>{STATUS_LABELS[f.status]}</span>
-            <h3>{f.title}</h3>
-            <p class="muted">{f.text}</p>
-          </article>
-        ))
-      }
-    </div>
-    <p><a href="/fonctionnalites/">Toutes les fonctionnalités, en images →</a></p>
+  <section class="section wrap" aria-labelledby="deja">
+    <h2 id="deja">Ce que Fourmy fait déjà</h2>
+    {
+      pillars.map((p) => (
+        <article class="pillar" id={p.id} aria-labelledby={`${p.id}-titre`}>
+          <FeatureFigure capture={p.capture} alt={p.alt} />
+          <div class="pillar-text">
+            <h3 id={`${p.id}-titre`}>{p.title}</h3>
+            <p class="pillar-lead">{p.text}</p>
+            <dl class="pillar-list">
+              {p.items.map(([term, desc]) => (
+                <div>
+                  <dt>{term}</dt>
+                  <dd>{desc}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </article>
+      ))
+    }
+    <p class="pillar-more"><a href="/fonctionnalites/">Toutes les fonctionnalités, en images</a></p>
   </section>
 
-  <section class="section wrap">
-    <div class="grid">
-      <article class="card">
-        <h3>Nouvelle génération d'Ekylibre</h3>
-        <p class="muted">
-          Fourmy reprend Ekylibre, logiciel libre de gestion agricole développé depuis 2008, avec un modèle plus simple et vos
-          données reprises telles quelles.
-        </p>
-      </article>
-      <article class="card">
-        <h3>Libre et réversible</h3>
-        <p class="muted">
-          Code ouvert sous licence AGPL, données exportables : votre ferme ne dépend pas d'un éditeur. La comptabilité reste
-          tenue dans <a href="https://lyvre.org/">Lyvre</a>.
-        </p>
-      </article>
-      <article class="card">
-        <h3>Au champ, même sans réseau</h3>
-        <p class="muted">L'application mobile enregistre hors ligne et envoie au retour de la connexion.</p>
-      </article>
+  <section class="section wrap promises" aria-label="Nos engagements">
+    <div>
+      <h3>Nouvelle génération d'Ekylibre</h3>
+      <p class="muted">
+        Fourmy reprend Ekylibre, logiciel libre de gestion agricole développé depuis 2008, avec un modèle plus simple et vos
+        données reprises telles quelles.
+      </p>
+    </div>
+    <div>
+      <h3>Libre et réversible</h3>
+      <p class="muted">
+        Code ouvert sous licence AGPL, données exportables : votre ferme ne dépend pas d'un éditeur. La comptabilité reste tenue
+        dans <a href="https://lyvre.org/">Lyvre</a>.
+      </p>
+    </div>
+    <div>
+      <h3>Au champ, même sans réseau</h3>
+      <p class="muted">L'application mobile enregistre hors ligne et envoie au retour de la connexion.</p>
     </div>
   </section>
 
   <section class="section wrap">
     <h2>Dernières nouveautés</h2>
-    <ul>
+    <ul class="news">
       {
         latest.map((e) => (
           <li>
-            <strong>{e.text}</strong> <span class="muted">— version {e.version}, {formatDate(e.date)}</span>
+            <strong>{e.text}</strong> <span class="muted">Version {e.version}, {formatDate(e.date)}.</span>
           </li>
         ))
       }
     </ul>
-    <p><a href="/changelog/">Toutes les nouveautés →</a> · <a href={APP_URL}>Se connecter à l'application</a></p>
+    <p><a href="/changelog/">Toutes les nouveautés</a> ou <a href={APP_URL}>se connecter à l'application</a>.</p>
   </section>
 </Base>
