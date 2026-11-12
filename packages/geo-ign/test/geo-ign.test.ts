@@ -52,6 +52,12 @@ describe("relief IGN", () => {
     const fake = (async () => new Response("<ServiceException/>", { headers: { "content-type": "text/xml" } })) as typeof fetch;
     await expect(fetchHeightmap({ west: 0, south: 44, east: 1, north: 45 }, 2, fake)).rejects.toThrow(/indisponible/);
   });
+  it("400 « LayerNotDefined » passager de la Géoplateforme : signalé comme 503 (à retenter), un vrai 400 reste 400", async () => {
+    const xml = (code: string) =>
+      (async () => new Response(`<ServiceExceptionReport><ServiceException code="${code}">Layer unknown</ServiceException></ServiceExceptionReport>`, { status: 400, headers: { "content-type": "text/xml" } })) as typeof fetch;
+    await expect(fetchHeightmap({ west: 0, south: 44, east: 1, north: 45 }, 2, xml("LayerNotDefined"))).rejects.toMatchObject({ status: 503 });
+    await expect(fetchHeightmap({ west: 0, south: 44, east: 1, north: 45 }, 2, xml("InvalidCRS"))).rejects.toMatchObject({ status: 400 });
+  });
 });
 
 describe("BD TOPO", () => {

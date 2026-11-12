@@ -70,7 +70,12 @@ export async function fetchHeightmap(
   const type = res.headers.get("content-type") ?? "";
   if (!res.ok || !type.startsWith("image/x-bil")) {
     const retry = Number(res.headers.get("retry-after"));
-    throw new IgnHttpError(`Relief IGN indisponible (${res.status} ${type})`, res.status, Number.isFinite(retry) && retry > 0 ? retry : null);
+    // Constaté le 2026-11-12 : par moments, un serveur de la Géoplateforme répond 400
+    // « LayerNotDefined » pour la couche du relief, puis la sert à l'essai suivant.
+    // Erreur passagère : traitée comme un 503, donc retentée.
+    const body = res.status === 400 ? await res.text().catch(() => "") : "";
+    const status = /LayerNotDefined/.test(body) ? 503 : res.status;
+    throw new IgnHttpError(`Relief IGN indisponible (${res.status} ${type}${status !== res.status ? ", couche momentanément inconnue" : ""})`, status, Number.isFinite(retry) && retry > 0 ? retry : null);
   }
   return decodeBil(await res.arrayBuffer(), size);
 }

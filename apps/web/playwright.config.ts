@@ -31,5 +31,16 @@ export default defineConfig({
         launchOptions: { args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] },
       },
     },
+    {
+      // Firefox : le plan 3D seulement. Les lignes drapées de Cesium y arrêtaient la vue
+      // (« d is not a function ») ; on vérifie que le rendu tient. `npx playwright install firefox`.
+      name: "firefox",
+      testMatch: /plan3d\.spec\.ts/,
+      use: {
+        ...devices["Desktop Firefox"],
+        viewport: { width: 1440, height: 900 },
+        launchOptions: { firefoxUserPrefs: { "webgl.force-enabled": true } },
+      },
+    },
   ],
 });

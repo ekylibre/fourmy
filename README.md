@@ -101,6 +101,9 @@ contrôle phyto faux.
 Application web : http://localhost:5173 — connexion avec le compte affiché
 par `seed:dev` (e-mail prérempli en développement). Parcours de bout en bout :
 API + `vite preview` démarrés, puis `DATABASE_URL=… corepack pnpm --filter @fourmy/web e2e`.
+Les navigateurs pilotables s'installent une fois :
+`corepack pnpm --filter @fourmy/web exec playwright install chromium firefox`
+(Firefox ne rejoue que le plan 3D).
 
 ### Site public, version et nouveautés
 
