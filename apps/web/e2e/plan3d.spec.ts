@@ -7,7 +7,9 @@ import { login, navTo } from "./shared";
  * IGN : une tuile manquante est tolérée (repli prévu), une exception non.
  */
 test("plan 3D : cuverie placée, remplissage qui suit la frise", async ({ page }) => {
-  test.setTimeout(120_000); // Cesium en WebGL logiciel + zoom au plus près : ~60 s
+  // Cesium en WebGL logiciel + zoom au plus près : ~60 s sur un poste, plus de 2 min sur
+  // les machines de la CI (scène plus riche depuis la végétation et les rangs).
+  test.setTimeout(process.env.CI ? 300_000 : 120_000);
   const crashes: string[] = [];
   page.on("pageerror", (e) => crashes.push(e.message));
   // Cesium n'émet pas d'exception de page quand le rendu casse : il l'écrit.

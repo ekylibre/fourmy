@@ -8,10 +8,13 @@ import { login, navTo } from "./shared";
  */
 test("connexion, cuverie dans le temps, carte, intervention jusqu'au registre", async ({ page }) => {
   const errors: string[] = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  page.on("console", (m) => m.type() === "error" && !m.text().startsWith("Failed to load resource") && errors.push(m.text()));
+  // Les serveurs de tuiles de l'IGN (Géoplateforme) répondent par moments 400 puis servent
+  // la tuile : ces erreurs-là ne disent rien de Fourmy et ne font pas échouer le parcours.
+  const ign = (s: string) => s.includes("data.geopf.fr");
+  page.on("pageerror", (e) => !ign(e.message) && errors.push(e.message));
+  page.on("console", (m) => m.type() === "error" && !m.text().startsWith("Failed to load resource") && !ign(m.text()) && errors.push(m.text()));
   // Ressources en échec : on veut l'URL (la console ne la donne pas).
-  page.on("response", (r) => r.status() >= 400 && errors.push(`HTTP ${r.status()} ${r.url()}`));
+  page.on("response", (r) => r.status() >= 400 && !ign(r.url()) && errors.push(`HTTP ${r.status()} ${r.url()}`));
 
   // Connexion de développement puis choix de la ferme.
   await login(page);

@@ -62,7 +62,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm migrate
-      - run: pnpm --filter @fourmy/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @fourmy/web exec playwright install --with-deps chromium firefox
       - name: Démarrer l'API et l'application
         run: |
           PORT=3000 node apps/api/dist/server.js > api.log 2>&1 &
