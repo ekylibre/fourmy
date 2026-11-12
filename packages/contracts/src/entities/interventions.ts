@@ -66,6 +66,12 @@ export const interventionInput = z.object({
   articleId: uuid,
   quantity: z.number().positive(),
   per: quantityPer,
+  /**
+   * Unité de saisie, si elle diffère de celle de l'article : un fertilisant
+   * stocké en tonnes se saisit en kg, ou en litres si sa densité est connue.
+   * Le stock est converti dans l'unité de l'article.
+   */
+  unit: z.string().trim().min(1).max(40).optional(),
   /** Lot consommé ; à défaut, le lot le mieux pourvu à la date. */
   lotId: uuid.optional(),
   /** Lieu de prélèvement ; à défaut, celui du lot. */

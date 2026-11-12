@@ -50,7 +50,7 @@ import { invalidateAfterIntervention, useActivities, useCrewTemplates, useEquipm
 import { useFarm } from "../../app/farm";
 import { RegulatoryPictos } from "../phyto/Hazards";
 import { PrecautionsPanel } from "../phyto/Precautions";
-import { crewRules, dangerMessages, mergePeriods, toFree } from "@fourmy/domain";
+import { crewRules, dangerMessages, inputUnitChoices, mergePeriods, toFree } from "@fourmy/domain";
 import { ActivityBadge, activityOfParcel } from "../activities/ActivityBadge";
 import { MapBoundary } from "../../components/MapBoundary";
 import { ProcedureIcon } from "../../components/ProcedureIcon";
@@ -71,6 +71,8 @@ type QuantityRow = {
   articleId: string | null;
   quantity: number | "";
   per: QuantityPer;
+  /** Unité de saisie d'un fertilisant, si autre que celle de l'article (kg d'un engrais stocké en tonnes…). */
+  unit?: string;
   to: string | null;
   keep?: { lotId?: string; from?: InterventionInput["from"] };
   /** Entretien : matériel qui reçoit la pièce ou le fluide. */
@@ -223,7 +225,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       .values(),
   ];
   const [inputs, setInputs] = useState<QuantityRow[]>(
-    planned?.inputs.map((i) => ({ articleId: i.articleId, quantity: i.quantity, per: i.per, to: null, keep: { lotId: i.lotId, from: i.from }, equipmentId: i.equipmentId })) ?? [],
+    planned?.inputs.map((i) => ({ articleId: i.articleId, quantity: i.quantity, per: i.per, unit: i.unit, to: null, keep: { lotId: i.lotId, from: i.from }, equipmentId: i.equipmentId })) ?? [],
   );
   const [outputs, setOutputs] = useState<QuantityRow[]>(
     planned?.outputs.map((o) => ({
@@ -278,8 +280,11 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   const nitrogenOf = (row: QuantityRow) => {
     const a = article(row.articleId);
     if (!a || row.quantity === "") return null;
-    return nitrogenNote(fertilizers.data?.get(a.id), { quantity: Number(row.quantity), per: row.per, unit: a.unit }, treatedM2 > 0 ? treatedM2 / 10_000 : null, inputDay);
+    return nitrogenNote(fertilizers.data?.get(a.id), { quantity: Number(row.quantity), per: row.per, unit: row.unit ?? a.unit }, treatedM2 > 0 ? treatedM2 / 10_000 : null, inputDay);
   };
+  // Unités de saisie d'un fertilisant : la sienne, ses voisines, le volume ou la masse si la densité est connue.
+  const unitChoices = (a: ReturnType<typeof article>) =>
+    a?.kind === "fertilizer" ? inputUnitChoices(a.unit, fertilizers.data?.get(a.id)?.composition?.density ?? null) : a ? [a.unit] : [];
   const nitrogenTotal = inputs.reduce((s, r) => {
     const n = nitrogenOf(r);
     return n?.ok ? s + n.totalKgHa : s;
@@ -357,6 +362,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         articleId: r.articleId!,
         quantity: Number(r.quantity),
         per: r.per,
+        ...(r.unit && r.unit !== article(r.articleId)?.unit && unitChoices(article(r.articleId)).includes(r.unit) ? { unit: r.unit } : {}),
         ...(r.keep?.lotId ? { lotId: r.keep.lotId } : {}),
         ...(r.keep?.from ? { from: r.keep.from } : {}),
         ...(shape === "maintenance" && r.equipmentId && maintained.includes(r.equipmentId) ? { equipmentId: r.equipmentId } : {}),
@@ -428,7 +434,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         fertDraft = {
           startedAt,
           parcelIds: parcels,
-          inputs: full.inputs.filter((i) => article(i.articleId)?.kind === "fertilizer").map(({ articleId, quantity, per }) => ({ articleId, quantity, per })),
+          inputs: full.inputs.filter((i) => article(i.articleId)?.kind === "fertilizer").map(({ articleId, quantity, per, unit }) => ({ articleId, quantity, per, ...(unit ? { unit } : {}) })),
           areaM2: treatedM2 > 0 ? treatedM2 : null,
           interventionId: editing?.id ?? null,
           // Conditions d'épandage (lot AJ) : gel et forte pluie d'après la météo de la saisie.
@@ -504,6 +510,8 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
     rows.map((row, i) => {
       const a = article(row.articleId);
       const update = (patch: Partial<QuantityRow>) => setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+      const units = kind === "input" ? unitChoices(a) : a ? [a.unit] : [];
+      const unit = row.unit && units.includes(row.unit) ? row.unit : a?.unit;
       return (
         <Stack key={i} gap={6}>
           <Group align="flex-end" wrap="nowrap">
@@ -514,7 +522,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               style={{ flex: 2 }}
               data={options}
               value={row.articleId}
-              onChange={(v) => update({ articleId: v })}
+              onChange={(v) => update({ articleId: v, unit: undefined })}
             />
             <NumberInput
               label={i === 0 ? "Quantité" : undefined}
@@ -526,14 +534,24 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               value={row.quantity}
               onChange={(v) => update({ quantity: v === "" ? "" : Number(v) })}
             />
+            {units.length > 1 && (
+              <Select
+                aria-label="Unité"
+                w={130}
+                allowDeselect={false}
+                data={units.map((u) => ({ value: u, label: unitLabel(u) }))}
+                value={unit ?? null}
+                onChange={(v) => update({ unit: v && v !== a?.unit ? v : undefined })}
+              />
+            )}
             <SegmentedControl
               aria-label="Quantité par"
               size="xs"
               value={row.per}
               onChange={(v) => update({ per: v as QuantityPer })}
               data={[
-                { value: "hectare", label: a ? `${unitLabel(a.unit)}/ha` : "par ha" },
-                { value: "total", label: a ? `${unitLabel(a.unit)} au total` : "total" },
+                { value: "hectare", label: unit ? `${unitLabel(unit)}/ha` : "par ha" },
+                { value: "total", label: unit ? `${unitLabel(unit)} au total` : "total" },
               ]}
             />
             <ActionIcon
@@ -547,7 +565,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
           </Group>
           {kind === "input" && row.per === "hectare" && a && row.quantity !== "" && treatedM2 > 0 && (
             <Text size="xs" c="dimmed" className="lv-num">
-              ≈ {(Number(row.quantity) * (treatedM2 / 10_000)).toLocaleString("fr-FR", { maximumFractionDigits: 3 })} {unitLabel(a.unit)} au total sur{" "}
+              ≈ {(Number(row.quantity) * (treatedM2 / 10_000)).toLocaleString("fr-FR", { maximumFractionDigits: 3 })} {unitLabel(unit ?? a.unit)} au total sur{" "}
               {formatHa(treatedM2)}
             </Text>
           )}

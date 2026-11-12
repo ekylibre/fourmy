@@ -462,7 +462,7 @@ export async function checkApplicationTx(tx: Tx, farmId: string, req: Fertilizat
     let efficient: number | null = 0;
     for (const i of fert) {
       const f = fertilizers.get(i.articleId)!;
-      const n = nitrogen(f, day, i.quantity, i.per === "hectare" ? `${f.unit}_per_hectare` : f.unit, areaHa);
+      const n = nitrogen(f, day, i.quantity, i.per === "hectare" ? `${i.unit ?? f.unit}_per_hectare` : (i.unit ?? f.unit), areaHa);
       if ("missing" in n) {
         indicators.push({ code: "fert_composition", level: "warning", message: `${f.name} : ${n.missing}, l'azote apporté n'est pas compté.` });
         efficient = null;
@@ -551,7 +551,7 @@ export async function checkApplicationTx(tx: Tx, farmId: string, req: Fertilizat
       if (p.zone === "in" || p.zone === "partial") {
         const current = fert.flatMap((i) => {
           const f = fertilizers.get(i.articleId)!;
-          const n = nitrogen(f, day, i.quantity, i.per === "hectare" ? `${f.unit}_per_hectare` : f.unit, areaHa);
+          const n = nitrogen(f, day, i.quantity, i.per === "hectare" ? `${i.unit ?? f.unit}_per_hectare` : (i.unit ?? f.unit), areaHa);
           return "missing" in n || !(n.totalKgHa > 0) ? [] : [{ date: day, product: f.name, composition: n.composition, nTotalKgHa: n.totalKgHa, nEfficientKgHa: n.efficientKgHa }];
         });
         const cover = await coverAt(tx, p.parcelId, day, req.startedAt, settings.campaignStartMmdd);

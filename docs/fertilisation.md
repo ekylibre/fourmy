@@ -79,6 +79,8 @@ Les tables du COMIFER sont reprises telles quelles, sources citées. L'accord du
 
 ### Saisie d'une intervention de fertilisation
 
+Un fertilisant se saisit dans l'unité de son choix : celle de l'article (souvent la tonne pour les fermes reprises d'Ekylibre), le kilogramme, ou le litre et le m³ quand la densité de sa composition est connue. Le stock est converti dans l'unité de l'article.
+
 L'encadré **Directive nitrates** se met à jour pendant la saisie :
 - azote apporté par hectare (total et efficace) ;
 - calendrier d'interdiction d'épandage selon la culture, le type de fertilisant et les zones de la commune ;
