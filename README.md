@@ -31,6 +31,8 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | [`docs/materiels.md`](docs/materiels.md) | Matériels : fiche, compteur et relevés, plan d'entretien et échéances, interventions d'entretien, pièces à commander, alertes, avatar 3D (mode d'emploi et API) |
 | [`docs/parcours-attelages.md`](docs/parcours-attelages.md) · [`docs/parcours-attelages-design.md`](docs/parcours-attelages-design.md) | Parcours GPS d'un matériel, intervention tirée des parcours, attelages dans l'intervention : exigences et design |
 | [`docs/materiels-entretien.md`](docs/materiels-entretien.md) · [`docs/materiels-entretien-design.md`](docs/materiels-entretien-design.md) | Matériels et entretien : exigences (et bilan de réalisation), design (et écarts à la réalisation) |
+| [`docs/equipe-personnes-design.md`](docs/equipe-personnes-design.md) | Équipe et personnes : fiche personne, données personnelles, rôle lecture seule, temps de travaux, invitations, import Ekylibre, synchro mobile |
+| [`docs/routage-osrm.md`](docs/routage-osrm.md) | Routage tracteur (OSRM auto-hébergé) : trajets du rejeu recalés sur la route |
 
 ## État du projet (2026-11-12)
 
@@ -59,6 +61,8 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | Télédétection, croissance, irrigation, 3D (lots Y à AC) | ✅ Sentinel-2 par ferme (NDVI, NDRE, NDMI), récoltes probables, végétation et météo du plan 3D, modèle de croissance, bilan hydrique et irrigations (`docs/teledetection.md`, `docs/modele-croissance.md`, `docs/jumeau-3d.md`) |
 | Modulation (lot AD) | ✅ cartes de modulation par zones, export ISO-XML et Shapefile, envoi agrirouter (non essayé sur un vrai compte ; `docs/modulation.md`) |
 | Fertilisation azotée (lots AE à AQ) | ✅ zonage nitrates, sols et analyses, plan prévisionnel de fumure (Nouvelle-Aquitaine), contrôles à la saisie, cahier d'enregistrement ; saisie des engrais en kg ou en litres (`docs/fertilisation.md`) |
+| Équipe et personnes (lots P1 à P5) | ✅ page Équipe en pavés et fiche personne (photo, coordonnées réservées, contrat, Certiphyto), rôle lecture seule, temps de travaux d'après les interventions, invitations par email ou lien, import Ekylibre des personnes, fiche et heures pour le mobile (`docs/equipe-personnes-design.md`) |
+| Plan 3D et matériels (12/11) | ✅ vue pleine hauteur, couches en barre d'icônes, plein écran, barre de temps ; outil Traccar attelé au rejeu ; trajets recalés par OSRM ; types de matériel porteurs de l'avatar, largeur de rampe (`docs/jumeau-3d.md`, `docs/routage-osrm.md`, `docs/materiels.md`) |
 | Migration réelle et recette | ✅ trois fermes reprises (08/11) ; recettes des 11 et 12/11 sur la ferme pilote de grandes cultures (`claudedocs/plan_de_test_global.md`), spécification métier (`docs/specifications-metier.md`) |
 
 ### À reprendre
@@ -117,9 +121,10 @@ graphique ; la CI n'a pas de WebGL sous Firefox).
 
 Comptes locaux **better-auth** (e-mail + mot de passe) : cookie de session
 pour le web, jeton signé `Authorization: Bearer` (en-tête `set-auth-token` à
-la connexion) pour le mobile. L'inscription libre est fermée : l'administrateur
-crée les comptes, le responsable de la ferme les y ajoute (page **Équipe**) et
-rattache chaque personne (intervenant) à son compte.
+la connexion) pour le mobile. L'inscription libre est fermée : le responsable de la ferme
+invite une personne depuis sa fiche (page **Équipe**), par email ou par un
+lien à lui transmettre ; elle crée son compte en acceptant. L'administrateur
+peut aussi créer un compte (`user:create`).
 
 ```bash
 # mot de passe lu sur l'entrée standard (jamais en argument)

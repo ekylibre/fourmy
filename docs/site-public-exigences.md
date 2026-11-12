@@ -139,6 +139,10 @@
    leurs parcelles (fixtures anonymisées, choix retenu). Recommandé : leur
    accord écrit, ou réserver aux captures les vues qui ne situent pas la
    ferme (stocks, cuverie, registre) et une carte recadrée.
+   **Réglé pour la ferme de Pierre (grandes cultures)** : accord écrit
+   obtenu (confirmé le 2026-11-12). Les captures de la page d'accueil (3D
+   et NDVI, interopérabilité, réglementaire, parcellaire) viennent de sa
+   ferme, sans coordonnées personnelles ni secret d'intégration à l'écran.
 2. **Boîte `contact@fourmy.org`** : à créer chez Gandi (ou redirection), et
    accès SMTP d'envoi (compte dédié) à fournir dans `.env.prod`.
 3. **Domaine canonique** : `fourmy.org` (www redirigé) — proposé.

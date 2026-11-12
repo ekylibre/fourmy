@@ -56,13 +56,65 @@ main { padding-block: 3rem 5rem; }
 .grid { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); }
 .card { background: var(--lv-surface); border: 1px solid var(--lv-line); border-radius: 14px; padding: 1.5rem; }
 .card h3 { margin-bottom: 0.4em; }
-.figure { border-radius: 12px; border: 1px solid var(--lv-line); overflow: hidden; background: var(--lv-surface-sunken); box-shadow: var(--lv-shadow-float); }
+.figure { margin: 0; border-radius: 12px; border: 1px solid var(--lv-line); overflow: hidden; background: var(--lv-surface-sunken); box-shadow: var(--lv-shadow-float); }
 .badge { display: inline-block; font-size: 0.8rem; font-weight: 600; padding: 0.15rem 0.6rem; border-radius: 999px; margin-bottom: 0.75rem; }
 .badge-disponible, .badge-en-cours { background: var(--lv-sauge); color: var(--lv-lichen-strong); }
 .badge-en-test, .badge-prochainement { background: var(--lv-paille-tint); color: var(--lv-paille-ink); }
 .badge-a-venir, .badge-plus-tard { background: var(--lv-ardoise-tint); color: var(--lv-ardoise); }
-.facts { display: flex; gap: 2.5rem; flex-wrap: wrap; margin-top: 1.5rem; }
-.facts strong { display: block; font: 800 2.2rem/1 var(--font-title); color: var(--lv-lichen); }
+/* Chiffres clés de l'accueil : la valeur, puis ce qu'elle compte. */
+.facts { display: flex; gap: 2.5rem; flex-wrap: wrap; margin: 4.5rem auto 0; }
+.facts div { margin: 0; }
+.facts dt { font: 800 2.2rem/1 var(--font-title); color: var(--lv-lichen); }
+.facts dd { margin: 0.25rem 0 0; color: var(--lv-ink-muted); }
+
+/* Accueil : le champ vu du drone, la caméra derrière l'attelage posée dessus. */
+.home-hero { padding-block: 1rem 2rem; }
+.home-hero-head { display: grid; gap: 0.25rem; }
+.home-hero-head h1 { max-width: 16ch; }
+.home-hero-head .lead { font-size: 1.25rem; color: var(--lv-ink-muted); max-width: 40rem; }
+.field { margin: 2.5rem 0 0; }
+.field-frame { position: relative; width: min(100% - 2.5rem, 80rem); margin-inline: auto; }
+.field-drone { width: 100%; border-radius: 16px; border: 1px solid var(--lv-line); box-shadow: var(--lv-shadow-float); background: var(--lv-surface-sunken); }
+.field-inset {
+  position: absolute; right: clamp(0.75rem, 3vw, 2.5rem); bottom: -3rem; width: clamp(10rem, 24vw, 19rem); margin: 0;
+  background: var(--lv-surface); padding: 0.4rem; border-radius: 12px; border: 1px solid var(--lv-line); box-shadow: var(--lv-shadow-float);
+}
+.field-inset img { border-radius: 8px; }
+.field-inset figcaption { font-size: 0.8rem; color: var(--lv-ink-muted); padding: 0.35rem 0.25rem 0.1rem; line-height: 1.35; }
+.field-caption {
+  width: min(100% - 2.5rem, 80rem); margin: 1rem auto 0; font-size: 0.95rem; color: var(--lv-ink-muted);
+  padding-right: calc(clamp(10rem, 24vw, 19rem) + clamp(1.5rem, 4vw, 3.5rem)); /* la place de l'incrustation */
+}
+@media (max-width: 52rem) {
+  .field-inset { bottom: -2rem; width: 44%; }
+  .field-inset figcaption { display: none; }
+  .field-caption { padding-right: 0; margin-top: 3rem; }
+  .facts { margin-top: 2.5rem; }
+}
+
+/* « Ce que Fourmy fait déjà » : trois domaines, une capture et ce que chacun couvre. */
+.pillar { display: grid; grid-template-columns: 1.35fr 1fr; gap: 3rem; align-items: start; padding-block: 2.75rem; border-top: 1px solid var(--lv-line); }
+.pillar:nth-of-type(even) { grid-template-columns: 1fr 1.35fr; }
+.pillar:nth-of-type(even) .figure { order: 2; }
+.pillar-text h3 { font-size: 1.6rem; margin-bottom: 0.3em; }
+.pillar-lead { color: var(--lv-ink-muted); font-size: 1.1rem; }
+.pillar-list { margin: 1.25rem 0 0; }
+.pillar-list div { display: grid; grid-template-columns: 9rem 1fr; gap: 0.15rem 1rem; padding: 0.75rem 0; border-top: 1px solid var(--lv-line); }
+.pillar-list dt { font-weight: 600; color: var(--lv-lichen-strong); }
+.pillar-list dd { margin: 0; }
+.pillar-more { padding-top: 1rem; border-top: 1px solid var(--lv-line); }
+@media (max-width: 52rem) {
+  .pillar, .pillar:nth-of-type(even) { grid-template-columns: 1fr; gap: 1.5rem; }
+  .pillar:nth-of-type(even) .figure { order: 0; }
+  .pillar-list div { grid-template-columns: 1fr; }
+}
+
+/* Engagements : trois paragraphes, sans cartes. */
+.promises { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.5rem; }
+.promises > div { border-top: 3px solid var(--lv-lichen); padding-top: 1rem; }
+@media (max-width: 52rem) { .promises { grid-template-columns: 1fr; gap: 1.5rem; } }
+.news { padding-left: 1.2rem; }
+.news li { margin-bottom: 0.5rem; }
 
 /* Fonctionnalités : capture + texte, en alternance. */
 .feature { display: grid; grid-template-columns: 1fr 1.25fr; gap: 2.5rem; align-items: center; padding-block: 2.5rem; border-top: 1px solid var(--lv-line); }

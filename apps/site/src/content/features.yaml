@@ -22,11 +22,12 @@ features:
     title: Plan 3D de l'exploitation
     text: >-
       Relief et photo IGN, bâtiments à leur hauteur, cuves qui se remplissent au fil des
-      vendanges, et rejeu des passages de tracteurs : la caméra suit l'avatar 3D du
-      tracteur et de son outil attelé, ou survole toute la parcelle comme un drone pendant
-      que le tracé de la journée se dessine.
+      vendanges, NDVI des parcelles, et rejeu des passages de tracteurs : la caméra suit
+      l'avatar 3D du tracteur et de son outil attelé, ou survole la ferme comme un drone,
+      pendant que le tracé de la journée se dessine. Les trajets sur route suivent la
+      route, et une barre de temps place le rejeu à l'instant voulu, en plein écran.
     status: disponible
-    capture: plan-3d
+    capture: accueil-3d
     since: 0.18.0
   - id: satellite
     title: Suivi des cultures par satellite
@@ -214,8 +215,9 @@ features:
   - id: avatar-3d
     title: Un avatar 3D pour chaque matériel
     text: >-
-      Chaque tracteur a son avatar à ses dimensions, à ses couleurs et avec son logo ;
-      il parcourt le plan 3D au rejeu des traces GPS.
+      Chaque tracteur a son avatar à ses dimensions, à ses couleurs et avec son logo, et
+      chaque outil sa forme selon son type — semoir, herse, charrue, pulvérisateur avec sa
+      rampe à la bonne largeur. Ils parcourent le plan 3D au rejeu des traces GPS.
     status: disponible
     capture: avatar-3d
     since: 0.46.0
@@ -227,17 +229,22 @@ features:
     status: en-test
     since: 0.21.0
   - id: equipe
-    title: Équipe et accès
+    title: Équipe, fiches et temps de travaux
     text: >-
-      Comptes personnels, rôles responsable et salarié ; chaque ferme est cloisonnée.
+      Une fiche par personne, avec ou sans compte : photo, coordonnées réservées au
+      responsable et à la personne, contrat, Certiphyto et son échéance. Ses heures
+      viennent des interventions saisies, par mois, par culture et par type de travail.
+      Une invitation par email ou par lien lui ouvre un compte ; le rôle « lecture seule »
+      convient au conseiller ou au comptable.
     status: disponible
-    capture: equipe
+    capture: equipe-temps
     since: 0.20.0
   - id: reprise
     title: Reprise de vos données Ekylibre
     text: >-
-      Parcelles, interventions, stocks et cuves repris d'Ekylibre ; le registre
-      phytosanitaire reste identique à l'original.
+      Parcelles, interventions, stocks, cuves et personnes repris d'Ekylibre ; le registre
+      phytosanitaire reste identique à l'original, et un nouvel import ne remplace jamais
+      ce que vous avez saisi dans Fourmy.
     status: disponible
     since: 0.9.0
   - id: stations-meteo
