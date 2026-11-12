@@ -1,3 +1,4 @@
+import { whenStyleLoaded } from "../../carto/when-style-loaded";
 import { useEffect, useRef, useState } from "react";
 import { Map as MlMap, NavigationControl, ScaleControl, setWorkerUrl, type GeoJSONSource, type LngLatBoundsLike } from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
@@ -135,7 +136,8 @@ export function ParcelMap({
     });
     m.addControl(new NavigationControl({ showCompass: false }), "top-right");
     m.addControl(new ScaleControl({ unit: "metric" }), "bottom-left");
-    m.on("load", () => setReady(true));
+    // Prête dès que le style est chargé, sans attendre les tuiles IGN.
+    whenStyleLoaded(m, () => setReady(true));
     m.on("click", (e) => clickRef.current?.({ lng: e.lngLat.lng, lat: e.lngLat.lat }));
     // Un geste de l'utilisateur (pas un fitBounds) : on ne recadre plus de soi-même.
     m.on("movestart", (e) => {
