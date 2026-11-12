@@ -1,6 +1,7 @@
 import { Document, WebIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS, KHRMaterialsUnlit } from "@gltf-transform/extensions";
 import type { AvatarParams } from "./params.js";
+import { beam, discHarrow, fertilizerSpreader, mountedSprayer, plough, rollerTool, rotaryHarrow, sower, tineCultivator } from "./tools.js";
 
 /**
  * Avatar 3D (glTF binaire) d'un matériel, à l'échelle réelle. Repère local :
@@ -331,9 +332,25 @@ function tractor(p: AvatarParams, m: Mesh): Zone {
     m.box("dark", cx1 - 0.05, s * (cabW / 2 + 0.17), zr - 0.18, 0.03, 0.34, 0.03); // bras
     m.box("dark", cx1 - 0.02, s * (cabW / 2 + 0.36), zr - 0.55, 0.05, 0.13, 0.32); // miroir
   }
-  // Marchepied et attelage arrière.
-  m.box("dark", cx0 + cabL * 0.55, Math.min(cabW, innerW) / 2 - 0.05, zf - 0.32, 0.35, 0.2, 0.06);
-  m.box("chassis", -rear / 2 - 0.15, 0, dr * 0.32, rear, 0.62, 0.2);
+  // Marchepied (deux marches) et réservoir sous la porte gauche.
+  const yStep = Math.min(cabW, innerW) / 2 + 0.02;
+  m.box("dark", cx0 + cabL * 0.62, yStep - 0.1, zf - 0.32, 0.35, 0.22, 0.05);
+  m.box("dark", cx0 + cabL * 0.62, yStep - 0.1, zf - 0.62, 0.35, 0.22, 0.05);
+  m.box("bodyDark", cx1 + 0.25, yStep - 0.15, zb - 0.15, 0.5, 0.3, 0.42);
+  // Montants de portes et phares de travail sur le toit.
+  for (const s of [1, -1]) m.box("body", (cx0 + cx1) / 2 + 0.1, s * (cabW / 2 - post / 2), zw, post, post, zr - zw);
+  for (const s of [1, -1]) m.box("light", cx1 + 0.08, s * (cabW / 2 - 0.15), zr + 0.01, 0.05, 0.16, 0.08);
+  // Relevage trois points et prise de force : les bras inférieurs finissent au point
+  // d'attelage (hitchOffsetM derrière l'essieu), là où l'outil porté s'accroche.
+  const xh = -p.hitchOffsetM;
+  for (const s of [1, -1]) {
+    beam(m, "dark", [-0.3, s * 0.36, dr * 0.34], [xh, s * 0.44, 0.44], 0.08, 0.06); // bras inférieurs
+    beam(m, "dark", [-0.25, s * 0.32, zf + 0.05], [-0.75, s * 0.36, zf - 0.05], 0.07, 0.07); // bras de relevage
+    beam(m, "dark", [-0.72, s * 0.36, zf - 0.05], [-0.72, s * 0.4, dr * 0.34 - 0.02], 0.05, 0.05); // chandelles
+  }
+  beam(m, "dark", [-0.35, 0, zf - 0.15], [xh - 0.1, 0, Math.min(1.05, zf - 0.1)], 0.07, 0.07); // 3e point
+  m.box("light", -0.48, 0, dr * 0.42, 0.18, 0.08, 0.08); // prise de force
+  m.box("chassis", -rear / 2 - 0.1, 0, dr * 0.2, rear * 0.8, 0.3, 0.12); // barre d'attelage
   return { x: x0 + (xf - x0) * 0.55, side: hoodW / 2 + 0.006, z: zb + (ztRear - zb) * 0.62, h: Math.min(0.26, (ztRear - zb) * 0.32) };
 }
 
@@ -384,13 +401,22 @@ function shape(p: AvatarParams, m: Mesh): Zone | undefined {
       m.box("dark", -hitch - body - 0.15, 0, 0.9, 0.1, p.workingWidthM || 12, 0.12); // rampe dépliée
       return { x: -hitch - body / 2, side: (W - 0.8) / 2 + 0.005, z: (tankZ + H - 0.3) / 2, h: 0.35 };
     }
-    case "mounted_tool": {
-      const ww = p.workingWidthM || W;
-      m.box("body", -L / 2, 0, 0.3, L, ww, Math.max(0.2, H * 0.3));
-      m.box("dark", -L / 2, 0, 0.02, L * 0.8, ww, 0.28);
-      m.box("chassis", -0.1, 0, 0.3, 0.2, 0.8, H - 0.3);
-      return { x: -L / 2, side: ww / 2 + 0.005, z: 0.3 + Math.max(0.2, H * 0.3) / 2, h: 0.15 };
-    }
+    case "mounted_tool":
+      return tineCultivator(p, m);
+    case "sower":
+      return sower(p, m);
+    case "rotary_harrow":
+      return rotaryHarrow(p, m);
+    case "plough":
+      return plough(p, m);
+    case "mounted_sprayer":
+      return mountedSprayer(p, m);
+    case "fertilizer_spreader":
+      return fertilizerSpreader(p, m);
+    case "disc_harrow":
+      return discHarrow(p, m);
+    case "roller":
+      return rollerTool(p, m);
     case "trailer": {
       const hitch = p.hitchOffsetM;
       const body = Math.max(1.5, L - hitch);

@@ -64,7 +64,7 @@ export function AvatarTab({ sheet: s }: { sheet: EquipmentSheet }) {
   const resolved = useMemo(() => {
     const clean: AvatarInput = Object.fromEntries(Object.entries(saved).filter(([k, v]) => v !== null && v !== undefined && k !== "colors")) as AvatarInput;
     if (saved.colors) clean.colors = Object.fromEntries(Object.entries(saved.colors).filter(([, v]) => v)) as AvatarInput["colors"];
-    return resolveAvatar({ kind: s.kind, technical: s.technical, brandColor: s.brandInfo?.color ?? null, saved: clean });
+    return resolveAvatar({ kind: s.kind, name: s.name, technical: s.technical, brandColor: s.brandInfo?.color ?? null, saved: clean });
   }, [saved, s.kind, s.technical, s.brandInfo?.color]);
 
   // Aperçu : modèle importé, sinon avatar recalculé dans le navigateur.

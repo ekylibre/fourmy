@@ -15,6 +15,7 @@ const rows = async <T>(tx: Tx, q: SQL) => (await tx.execute(q)) as unknown as T[
 const iso = (v: unknown) => (v ? new Date(v as string).toISOString() : null);
 
 type Row = {
+  name?: string | null;
   kind: string;
   technical: unknown;
   avatar: AvatarWrite | null;
@@ -31,7 +32,7 @@ const LOGO_PNG = sql`
 async function load(tx: Tx, id: string): Promise<Row> {
   const [r] = await rows<Row>(
     tx,
-    sql`SELECT e.kind, e.technical, e.avatar, e.model_asset_id, b.color AS brand_color, ${LOGO_PNG} AS logo_id
+    sql`SELECT e.name, e.kind, e.technical, e.avatar, e.model_asset_id, b.color AS brand_color, ${LOGO_PNG} AS logo_id
         FROM equipments e LEFT JOIN farm_brands b ON b.id = e.brand_id WHERE e.id = ${id}`,
   );
   if (!r) throw new NotFound("Matériel introuvable");
@@ -46,7 +47,7 @@ const strip = (w: AvatarWrite | null): AvatarInput => {
   return out as AvatarInput;
 };
 
-const resolve = (r: Row): ResolvedAvatar => resolveAvatar({ kind: r.kind, technical: r.technical, brandColor: r.brand_color, saved: strip(r.avatar), logoId: r.logo_id });
+const resolve = (r: Row): ResolvedAvatar => resolveAvatar({ kind: r.kind, name: r.name, technical: r.technical, brandColor: r.brand_color, saved: strip(r.avatar), logoId: r.logo_id });
 
 export async function avatarInfo(db: Database, farmId: string, id: string): Promise<AvatarInfo> {
   return withFarm(db, farmId, async (tx) => {
