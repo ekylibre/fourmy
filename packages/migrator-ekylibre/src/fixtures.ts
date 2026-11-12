@@ -90,7 +90,11 @@ function exportQuery(table: (typeof FIXTURE_TABLES)[number], label: string): str
     case "lot_lineage":
       return `SELECT to_jsonb(t) FROM lot_lineage t JOIN lots l ON l.id = t.child_lot_id WHERE l.farm_id = $1`;
     case "people":
-      return `SELECT to_jsonb(t) || jsonb_build_object('name', 'Personne ' || ${rank("t")}, 'user_id', NULL)
+      // Identité anonymisée : ni prénom, ni nom, ni photo, ni Certiphyto, ni lien Ekylibre ;
+      // les données personnelles (person_private) ne sont pas exportées.
+      return `SELECT to_jsonb(t) || jsonb_build_object('name', 'Personne ' || ${rank("t")}, 'user_id', NULL,
+                     'first_name', NULL, 'last_name', NULL, 'photo_id', NULL, 'certiphyto_number', NULL,
+                     'certiphyto_category', NULL, 'certiphyto_valid_until', NULL, 'external_ids', '{}'::jsonb)
               FROM people t WHERE t.farm_id = $1`;
     case "intervention_crews":
       // Attelages (0022) : avant périodes et paramètres, qui les référencent ; l'attelage type n'est pas exporté.
