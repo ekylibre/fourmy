@@ -155,6 +155,9 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   const planned = toComplete ?? editing;
   const correcting = editing?.status === "done";
   const [correctionId] = useState(() => crypto.randomUUID());
+  // Identifiant tiré une fois par formulaire : un second envoi (double clic,
+  // Entrée répétée) retombe sur la même intervention au lieu d'en créer une autre.
+  const [newId] = useState(() => crypto.randomUUID());
   const [reason, setReason] = useState("");
   // Contrôle réglementaire : cible (usage E-Phy) choisie par produit, dernier résultat, motif d'un feu rouge.
   const [usageChoices, setUsageChoices] = useState<Record<string, string>>(() =>
@@ -473,7 +476,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         const r = await api.put<InterventionUpdateResult>(farmPath(farmId, `/interventions/${editing.id}`), write);
         return { warnings: r.warnings, id: editing.id };
       }
-      const id = planned?.id ?? crypto.randomUUID();
+      const id = planned?.id ?? newId;
       if (!planned) {
         // Réalisée d'emblée : on crée l'intervention puis on la réalise avec tout son contenu.
         await api.post<Intervention>(
@@ -519,6 +522,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               label={i === 0 ? "Produit" : undefined}
               aria-label="Produit"
               searchable
+              selectFirstOptionOnChange
               style={{ flex: 2 }}
               data={options}
               value={row.articleId}
@@ -723,8 +727,15 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   return (
     <form
       aria-label="Saisie de l'intervention"
+      // Entrée dans un champ (liste de matériels, quantité…) n'envoie pas le
+      // formulaire : seul le bouton l'envoie.
+      onKeyDown={(e) => {
+        const t = e.target as HTMLElement;
+        if (e.key === "Enter" && t.tagName === "INPUT" && (t as HTMLInputElement).type !== "submit") e.preventDefault();
+      }}
       onSubmit={(e) => {
         e.preventDefault();
+        if (submit.isPending) return;
         setError(null);
         if (!code) return setError("Choisissez une intervention.");
         if (inCrews ? crews.some((c) => c.periods.some((p) => !p.startedAt || !p.stoppedAt)) : periods.some((p) => !p.startedAt || (completing && !p.stoppedAt))) {
@@ -756,6 +767,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               )}
               leftSection={code ? <ProcedureIcon procedure={code} /> : undefined}
               searchable
+              selectFirstOptionOnChange
               required
               disabled={Boolean(toComplete)}
             />
@@ -837,10 +849,11 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
                   </>
                 ) : (
                   <>
-                    {shape !== "maintenance" && <MultiSelect label="Matériels" searchable data={equipmentOptions} value={tools} onChange={setTools} />}
+                    {shape !== "maintenance" && <MultiSelect label="Matériels" searchable selectFirstOptionOnChange data={equipmentOptions} value={tools} onChange={setTools} />}
                     <MultiSelect
                       label="Intervenants"
                       searchable
+                      selectFirstOptionOnChange
                       data={peopleOptions}
                       value={doers}
                       onChange={setDoers}
@@ -899,6 +912,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
                   <MultiSelect
                     aria-label="Parcelles"
                     searchable
+                    selectFirstOptionOnChange
                     data={snapshot.landParcels.map((p) => ({ value: p.id, label: `${p.name} (${formatHa(p.version.areaM2)})` }))}
                     value={parcels}
                     onChange={setParcels}
@@ -1126,6 +1140,7 @@ function BbchField({ farmId, activities, value, onChange }: { farmId: string; ac
       placeholder={crop ? "Stade de la culture au traitement" : "Culture des parcelles inconnue"}
       disabled={!crop}
       searchable
+      selectFirstOptionOnChange
       clearable
       data={data}
       value={value}

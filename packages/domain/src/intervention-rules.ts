@@ -5,7 +5,7 @@ import type {
   ProcedureDefinition,
   TargetKind,
 } from "@fourmy/contracts";
-import { isIrrigation, SHAPE_LABELS } from "@fourmy/contracts";
+import { isIrrigation } from "@fourmy/contracts";
 
 /**
  * Règles de forme d'une intervention (docs/interventions.md §4.3). Fonction
@@ -29,6 +29,13 @@ const MIN_INPUT_KIND: Partial<Record<ProcedureDefinition["shape"], ArticleKind>>
   sowing: "seed",
 };
 
+/** Intrant exigé à la réalisation, dit en français correct (genre, article). */
+const MIN_INPUT_MESSAGES: Partial<Record<ProcedureDefinition["shape"], string>> = {
+  treatment: "Un traitement demande au moins un produit phytosanitaire.",
+  fertilization: "Une fertilisation demande au moins un fertilisant.",
+  sowing: "Un semis ou une plantation demande au moins une semence ou un plant.",
+};
+
 const KIND_LABELS: Record<ArticleKind, string> = {
   phyto: "produit phytosanitaire",
   fertilizer: "fertilisant",
@@ -47,7 +54,6 @@ export function validateIntervention(
   ctx: RuleContext,
 ): string[] {
   const errors: string[] = [];
-  const shape = SHAPE_LABELS[procedure.shape].toLowerCase();
 
   // Cibles : parcelles, ou matériel / bâtiment pour un entretien.
   const allowedTargets: TargetKind[] = procedure.shape === "maintenance" ? ["equipment", "place", "container"] : ["land_parcel"];
@@ -73,7 +79,7 @@ export function validateIntervention(
   });
   const required = MIN_INPUT_KIND[procedure.shape];
   if (mode === "complete" && required && !inputKinds.includes(required)) {
-    errors.push(`Un ${shape} demande au moins un ${KIND_LABELS[required]}.`);
+    errors.push(MIN_INPUT_MESSAGES[procedure.shape] ?? `« ${procedure.label} » demande au moins un ${KIND_LABELS[required]}.`);
   }
 
   // Sorties : natures acceptées, destination à la réalisation.

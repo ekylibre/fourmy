@@ -1,6 +1,7 @@
 import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
+import { notifications } from "@mantine/notifications";
 import { server } from "./setup";
 import { FARM, renderApp } from "./render";
 
@@ -130,6 +131,35 @@ describe("interventions", () => {
     await user.click(within(form).getByRole("button", { name: "Enregistrer" }));
     await vi.waitFor(() => expect(calls).toHaveLength(2));
     expect(calls[1]).toMatchObject({ inputs: [{ articleId: ENGRAIS, quantity: 120, per: "hectare", unit: "Litre" }] });
+  });
+
+  it("Entrée dans un champ n'envoie pas le formulaire ; deux envois portent le même identifiant", async () => {
+    const ids: string[] = [];
+    server.use(
+      http.post("*/interventions", async ({ request }) => {
+        ids.push(((await request.json()) as { id: string }).id);
+        return HttpResponse.json({}, { status: 201 });
+      }),
+      http.post("*/interventions/:id/complete", () => HttpResponse.json({ intervention: {}, movements: [], warnings: [] })),
+    );
+    const user = userEvent.setup();
+    renderApp(`/f/${FARM}/interventions?at=2026-06-10`);
+    const button = await screen.findByRole("button", { name: "Nouvelle intervention" });
+    await vi.waitFor(() => expect(button).toBeEnabled());
+    await user.click(button);
+    const form = await screen.findByRole("form", { name: "Saisie de l'intervention" });
+    await user.click(within(form).getByRole("combobox", { name: "Intervention" }));
+    await user.click((await screen.findAllByRole("option", { name: "Labour" }))[0]!);
+    await user.click(within(form).getByRole("combobox", { name: "Parcelles" }));
+    await user.click(await screen.findByRole("option", { name: /Les Rouffiats/ }));
+    await user.type(within(form).getByRole("combobox", { name: "Matériels" }), "matériel inconnu{Enter}");
+    await new Promise((r) => setTimeout(r, 50));
+    expect(ids).toHaveLength(0);
+    const save = within(form).getByRole("button", { name: "Enregistrer" });
+    await user.dblClick(save);
+    await vi.waitFor(() => expect(ids.length).toBeGreaterThan(0));
+    expect(new Set(ids).size).toBe(1);
+    notifications.clean();
   });
 
   it("la durée calcule la fin ; déplacer le début garde la durée", async () => {

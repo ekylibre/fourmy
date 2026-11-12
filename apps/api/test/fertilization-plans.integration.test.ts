@@ -205,6 +205,22 @@ describe.skipIf(!url)("plans de fumure (intégration)", () => {
     expect(text).toContain('"Urée 46";"46 % N";"III"');
   });
 
+  it("cahier : un apport d'automne sur une parcelle sans production de la campagne y figure quand même", async () => {
+    const i = crypto.randomUUID();
+    await sql`INSERT INTO interventions (id, farm_id, procedure, status, origin, started_at, stopped_at) VALUES (${i}, ${farmId}, 'fertilizing', 'done', 'web', '2026-10-20T08:00:00Z', '2026-10-20T10:00:00Z')`;
+    await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id) VALUES (${crypto.randomUUID()}, ${i}, 'target', 'land_parcel', ${p2026})`;
+    await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id, quantity, unit) VALUES (${crypto.randomUUID()}, ${i}, 'input', 'article', ${urea}, 100, 'kilogram_per_hectare')`;
+    try {
+      const r = (await (await app.request(`${base()}/fertilization/record?campaign=2027`, { headers: worker.headers })).json()) as FertilizationRecord;
+      expect(r.parcels).toHaveLength(1);
+      expect(r.parcels[0]).toMatchObject({ name: "Champ Maïs 2026", crop: expect.stringContaining("aucune culture saisie"), soilCover: null, plannedDose: null });
+      expect(r.parcels[0]!.applications).toEqual([expect.objectContaining({ date: "2026-10-20", product: "Urée 46", nTotalKgHa: 46 })]);
+    } finally {
+      await sql`DELETE FROM intervention_parameters WHERE intervention_id = ${i}`;
+      await sql`DELETE FROM interventions WHERE id = ${i}`;
+    }
+  });
+
   it("réaliser un épandage en période d'interdiction : refusé sans motif, contrôle et motif enregistrés", async () => {
     const post = (path: string, body: unknown) => app.request(`${base()}${path}`, { method: "POST", headers, body: JSON.stringify(body) });
     const fertilizing = (day: string, extra: object = {}) => ({

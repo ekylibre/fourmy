@@ -31,7 +31,7 @@ describe("connexion et choix de la ferme", () => {
   it("se déconnecte : retour à la connexion", async () => {
     const user = userEvent.setup();
     const { router } = renderApp(`/f/${FARM}?at=2026-06-30`);
-    await user.click(await screen.findByRole("button", { name: "Se déconnecter" }));
+    await user.click((await screen.findAllByRole("button", { name: "Se déconnecter" }))[0]!);
     expect(await screen.findByRole("heading", { name: "Connexion" })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/login");
   });

@@ -239,14 +239,16 @@ export function CrewsEditor({
                     if (t) onChange(crews.map((x, j) => (j === k ? fromTemplate(x, t) : x)));
                   }}
                   searchable
+                  selectFirstOptionOnChange
                 />
               )}
               <TextInput size="xs" aria-label="Nom de l'attelage" placeholder="Nom (facultatif)" maxLength={80} value={c.label} onChange={(e) => update(k, { label: e.currentTarget.value })} />
-              <MultiSelect label="Matériels" searchable data={equipmentOptions} value={c.tools} onChange={(tools) => update(k, { tools })} />
+              <MultiSelect label="Matériels" searchable selectFirstOptionOnChange data={equipmentOptions} value={c.tools} onChange={(tools) => update(k, { tools })} />
               <MultiSelect
                 label="Intervenants"
                 placeholder={c.doers.length ? undefined : "Conducteur inconnu"}
                 searchable
+                selectFirstOptionOnChange
                 data={peopleOptions}
                 value={c.doers}
                 onChange={(doers) => update(k, { doers })}

@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import type { Intervention } from "@fourmy/contracts";
@@ -76,11 +76,22 @@ describe("recherche dans la liste", () => {
     expect(await screen.findByText("Récolte")).toBeInTheDocument();
     expect(screen.queryByText("Pulvérisation")).not.toBeInTheDocument();
     expect(screen.getByText("1 intervention(s) trouvée(s) sur la campagne 2026.")).toBeInTheDocument();
-    expect(router.state.location.search).toContain("q=decevant");
+    await waitFor(() => expect(router.state.location.search).toContain("q=decevant"));
 
     await user.click(screen.getByRole("button", { name: "Effacer la recherche" }));
     expect(await screen.findByText("Pulvérisation")).toBeInTheDocument();
     expect(screen.queryByText("Récolte")).not.toBeInTheDocument();
+  });
+
+  it("une frappe rapide ne perd aucune lettre ; l'adresse suit après la pause", async () => {
+    const user = userEvent.setup({ delay: null });
+    const { router } = renderApp(`/f/${FARM}/interventions?at=2026-06-10`);
+    expect(await screen.findByText("Pulvérisation")).toBeInTheDocument();
+    const box = screen.getByRole("textbox", { name: "Rechercher dans la campagne" });
+    await user.type(box, "rendement decevant");
+    expect(box).toHaveValue("rendement decevant");
+    expect(await screen.findByText("Récolte")).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.search).toContain("q=rendement+decevant"));
   });
 
   it("par n° AMM du produit", async () => {

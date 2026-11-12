@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { ActionIcon, Button, CloseButton, Group, SegmentedControl, Stack, Switch, Text, TextInput, Title, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
@@ -44,6 +44,28 @@ export function InterventionsPage() {
   const view: View = VIEWS.includes(asked as View) ? (asked as View) : (stored() ?? "list");
   const [wholeCampaign, setWholeCampaign] = useState(false);
   const query = params.get("q") ?? "";
+  // Le champ garde sa propre valeur : lue dans l'URL, une frappe rapide (ou la
+  // saisie prédictive d'un téléphone) perdait des lettres entre deux mises à jour.
+  // L'URL est écrite après une courte pause de frappe ; une adresse changée
+  // d'ailleurs (retour arrière, lien) remplace le champ.
+  const [text, setText] = useState(query);
+  const written = useRef(query);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    if (query !== written.current) {
+      written.current = query;
+      setText(query);
+    }
+  }, [query]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const search = (v: string, delay = 250) => {
+    setText(v);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      written.current = v;
+      setParam("q", v);
+    }, delay);
+  };
   const [showCancelled, setShowCancelled] = useState(false);
   const [cancelling, setCancelling] = useState<Intervention | null>(null);
 
@@ -98,7 +120,7 @@ export function InterventionsPage() {
   const campaign = list.data!.items;
   const pool = edgeYear ? [...campaign, ...(edge.data?.items ?? []).filter((i) => !campaign.some((c) => c.id === i.id))] : campaign;
   // Recherche (vue Liste) : toujours sur toute la campagne.
-  const matcher = view === "list" ? makeMatcher(query) : null;
+  const matcher = view === "list" ? makeMatcher(text) : null;
   const listWhole = view === "list" && (wholeCampaign || matcher !== null);
   const scoped = matcher ? campaign.filter((i) => matcher(searchText(i, names))) : listWhole ? campaign : pool.filter((i) => inWeek(i, week));
   const visible = showCancelled || view === "kanban" ? scoped : scoped.filter((i) => i.status !== "cancelled");
@@ -120,7 +142,7 @@ export function InterventionsPage() {
       </Group>
 
       <Group justify="space-between" wrap="wrap" gap="sm">
-        <Group gap={4} wrap="nowrap">
+        <Group gap={4}>
           <Tooltip label="Semaine précédente">
             <ActionIcon variant="default" aria-label="Semaine précédente" onClick={() => setDay(addDays(week.start, -7))} disabled={listWhole}>
               <ChevronLeft size={16} />
@@ -178,9 +200,9 @@ export function InterventionsPage() {
             aria-label="Rechercher dans la campagne"
             placeholder={`Rechercher dans la campagne ${year} : intervention, parcelle, produit ou AMM, matériel, personne, notes`}
             leftSection={<Search size={16} />}
-            rightSection={query ? <CloseButton aria-label="Effacer la recherche" onClick={() => setParam("q", "")} /> : null}
-            value={query}
-            onChange={(e) => setParam("q", e.currentTarget.value)}
+            rightSection={text ? <CloseButton aria-label="Effacer la recherche" onClick={() => search("", 0)} /> : null}
+            value={text}
+            onChange={(e) => search(e.currentTarget.value)}
           />
           <ListView items={visible} names={names} actions={actions} now={now} />
         </>

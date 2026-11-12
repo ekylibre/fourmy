@@ -1,7 +1,7 @@
-import { AppShell, Badge, Burger, Button, Group, NavLink, Stack, Text } from "@mantine/core";
+import { ActionIcon, AppShell, Badge, Box as MBox, Burger, Button, Group, NavLink, Stack, Text, Tooltip } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { useState } from "react";
-import { Box, Boxes, Grid3x3, Leaf, ClipboardList, Database, FileText, LayoutDashboard, Map, Plug, Scale, Users, Wine, FlaskConical, Sprout, Tractor, type LucideIcon } from "lucide-react";
+import { Box, Boxes, Grid3x3, Leaf, ClipboardList, Database, FileText, LayoutDashboard, LogOut, Map, Plug, Scale, Users, Wine, FlaskConical, Sprout, Tractor, type LucideIcon } from "lucide-react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { Wordmark } from "@fourmy/ui-lyvre";
 import { useFarm } from "../app/farm";
@@ -92,16 +92,23 @@ export function Layout() {
     />
   );
 
+  const logout = async () => {
+    await signOut();
+    navigate("/login");
+  };
+
   return (
     <AppShell header={{ height: 56 }} navbar={{ width: 240, breakpoint: "sm", collapsed: { mobile: !opened } }} padding={0}>
       <AppShell.Header>
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
           <Group gap="md" wrap="nowrap">
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label="Menu" />
-            <Link to="/farms" style={{ textDecoration: "none" }}>
-              <Wordmark />
-            </Link>
-            <Text fw={600} truncate maw={260}>
+            <MBox visibleFrom="xs">
+              <Link to="/farms" style={{ textDecoration: "none" }}>
+                <Wordmark />
+              </Link>
+            </MBox>
+            <Text fw={600} truncate maw={{ base: 96, sm: 260 }}>
               {farm.name}
             </Text>
             <Badge color={farm.role === "owner" ? "lichen" : "ardoise"}>{farm.role === "owner" ? "Responsable" : "Salarié"}</Badge>
@@ -112,16 +119,14 @@ export function Layout() {
                 {session.data.name ?? session.data.email}
               </Text>
             )}
-            <Button
-              variant="subtle"
-              size="xs"
-              onClick={async () => {
-                await signOut();
-                navigate("/login");
-              }}
-            >
+            <Button variant="subtle" size="xs" onClick={logout} visibleFrom="sm">
               Se déconnecter
             </Button>
+            <Tooltip label="Se déconnecter">
+              <ActionIcon variant="subtle" aria-label="Se déconnecter" onClick={logout} hiddenFrom="sm">
+                <LogOut size={18} />
+              </ActionIcon>
+            </Tooltip>
           </Group>
         </Group>
       </AppShell.Header>

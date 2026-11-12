@@ -157,7 +157,8 @@ export function TrackSessionsTab({ farmId, equipmentId }: { farmId: string; equi
               <Group justify="flex-end">
                 <ColumnPicker columns={columns} />
               </Group>
-              <Table striped highlightOnHover aria-label="Parcours">
+              <Table.ScrollContainer minWidth={640}>
+                <Table striped highlightOnHover aria-label="Parcours">
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th w={32} />
@@ -177,7 +178,8 @@ export function TrackSessionsTab({ farmId, equipmentId }: { farmId: string; equi
                     <SessionRow key={s.id} s={s} farmId={farmId} onTool={onTool} show={columns.visible} checked={selected.includes(s.id)} onToggle={() => toggle(s.id)} />
                   ))}
                 </Table.Tbody>
-              </Table>
+                </Table>
+              </Table.ScrollContainer>
               {list.hasNextPage && (
                 <Button variant="subtle" size="xs" onClick={() => void list.fetchNextPage()} loading={list.isFetchingNextPage} style={{ alignSelf: "center" }}>
                   Parcours plus anciens
