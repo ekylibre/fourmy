@@ -13,6 +13,7 @@ import {
 import type { DomainCtx } from "@fourmy/domain";
 import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
 import { cardsWork } from "./people-work.js";
+import { openInvitation } from "./invitations.js";
 
 /**
  * Équipe et personnes, lot P1 (docs/equipe-personnes-design.md) : grille,
@@ -57,12 +58,15 @@ type CardRow = {
   certiphyto_number: string | null;
   certiphyto_valid_until: string | null;
   external_ids: Record<string, unknown> | null;
+  invited: boolean;
 };
 
 const CARD = sql`
   SELECT p.id, p.farm_id, p.name, p.role, p.user_id, p.active, p.created_at, p.updated_at,
          p.first_name, p.last_name, ph.sha256 AS photo_hash, m.role AS member_role,
-         p.certiphyto_category, p.certiphyto_number, p.certiphyto_valid_until, p.external_ids
+         p.certiphyto_category, p.certiphyto_number, p.certiphyto_valid_until, p.external_ids,
+         EXISTS (SELECT 1 FROM person_invitations iv WHERE iv.person_id = p.id AND iv.accepted_at IS NULL
+                   AND iv.revoked_at IS NULL AND iv.expires_at > now()) AS invited
   FROM people p
   LEFT JOIN person_photos ph ON ph.id = p.photo_id
   LEFT JOIN memberships m ON m.farm_id = p.farm_id AND m.user_id = p.user_id`;
@@ -81,7 +85,7 @@ function toCard(r: CardRow, at: string): PersonCard {
     firstName: r.first_name,
     lastName: r.last_name,
     photo: r.photo_hash ? { hash: r.photo_hash.slice(0, 16) } : null,
-    account: r.member_role ? { status: "active", role: r.member_role } : { status: "none", role: null },
+    account: r.member_role ? { status: "active", role: r.member_role } : { status: r.invited ? "invited" : "none", role: null },
     certiphyto: { status: certiphytoStatusAt(validUntil, at), validUntil },
     monthHours: null,
     lastIntervention: null,
@@ -146,6 +150,7 @@ export async function personSheet(db: Database, farmId: string, id: string, at: 
       const [p] = await rows<PrivateRow>(tx, sql`SELECT * FROM person_private WHERE person_id = ${id}`);
       sheet.private = toPrivate(p);
     }
+    if (viewer.role === "owner") sheet.invitation = await openInvitation(tx, id);
     return sheet;
   });
 }
@@ -344,5 +349,49 @@ export async function removeAccount(db: Database, farmId: string, id: string): P
     await assertAnotherOwner(tx, userId);
     await tx.execute(sql`DELETE FROM memberships WHERE user_id = ${userId}`);
     await tx.execute(sql`UPDATE people SET user_id = NULL, updated_at = now() WHERE id = ${id}`);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Effacement (design §4.4)
+// ---------------------------------------------------------------------------
+
+/**
+ * Sans historique (aucune intervention, aucun attelage type) : la personne est
+ * supprimée. Avec un historique : anonymisée — nom remplacé, identité,
+ * coordonnées, photo et Certiphyto effacés, accès retiré ; ses interventions
+ * et ses heures restent (registres réglementaires).
+ */
+export async function erasePerson(db: Database, farmId: string, ctx: DomainCtx, id: string): Promise<"deleted" | "anonymized"> {
+  return withFarm(db, farmId, async (tx) => {
+    const [p] = await rows<{ user_id: string | null; photo_id: string | null; used: boolean }>(
+      tx,
+      sql`SELECT p.user_id, p.photo_id,
+                 EXISTS (SELECT 1 FROM intervention_parameters ip WHERE ip.ref_type = 'person' AND ip.ref_id = p.id)
+                 OR EXISTS (SELECT 1 FROM crew_template_members m WHERE m.person_id = p.id) AS used
+          FROM people p WHERE p.id = ${id}`,
+    );
+    if (!p) throw new NotFound("Personne introuvable");
+    if (p.user_id) {
+      await assertAnotherOwner(tx, p.user_id);
+      await tx.execute(sql`DELETE FROM memberships WHERE user_id = ${p.user_id}`);
+    }
+    await tx.execute(sql`UPDATE person_invitations SET revoked_at = now() WHERE person_id = ${id} AND accepted_at IS NULL AND revoked_at IS NULL`);
+    if (!p.used) {
+      await tx.execute(sql`DELETE FROM people WHERE id = ${id}`);
+      if (p.photo_id) await tx.execute(sql`DELETE FROM person_photos WHERE id = ${p.photo_id}`);
+      await audit(tx, farmId, ctx, id, "delete");
+      return "deleted";
+    }
+    const [n] = await rows<{ n: number }>(tx, sql`SELECT count(*)::int + 1 AS n FROM people WHERE name LIKE 'Personne anonymisée %'`);
+    await tx.execute(sql`
+      UPDATE people SET name = ${`Personne anonymisée ${n!.n}`}, first_name = NULL, last_name = NULL, role = NULL, user_id = NULL,
+        active = false, photo_id = NULL, certiphyto_category = NULL, certiphyto_number = NULL, certiphyto_valid_until = NULL,
+        external_ids = '{}'::jsonb, updated_at = now()
+      WHERE id = ${id}`);
+    await tx.execute(sql`DELETE FROM person_private WHERE person_id = ${id}`);
+    if (p.photo_id) await tx.execute(sql`DELETE FROM person_photos WHERE id = ${p.photo_id}`);
+    await audit(tx, farmId, ctx, id, "anonymize");
+    return "anonymized";
   });
 }

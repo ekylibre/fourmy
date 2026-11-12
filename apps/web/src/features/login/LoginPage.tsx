@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Alert, Button, Center, Paper, PasswordInput, Stack, Text, TextInput, Title } from "@mantine/core";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { Wordmark } from "@fourmy/ui-lyvre";
 import { DEV_EMAIL, signIn } from "../../app/session";
 
@@ -16,6 +16,9 @@ export function LoginPage() {
   const [pending, setPending] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  // Retour après connexion (page d'invitation) : un chemin interne seulement.
+  const next = useSearchParams()[0].get("next");
+  const target = next && /^\/(?!\/)/.test(next) ? next : "/farms";
 
   return (
     <Center mih="100vh" p="md">
@@ -37,7 +40,7 @@ export function LoginPage() {
               setPending(false);
               if (failure) return setError(failure);
               await queryClient.invalidateQueries({ queryKey: ["session"] });
-              navigate("/farms");
+              navigate(target);
             }}
           >
             <Stack>

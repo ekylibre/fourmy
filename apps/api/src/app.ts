@@ -5,6 +5,7 @@ import { getAuth } from "./auth.js";
 import { contactRoutes } from "./contact.js";
 import { farmRoutes } from "./routes/farm.js";
 import { meRoutes } from "./routes/me.js";
+import { invitationRoutes } from "./routes/invitations.js";
 import { readPicture } from "./repos/activities.js";
 import { db } from "./db.js";
 import { BadRequest, NotFound, Conflict } from "./routes/helpers.js";
@@ -33,6 +34,8 @@ export function createApp() {
     if (!pic) return c.notFound();
     return c.body(pic.bytes as unknown as ArrayBuffer, 200, { "content-type": pic.type, "cache-control": "public, max-age=604800" });
   });
+  // Invitations (lot P3) : lues et acceptées par leur jeton, avant toute ferme.
+  app.route("/api/v1/invitations", invitationRoutes);
   app.route("/api/v1/me", new Hono<Env>().use(auth).route("/", meRoutes));
   app.route("/api/v1/farms/:farmId", new Hono<Env>().use(auth).use(farmScope).route("/", farmRoutes));
 

@@ -28,3 +28,26 @@ export async function upsertLocalUser(
     return id;
   });
 }
+
+/**
+ * Crée un compte local, jamais en remplaçant un compte existant (acceptation
+ * d'une invitation) : null si l'email a déjà un compte.
+ */
+export async function createLocalUserIfAbsent(
+  db: Database,
+  input: { email: string; name?: string; password: string },
+): Promise<string | null> {
+  const email = input.email.trim().toLowerCase();
+  if (input.password.length < 10) throw new Error("Mot de passe trop court (10 caractères au moins).");
+  const hash = await hashPassword(input.password);
+  return db.transaction(async (tx) => {
+    const [user] = (await tx.execute(sql`
+      INSERT INTO users (id, email, name, email_verified) VALUES (gen_random_uuid(), ${email}, ${input.name ?? null}, true)
+      ON CONFLICT (email) DO NOTHING RETURNING id`)) as unknown as { id: string }[];
+    if (!user) return null;
+    await tx.execute(sql`
+      INSERT INTO auth_accounts (user_id, account_id, provider_id, password)
+      VALUES (${user.id}, ${user.id}, 'credential', ${hash})`);
+    return user.id;
+  });
+}
