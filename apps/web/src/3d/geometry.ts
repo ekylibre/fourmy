@@ -25,6 +25,43 @@ export function splitRuns(samples: Sample[]): { working: boolean; coords: Pt[] }
 }
 
 /**
+ * Trace redécoupée tous les `stepM` mètres au plus (instant interpolé) : la
+ * trace simplifiée par l'API garde les seuls bouts d'une passe droite, et une
+ * ligne tendue entre eux passerait sous le relief.
+ */
+export function densify(samples: Sample[], stepM = 8): Sample[] {
+  const out: Sample[] = [];
+  samples.forEach((s, i) => {
+    const prev = samples[i - 1];
+    if (prev) {
+      const k = Math.cos((s[2] * Math.PI) / 180);
+      const d = Math.hypot((s[1] - prev[1]) * M_PER_DEG * k, (s[2] - prev[2]) * M_PER_DEG);
+      const n = Math.floor(d / stepM);
+      const [t0, t1] = [Date.parse(prev[0]), Date.parse(s[0])];
+      for (let j = 1; j <= n && d > 0; j++) {
+        const f = (j * stepM) / d;
+        if (f >= 1) break;
+        out.push([new Date(t0 + (t1 - t0) * f).toISOString(), prev[1] + (s[1] - prev[1]) * f, prev[2] + (s[2] - prev[2]) * f, s[3]]);
+      }
+    }
+    out.push(s);
+  });
+  return out;
+}
+
+/** Tronçons de même état en indices [from, to] ; chacun part du dernier point du précédent. */
+export function runIndexes(samples: Sample[]): { working: boolean; from: number; to: number }[] {
+  const runs: { working: boolean; from: number; to: number }[] = [];
+  samples.forEach((s, i) => {
+    const working = s[3] === true;
+    const last = runs.at(-1);
+    if (last && last.working === working) last.to = i;
+    else runs.push({ working, from: Math.max(0, i - 1), to: i });
+  });
+  return runs.filter((r) => r.to > r.from);
+}
+
+/**
  * Placement manuel d'une cuve : position cliquée → coordonnées locales dans
  * le repère du bâtiment (même origine que l'API), ou raison du refus.
  */

@@ -325,6 +325,12 @@ d'intervention s'adapte à cette forme.
     effilé au dessus plus clair, liseré blanc, calandre sombre et phares,
     ailes galbées, échappement, rétroviseurs, pneus à crampons, jantes et
     moyeux orangés. Environ 4 000 triangles.
+  - Proportions d'un tracteur standard (Claas Arion, John Deere 6R) :
+    capot étroit (0,95 m au plus) dont le haut arrive au niveau du haut
+    des roues arrière ; cabine posée au-dessus du pont arrière, lunette
+    un peu derrière l'essieu, plancher à 62 % du diamètre arrière, grandes
+    vitres dès le haut des roues ; pneus avant larges (88 % des arrière) ;
+    masse de lestage devant le nez.
   - Ajusté par les données de l'avatar : longueur, largeur, hauteur,
     empattement, diamètre des roues, couleurs (carrosserie et ses nuances,
     vitres, pneus, jantes), logo.
@@ -380,15 +386,23 @@ d'intervention s'adapte à cette forme.
 - **Rejeu d'une trace** : l'avatar remplace le point.
   - Il est posé sur le relief et orienté selon le cap, calculé entre deux
     points de la trace et conservé à l'arrêt.
-  - Il garde une taille minimale à l'écran quand on dézoome.
+  - Il garde une taille minimale à l'écran quand on dézoome, sauf en vue
+    drone, où il est à sa taille réelle, à l'échelle de la parcelle.
   - Le logo s'affiche au-dessus jusqu'à 2 km de distance.
-- **« Suivre le matériel »** (activé par défaut) : la caméra se place
-  derrière l'avatar, à 25 m, et tourne avec son cap pendant la lecture.
-  Couper l'interrupteur revient à la vue d'ensemble de la trace. Le suivi
-  intégré de Cesium n'est pas utilisé : il attend le volume englobant du
-  modèle, qui n'est jamais disponible pour un modèle posé sur le relief.
-- **Tracé de la trace** : posé sur les altitudes du relief (+0,5 m), dans
-  une collection de lignes, sans worker de géométrie. Les lignes drapées
+- **Caméra** du rejeu, au choix :
+  - **Derrière le matériel** (par défaut) : la caméra se place derrière
+    l'avatar, à 25 m, et tourne avec son cap pendant la lecture. Le suivi
+    intégré de Cesium n'est pas utilisé : il attend le volume englobant du
+    modèle, qui n'est jamais disponible pour un modèle posé sur le relief.
+  - **Drone** : plongée à 45° sur toute la zone travaillée (sans le trajet
+    sur route), qui tourne d'un demi-degré par minute de rejeu.
+  - **Libre** : vue d'ensemble de la trace, que l'on déplace à la souris.
+- **Tracé de la trace** : toute la journée en trait léger ; pendant la
+  lecture, la partie déjà parcourue repasse en couleur derrière le
+  matériel. La trace simplifiée par l'API est redécoupée tous les 8 m et
+  posée sur les altitudes du relief (+0,5 m) : une ligne tendue entre les
+  deux bouts d'une passe passait sous le relief. Le tracé complet est une
+  collection de lignes, sans worker de géométrie : les lignes drapées
   arrêtaient la vue sous Firefox.
 - **Logo au-dessus du véhicule** : c'est sa version PNG. Un SVG sans
   dimensions n'est pas une texture WebGL valide.

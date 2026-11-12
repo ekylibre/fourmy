@@ -15,7 +15,7 @@ import { useSnapshot } from "../app/queries";
 import { ErrorAlert, Loading } from "../components/states";
 import { ErrorPanel } from "../components/RouteError";
 import { TankContents } from "../features/cellar/CellarPage";
-import { FarmScene, TERRAIN_TILE_BYTES, type PlanData } from "./FarmScene";
+import { FarmScene, TERRAIN_TILE_BYTES, type PlanData, type TrackCamera } from "./FarmScene";
 import { placementFromClick } from "./geometry";
 import { indexColor } from "@fourmy/contracts";
 import { imageFor, useParcelIndicesAt, useRemoteSensingStatus, useSatelliteLayer, useVegetationIndex } from "../features/remote-sensing/remote-sensing";
@@ -44,7 +44,7 @@ export function Plan3DPage() {
   const [speed, setSpeed] = useState("60");
   const [clock, setClock] = useState<string | null>(null);
   const [renderError, setRenderError] = useState<unknown>(null);
-  const [following, setFollowing] = useState(true);
+  const [camera, setCamera] = useState<TrackCamera>("follow");
   const handlers = useRef({ ground: (_p: Pt) => {} });
 
   const plan = useQuery({
@@ -205,7 +205,7 @@ export function Plan3DPage() {
       // Logo au-dessus du véhicule : la version PNG (un SVG sans dimensions n'est pas une texture valide).
       const logo = avatar?.logoAssetId;
       const offset = Number((avatar?.params as { hitchOffsetM?: number } | undefined)?.hitchOffsetM ?? 1);
-      scene.current?.follow(following);
+      scene.current?.setCamera(camera);
       await scene.current?.setTrack(t.samples, name, {
         modelUrl: avatar ? modelUrl(equipment!, avatar.hash) : undefined,
         logoUrl: logo ? assetUrl(farm.id, logo) : undefined,
@@ -337,15 +337,25 @@ export function Plan3DPage() {
                 </Button>
               </Group>
               {loadTrack.data && loadTrack.data.samples.length > 1 && (
-                <Switch
-                  mt="sm"
-                  label="Suivre le matériel (caméra derrière son avatar)"
-                  checked={following}
-                  onChange={(e) => {
-                    setFollowing(e.currentTarget.checked);
-                    scene.current?.follow(e.currentTarget.checked);
-                  }}
-                />
+                <Stack gap={4} mt="sm">
+                  <Text size="sm" id="camera-rejeu">
+                    Caméra
+                  </Text>
+                  <SegmentedControl
+                    aria-labelledby="camera-rejeu"
+                    size="xs"
+                    value={camera}
+                    data={[
+                      { value: "follow", label: "Derrière le matériel" },
+                      { value: "drone", label: "Drone" },
+                      { value: "overview", label: "Libre" },
+                    ]}
+                    onChange={(v) => {
+                      setCamera(v as TrackCamera);
+                      scene.current?.setCamera(v as TrackCamera);
+                    }}
+                  />
+                </Stack>
               )}
               <Switch
                 mt="sm"

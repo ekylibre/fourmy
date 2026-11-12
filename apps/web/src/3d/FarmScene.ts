@@ -1,6 +1,8 @@
 import "./cesium-base";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import {
+  CallbackProperty,
+  ConstantProperty,
   Cartesian2,
   Cartesian3,
   Cartographic,
@@ -47,7 +49,7 @@ import {
 } from "cesium";
 import { outerRing, type Pt } from "@fourmy/domain";
 import type { GeoJsonGeometry } from "@fourmy/contracts";
-import { behind, cesiumHeading, headings, initialView, splitRuns, type Sample } from "./geometry";
+import { behind, cesiumHeading, densify, headings, initialView, runIndexes, splitRuns, type Sample } from "./geometry";
 import { localFrame, rowPieces } from "@fourmy/domain";
 import type { ParcelVegetation } from "@fourmy/contracts";
 import { instancedBoxGlb, type BoxInstance } from "./vegetation-glb";
@@ -178,6 +180,9 @@ export interface FarmSceneOptions {
   onRenderError?: (error: unknown) => void;
 }
 
+/** Caméra du rejeu d'une trace. */
+export type TrackCamera = "overview" | "drone" | "follow";
+
 export class FarmScene {
   readonly viewer: Viewer;
   private planEntities: Entity[] = [];
@@ -186,9 +191,11 @@ export class FarmScene {
   private trackLines: PolylineCollection | null = null;
   /** Cap boussole (degrés) du matériel le long de la trace, pour la caméra qui le suit. */
   private trackHeading: SampledProperty | null = null;
-  private following = false;
+  private cameraMode: TrackCamera = "overview";
   /** Vue d'ensemble de la trace chargée. */
   private trackView: (() => void) | null = null;
+  /** Vue drone : centre et taille de la zone travaillée, début du rejeu. */
+  private droneFrame: { center: Cartesian3; size: number; start: JulianDate } | null = null;
   private readonly followRange = 25;
   private selectedTank: string | null = null;
   private plan: PlanData | null = null;
@@ -240,7 +247,7 @@ export class FarmScene {
     this.viewer.scene.globe.depthTestAgainstTerrain = true; // clic sur le relief, cuves masquées par les collines
     this.viewer.clock.onTick.addEventListener((clock) => {
       opts.onClockTick?.(JulianDate.toIso8601(clock.currentTime, 0));
-      this.followTick();
+      this.cameraTick();
     });
 
     this.handler = new ScreenSpaceEventHandler(this.viewer.scene.canvas);
@@ -569,9 +576,10 @@ export class FarmScene {
    * Trace d'un matériel pour la journée : lignes drapées (travail / transport)
    * et point mobile posé sur le relief, animé par l'horloge Cesium.
    */
-  async setTrack(samples: Sample[], label: string, avatar: TrackAvatar = {}) {
+  async setTrack(simplified: Sample[], label: string, avatar: TrackAvatar = {}) {
     this.clearTrack();
-    if (samples.length < 2) return;
+    if (simplified.length < 2) return;
+    const samples = densify(simplified);
     const add = (e: Entity.ConstructorOptions) => this.trackEntities.push(this.viewer.entities.add(e));
     // Altitudes du relief aux points de la trace (niveau 15 : ~5 m).
     const cartos = samples.map(([, lon, lat]) => Cartographic.fromDegrees(lon, lat));
@@ -581,15 +589,36 @@ export class FarmScene {
     // createGroundPolylineGeometry échouait sous certains Firefox avec carte
     // graphique (« d is not a function »), et Cesium arrêtait alors le rendu.
     const heightAt = new Map(samples.map(([, lon, lat], i) => [`${lon},${lat}`, grounded[i]?.height ?? 0]));
+    // Toute la journée en trait léger ; le rejeu repasse en couleur ce qui est fait.
     const lines = new PolylineCollection();
     for (const run of splitRuns(samples)) {
       lines.add({
         positions: run.coords.map(([lon, lat]) => Cartesian3.fromDegrees(lon, lat, (heightAt.get(`${lon},${lat}`) ?? 0) + 0.5)),
-        width: run.working ? 4 : 2,
-        material: Material.fromType("Color", { color: run.working ? COLORS.work : COLORS.transport.withAlpha(0.8) }),
+        width: run.working ? 3 : 2,
+        material: Material.fromType("Color", { color: (run.working ? COLORS.work : COLORS.transport).withAlpha(0.15) }),
       });
     }
     this.trackLines = this.viewer.scene.primitives.add(lines);
+    const times = samples.map((x) => Date.parse(x[0]));
+    const points = samples.map(([, lon, lat], i) => Cartesian3.fromDegrees(lon, lat, (grounded[i]?.height ?? 0) + 0.6));
+    for (const run of runIndexes(samples)) {
+      const done = new CallbackProperty((time) => {
+        const now = time ? JulianDate.toDate(time).getTime() : 0;
+        if (now <= times[run.from]!) return [];
+        let k = run.from;
+        while (k < run.to && times[k + 1]! <= now) k++;
+        const head = points.slice(run.from, k + 1);
+        if (k < run.to) {
+          const f = (now - times[k]!) / (times[k + 1]! - times[k]! || 1);
+          head.push(Cartesian3.lerp(points[k]!, points[k + 1]!, f, new Cartesian3()));
+        }
+        return head;
+      }, false);
+      add({
+        id: `track:done:${run.from}`,
+        polyline: { positions: done, width: run.working ? 4 : 2, material: run.working ? COLORS.work : COLORS.transport.withAlpha(0.8) },
+      });
+    }
     // Avatar posé sur le relief (sinon point surélevé), orienté selon le cap.
     const lift = avatar.modelUrl ? 0 : 2;
     const position = new SampledPositionProperty();
@@ -621,7 +650,7 @@ export class FarmScene {
         availability: new TimeIntervalCollection([new TimeInterval({ start: JulianDate.greaterThan(from, start) ? from : start, stop: JulianDate.lessThan(to, stop) ? to : stop })]),
         position: toolPos,
         orientation,
-        model: { uri: h.url, minimumPixelSize: 32, maximumScale: 20, heightReference: HeightReference.CLAMP_TO_GROUND },
+        model: { uri: h.url, minimumPixelSize: this.cameraMode === "drone" ? 0 : 32, maximumScale: 20, heightReference: HeightReference.CLAMP_TO_GROUND },
       });
     }
     add({
@@ -632,7 +661,7 @@ export class FarmScene {
       ...(avatar.modelUrl
         ? {
             orientation,
-            model: { uri: avatar.modelUrl, minimumPixelSize: 48, maximumScale: 20, heightReference: HeightReference.CLAMP_TO_GROUND },
+            model: { uri: avatar.modelUrl, minimumPixelSize: this.cameraMode === "drone" ? 0 : 48, maximumScale: 20, heightReference: HeightReference.CLAMP_TO_GROUND },
             billboard: avatar.logoUrl
               ? {
                   image: avatar.logoUrl,
@@ -668,14 +697,25 @@ export class FarmScene {
     const lons = samples.map((s) => s[1]);
     const lats = samples.map((s) => s[2]);
     const v = initialView({ west: Math.min(...lons), south: Math.min(...lats), east: Math.max(...lons), north: Math.max(...lats) });
+    // Vue drone : la zone travaillée (sans le trajet sur route), à son altitude.
+    const worked = splitRuns(samples).filter((r) => r.working).flatMap((r) => r.coords);
+    const zone = worked.length > 1 ? worked : samples.map((x) => [x[1], x[2]] as [number, number]);
+    const [w, e, so, n] = [Math.min(...zone.map((c) => c[0])), Math.max(...zone.map((c) => c[0])), Math.min(...zone.map((c) => c[1])), Math.max(...zone.map((c) => c[1]))];
+    const midLat = (so + n) / 2;
+    const ground = grounded.reduce((a, c) => a + (c.height ?? 0), 0) / grounded.length;
+    this.droneFrame = {
+      center: Cartesian3.fromDegrees((w + e) / 2, midLat, ground),
+      size: Math.max((e - w) * 111_320 * Math.cos((midLat * Math.PI) / 180), (n - so) * 111_320, 80),
+      start: start.clone(),
+    };
     this.trackView = () =>
       this.viewer.camera.flyTo({
         destination: Cartesian3.fromDegrees(v.lon, v.lat, v.altitude),
         orientation: { heading: 0, pitch: CesiumMath.toRadians(v.pitchDeg), roll: 0 },
         duration: 1.2,
       });
-    if (this.following) this.followTick();
-    else this.trackView();
+    if (this.cameraMode === "overview") this.trackView();
+    else this.cameraTick();
   }
 
   /** Tous les matériels suivis à leur dernière position connue (FR-MAT-86). */
@@ -709,29 +749,42 @@ export class FarmScene {
   }
 
   /**
-   * Caméra qui suit le matériel pendant le rejeu (vue de trois quarts arrière,
-   * à quelques dizaines de mètres), ou retour à la vue d'ensemble de la trace.
+   * Caméra du rejeu : vue d'ensemble de la trace (libre), drone qui tourne
+   * lentement au-dessus de la zone travaillée, ou derrière le matériel.
    */
-  follow(on: boolean) {
-    this.following = on;
-    if (on) {
-      this.viewer.camera.cancelFlight();
-      this.followTick();
-    } else {
-      this.viewer.camera.lookAtTransform(Matrix4.IDENTITY);
+  setCamera(mode: TrackCamera) {
+    const was = this.cameraMode;
+    this.cameraMode = mode;
+    // Vue drone : l'avatar à sa taille réelle, à l'échelle de la parcelle.
+    for (const e of this.trackEntities) {
+      if (e.model) e.model.minimumPixelSize = new ConstantProperty(mode === "drone" ? 0 : e.id === "track:vehicle" ? 48 : 32);
+    }
+    if (mode === "overview") {
+      if (was !== "overview") this.viewer.camera.lookAtTransform(Matrix4.IDENTITY);
       this.trackView?.();
+    } else {
+      this.viewer.camera.cancelFlight();
+      this.cameraTick();
     }
   }
 
   /**
-   * Caméra derrière le matériel, tournée dans son cap. (Le suivi intégré de
+   * Caméra derrière le matériel, tournée dans son cap (le suivi intégré de
    * Cesium attend le volume englobant du modèle, jamais disponible pour un
-   * modèle posé sur le relief.)
+   * modèle posé sur le relief) ; ou drone en plongée à 45°, qui tourne d'un
+   * degré toutes les deux minutes de rejeu autour de la parcelle entière.
    */
-  private followTick() {
-    if (!this.following || !this.trackHeading) return;
-    const vehicle = this.viewer.entities.getById("track:vehicle");
+  private cameraTick() {
     const time = this.viewer.clock.currentTime;
+    if (this.cameraMode === "drone" && this.droneFrame) {
+      const { center, size, start } = this.droneFrame;
+      const minutes = JulianDate.secondsDifference(time, start) / 60;
+      const heading = CesiumMath.toRadians(200 + minutes * 0.5);
+      this.viewer.camera.lookAt(center, new HeadingPitchRange(heading, CesiumMath.toRadians(-45), size * 1.25));
+      return;
+    }
+    if (this.cameraMode !== "follow" || !this.trackHeading) return;
+    const vehicle = this.viewer.entities.getById("track:vehicle");
     const at = vehicle?.position?.getValue(time);
     if (!at) return;
     const cap = this.trackHeading.getValue(time) as number | undefined;
@@ -739,8 +792,9 @@ export class FarmScene {
   }
 
   clearTrack() {
-    if (this.following) this.viewer.camera.lookAtTransform(Matrix4.IDENTITY);
+    if (this.cameraMode !== "overview") this.viewer.camera.lookAtTransform(Matrix4.IDENTITY);
     this.trackHeading = null;
+    this.droneFrame = null;
     for (const e of this.trackEntities) this.viewer.entities.remove(e);
     this.trackEntities = [];
     if (this.trackLines) this.viewer.scene.primitives.remove(this.trackLines);
