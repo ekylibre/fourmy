@@ -588,8 +588,6 @@ en parallèle de P2 et P3.
     personnelles, lecture seule, photo, compte ;
   - `apps/web/test/team.test.tsx`.
 - **En attente** :
-  - invitations (lot P3) : en attendant, la fiche rattache un compte
-    existant par son email ;
   - masquage des boutons de saisie pour un lecteur dans le reste de
     l'application (`useCanWrite`, prêt). L'API refuse déjà ces écritures.
 
@@ -619,4 +617,36 @@ en parallèle de P2 et P3.
   - `apps/api/test/people-work.integration.test.ts` : chevauchement
     partagé, prorata par activité, sommes égales au total, pavés,
     pagination ;
+  - `apps/web/test/team.test.tsx`.
+
+### Lot P3 (2026-11-12)
+
+- **Base** : migration `0046_person_invitations.sql`.
+  - Table `person_invitations`, avec RLS : seul le SHA-256 du jeton est
+    stocké, et une seule invitation ouverte par personne.
+  - Fonctions `fourmy_invitation` et `fourmy_accept_invitation` (`SECURITY
+    DEFINER`, exécutées en `fourmy_app`).
+- **API** : `repos/invitations.ts`, `routes/invitations.ts`.
+  - `POST` et `DELETE /people/:id/invitations` (responsable). Email si SMTP,
+    sinon le lien est renvoyé une seule fois. Un envoi en échec renvoie
+    aussi le lien.
+  - Routes publiques `GET /api/v1/invitations/:token` et
+    `POST …/accept`.
+  - Création de compte stricte (`createLocalUserIfAbsent`) : un lien
+    d'invitation ne remplace jamais le mot de passe d'un compte existant.
+    Ce compte doit se connecter et avoir le même email.
+  - `DELETE /people/:id` : suppression sans historique, anonymisation
+    sinon. Le dernier responsable reste.
+  - Pavés et fiche : état « Invitée » ; invitation en cours visible du
+    responsable.
+- **Web** :
+  - panneau « Compte Fourmy » : inviter, renvoyer, copier le lien,
+    annuler, changer le rôle, retirer l'accès ;
+  - bouton « Supprimer » avec explication ;
+  - page publique `/invitation/:token` ;
+  - retour après connexion (`/login?next=`, chemin interne seulement).
+- **Tests** :
+  - `apps/api/test/invitations.integration.test.ts` : lien, email
+    (transport simulé), acceptation, usage unique, compte existant et autre
+    email refusés, révocation, expiration, effacement ;
   - `apps/web/test/team.test.tsx`.

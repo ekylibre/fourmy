@@ -105,6 +105,8 @@ export const personSheet = personCard.extend({
   /** Le lecteur peut modifier les coordonnées (responsable, ou sa propre fiche). */
   canEditContact: z.boolean(),
   private: personPrivate.optional(),
+  /** Invitation en cours (responsable seulement). */
+  invitation: z.object({ email: z.string(), role: memberRole, expiresAt: z.string(), sentByEmail: z.boolean() }).nullable().optional(),
 });
 export type PersonSheet = z.infer<typeof personSheet>;
 
@@ -184,3 +186,27 @@ export const personIntervention = z.object({
   equipments: z.array(z.string()),
 });
 export type PersonIntervention = z.infer<typeof personIntervention>;
+
+/** Invitation d'une personne à avoir un compte (lot P3). */
+export const personInvite = z.object({ email: z.string().trim().toLowerCase().email().max(254).optional(), role: memberRole });
+export type PersonInvite = z.infer<typeof personInvite>;
+export const invitationResult = z.object({
+  status: z.enum(["sent", "link"]),
+  link: z.string().nullable(),
+  sentByEmail: z.boolean(),
+  expiresAt: z.string(),
+  email: z.string(),
+});
+export type InvitationResult = z.infer<typeof invitationResult>;
+
+/** Invitation lue par son jeton, avant connexion. */
+export const publicInvitation = z.object({
+  farmId: uuid,
+  farmName: z.string(),
+  firstName: z.string(),
+  email: z.string(),
+  role: memberRole,
+  status: z.enum(["open", "expired", "accepted", "revoked"]),
+  accountExists: z.boolean(),
+});
+export type PublicInvitation = z.infer<typeof publicInvitation>;

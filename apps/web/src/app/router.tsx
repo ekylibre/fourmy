@@ -23,6 +23,7 @@ import { PartsPage } from "../features/maintenance/PartsPage";
 import { ParcelCreatePage } from "../features/parcels/ParcelCreatePage";
 import { ParcelSheetPage } from "../features/parcels/ParcelSheetPage";
 import { LoginPage } from "../features/login/LoginPage";
+import { InvitationPage } from "../features/invitation/InvitationPage";
 import { RegisterPage } from "../features/register/RegisterPage";
 import { StockPage } from "../features/stock/StockPage";
 import { TeamPage } from "../features/team/TeamPage";
@@ -114,6 +115,8 @@ const legacy = (path: string) => ({ path, element: <LegacyRedirect /> });
 export const routes = [
   { path: "/", element: <Navigate to="/farms" replace /> },
   { path: "/login", element: <LoginPage /> },
+  // Invitation à rejoindre une ferme (lot P3) : publique, avant connexion.
+  { path: "/invitation/:token", element: <InvitationPage /> },
   { path: "/farms", element: <RequireAuth><FarmsPage /></RequireAuth> },
   // Retour du consentement agrirouter (adresse enregistrée chez agrirouter, sans ferme dans le chemin).
   { path: "/agrirouter/callback", element: <RequireAuth><AgrirouterCallbackPage /></RequireAuth> },

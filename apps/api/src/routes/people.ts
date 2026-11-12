@@ -1,11 +1,13 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { memberRole, personProfileWrite, uuid } from "@fourmy/contracts";
+import { memberRole, personInvite, personProfileWrite, uuid } from "@fourmy/contracts";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
-import { createPerson, getPhoto, listPeople, personSheet, removeAccount, setAccountRole, setPhoto, updatePerson, PHOTO_MAX_BYTES, type Viewer } from "../repos/people.js";
+import { createPerson, erasePerson, getPhoto, listPeople, personSheet, removeAccount, setAccountRole, setPhoto, updatePerson, PHOTO_MAX_BYTES, type Viewer } from "../repos/people.js";
 import { BadRequest, domainCtx, problem, uuidParam } from "./helpers.js";
 import { personInterventions, personWork } from "../repos/people-work.js";
+import { invitePerson, revokeInvitation } from "../repos/invitations.js";
+import { appMailer } from "../mail.js";
 
 /** Date de la frise (AAAA-MM-JJ), aujourd'hui par défaut. */
 const atDay = (v: string | undefined) => {
@@ -76,6 +78,23 @@ export const peopleRoutes = new Hono<Env>()
   .delete("/people/:id/photo", async (c) => {
     await setPhoto(db(), c.get("farmId"), uuidParam(c, "id"), { userId: c.get("userId"), role: c.get("role") }, null);
     return c.body(null, 204);
+  })
+  // Invitation à avoir un compte (lot P3) : email si SMTP, sinon lien à transmettre.
+  .post("/people/:id/invitations", requireOwner, async (c) => {
+    const parsed = personInvite.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.message);
+    const appUrl = process.env.BETTER_AUTH_URL ?? new URL(c.req.url).origin;
+    const r = await invitePerson(db(), c.get("farmId"), uuidParam(c, "id"), { ...parsed.data, invitedBy: c.get("userId"), appUrl, mailer: appMailer() });
+    return c.json(r, 201);
+  })
+  .delete("/people/:id/invitations", requireOwner, async (c) => {
+    await revokeInvitation(db(), c.get("farmId"), uuidParam(c, "id"));
+    return c.body(null, 204);
+  })
+  // Effacement : supprimée sans historique, anonymisée sinon (design §4.4).
+  .delete("/people/:id", requireOwner, async (c) => {
+    const result = await erasePerson(db(), c.get("farmId"), domainCtx(c), uuidParam(c, "id"));
+    return c.json({ result });
   })
   // Compte de la personne : rôle, retrait de l'accès (la personne reste).
   .patch("/people/:id/account", requireOwner, async (c) => {
