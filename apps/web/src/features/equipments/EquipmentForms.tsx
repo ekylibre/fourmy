@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { ActionIcon, Alert, Button, Checkbox, Group, Modal, NumberInput, SegmentedControl, Select, Stack, Switch, Text, TextInput, Textarea } from "@mantine/core";
+import { ActionIcon, Alert, Anchor, Button, Checkbox, Group, Modal, NumberInput, SegmentedControl, Select, Stack, Switch, Text, TextInput, Textarea } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
+import { typeFromName } from "@fourmy/equipment-3d";
 import {
   EQUIPMENT_KIND_LABELS,
+  EQUIPMENT_TYPES,
+  type EquipmentType,
   EQUIPMENT_STATE_LABELS,
   METERED_KINDS,
   type EquipmentAggregate,
@@ -126,13 +129,16 @@ export function ReadingModal({ farmId, equipment, onClose }: { farmId: string; e
   );
 }
 
+const TYPE_OPTIONS = Object.entries(EQUIPMENT_TYPES).map(([value, t]) => ({ value, label: t.label }));
+
 type Draft = EquipmentWrite & { aggregates: EquipmentAggregate[] };
 
-const emptyDraft = (): Draft => ({ name: "", kind: "tractor", state: "active", brand: "", model: "", serialNumber: "", manufacturerType: "", year: null, meterUnit: "hours", commissionedAt: null, aggregates: [], externalIds: {}, notes: "" });
+const emptyDraft = (): Draft => ({ name: "", kind: "tractor", type: "tractor", state: "active", brand: "", model: "", serialNumber: "", manufacturerType: "", year: null, meterUnit: "hours", commissionedAt: null, aggregates: [], externalIds: {}, notes: "" });
 
 const fromSheet = (s: EquipmentSheet): Draft => ({
   name: s.name,
   kind: s.kind,
+  type: s.type ?? null,
   state: s.state ?? "active",
   brand: s.brand ?? "",
   model: s.model ?? "",
@@ -152,6 +158,14 @@ export function EquipmentFormModal({ farmId, sheet, onClose, onCreated }: { farm
   const [d, setD] = useState<Draft>(sheet ? fromSheet(sheet) : emptyDraft());
   const [error, setError] = useState<string | null>(null);
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((x) => ({ ...x, [k]: v }));
+  // Type de matériel : il fixe la nature Ekylibre et l'avatar 3D de base.
+  const setType = (type: EquipmentType | null) =>
+    setD((x) => {
+      if (!type) return { ...x, type: null };
+      const kind = EQUIPMENT_TYPES[type].kind;
+      return { ...x, type, kind, meterUnit: sheet ? x.meterUnit : METERED_KINDS.includes(kind) ? "hours" : null };
+    });
+  const suggested = typeFromName([d.name, d.brand, d.model].filter(Boolean).join(" ")) as EquipmentType | null;
 
   const save = useMutation({
     mutationFn: () => {
@@ -171,9 +185,35 @@ export function EquipmentFormModal({ farmId, sheet, onClose, onCreated }: { farm
     <Modal opened onClose={onClose} title={sheet ? `Fiche — ${sheet.name}` : "Nouveau matériel"} size="lg">
       <Stack>
         <TextInput label="Nom" required value={d.name} onChange={(e) => set("name", e.currentTarget.value)} />
+        <Select
+          label="Type"
+          description={
+            d.type
+              ? "Il porte l'avatar 3D de base du matériel (onglet 3D)."
+              : suggested
+                ? undefined
+                : "Il porte l'avatar 3D de base du matériel (onglet 3D) ; sans type, l'avatar se déduit du nom."
+          }
+          placeholder="Choisir un type"
+          searchable
+          clearable
+          data={TYPE_OPTIONS}
+          value={d.type ?? null}
+          onChange={(v) => setType((v as EquipmentType | null) ?? null)}
+        />
+        {!d.type && suggested && (
+          <Text size="sm" c="dimmed" mt={-8}>
+            D'après le nom : {EQUIPMENT_TYPES[suggested].label}.{" "}
+            <Anchor component="button" type="button" size="sm" onClick={() => setType(suggested)}>
+              Appliquer
+            </Anchor>
+          </Text>
+        )}
         <Group grow>
           <Select
-            label="Nature"
+            label="Nature (Ekylibre)"
+            disabled={!!d.type}
+            description={d.type ? "Déduite du type." : undefined}
             data={Object.entries(EQUIPMENT_KIND_LABELS).map(([value, label]) => ({ value, label }))}
             value={d.kind}
             onChange={(v) => {
@@ -230,6 +270,19 @@ export function EquipmentFormModal({ farmId, sheet, onClose, onCreated }: { farm
             set("externalIds", v.trim() ? { ...rest, traccar: v } : rest);
           }}
         />
+        {d.kind !== "tractor" && d.kind !== "self_propelled_equipment" && (
+          <TextInput
+            label="Outil annoncé par Traccar"
+            description="Nom que le boîtier du tracteur envoie pour cet outil (attribut « tool », colonne Outil des parcours). Les parcours libres qui l'annoncent sont reliés à ce matériel (FR-GPS-17)."
+            placeholder="ex. Tigre"
+            value={d.externalIds.traccarTool ?? ""}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              const { traccarTool: _, ...rest } = d.externalIds;
+              set("externalIds", v.trim() ? { ...rest, traccarTool: v } : rest);
+            }}
+          />
+        )}
         <Textarea label="Notes" autosize minRows={2} value={d.notes ?? ""} onChange={(e) => set("notes", e.currentTarget.value)} />
         {error && <Alert color="brique">{error}</Alert>}
         <Group justify="flex-end">

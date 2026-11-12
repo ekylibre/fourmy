@@ -166,6 +166,7 @@ test("plan 3D (relief et photo IGN, cuverie)", async ({ page }) => {
   await page.getByLabel("Date de la frise").fill("2021-12-31");
   await navTo(page, "Plan 3D", "Cartes");
   await expect(page.locator(".cesium-widget canvas")).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("button", { name: "Cuverie", exact: true }).click();
   await expect(page.getByText(/cuve\(s\) placée\(s\)/)).toBeVisible({ timeout: 60_000 });
   await page.waitForTimeout(6000);
   await snap(page, "plan-3d");

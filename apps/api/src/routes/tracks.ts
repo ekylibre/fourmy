@@ -4,6 +4,7 @@ import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import { trackReplay, trackCoverage, toCzml } from "../repos/tracks.js";
 import { hitches, latestPositions } from "../repos/avatar.js";
+import { OSRM_URL, snapTransit } from "../osrm.js";
 import {
   computeTrackSessions,
   draftTrackSessions,
@@ -31,6 +32,12 @@ export const trackRoutes = new Hono<Env>()
   .get("/tracks", async (c) => {
     const q = { equipmentId: uuidParam(c, "equipment", "query"), ...window(c, 31) };
     const track = await trackReplay(db(), c.get("farmId"), { ...q, toleranceM: Number(c.req.query("tolerance") ?? 2) });
+    // Déplacements recalés sur la route (OSRM auto-hébergé), pour le rejeu 3D.
+    if (c.req.query("road") === "1" && OSRM_URL) {
+      const r = await snapTransit(track.samples);
+      track.samples = r.samples;
+      track.road = { runs: r.runs, snapped: r.snapped };
+    }
     if ((c.req.query("format") ?? "json") === "czml") return c.json(toCzml(track, c.req.query("name") ?? "Matériel"));
     return c.json(track);
   })

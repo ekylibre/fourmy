@@ -169,6 +169,11 @@ export function TrackSessionsTab({ farmId, equipmentId }: { farmId: string; equi
                     {columns.visible("area") && <Table.Th ta="right">Surface</Table.Th>}
                     {columns.visible("distance") && <Table.Th ta="right">Distance</Table.Th>}
                     {columns.visible("tool") && <Table.Th>Outil</Table.Th>}
+                    {columns.visible("width") && (
+                      <Table.Th ta="right" title="Largeur de travail envoyée par le boîtier (Traccar)">
+                        Largeur
+                      </Table.Th>
+                    )}
                     {onTool && columns.visible("tracker") && <Table.Th>Tracteur</Table.Th>}
                     {columns.visible("state") && <Table.Th>État</Table.Th>}
                   </Table.Tr>
@@ -210,6 +215,7 @@ const SESSION_COLUMNS: ColumnDef[] = [
   { key: "area", label: "Surface" },
   { key: "distance", label: "Distance" },
   { key: "tool", label: "Outil" },
+  { key: "width", label: "Largeur" },
   { key: "tracker", label: "Tracteur" },
   { key: "state", label: "État" },
 ];
@@ -257,7 +263,12 @@ function SessionRow({ s, farmId, onTool, show, checked, onToggle }: { s: TrackSe
           {km(s.distanceM)}
         </Table.Td>
       )}
-      {show("tool") && <Table.Td>{s.tool?.name ?? (s.toolHint ? <Text span c="dimmed" size="sm" title="Outil annoncé par le boîtier, non relié à un matériel">{s.toolHint}</Text> : "—")}</Table.Td>}
+      {show("tool") && <Table.Td>{s.tool?.name ?? (s.toolHint ? <Text span c="dimmed" size="sm" title="Outil annoncé par le boîtier, non relié à un matériel : à renseigner dans la fiche de l'outil (« Outil annoncé par Traccar »)">{s.toolHint}</Text> : "—")}</Table.Td>}
+      {show("width") && (
+        <Table.Td ta="right" className="lv-num" title="Largeur de travail envoyée par le boîtier (Traccar)">
+          {s.widthM == null ? "—" : `${s.widthM.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} m`}
+        </Table.Td>
+      )}
       {onTool && show("tracker") && <Table.Td>{s.tracker?.name ?? "—"}</Table.Td>}
       {show("state") && (
       <Table.Td>

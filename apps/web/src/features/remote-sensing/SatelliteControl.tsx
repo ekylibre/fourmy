@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 import { Anchor, Badge, Group, Paper, SegmentedControl, Stack, Text, Title } from "@mantine/core";
 import { INDEX_SCALES, STALE_AFTER_DAYS, VEGETATION_INDICES, type ParcelIndexAt, type ParcelIndicesAt, type VegetationIndex } from "@fourmy/contracts";
@@ -50,6 +51,19 @@ export function IndexPicker({ value, onChange }: { value: VegetationIndex; onCha
  * Choix de la couche satellite et date de l'image affichée. Sans intégration
  * Copernicus, renvoie vers les Intégrations plutôt que de proposer des couches vides.
  */
+/** Encadré « Satellite », ou rien dans un panneau qui a déjà son cadre. */
+function Frame({ bare, children }: { bare: boolean; children: ReactNode }) {
+  if (bare) return <>{children}</>;
+  return (
+    <Paper p="md">
+      <Title order={4} mb="xs">
+        Satellite
+      </Title>
+      {children}
+    </Paper>
+  );
+}
+
 export function SatelliteControl({
   farmId,
   enabled,
@@ -58,6 +72,7 @@ export function SatelliteControl({
   onChange,
   index,
   onIndexChange,
+  bare = false,
 }: {
   farmId: string;
   enabled: boolean;
@@ -67,14 +82,14 @@ export function SatelliteControl({
   /** Indice de la coloration « Par parcelle » (l'image reste celle du NDVI). */
   index: VegetationIndex;
   onIndexChange: (i: VegetationIndex) => void;
+  /** Sans cadre ni titre : dans un panneau qui porte déjà les siens (barre d'icônes du plan 3D). */
+  bare?: boolean;
 }) {
   const location = useLocation();
+
   if (!enabled) {
     return (
-      <Paper p="md">
-        <Title order={4} mb={4}>
-          Satellite
-        </Title>
+      <Frame bare={bare}>
         <Text size="sm" c="dimmed">
           Images Sentinel-2 et NDVI des parcelles :{" "}
           <Anchor component={Link} to={`/f/${farmId}/integrations${location.search}`}>
@@ -82,16 +97,13 @@ export function SatelliteControl({
           </Anchor>
           .
         </Text>
-      </Paper>
+      </Frame>
     );
   }
   const img = imageFor(data, layer);
   const age = img && data ? Math.round((Date.parse(data.at) - Date.parse(img.date)) / 86_400_000) : null;
   return (
-    <Paper p="md">
-      <Title order={4} mb="xs">
-        Satellite
-      </Title>
+    <Frame bare={bare}>
       <SegmentedControl
         fullWidth
         size="xs"
@@ -133,7 +145,7 @@ export function SatelliteControl({
           {data.attribution}
         </Text>
       )}
-    </Paper>
+    </Frame>
   );
 }
 

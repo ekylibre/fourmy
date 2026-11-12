@@ -80,14 +80,38 @@ const DEFAULT_COLORS: AvatarParams["colors"] = { body: "#7A8C80", cab: "#2B3A42"
 const TRACTOR_COLORS: AvatarParams["colors"] = { body: "#3FBEE0", cab: "#5C2930", wheels: "#4F1F26", accent: "#E89E00" };
 
 /**
- * Gabarit d'un outil d'après son nom ou son modèle : la reprise d'Ekylibre ne
+ * Gabarit de base de chaque type de matériel (fiche, `equipment_type`). Un
+ * type ajouté à `EQUIPMENT_TYPES` (contrats) doit l'être ici : le test
+ * `apps/api/test/equipment-types.test.ts` le vérifie.
+ */
+export const TEMPLATE_FOR_TYPE: Record<string, AvatarTemplate> = {
+  tractor: "tractor",
+  self_propelled: "self_propelled",
+  sower: "sower",
+  rotary_harrow: "rotary_harrow",
+  plough: "plough",
+  disc_harrow: "disc_harrow",
+  cultivator: "mounted_tool",
+  roller: "roller",
+  shredder: "trailed_tool",
+  mounted_sprayer: "mounted_sprayer",
+  trailed_sprayer: "trailed_sprayer",
+  fertilizer_spreader: "fertilizer_spreader",
+  trailer: "trailer",
+  other_tool: "trailed_tool",
+  fixed_equipment: "box",
+  connected_object: "box",
+};
+
+/**
+ * Type d'un outil d'après son nom ou son modèle : la reprise d'Ekylibre ne
  * donne souvent que « trailed_equipment ». Proposition seulement : la fiche
  * permet d'en choisir un autre. null si rien ne se reconnaît.
  */
-export function templateFromName(text: string | null | undefined): AvatarTemplate | null {
+export function typeFromName(text: string | null | undefined): string | null {
   if (!text) return null;
   const t = text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
-  const rules: [RegExp, AvatarTemplate][] = [
+  const rules: [RegExp, string][] = [
     [/semoir|monosem|\bng ?\+|maxima|planter|precea|optima|seeder|\bdrill/, "sower"],
     [/herse rot|rotative|\btigre\b|maschio|power harrow|\bhr ?\d/, "rotary_harrow"],
     [/charrue|gregoire|besson|\brb ?\d|lemken|kverneland|plough|\bplow/, "plough"],
@@ -95,9 +119,17 @@ export function templateFromName(text: string | null | undefined): AvatarTemplat
     [/engrais|epandeur|\bzav?\b|\bza-?[mvx]|bogballe|sulky|rauch|vicon/, "fertilizer_spreader"],
     [/dechaumeur|disques|discover|cover.?crop|carrier|rubin|\bxs ?\d/, "disc_harrow"],
     [/rouleau|croskill|cultipacker/, "roller"],
-    [/vibroculteur|cultivateur|chisel|scarificateur|herse a dents|canadien/, "mounted_tool"],
+    [/vibroculteur|cultivateur|chisel|scarificateur|herse a dents|canadien/, "cultivator"],
+    [/broyeur|gyrobroyeur|girobroyeur|mulcher|delimbe/, "shredder"],
+    [/remorque|benne|plateau|trailer/, "trailer"],
   ];
   return rules.find(([re]) => re.test(t))?.[1] ?? null;
+}
+
+/** Gabarit d'un outil d'après son nom (via son type) ; null si rien ne se reconnaît. */
+export function templateFromName(text: string | null | undefined): AvatarTemplate | null {
+  const type = typeFromName(text);
+  return type ? (TEMPLATE_FOR_TYPE[type] ?? null) : null;
 }
 
 /** Largeur de travail écrite dans le nom (« Lansaman 4.5m », « 3 m ») ; null sinon. */
@@ -161,6 +193,8 @@ export interface ResolvedAvatar {
 /** Paramètres de l'avatar : saisie > fiche technique > défaut du gabarit. */
 export function resolveAvatar(input: {
   kind: string;
+  /** Type de matériel de la fiche : il porte le gabarit de base (TEMPLATE_FOR_TYPE). */
+  type?: string | null;
   /** Nom et modèle du matériel : proposent un gabarit d'outil et une largeur de travail. */
   name?: string | null;
   technical?: unknown;
@@ -170,8 +204,9 @@ export function resolveAvatar(input: {
 }): ResolvedAvatar {
   const saved = input.saved ?? {};
   const byKind = templateForKind(input.kind);
-  const byName = byKind === "trailed_tool" || byKind === "trailed_sprayer" ? templateFromName(input.name) : null;
-  const template = saved.template ?? byName ?? byKind;
+  const byType = input.type ? (TEMPLATE_FOR_TYPE[input.type] ?? null) : null;
+  const byName = !byType && (byKind === "trailed_tool" || byKind === "trailed_sprayer") ? templateFromName(input.name) : null;
+  const template = saved.template ?? byType ?? byName ?? byKind;
   const d = DEFAULTS[template];
   const t = input.technical;
   const fromTech: Partial<Record<keyof typeof d, number | null>> =
@@ -194,7 +229,7 @@ export function resolveAvatar(input: {
           heightM: techMeters(t, "dimensions", "hauteur"),
           workingWidthM: techMeters(t, "dimensions", "largeur_travail") ?? widthFromName(input.name),
         };
-  const provenance: Record<string, Provenance> = { template: saved.template ? "input" : "default" };
+  const provenance: Record<string, Provenance> = { template: saved.template ? "input" : byType ? "technical" : "default" };
   const pick = <K extends keyof typeof d>(k: K): number => {
     const s = saved[k];
     if (typeof s === "number" && s > 0) {

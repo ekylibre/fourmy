@@ -19,15 +19,22 @@ const PROVENANCE: Record<Provenance, { label: string; color: string }> = {
   default: { label: "Par défaut", color: "gray" },
 };
 
-const DIMENSIONS: { key: keyof AvatarWrite; label: string; templates?: string[] }[] = [
+/** Gabarits dont la largeur de travail (rampe, barre de coupe…) se dessine, distincte du corps. */
+const WORKING_WIDTH = ["trailed_tool", "trailed_sprayer", "mounted_tool", "mounted_sprayer", "sower", "rotary_harrow", "plough", "disc_harrow", "roller"];
+const SPRAYERS = ["trailed_sprayer", "mounted_sprayer"];
+const DIMENSIONS: { key: keyof AvatarWrite; label: string | ((template: string) => string); templates?: string[]; help?: (template: string) => string | undefined }[] = [
   { key: "lengthM", label: "Longueur" },
-  { key: "widthM", label: "Largeur" },
+  {
+    key: "widthM",
+    label: (t) => (WORKING_WIDTH.includes(t) ? "Largeur (corps)" : "Largeur"),
+    help: (t) => (SPRAYERS.includes(t) ? "Cuve et châssis, au gabarit routier (3 m au plus)." : undefined),
+  },
   { key: "heightM", label: "Hauteur" },
   { key: "wheelbaseM", label: "Empattement", templates: ["tractor", "self_propelled"] },
   { key: "frontWheelDiameterM", label: "Roues avant (diamètre)", templates: ["tractor", "self_propelled"] },
-  { key: "rearWheelDiameterM", label: "Roues arrière (diamètre)", templates: ["tractor", "self_propelled", "trailed_tool", "trailed_sprayer", "trailer"] },
-  { key: "workingWidthM", label: "Largeur de travail", templates: ["trailed_tool", "trailed_sprayer", "mounted_tool"] },
-  { key: "hitchOffsetM", label: "Attelage (distance)", templates: ["tractor", "trailed_tool", "trailed_sprayer", "trailer"] },
+  { key: "rearWheelDiameterM", label: "Roues arrière (diamètre)", templates: ["tractor", "self_propelled", "trailed_tool", "trailed_sprayer", "trailer", "disc_harrow"] },
+  { key: "workingWidthM", label: (t) => (SPRAYERS.includes(t) ? "Largeur de rampe" : "Largeur de travail"), templates: WORKING_WIDTH },
+  { key: "hitchOffsetM", label: "Attelage (distance)", templates: ["tractor", "trailed_tool", "trailed_sprayer", "trailer", "disc_harrow"] },
 ];
 const COLORS: { key: "body" | "cab" | "wheels" | "accent"; label: string }[] = [
   { key: "body", label: "Carrosserie" },
@@ -64,7 +71,7 @@ export function AvatarTab({ sheet: s }: { sheet: EquipmentSheet }) {
   const resolved = useMemo(() => {
     const clean: AvatarInput = Object.fromEntries(Object.entries(saved).filter(([k, v]) => v !== null && v !== undefined && k !== "colors")) as AvatarInput;
     if (saved.colors) clean.colors = Object.fromEntries(Object.entries(saved.colors).filter(([, v]) => v)) as AvatarInput["colors"];
-    return resolveAvatar({ kind: s.kind, name: s.name, technical: s.technical, brandColor: s.brandInfo?.color ?? null, saved: clean });
+    return resolveAvatar({ kind: s.kind, type: s.type, name: s.name, technical: s.technical, brandColor: s.brandInfo?.color ?? null, saved: clean });
   }, [saved, s.kind, s.technical, s.brandInfo?.color]);
 
   // Aperçu : modèle importé, sinon avatar recalculé dans le navigateur.
@@ -171,7 +178,8 @@ export function AvatarTab({ sheet: s }: { sheet: EquipmentSheet }) {
               {DIMENSIONS.filter((d) => !d.templates || d.templates.includes(resolved.params.template)).map((d) => (
                 <Group key={d.key} justify="space-between" align="flex-end" wrap="nowrap">
                   <NumberInput
-                    label={d.label}
+                    label={typeof d.label === "function" ? d.label(resolved.params.template) : d.label}
+                    description={d.help?.(resolved.params.template)}
                     suffix=" m"
                     decimalScale={2}
                     min={0.05}

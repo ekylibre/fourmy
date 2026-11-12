@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { Badge, Button, Group, Paper, SegmentedControl, Select, Stack, Table, Text, TextInput, Title } from "@mantine/core";
 import { Gauge, Link2, Plus, Radio, Search, Wrench } from "lucide-react";
-import { equipmentKindLabel, equipmentStateLabel, type EquipmentSummary } from "@fourmy/contracts";
+import { equipmentKindLabel, equipmentStateLabel, equipmentTypeLabel, type EquipmentSummary } from "@fourmy/contracts";
 import { useFarm } from "../../app/farm";
 import { formatDate } from "../../app/labels";
 import { useEquipments } from "../../app/queries";
@@ -130,7 +130,7 @@ export function EquipmentsPage() {
                     </Stack>
                   </Group>
                 </Table.Td>
-                {columns.visible("kind") && <Table.Td>{equipmentKindLabel(e.kind)}</Table.Td>}
+                {columns.visible("kind") && <Table.Td>{equipmentTypeLabel(e.type) ?? equipmentKindLabel(e.kind)}</Table.Td>}
                 {columns.visible("brand") && (
                   <Table.Td>
                     <Text size="sm">{[e.brand, e.model].filter(Boolean).join(" · ") || "—"}</Text>

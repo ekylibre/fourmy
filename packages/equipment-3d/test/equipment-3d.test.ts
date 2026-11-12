@@ -65,6 +65,11 @@ describe("modèle glTF", () => {
     const sprayer = resolveAvatar({ kind: "trailed_equipment", saved: { template: "trailed_sprayer", workingWidthM: 24 } }).params;
     const s = await buildAvatarGlb(sprayer);
     expect(s.bounds.max[1] - s.bounds.min[1]).toBeCloseTo(24, 0); // rampe dépliée
+    // Largeur saisie dans le corps (18 m, celle de la rampe) : la cuve garde son gabarit, seule la rampe compte.
+    for (const template of ["mounted_sprayer", "trailed_sprayer"] as const) {
+      const wide = await buildAvatarGlb(resolveAvatar({ kind: "trailed_equipment", saved: { template, widthM: 18, workingWidthM: 6 } }).params);
+      expect(wide.bounds.max[1] - wide.bounds.min[1], template).toBeCloseTo(6, 0);
+    }
     await expect(inspectGlb(new TextEncoder().encode("pas un modèle"))).rejects.toThrow(/GLB/);
     expect(pngRatio(PNG)).toBe(1);
   });

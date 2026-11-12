@@ -83,4 +83,51 @@ describe.skipIf(!url)("avatar 3D (intégration)", () => {
     // « Charrue » : gabarit de charrue portée proposé d'après le nom, accrochée au relevage (pas de timon).
     expect(h.items).toEqual([expect.objectContaining({ toolId: plough, toolName: "Charrue", from: periods[0]!.startedAt, hitchOffsetM: 0 })]);
   });
+
+  it("type de matériel : il fixe la nature et l'avatar de base ; une fiche sans type le garde", async () => {
+    const res = await app.request(`${base()}/equipments`, { method: "POST", headers, body: JSON.stringify({ name: "Matériel 7", kind: "equipment", type: "sower" }) });
+    expect(res.status).toBe(201);
+    const id = ((await res.json()) as { id: string }).id;
+    const sheet = async () => (await (await app.request(`${base()}/equipments/${id}/sheet`, { headers })).json()) as { kind: string; type: string | null };
+    expect(await sheet()).toMatchObject({ kind: "trailed_equipment", type: "sower" });
+    const avatar = async () => (await (await app.request(`${base()}/equipments/${id}/avatar`, { headers })).json()) as { params: { template: string }; provenance: { template: string } };
+    expect(await avatar()).toMatchObject({ params: { template: "sower" }, provenance: { template: "technical" } });
+    // Modification sans le champ type (ancien client) : le type reste.
+    const put = await app.request(`${base()}/equipments/${id}`, { method: "PUT", headers, body: JSON.stringify({ name: "Semoir 7", kind: "trailed_equipment" }) });
+    expect(put.status).toBe(204);
+    expect((await sheet()).type).toBe("sower");
+    // Changement de type : l'avatar suit.
+    await app.request(`${base()}/equipments/${id}`, { method: "PUT", headers, body: JSON.stringify({ name: "Semoir 7", kind: "trailed_equipment", type: "mounted_sprayer" }) });
+    expect((await avatar()).params.template).toBe("mounted_sprayer");
+    // Un type inconnu est refusé.
+    const bad = await app.request(`${base()}/equipments/${id}`, { method: "PUT", headers, body: JSON.stringify({ name: "Semoir 7", kind: "trailed_equipment", type: "fusée" }) });
+    expect(bad.status).toBe(400);
+  });
+
+  it("outil annoncé par Traccar : relié à la main, il s'attelle hors des interventions saisies", async () => {
+    const [b] = await sql<{ id: string }[]>`SELECT id FROM tracker_bindings WHERE equipment_id = ${tractor}`;
+    const session = (id: string, from: string, to: string) =>
+      sql`INSERT INTO track_sessions (id, farm_id, equipment_id, binding_id, kind, started_at, stopped_at, position_count, distance_m, tool_hint, settings_hash)
+          VALUES (${id}, ${farmId}, ${tractor}, ${b!.id}, 'work', ${from}, ${to}, 10, 500, 'Herse X', 'h')`;
+    const free = crypto.randomUUID();
+    await session(free, "2026-11-03T11:00:00Z", "2026-11-03T12:00:00Z");
+    // Pendant le labour saisi (07:30-10:00) : l'intervention prime sur le boîtier.
+    await session(crypto.randomUUID(), "2026-11-03T08:00:00Z", "2026-11-03T09:00:00Z");
+    const hitchesOf = async () =>
+      (await (await app.request(`${base()}/tracks/hitches?equipment=${tractor}&from=2026-11-03T00:00:00.000Z&to=2026-11-04T00:00:00.000Z`, { headers })).json()).items as { toolName: string; from: string }[];
+    expect((await hitchesOf()).map((x) => x.toolName)).toEqual(["Charrue"]); // nom non relié : rien de plus
+
+    const res = await app.request(`${base()}/equipments`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ name: "Herse rotative", kind: "trailed_equipment", externalIds: { traccarTool: " herse x " } }),
+    });
+    const harrow = ((await res.json()) as { id: string }).id;
+    const [s] = await sql<{ tool_equipment_id: string | null }[]>`SELECT tool_equipment_id FROM track_sessions WHERE id = ${free}`;
+    expect(s!.tool_equipment_id).toBe(harrow); // parcours libre relié tout de suite
+    expect((await hitchesOf()).map((x) => [x.toolName, x.from])).toEqual([
+      ["Charrue", "2026-11-03T07:30:00.000Z"],
+      ["Herse rotative", "2026-11-03T11:00:00.000Z"],
+    ]);
+  });
 });

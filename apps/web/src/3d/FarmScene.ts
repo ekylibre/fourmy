@@ -802,6 +802,12 @@ export class FarmScene {
     this.viewer.clock.shouldAnimate = false;
   }
 
+  /** Rejeu : se place à un instant (barre de temps). */
+  seek(iso: string) {
+    this.viewer.clock.currentTime = JulianDate.fromIso8601(iso);
+    this.cameraTick();
+  }
+
   play(on: boolean, multiplier?: number) {
     if (multiplier) this.viewer.clock.multiplier = multiplier;
     this.viewer.clock.shouldAnimate = on;

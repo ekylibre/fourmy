@@ -12,6 +12,19 @@ visible) ([`requirements.md`](requirements.md) §4.9 bis). Étude d'origine :
 
 ## Ce que voit l'utilisateur
 
+- **Mise en page du plan 3D** (retours du 2026-11-12) :
+  - la vue occupe toute la hauteur ;
+  - la **barre de rejeu** reste posée en bas de la vue : matériel, lecture,
+    vitesse, heure, caméra, barre de temps pour se placer à un instant,
+    outils attelés avec leurs horaires, trajets recalés sur la route
+    ([`routage-osrm.md`](routage-osrm.md)) ;
+  - les couches et réglages sont une **barre d'icônes** verticale en haut à
+    droite de la vue : végétation et météo, image satellite, matériels
+    suivis, cuverie, bâtiments (responsable, s'il en manque la hauteur).
+    Chaque icône ouvre sa rubrique dans une petite fenêtre à côté, une seule
+    à la fois, fermée par un clic ailleurs ou Échap. Un point vert signale
+    une couche active ;
+  - bouton **plein écran** (Échap pour sortir).
 - **Plan 3D, encadré « Jumeau : végétation et météo »** :
   - *Rangs de végétation (état observé)* : chaque parcelle porte ses rangs
     en 3D, posés sur le relief IGN et inclinés avec la pente. Leur hauteur,

@@ -56,5 +56,7 @@ export const trackReplay = z.object({
   toleranceM: z.number(),
   /** [instant ISO, longitude, latitude, au travail ?] après simplification. */
   samples: z.array(z.tuple([isoDateTime, z.number(), z.number(), z.boolean().nullable()])),
+  /** Recalage des déplacements sur la route (OSRM, `road=1`) : null si non demandé ou service absent. */
+  road: z.object({ runs: z.number().int(), snapped: z.number().int() }).nullable().optional(),
 });
 export type TrackReplay = z.infer<typeof trackReplay>;
