@@ -49,6 +49,8 @@ export const trackSession = z.object({
   parcels: z.array(z.object({ landParcelId: z.string().uuid(), name: z.string(), areaM2: z.number(), share: z.number() })),
   /** Attribut `tool` de Traccar le plus fréquent. */
   toolHint: z.string().nullable(),
+  /** Largeur de travail envoyée par le boîtier (attribut `widthM`, valeur la plus fréquente), en mètres. */
+  widthM: z.number().nullable(),
   /** Outil résolu (attelage déclaré, lien Traccar, intervention). */
   tool: z.object({ id: z.string().uuid(), name: z.string() }).nullable(),
   /** Onglet d'un outil (FR-GPS-17) : le matériel tracteur. */

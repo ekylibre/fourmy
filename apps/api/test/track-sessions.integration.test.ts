@@ -90,6 +90,16 @@ describe.skipIf(!url)("parcours (intégration)", () => {
     expect(work!.parcels[0]!.share).toBeCloseTo(expected / 10_000, 2);
   });
 
+  it("liste : largeur de travail annoncée par le boîtier", async () => {
+    const res = await app.request(
+      `/api/v1/farms/${farmId}/equipments/${tractor}/track-sessions?from=2026-10-05T00:00:00Z&to=2026-10-06T00:00:00Z`,
+      { headers },
+    );
+    expect(res.status).toBe(200);
+    const { items } = (await res.json()) as { items: { kind: string; widthM: number | null }[] };
+    expect(items.find((s) => s.kind === "work")?.widthM).toBe(10);
+  });
+
   it("incrémental : mêmes parcours, mêmes identifiants", async () => {
     const before = (await sessions()).map((s) => s.id);
     await computeTrackSessions(db, farmId);

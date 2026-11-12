@@ -330,6 +330,7 @@ type SessionRow = {
   covered_area_m2: string | null;
   parcels: TrackSession["parcels"];
   tool_hint: string | null;
+  width_m: number | string | null;
   tool_id: string | null;
   tool_name: string | null;
   tracker_name: string;
@@ -341,6 +342,10 @@ type SessionRow = {
 
 const SESSION_COLUMNS = sql`
   s.id, s.equipment_id, s.kind, s.started_at, s.stopped_at, s.distance_m, s.covered_area_m2, s.parcels, s.tool_hint,
+  -- Largeur de travail annoncée par le boîtier pendant le parcours (la plus fréquente).
+  (SELECT mode() WITHIN GROUP (ORDER BY (p.attrs->>'widthM')::float8) FROM positions p
+    WHERE p.binding_id = s.binding_id AND p.time >= s.started_at AND p.time <= s.stopped_at
+      AND p.attrs->>'widthM' ~ '^[0-9]+(\.[0-9]+)?$') AS width_m,
   t.id AS tool_id, t.name AS tool_name, e.name AS tracker_name,
   i.id AS intervention_id, i.procedure, i.status, s.drift`;
 const SESSION_JOINS = sql`
@@ -360,6 +365,7 @@ function toSession(r: SessionRow, viewer: string): TrackSession {
     coveredAreaM2: r.covered_area_m2 === null ? null : Number(r.covered_area_m2),
     parcels: r.parcels ?? [],
     toolHint: r.tool_hint,
+    widthM: r.width_m === null ? null : Number(r.width_m),
     tool: r.tool_id ? { id: r.tool_id, name: r.tool_name! } : null,
     tracker: r.equipment_id === viewer ? null : { id: r.equipment_id, name: r.tracker_name },
     intervention: r.intervention_id ? { id: r.intervention_id, procedure: r.procedure!, status: r.status! } : null,
