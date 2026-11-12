@@ -144,8 +144,9 @@
 3. **Domaine canonique** : `fourmy.org` (www redirigé) — proposé.
 4. **Adresse de l'application en production** (Eyona) : `app.fourmy.org` ?
    Le bouton « Se connecter » pointe vers dev.fourmy.org en attendant.
-5. **Roadmap** : contenu initial à valider (je propose une première version
-   tirée du README et de `docs/interventions.md`).
+5. **Roadmap** : contenu à valider. La page publique (`apps/site/src/content/roadmap.yaml`)
+   est tirée de la roadmap GitHub ([Fourmy — Roadmap](https://github.com/orgs/ekylibre/projects/2)),
+   sans noms de fermes ni détails internes.
 6. **Historique Git dans Dokploy** : réglé. Dokploy clone sans historique,
    l'image du site est donc construite par la CI (`docs/deploiement.md`) ;
    premier déploiement le 2026-11-07.

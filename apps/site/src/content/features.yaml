@@ -23,7 +23,8 @@ features:
     text: >-
       Relief et photo IGN, bâtiments à leur hauteur, cuves qui se remplissent au fil des
       vendanges, et rejeu des passages de tracteurs : la caméra suit l'avatar 3D du
-      tracteur et de son outil attelé.
+      tracteur et de son outil attelé, ou survole toute la parcelle comme un drone pendant
+      que le tracé de la journée se dessine.
     status: disponible
     capture: plan-3d
     since: 0.18.0
@@ -56,8 +57,9 @@ features:
     text: >-
       Labour, semis, traitements, fertilisation, récolte, vendange, entretien du matériel :
       le formulaire s'adapte à ce que vous faites, chaque travail a son icône. Doses à
-      l'hectare ou au total, plusieurs périodes de travail, vos produits et matériels
-      habituels proposés en premier.
+      l'hectare ou au total, engrais en kilos ou en litres, plusieurs périodes de travail,
+      vos produits et matériels habituels proposés en premier. Utilisable sur téléphone, et
+      rien ne se perd si le réseau coupe pendant l'enregistrement.
     status: disponible
     capture: intervention
     since: 0.19.0
@@ -154,7 +156,8 @@ features:
   - id: cahier-fertilisation
     title: Cahier de fertilisation et directive nitrates
     text: >-
-      Le cahier d'enregistrement se déduit des interventions, prêt à imprimer ou en CSV. À la
+      Le cahier d'enregistrement se déduit des interventions, prêt à imprimer ou en CSV,
+      apports d'automne compris. À la
       saisie d'un épandage, Fourmy vérifie le calendrier d'interdiction, le plan, les
       couverts d'interculture, l'azote libéré avant l'hiver et les conditions du jour ; un
       épandage interdit demande un motif, conservé avec l'intervention. Une liste vous dit

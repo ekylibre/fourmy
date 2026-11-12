@@ -1,10 +1,13 @@
 # Roadmap publique (page Roadmap). status : en-cours | prochainement | plus-tard.
-# Première version à valider (docs/site-public-exigences.md, question ouverte 5).
+# Version publique, à valider (docs/site-public-exigences.md, question 5), tirée de la
+# roadmap GitHub (projet « Fourmy — Roadmap », claudedocs/points_ouverts.md) : sans noms
+# de fermes ni détails internes.
 roadmap:
   - title: Tests avec les fermes pilotes
     text: >-
       Une grande culture et un domaine viticole utilisent Fourmy sur leurs propres données,
-      reprises d'Ekylibre.
+      reprises d'Ekylibre. Recette complète faite en novembre 2026 avant l'envoi à la
+      première ferme : écrans, rôles, réglementaire, téléphone.
     status: en-cours
     horizon: Fin 2026
   - title: Application mobile sur le terrain
@@ -17,6 +20,14 @@ roadmap:
     text: Hébergement de production, sauvegardes, ouverture aux premières fermes.
     status: prochainement
     horizon: Début 2027
+  - title: Outils de relief
+    text: Profil d'un trajet, pente, ombrage et courbes de niveau sur la carte et le plan 3D.
+    status: prochainement
+  - title: Cartes de modulation sur le tracteur
+    text: >-
+      Envoi des cartes aux consoles par agrirouter essayé en conditions réelles, puis retour
+      des doses réellement appliquées.
+    status: prochainement
   - title: Registre phytosanitaire en PDF
     text: Le registre prêt à imprimer pour les contrôles.
     status: prochainement
@@ -44,6 +55,11 @@ roadmap:
     text: >-
       Référentiels régionaux des autres régions, rôle conseiller pour proposer les plans,
       contrôles de l'épandage sur le mobile hors ligne.
+    status: plus-tard
+  - title: Viticulture et élevage
+    text: >-
+      Déclaration de récolte, registre de cave et parcellaire viticole ; suivi des animaux
+      par lots, puis individuel.
     status: plus-tard
   - title: Sondes et pièges connectés
     text: De nouvelles intégrations sur le modèle des traceurs GPS et des stations météo.
