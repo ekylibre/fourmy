@@ -19,7 +19,7 @@ export async function signIn(email: string, password = TEST_PASSWORD): Promise<s
 }
 
 /** Crée une ferme, un utilisateur et son appartenance ; renvoie les en-têtes d'appel. */
-export async function setupFarm(sql: Sql, name: string, role: "owner" | "worker" = "owner") {
+export async function setupFarm(sql: Sql, name: string, role: "owner" | "worker" | "reader" = "owner") {
   const farmId = crypto.randomUUID();
   await sql`INSERT INTO farms (id, name) VALUES (${farmId}, ${name})`;
   const member = await addMember(sql, farmId, role);
@@ -27,7 +27,7 @@ export async function setupFarm(sql: Sql, name: string, role: "owner" | "worker"
 }
 
 /** Crée un compte local, le rend membre de la ferme et le connecte. */
-export async function addMember(sql: Sql, farmId: string, role: "owner" | "worker") {
+export async function addMember(sql: Sql, farmId: string, role: "owner" | "worker" | "reader") {
   const email = `${crypto.randomUUID()}@test.fourmy`;
   const userId = await upsertLocalUser(db(), { email, password: TEST_PASSWORD });
   await sql`INSERT INTO memberships (id, farm_id, user_id, role) VALUES (${crypto.randomUUID()}, ${farmId}, ${userId}, ${role})`;

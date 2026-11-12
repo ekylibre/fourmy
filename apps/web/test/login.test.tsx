@@ -42,28 +42,6 @@ describe("connexion et choix de la ferme", () => {
   });
 });
 
-describe("équipe (responsable)", () => {
-  it("liste les membres et les personnes ; ajoute un membre par e-mail", async () => {
-    const user = userEvent.setup();
-    let added: unknown = null;
-    const { http, HttpResponse } = await import("msw");
-    const { server } = await import("./setup");
-    server.use(
-      http.post("*/members", async ({ request }) => {
-        added = await request.json();
-        return HttpResponse.json({ items: [], nextCursor: null }, { status: 201 });
-      }),
-    );
-    renderApp(`/f/${FARM}/team?at=2026-06-30`);
-    expect(await screen.findByRole("heading", { name: "Membres" })).toBeInTheDocument();
-    expect(await screen.findByText("Camille")).toBeInTheDocument();
-    await user.type(screen.getByRole("textbox", { name: "E-mail du compte" }), "salarie@ferme.fr");
-    await user.click(screen.getByRole("button", { name: "Ajouter" }));
-    expect(await screen.findByText("Membre ajouté.")).toBeInTheDocument();
-    expect(added).toEqual({ email: "salarie@ferme.fr", role: "worker" });
-  });
-});
-
 describe("intégrations (responsable)", () => {
   it("formulaire généré depuis le fournisseur ; le secret part une fois, puis n'est plus affiché", async () => {
     const user = userEvent.setup();

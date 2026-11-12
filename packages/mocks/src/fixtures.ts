@@ -14,7 +14,7 @@ import type {
 } from "@fourmy/contracts";
 import { PROCEDURES, SHAPE_LABELS, TREATMENT_PURPOSE_LABELS, copernicusAttribution } from "@fourmy/contracts";
 import type { CropModelAt, CropModelDay, ParcelCropSeries, ParcelCropState, ParcelIndexSeries, ParcelIndicesAt, Vegetation3dAt, VegetationIndex } from "@fourmy/contracts";
-import type { Activity, Article, Intervention, Person, PhytoRegisterEntry, ProcedureCatalogue, StockLevel } from "@fourmy/contracts";
+import type { Activity, Article, Intervention, PersonCard, PersonSheet, PhytoRegisterEntry, ProcedureCatalogue, StockLevel } from "@fourmy/contracts";
 
 /**
  * Jeu de données de démonstration — anonymisé, inspiré d'une petite ferme
@@ -207,7 +207,15 @@ export const demoArticles: Article[] = [
   },
 ];
 
-export const demoPeople: Person[] = [
+const personCardDefaults = {
+  photo: null,
+  certiphyto: { status: "none" as const, validUntil: null },
+  monthHours: null,
+  lastIntervention: null,
+};
+
+/** Équipe de la démo : Camille (sans compte, intervenante) et le compte de démonstration. */
+export const demoPeople: PersonCard[] = [
   {
     id: "00000000-0000-7000-8000-000000000601",
     farmId: DEMO_FARM_ID,
@@ -217,8 +225,46 @@ export const demoPeople: Person[] = [
     active: true,
     createdAt: now,
     updatedAt: now,
+    firstName: null,
+    lastName: null,
+    account: { status: "none", role: null },
+    ...personCardDefaults,
+    certiphyto: { status: "expiring", validUntil: "2026-08-15" },
+  },
+  {
+    id: "00000000-0000-7000-8000-000000000602",
+    farmId: DEMO_FARM_ID,
+    name: "Dominique Martin",
+    role: null,
+    userId: DEMO_USER_ID,
+    active: true,
+    createdAt: now,
+    updatedAt: now,
+    firstName: "Dominique",
+    lastName: "Martin",
+    account: { status: "active", role: "owner" },
+    ...personCardDefaults,
   },
 ];
+
+/** Fiche d'une personne de la démo, vue par le responsable (coordonnées fictives). */
+export function demoPersonSheet(id: string): PersonSheet | null {
+  const p = demoPeople.find((x) => x.id === id);
+  if (!p) return null;
+  return {
+    ...p,
+    certiphyto: { status: p.certiphyto.status, category: p.certiphyto.validUntil ? "operateur" : null, number: p.certiphyto.validUntil ? "OP-0001" : null, validUntil: p.certiphyto.validUntil },
+    external: { ekylibre: false },
+    canEditContact: true,
+    private: {
+      email: "camille@exemple.test",
+      mobile: "06 00 00 00 00",
+      address: { line1: "1 chemin des Vignes", line2: null, postalCode: "33000", city: "Bordeaux", country: "FR" },
+      birthDate: null,
+      contract: { type: "seasonal", startedOn: "2026-04-01", endedOn: null },
+    },
+  };
+}
 
 export const demoInterventions: Intervention[] = [
   {

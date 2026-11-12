@@ -1,5 +1,7 @@
 import { useQuery, type QueryClient } from "@tanstack/react-query";
 import type {
+  PersonCard,
+  PersonSheet,
   Activity,
   FarmPhytoArticle,
   ParcelCertification,
@@ -118,6 +120,24 @@ export function useProcedures(farmId: string) {
     queryKey: ["procedures", farmId],
     queryFn: () => api.get<ProcedureCatalogue>(farmPath(farmId, "/procedures")),
     staleTime: 5 * 60_000,
+  });
+}
+
+/** Grille Équipe à une date (heures du mois, Certiphyto à la date). */
+export function useTeam(farmId: string, day: string) {
+  return useQuery({
+    queryKey: ["people", farmId, "team", day],
+    queryFn: () => api.get<Page<PersonCard>>(farmPath(farmId, `/people?at=${day}`)),
+    placeholderData: (prev) => prev,
+  });
+}
+
+/** Fiche d'une personne (données personnelles si le compte y a droit). */
+export function usePersonSheet(farmId: string, id: string, day: string) {
+  return useQuery({
+    queryKey: ["people", farmId, "sheet", id, day],
+    queryFn: () => api.get<PersonSheet>(farmPath(farmId, `/people/${id}?at=${day}`)),
+    placeholderData: (prev) => prev,
   });
 }
 

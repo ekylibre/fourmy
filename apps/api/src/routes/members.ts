@@ -2,12 +2,15 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
 import { withFarm, type Tx } from "@fourmy/db";
+import { memberRole } from "@fourmy/contracts";
 import { requireOwner, type Env, type Role } from "../context.js";
+import { ensureMemberPeople } from "../repos/people.js";
 import { db } from "../db.js";
 import { BadRequest, Conflict, NotFound, problem, uuidParam } from "./helpers.js";
 
-const role = z.enum(["owner", "worker"]);
-const memberAdd = z.object({ email: z.string().trim().toLowerCase().email(), role });
+const role = memberRole;
+/** `personId` : la personne de la fiche qui reçoit ce compte ; sinon une personne est créée. */
+const memberAdd = z.object({ email: z.string().trim().toLowerCase().email(), role, personId: z.string().uuid().optional() });
 const memberPatch = z.object({ role });
 
 type Member = { userId: string; email: string; name: string | null; role: Role; personId: string | null };
@@ -47,6 +50,14 @@ export const memberRoutes = new Hono<Env>()
         INSERT INTO memberships (id, farm_id, user_id, role) VALUES (gen_random_uuid(), ${farmId}, ${user.id}, ${r})
         ON CONFLICT (farm_id, user_id) DO NOTHING RETURNING id`)) as unknown as unknown[];
       if (added.length === 0) throw new Conflict(`${email} est déjà membre de la ferme.`);
+      // Tout membre a une personne : celle de la fiche, sinon une nouvelle.
+      if (parsed.data.personId) {
+        const linked = (await tx.execute(sql`
+          UPDATE people SET user_id = ${user.id}, updated_at = now()
+          WHERE id = ${parsed.data.personId} AND user_id IS NULL RETURNING id`)) as unknown as unknown[];
+        if (linked.length === 0) throw new Conflict("Cette personne a déjà un compte, ou n'existe pas.");
+      }
+      await ensureMemberPeople(tx);
       return list(tx);
     });
     return c.json({ items, nextCursor: null }, 201);
@@ -56,7 +67,7 @@ export const memberRoutes = new Hono<Env>()
     if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.message);
     const userId = uuidParam(c, "userId");
     const items = await withFarm(db(), c.get("farmId"), async (tx) => {
-      if (parsed.data.role === "worker") await assertAnotherOwner(tx, userId);
+      if (parsed.data.role !== "owner") await assertAnotherOwner(tx, userId);
       const updated = (await tx.execute(sql`
         UPDATE memberships SET role = ${parsed.data.role} WHERE user_id = ${userId} RETURNING id`)) as unknown as unknown[];
       if (updated.length === 0) throw new NotFound("Membre introuvable.");

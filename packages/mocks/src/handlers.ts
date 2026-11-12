@@ -13,6 +13,7 @@ import {
   demoInterventions,
   demoInterventionHistory,
   demoPeople,
+  demoPersonSheet,
   demoProcedures,
   demoEquipments,
   demoStock,
@@ -249,6 +250,10 @@ export const handlers = [
   ),
   http.get(`*${base}/maintenance/due`, () => HttpResponse.json({ items: [], byEquipment: {} })),
   http.get(`*${base}/people`, () => page(demoPeople)),
+  http.get(`*${base}/people/:id`, ({ params }) => {
+    const sheet = demoPersonSheet(String(params.id));
+    return sheet ? HttpResponse.json(sheet) : HttpResponse.json({ title: "Personne introuvable", status: 404 }, { status: 404 });
+  }),
   http.get(`*${base}/registers/phyto`, ({ request }) => {
     const url = new URL(request.url);
     if (url.searchParams.get("format") === "csv") {

@@ -10,7 +10,7 @@ export const meRoutes = new Hono<Env>().get("/farms", async (c) => {
     return (await tx.execute(sql`SELECT farm_id AS id, name, role FROM fourmy_user_farms(${c.get("userId")})`)) as unknown as {
       id: string;
       name: string;
-      role: "owner" | "worker";
+      role: "owner" | "worker" | "reader";
     }[];
   });
   return c.json({ userId: c.get("userId"), user: c.get("user"), items });
