@@ -4,6 +4,8 @@ import {
   planInterventionCompletion,
   planCorrection,
   toStockQuantity,
+  convertQuantity,
+  unitScale,
   pickLot,
   buildEvent,
   validateIntervention,
@@ -277,13 +279,16 @@ export async function readIntervention(tx: Tx, id: string): Promise<Intervention
 // Validation : existence des références + règles de forme du domaine
 // ---------------------------------------------------------------------------
 
-type Article = { id: string; name: string; unit: string; kind: ArticleKind };
+type Article = { id: string; name: string; unit: string; kind: ArticleKind; density: number | null };
 
 async function loadArticles(tx: Tx, ids: string[]): Promise<Map<string, Article>> {
   if (ids.length === 0) return new Map();
   const list = await rows<Article>(
     tx,
-    sql`SELECT id, name, unit, kind FROM articles WHERE id IN (${sql.join([...new Set(ids)].map((i) => sql`${i}`), sql`, `)})`,
+    // Densité du fertilisant (kg/L) : conversion d'une saisie en litres d'un produit stocké en tonnes.
+    sql`SELECT a.id, a.name, a.unit, a.kind, f.density::float8 AS density
+        FROM articles a LEFT JOIN article_fertilizers f ON f.article_id = a.id
+        WHERE a.id IN (${sql.join([...new Set(ids)].map((i) => sql`${i}`), sql`, `)})`,
   );
   return new Map(list.map((a) => [a.id, a]));
 }
@@ -319,6 +324,17 @@ async function validate(tx: Tx, procedureCode: string, raw: Body, mode: "plan" |
     articleKind: (id) => articles.get(id)?.kind,
   });
   if (errors.length) throw new DomainError(errors.join(" "));
+  // Unité de saisie d'un intrant (fertilisants seulement) : convertible dans celle de l'article.
+  for (const i of body.inputs) {
+    const a = articles.get(i.articleId);
+    if (!a || !i.unit || i.unit === a.unit) continue;
+    if (a.kind !== "fertilizer") throw new DomainError(`${a.name} : se saisit dans son unité (${a.unit}).`);
+    if (convertQuantity(1, i.unit, a.unit, a.density) === null) {
+      throw new DomainError(
+        `${a.name} : ${i.unit} ne se convertit pas en ${a.unit}${unitScale(i.unit) && unitScale(a.unit) ? " sans la densité du produit (fiche du fertilisant)" : ""}.`,
+      );
+    }
+  }
   for (const kind of TARGET_KINDS) {
     await assertExist(tx, TABLE_OF[kind], body.targets.filter((t) => t.kind === kind).map((t) => t.id), "Cible");
   }
@@ -381,7 +397,7 @@ async function writeBody(tx: Tx, interventionId: string, body: Body, articles: M
   }
   for (const i of body.inputs) {
     const a = articles.get(i.articleId)!;
-    await insert("input", "article", i.articleId, i.quantity, storedUnit(a.unit, i.per), {
+    await insert("input", "article", i.articleId, i.quantity, storedUnit(i.unit ?? a.unit, i.per), {
       ...(i.lotId ? { lotId: i.lotId } : {}),
       ...(i.from ? { from: i.from } : {}),
       ...(i.equipmentId ? { equipmentId: i.equipmentId } : {}),
@@ -569,7 +585,7 @@ async function recordNitrateCheck(tx: Tx, ctx: DomainCtx, interventionId: string
   const check = await checkApplicationTx(tx, farmId, {
     startedAt: new Date(startedAt).toISOString(),
     parcelIds: parcels.map((t) => t.id),
-    inputs: body.inputs.map(({ articleId, quantity, per }) => ({ articleId, quantity, per })),
+    inputs: body.inputs.map(({ articleId, quantity, per, unit }) => ({ articleId, quantity, per, ...(unit ? { unit } : {}) })),
     areaM2,
     interventionId,
     weather: weatherOf(body.weather),
@@ -765,7 +781,7 @@ async function applyCompletion(
   const lines: ResolvedStockLine[] = [];
   for (const i of input.inputs) {
     const article = articles.get(i.articleId)!;
-    const quantity = toStockQuantity({ quantity: i.quantity, unit: storedUnit(article.unit, i.per), articleUnit: article.unit, areaHa });
+    const quantity = toStockQuantity({ quantity: i.quantity, unit: storedUnit(i.unit ?? article.unit, i.per), articleUnit: article.unit, areaHa, density: article.density });
     const lots = await availableLots(tx, article.id, stoppedAt!);
     const byLot = new Map<string, number>();
     for (const l of lots) byLot.set(l.lot_id, (byLot.get(l.lot_id) ?? 0) + l.available);

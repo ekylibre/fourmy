@@ -43,7 +43,7 @@ export interface CheckableBody {
   procedure: string;
   periods: WorkPeriod[];
   targets: InterventionTarget[];
-  inputs: { articleId: string; quantity: number; per: "hectare" | "total"; equipmentId?: string }[];
+  inputs: { articleId: string; quantity: number; per: "hectare" | "total"; unit?: string; equipmentId?: string }[];
   plannedAt?: string;
   /** Moyens : en attelages, l'applicateur est celui de l'attelage du pulvérisateur (FR-ATT-12). */
   staffing?: StaffingBody["staffing"];

@@ -185,6 +185,12 @@ pulvérisateur (registre phyto, FR-ATT-12).
 - Une **dose par hectare** est multipliée par la **surface traitée** : somme
   des `workedAreaM2` si renseignés, sinon zones de travail, sinon surfaces des
   parcelles **à la date**. Une unité incohérente est refusée (déjà en place).
+- Un **fertilisant** peut se saisir dans une autre unité que celle de son
+  article (`unit` de l'intrant, 12/11/2026) : kilogrammes d'un engrais stocké
+  en tonnes, litres d'un produit stocké en tonnes si la densité de sa
+  composition est connue. Le stock sort dans l'unité de l'article, l'azote suit
+  l'unité saisie. Une unité non convertible, ou des litres sans densité, sont
+  refusés ; les autres intrants (phyto, semences…) restent dans leur unité.
 - Une **sortie** exige une destination (déjà en place).
 - Les périodes sont ordonnées et ne se chevauchent pas.
 - **Annuler** une intervention réalisée = contre-passer ses mouvements

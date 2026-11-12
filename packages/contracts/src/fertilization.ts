@@ -424,7 +424,9 @@ export const PLAN_REFERENTIAL = "Nouvelle-Aquitaine, arrêté référentiel du 2
 export const fertilizationCheckRequest = z.object({
   startedAt: z.string().datetime({ offset: true }),
   parcelIds: z.array(z.string().uuid()).max(100),
-  inputs: z.array(z.object({ articleId: z.string().uuid(), quantity: z.number().positive(), per: z.enum(["hectare", "total"]) })).max(30),
+  inputs: z
+    .array(z.object({ articleId: z.string().uuid(), quantity: z.number().positive(), per: z.enum(["hectare", "total"]), unit: z.string().trim().min(1).max(40).optional() }))
+    .max(30),
   /** Surface travaillée totale (m²), pour une quantité « au total ». */
   areaM2: z.number().positive().nullable().default(null),
   /** Intervention modifiée : ses propres apports ne comptent pas deux fois. */

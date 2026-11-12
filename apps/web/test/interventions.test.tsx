@@ -88,6 +88,50 @@ describe("interventions", () => {
     expect(complete.body.periods).toHaveLength(1);
   });
 
+  it("un engrais stocké en tonnes se saisit en litres (densité connue) ; l'unité part avec la saisie", async () => {
+    const ENGRAIS = "00000000-0000-7000-8000-00000000f201";
+    const now = "2026-01-01T00:00:00.000Z";
+    const composition = { basis: "mass_percent", nTotal: 14, nMineralShare: 1, p2o5: 48, k2o: null, so3: null, density: 1.4, nitrateType: "III", foliar: false } as const;
+    const calls: Record<string, unknown>[] = [];
+    server.use(
+      http.get("*/articles", () =>
+        HttpResponse.json({ items: [{ id: ENGRAIS, farmId: FARM, lexiconRef: null, name: "14-48 liquide", kind: "fertilizer", unit: "Tonne", createdAt: now, updatedAt: now }], nextCursor: null }),
+      ),
+      http.get("*/fertilizers", () =>
+        HttpResponse.json({ items: [{ id: ENGRAIS, name: "14-48 liquide", kind: "fertilizer", unit: "Tonne", lexiconRef: null, composition, origin: "confirmed", source: null, proposal: null, analyses: [], usage: 1 }] }),
+      ),
+      http.post("*/interventions", async ({ request }) => HttpResponse.json(calls.push((await request.json()) as Record<string, unknown>) && {}, { status: 201 })),
+      http.post("*/interventions/:id/complete", async ({ request }) => {
+        calls.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ intervention: {}, movements: [], warnings: [] });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(`/f/${FARM}/interventions?at=2026-06-10`);
+    const button = await screen.findByRole("button", { name: "Nouvelle intervention" });
+    await vi.waitFor(() => expect(button).toBeEnabled());
+    await user.click(button);
+    const form = await screen.findByRole("form", { name: "Saisie de l'intervention" });
+    await user.click(within(form).getByRole("combobox", { name: "Intervention" }));
+    await user.click(await screen.findByRole("option", { name: "Fertilisation" }));
+    await user.click(within(form).getByRole("combobox", { name: "Parcelles" }));
+    await user.click(await screen.findByRole("option", { name: /Les Rouffiats/ }));
+    await user.click(within(form).getByRole("combobox", { name: "Produit" }));
+    await user.click(await screen.findByRole("option", { name: /14-48 liquide/ }));
+    // Unités proposées : la sienne (tonne), le kilogramme, et le volume grâce à la densité.
+    const unit = await within(form).findByRole("combobox", { name: "Unité" });
+    await user.click(unit);
+    expect((await screen.findAllByRole("option")).map((o) => o.textContent)).toEqual(expect.arrayContaining(["Kilogramme", "Litre", "m³"]));
+    await user.click(screen.getByRole("option", { name: "Litre" }));
+    expect(within(form).getByText("Litre/ha")).toBeInTheDocument();
+    await user.type(within(form).getByRole("textbox", { name: "Quantité" }), "120");
+    // 120 L × 1,4 kg/L × 14 % = 23,5 kg N/ha.
+    expect(await within(form).findByText(/23,5 kg N\/ha/)).toBeInTheDocument();
+    await user.click(within(form).getByRole("button", { name: "Enregistrer" }));
+    await vi.waitFor(() => expect(calls).toHaveLength(2));
+    expect(calls[1]).toMatchObject({ inputs: [{ articleId: ENGRAIS, quantity: 120, per: "hectare", unit: "Litre" }] });
+  });
+
   it("la durée calcule la fin ; déplacer le début garde la durée", async () => {
     const user = userEvent.setup();
     const form = await openForm(user);
