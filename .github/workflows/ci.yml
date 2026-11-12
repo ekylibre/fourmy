@@ -5,7 +5,7 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       db:
         image: timescale/timescaledb-ha:pg17
@@ -20,12 +20,12 @@ jobs:
     env:
       DATABASE_URL: postgres://fourmy:fourmy@localhost:5432/fourmy
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # historique complet : version et changelog (packages/release)
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with: { version: 9.15.0 }
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
@@ -37,7 +37,7 @@ jobs:
   e2e:
     # Parcours navigateur de bout en bout : vraie API, vraie base, build de prod.
     needs: check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       db:
         image: timescale/timescaledb-ha:pg17
@@ -52,12 +52,12 @@ jobs:
     env:
       DATABASE_URL: postgres://fourmy:fourmy@localhost:5432/fourmy
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # historique complet : version et changelog (packages/release)
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with: { version: 9.15.0 }
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
@@ -71,7 +71,7 @@ jobs:
       - run: pnpm --filter @fourmy/web e2e
       - run: pnpm --filter @fourmy/site e2e
       - if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-traces
           path: |
@@ -85,21 +85,21 @@ jobs:
     # Dokploy est relancé pour la récupérer (docs/deploiement.md).
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [check, e2e]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/site.Dockerfile
