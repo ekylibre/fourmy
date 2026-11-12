@@ -27,3 +27,4 @@ export * from "./vegetation3d.js";
 export * from "./crop-model.js";
 export * from "./modulation.js";
 export * from "./fertilization/index.js";
+export * from "./work-time.js";

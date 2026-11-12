@@ -1,6 +1,21 @@
 import { useState, type ReactNode } from "react";
-import { Link, useLocation, useParams } from "react-router";
-import { Badge, Button, FileButton, Grid, Group, Modal, Paper, Select, Stack, Table, Text, TextInput, Title } from "@mantine/core";
+import { Link, useLocation, useParams, useSearchParams } from "react-router";
+import {
+  Badge,
+  Button,
+  FileButton,
+  Grid,
+  Group,
+  Modal,
+  Paper,
+  Select,
+  Stack,
+  Table,
+  Tabs,
+  Text,
+  TextInput,
+  Title,
+} from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ImageUp, Pencil, Trash2, UserMinus } from "lucide-react";
@@ -19,6 +34,7 @@ import { usePersonSheet } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
 import { PersonAvatar } from "./PersonAvatar";
 import { PersonFormModal } from "./PersonForm";
+import { PersonWorkTab } from "./PersonWorkTab";
 import { accountLabel, CERTIPHYTO_BADGE } from "./TeamPage";
 
 /** Photo carrée de 256 px (JPEG), recadrée au centre dans le navigateur. */
@@ -32,8 +48,22 @@ export async function squarePhoto(file: File, size = 256): Promise<Blob> {
     const canvas = document.createElement("canvas");
     canvas.width = size;
     canvas.height = size;
-    canvas.getContext("2d")?.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+    canvas
+      .getContext("2d")
+      ?.drawImage(
+        img,
+        (img.naturalWidth - side) / 2,
+        (img.naturalHeight - side) / 2,
+        side,
+        side,
+        0,
+        0,
+        size,
+        size,
+      );
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.85),
+    );
     if (!blob) throw new Error("Image illisible.");
     return blob;
   } finally {
@@ -42,12 +72,15 @@ export async function squarePhoto(file: File, size = 256): Promise<Blob> {
 }
 
 async function putPhoto(farmId: string, id: string, blob: Blob | null) {
-  const res = await fetch(`${globalThis.location?.origin ?? ""}/api/v1${farmPath(farmId, `/people/${id}/photo`)}`, {
-    method: blob ? "PUT" : "DELETE",
-    body: blob,
-    headers: blob ? { "content-type": blob.type } : undefined,
-    credentials: "same-origin",
-  });
+  const res = await fetch(
+    `${globalThis.location?.origin ?? ""}/api/v1${farmPath(farmId, `/people/${id}/photo`)}`,
+    {
+      method: blob ? "PUT" : "DELETE",
+      body: blob,
+      headers: blob ? { "content-type": blob.type } : undefined,
+      credentials: "same-origin",
+    },
+  );
   if (!res.ok) {
     const b = await res.json().catch(() => ({}));
     throw new Error(b.detail ?? b.title ?? `Erreur ${res.status}`);
@@ -63,27 +96,45 @@ export function PersonSheetPage() {
   const sheet = usePersonSheet(farm.id, personId, day);
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") === "work" ? "work" : "general";
   const back = new URLSearchParams(location.search);
   back.delete("tab");
 
   const photo = useMutation({
-    mutationFn: async (file: File | null) => putPhoto(farm.id, personId, file ? await squarePhoto(file) : null),
+    mutationFn: async (file: File | null) =>
+      putPhoto(farm.id, personId, file ? await squarePhoto(file) : null),
     onSuccess: () => {
       notifications.show({ color: "lichen", message: "Photo enregistrée." });
       void queryClient.invalidateQueries({ queryKey: ["people", farm.id] });
     },
-    onError: (e) => notifications.show({ color: "brique", title: "Photo refusée", message: e instanceof Error ? e.message : String(e) }),
+    onError: (e) =>
+      notifications.show({
+        color: "brique",
+        title: "Photo refusée",
+        message: e instanceof Error ? e.message : String(e),
+      }),
   });
 
   if (sheet.error) return <ErrorAlert error={sheet.error} />;
   if (!sheet.data) return <Loading />;
   const s = sheet.data;
   const owner = farm.role === "owner";
-  const cert = s.certiphyto.status === "expired" || s.certiphyto.status === "expiring" ? CERTIPHYTO_BADGE[s.certiphyto.status] : null;
+  const cert =
+    s.certiphyto.status === "expired" || s.certiphyto.status === "expiring"
+      ? CERTIPHYTO_BADGE[s.certiphyto.status]
+      : null;
 
   return (
     <Stack>
-      <Button component={Link} to={`/f/${farm.id}/team${back.size ? `?${back}` : ""}`} variant="subtle" size="compact-sm" leftSection={<ArrowLeft size={14} />} w="fit-content">
+      <Button
+        component={Link}
+        to={`/f/${farm.id}/team${back.size ? `?${back}` : ""}`}
+        variant="subtle"
+        size="compact-sm"
+        leftSection={<ArrowLeft size={14} />}
+        w="fit-content"
+      >
         Équipe
       </Button>
       <Group justify="space-between" align="flex-start">
@@ -92,7 +143,10 @@ export function PersonSheetPage() {
           <Stack gap={4}>
             <Title order={1}>{s.name}</Title>
             <Group gap="xs">
-              <Badge variant="light" color={s.account.status === "active" ? "lichen" : "gray"}>
+              <Badge
+                variant="light"
+                color={s.account.status === "active" ? "lichen" : "gray"}
+              >
                 {accountLabel(s)}
               </Badge>
               {!s.active && (
@@ -115,40 +169,84 @@ export function PersonSheetPage() {
         </Group>
         {s.canEditContact && (
           <Group>
-            <FileButton accept="image/png,image/jpeg" onChange={(f) => f && photo.mutate(f)}>
+            <FileButton
+              accept="image/png,image/jpeg"
+              onChange={(f) => f && photo.mutate(f)}
+            >
               {(props) => (
-                <Button {...props} variant="light" leftSection={<ImageUp size={16} />} loading={photo.isPending}>
+                <Button
+                  {...props}
+                  variant="light"
+                  leftSection={<ImageUp size={16} />}
+                  loading={photo.isPending}
+                >
                   {s.photo ? "Changer la photo" : "Ajouter une photo"}
                 </Button>
               )}
             </FileButton>
             {s.photo && (
-              <Button variant="subtle" color="brique" leftSection={<Trash2 size={16} />} onClick={() => photo.mutate(null)}>
+              <Button
+                variant="subtle"
+                color="brique"
+                leftSection={<Trash2 size={16} />}
+                onClick={() => photo.mutate(null)}
+              >
                 Retirer la photo
               </Button>
             )}
-            <Button variant="default" leftSection={<Pencil size={16} />} onClick={() => setEditing(true)}>
+            <Button
+              variant="default"
+              leftSection={<Pencil size={16} />}
+              onClick={() => setEditing(true)}
+            >
               Modifier
             </Button>
           </Group>
         )}
       </Group>
 
-      <Grid>
-        <Grid.Col span={{ base: 12, md: 7 }}>
-          <Stack>
-            <Identity sheet={s} />
-            {s.private && <Contact sheet={s} />}
-          </Stack>
-        </Grid.Col>
-        <Grid.Col span={{ base: 12, md: 5 }}>
-          <Stack>
-            <Certiphyto sheet={s} />
-            {owner && <AccountPanel farmId={farm.id} sheet={s} />}
-          </Stack>
-        </Grid.Col>
-      </Grid>
-      {editing && <PersonFormModal farmId={farm.id} sheet={s} full={owner} onClose={() => setEditing(false)} />}
+      <Tabs
+        value={tab}
+        onChange={(v) => {
+          const next = new URLSearchParams(params);
+          if (v && v !== "general") next.set("tab", v);
+          else next.delete("tab");
+          setParams(next, { replace: true });
+        }}
+        keepMounted={false}
+      >
+        <Tabs.List>
+          <Tabs.Tab value="general">Général</Tabs.Tab>
+          <Tabs.Tab value="work">Temps de travaux</Tabs.Tab>
+        </Tabs.List>
+        <Tabs.Panel value="work" pt="md">
+          <PersonWorkTab farmId={farm.id} personId={s.id} day={day} />
+        </Tabs.Panel>
+        <Tabs.Panel value="general" pt="md">
+          <Grid>
+            <Grid.Col span={{ base: 12, md: 7 }}>
+              <Stack>
+                <Identity sheet={s} />
+                {s.private && <Contact sheet={s} />}
+              </Stack>
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, md: 5 }}>
+              <Stack>
+                <Certiphyto sheet={s} />
+                {owner && <AccountPanel farmId={farm.id} sheet={s} />}
+              </Stack>
+            </Grid.Col>
+          </Grid>
+        </Tabs.Panel>
+      </Tabs>
+      {editing && (
+        <PersonFormModal
+          farmId={farm.id}
+          sheet={s}
+          full={owner}
+          onClose={() => setEditing(false)}
+        />
+      )}
     </Stack>
   );
 }
@@ -174,7 +272,11 @@ function Identity({ sheet: s }: { sheet: PersonSheet }) {
         <Table.Tbody>
           <Row label="Prénom">{s.firstName}</Row>
           <Row label="Nom">{s.lastName}</Row>
-          {s.private && <Row label="Date de naissance">{s.private.birthDate ? formatDate(s.private.birthDate) : null}</Row>}
+          {s.private && (
+            <Row label="Date de naissance">
+              {s.private.birthDate ? formatDate(s.private.birthDate) : null}
+            </Row>
+          )}
           {s.private && (
             <Row label="Contrat">
               {s.private.contract.type
@@ -186,7 +288,8 @@ function Identity({ sheet: s }: { sheet: PersonSheet }) {
       </Table>
       {!s.firstName && !s.lastName && s.canEditContact && (
         <Text size="sm" c="dimmed" mt="xs">
-          Prénom et nom à saisir (« Modifier ») : le nom affiché vient de l'ancienne fiche.
+          Prénom et nom à saisir (« Modifier ») : le nom affiché vient de
+          l'ancienne fiche.
         </Text>
       )}
     </Paper>
@@ -195,7 +298,12 @@ function Identity({ sheet: s }: { sheet: PersonSheet }) {
 
 function Contact({ sheet: s }: { sheet: PersonSheet }) {
   const p = s.private!;
-  const address = [p.address.line1, p.address.line2, [p.address.postalCode, p.address.city].filter(Boolean).join(" "), p.address.country && p.address.country !== "FR" ? p.address.country : null]
+  const address = [
+    p.address.line1,
+    p.address.line2,
+    [p.address.postalCode, p.address.city].filter(Boolean).join(" "),
+    p.address.country && p.address.country !== "FR" ? p.address.country : null,
+  ]
     .filter(Boolean)
     .join(", ");
   return (
@@ -208,8 +316,14 @@ function Contact({ sheet: s }: { sheet: PersonSheet }) {
       </Text>
       <Table>
         <Table.Tbody>
-          <Row label="Email">{p.email ? <a href={`mailto:${p.email}`}>{p.email}</a> : null}</Row>
-          <Row label="Portable">{p.mobile ? <a href={`tel:${p.mobile.replace(/[^0-9+]/g, "")}`}>{p.mobile}</a> : null}</Row>
+          <Row label="Email">
+            {p.email ? <a href={`mailto:${p.email}`}>{p.email}</a> : null}
+          </Row>
+          <Row label="Portable">
+            {p.mobile ? (
+              <a href={`tel:${p.mobile.replace(/[^0-9+]/g, "")}`}>{p.mobile}</a>
+            ) : null}
+          </Row>
           <Row label="Adresse">{address || null}</Row>
         </Table.Tbody>
       </Table>
@@ -231,14 +345,20 @@ function Certiphyto({ sheet: s }: { sheet: PersonSheet }) {
       ) : (
         <Table>
           <Table.Tbody>
-            <Row label="Catégorie">{c.category ? CERTIPHYTO_CATEGORY_LABELS[c.category] : null}</Row>
+            <Row label="Catégorie">
+              {c.category ? CERTIPHYTO_CATEGORY_LABELS[c.category] : null}
+            </Row>
             <Row label="Numéro">{c.number}</Row>
             <Row label="Valable jusqu'au">
               {c.validUntil ? (
                 <Group gap="xs">
                   <span>{formatDate(c.validUntil)}</span>
                   {c.status !== "valid" && c.status !== "none" && (
-                    <Badge size="sm" variant="light" color={CERTIPHYTO_BADGE[c.status].color}>
+                    <Badge
+                      size="sm"
+                      variant="light"
+                      color={CERTIPHYTO_BADGE[c.status].color}
+                    >
                       {c.status === "expired" ? "expiré" : "à renouveler"}
                     </Badge>
                   )}
@@ -252,19 +372,34 @@ function Certiphyto({ sheet: s }: { sheet: PersonSheet }) {
   );
 }
 
-const ROLE_OPTIONS = (Object.keys(MEMBER_ROLE_LABELS) as MemberRole[]).map((value) => ({ value, label: MEMBER_ROLE_LABELS[value] }));
+const ROLE_OPTIONS = (Object.keys(MEMBER_ROLE_LABELS) as MemberRole[]).map(
+  (value) => ({ value, label: MEMBER_ROLE_LABELS[value] }),
+);
 
 /** Compte Fourmy de la personne (responsable) : rôle, retrait de l'accès, rattachement d'un compte existant. */
-function AccountPanel({ farmId, sheet: s }: { farmId: string; sheet: PersonSheet }) {
+function AccountPanel({
+  farmId,
+  sheet: s,
+}: {
+  farmId: string;
+  sheet: PersonSheet;
+}) {
   const queryClient = useQueryClient();
   const [email, setEmail] = useState(s.private?.email ?? "");
   const [role, setRole] = useState<MemberRole>("worker");
   const [confirm, setConfirm] = useState(false);
-  const refresh = () => void queryClient.invalidateQueries({ queryKey: ["people", farmId] });
-  const fail = (e: unknown) => notifications.show({ color: "brique", title: "Refusé", message: e instanceof ApiError ? e.message : String(e) });
+  const refresh = () =>
+    void queryClient.invalidateQueries({ queryKey: ["people", farmId] });
+  const fail = (e: unknown) =>
+    notifications.show({
+      color: "brique",
+      title: "Refusé",
+      message: e instanceof ApiError ? e.message : String(e),
+    });
 
   const changeRole = useMutation({
-    mutationFn: (r: MemberRole) => api.patch(farmPath(farmId, `/people/${s.id}/account`), { role: r }),
+    mutationFn: (r: MemberRole) =>
+      api.patch(farmPath(farmId, `/people/${s.id}/account`), { role: r }),
     onSuccess: () => {
       notifications.show({ color: "lichen", message: "Rôle modifié." });
       refresh();
@@ -274,14 +409,18 @@ function AccountPanel({ farmId, sheet: s }: { farmId: string; sheet: PersonSheet
   const remove = useMutation({
     mutationFn: () => api.delete(farmPath(farmId, `/people/${s.id}/account`)),
     onSuccess: () => {
-      notifications.show({ color: "lichen", message: "Accès retiré : la personne et son historique restent." });
+      notifications.show({
+        color: "lichen",
+        message: "Accès retiré : la personne et son historique restent.",
+      });
       setConfirm(false);
       refresh();
     },
     onError: fail,
   });
   const attach = useMutation({
-    mutationFn: () => api.post(farmPath(farmId, "/members"), { email, role, personId: s.id }),
+    mutationFn: () =>
+      api.post(farmPath(farmId, "/members"), { email, role, personId: s.id }),
     onSuccess: () => {
       notifications.show({ color: "lichen", message: "Compte rattaché." });
       refresh();
@@ -296,20 +435,44 @@ function AccountPanel({ farmId, sheet: s }: { farmId: string; sheet: PersonSheet
       </Title>
       {s.account.status === "active" && s.account.role ? (
         <Stack gap="sm">
-          <Select label="Rôle sur la ferme" data={ROLE_OPTIONS} value={s.account.role} allowDeselect={false} onChange={(v) => v && changeRole.mutate(v as MemberRole)} />
+          <Select
+            label="Rôle sur la ferme"
+            data={ROLE_OPTIONS}
+            value={s.account.role}
+            allowDeselect={false}
+            onChange={(v) => v && changeRole.mutate(v as MemberRole)}
+          />
           <Text size="xs" c="dimmed">
-            Lecture seule : consulte la ferme et exporte les registres, sans rien saisir ni voir les coordonnées.
+            Lecture seule : consulte la ferme et exporte les registres, sans
+            rien saisir ni voir les coordonnées.
           </Text>
-          <Button variant="subtle" color="brique" leftSection={<UserMinus size={16} />} onClick={() => setConfirm(true)} w="fit-content">
+          <Button
+            variant="subtle"
+            color="brique"
+            leftSection={<UserMinus size={16} />}
+            onClick={() => setConfirm(true)}
+            w="fit-content"
+          >
             Retirer l'accès
           </Button>
-          <Modal opened={confirm} onClose={() => setConfirm(false)} title="Retirer l'accès">
-            <Text size="sm">{s.name} ne pourra plus se connecter à cette ferme. Sa fiche et ses interventions restent.</Text>
+          <Modal
+            opened={confirm}
+            onClose={() => setConfirm(false)}
+            title="Retirer l'accès"
+          >
+            <Text size="sm">
+              {s.name} ne pourra plus se connecter à cette ferme. Sa fiche et
+              ses interventions restent.
+            </Text>
             <Group justify="flex-end" mt="md">
               <Button variant="default" onClick={() => setConfirm(false)}>
                 Annuler
               </Button>
-              <Button color="brique" loading={remove.isPending} onClick={() => remove.mutate()}>
+              <Button
+                color="brique"
+                loading={remove.isPending}
+                onClick={() => remove.mutate()}
+              >
                 Retirer l'accès
               </Button>
             </Group>
@@ -318,11 +481,29 @@ function AccountPanel({ farmId, sheet: s }: { farmId: string; sheet: PersonSheet
       ) : (
         <Stack gap="sm">
           <Text size="sm" c="dimmed">
-            Sans compte : la personne est intervenante, sans accès à Fourmy. Rattachez un compte existant (l'invitation par email arrive au lot suivant).
+            Sans compte : la personne est intervenante, sans accès à Fourmy.
+            Rattachez un compte existant (l'invitation par email arrive au lot
+            suivant).
           </Text>
-          <TextInput label="Email du compte" type="email" value={email} onChange={(e) => setEmail(e.currentTarget.value)} />
-          <Select label="Rôle" data={ROLE_OPTIONS} value={role} allowDeselect={false} onChange={(v) => v && setRole(v as MemberRole)} />
-          <Button w="fit-content" disabled={!email.trim()} loading={attach.isPending} onClick={() => attach.mutate()}>
+          <TextInput
+            label="Email du compte"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.currentTarget.value)}
+          />
+          <Select
+            label="Rôle"
+            data={ROLE_OPTIONS}
+            value={role}
+            allowDeselect={false}
+            onChange={(v) => v && setRole(v as MemberRole)}
+          />
+          <Button
+            w="fit-content"
+            disabled={!email.trim()}
+            loading={attach.isPending}
+            onClick={() => attach.mutate()}
+          >
             Rattacher le compte
           </Button>
         </Stack>

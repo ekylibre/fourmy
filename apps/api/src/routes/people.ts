@@ -5,6 +5,7 @@ import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import { createPerson, getPhoto, listPeople, personSheet, removeAccount, setAccountRole, setPhoto, updatePerson, PHOTO_MAX_BYTES, type Viewer } from "../repos/people.js";
 import { BadRequest, domainCtx, problem, uuidParam } from "./helpers.js";
+import { personInterventions, personWork } from "../repos/people-work.js";
 
 /** Date de la frise (AAAA-MM-JJ), aujourd'hui par défaut. */
 const atDay = (v: string | undefined) => {
@@ -40,6 +41,22 @@ export const peopleRoutes = new Hono<Env>()
     const viewer: Viewer = { userId: c.get("userId"), role: c.get("role") };
     await updatePerson(db(), c.get("farmId"), domainCtx(c), id, viewer, parsed.data);
     return c.json(await personSheet(db(), c.get("farmId"), id, atDay(undefined), viewer));
+  })
+  // Temps de travaux (lot P2) : visibles de tous les membres.
+  .get("/people/:id/work", async (c) => c.json(await personWork(db(), c.get("farmId"), uuidParam(c, "id"), atDay(c.req.query("at")))))
+  .get("/people/:id/interventions", async (c) => {
+    const day = (k: string) => {
+      const v = c.req.query(k);
+      if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) throw new BadRequest(`${k} : date AAAA-MM-JJ`);
+      return v;
+    };
+    const fromDay = day("from");
+    const toDay = day("to");
+    if (toDay <= fromDay) throw new BadRequest("from < to");
+    const offset = Number(c.req.query("cursor") ?? 0);
+    const limit = Number(c.req.query("limit") ?? 20);
+    if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 100) throw new BadRequest("cursor, limit : entiers (limit ≤ 100)");
+    return c.json(await personInterventions(db(), c.get("farmId"), uuidParam(c, "id"), { fromDay, toDay, offset, limit }));
   })
   // Photo : visible de tous les membres (pavés), modifiable par le responsable ou la personne.
   .get("/people/:id/photo", async (c) => {

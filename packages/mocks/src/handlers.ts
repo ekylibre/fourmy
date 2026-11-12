@@ -250,6 +250,32 @@ export const handlers = [
   ),
   http.get(`*${base}/maintenance/due`, () => HttpResponse.json({ items: [], byEquipment: {} })),
   http.get(`*${base}/people`, () => page(demoPeople)),
+  http.get(`*${base}/people/:id/work`, () =>
+    HttpResponse.json({
+      at: "2026-06-30",
+      periods: {
+        week: { from: "2026-06-29", to: "2026-07-06", hours: 4 },
+        month: { from: "2026-06-01", to: "2026-07-01", hours: 21.5 },
+        campaign: { from: "2026-01-01", to: "2027-01-01", hours: 64, label: "Campagne 2026" },
+        last12: { from: "2025-07-01", to: "2026-07-01", hours: 120 },
+      },
+      byMonth: ["2025-07", "2025-08", "2025-09", "2025-10", "2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06"].map((month, i) => ({ month, hours: [12, 9, 14, 6, 0, 0, 2, 4, 8, 12, 16.5, 21.5][i]! })),
+      byActivity: [
+        { activityId: "00000000-0000-7000-8000-000000000701", name: "Vigne", hours: 52 },
+        { activityId: null, name: "Sans activité", hours: 12 },
+      ],
+      byProcedure: [
+        { procedure: "spraying", hours: 40 },
+        { procedure: "plowing", hours: 24 },
+      ],
+    }),
+  ),
+  http.get(`*${base}/people/:id/interventions`, () =>
+    HttpResponse.json({
+      items: [{ id: "00000000-0000-7000-8000-000000000401", date: "2026-06-10", procedure: "spraying", hours: 3.5, parcels: ["Les Rouffiats"], equipments: ["Tracteur"] }],
+      nextCursor: null,
+    }),
+  ),
   http.get(`*${base}/people/:id`, ({ params }) => {
     const sheet = demoPersonSheet(String(params.id));
     return sheet ? HttpResponse.json(sheet) : HttpResponse.json({ title: "Personne introuvable", status: 404 }, { status: 404 });

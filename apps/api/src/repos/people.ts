@@ -12,6 +12,7 @@ import {
 } from "@fourmy/contracts";
 import type { DomainCtx } from "@fourmy/domain";
 import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
+import { cardsWork } from "./people-work.js";
 
 /**
  * Équipe et personnes, lot P1 (docs/equipe-personnes-design.md) : grille,
@@ -91,7 +92,10 @@ function toCard(r: CardRow, at: string): PersonCard {
 export async function listPeople(db: Database, farmId: string, at: string): Promise<PersonCard[]> {
   return withFarm(db, farmId, async (tx) => {
     await ensureMemberPeople(tx);
-    return (await rows<CardRow>(tx, sql`${CARD} ORDER BY p.active DESC, lower(p.name)`)).map((r) => toCard(r, at));
+    const cards = (await rows<CardRow>(tx, sql`${CARD} ORDER BY p.active DESC, lower(p.name)`)).map((r) => toCard(r, at));
+    // Heures du mois et dernière intervention (lot P2).
+    const work = await cardsWork(tx, cards.map((c) => c.id), at);
+    return cards.map((c) => ({ ...c, ...work.get(c.id) }));
   });
 }
 
@@ -126,7 +130,7 @@ export async function personSheet(db: Database, farmId: string, id: string, at: 
     await ensureMemberPeople(tx);
     const [r] = await rows<CardRow>(tx, sql`${CARD} WHERE p.id = ${id}`);
     if (!r) throw new NotFound("Personne introuvable");
-    const card = toCard(r, at);
+    const card = { ...toCard(r, at), ...(await cardsWork(tx, [id], at)).get(id) };
     const sheet: PersonSheet = {
       ...card,
       certiphyto: {

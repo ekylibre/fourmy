@@ -150,3 +150,37 @@ export function displayName(p: { firstName?: string | null; lastName?: string | 
   const full = [p.firstName, p.lastName].map((s) => s?.trim()).filter(Boolean).join(" ");
   return full || p.name?.trim() || "";
 }
+
+// ---------------------------------------------------------------------------
+// Temps de travaux (lot P2, design §5)
+// ---------------------------------------------------------------------------
+
+const bucket = z.object({ from: isoDate, to: isoDate, hours: z.number() });
+
+/** Résumé des heures d'une personne à la date de la frise. */
+export const personWork = z.object({
+  at: isoDate,
+  periods: z.object({
+    week: bucket,
+    month: bucket,
+    campaign: bucket.extend({ label: z.string() }),
+    last12: bucket,
+  }),
+  /** 12 derniers mois, du plus ancien au plus récent. */
+  byMonth: z.array(z.object({ month: z.string(), hours: z.number() })),
+  /** Sur la campagne : au prorata des surfaces travaillées ; null = sans activité. */
+  byActivity: z.array(z.object({ activityId: uuid.nullable(), name: z.string(), hours: z.number() })),
+  byProcedure: z.array(z.object({ procedure: z.string(), hours: z.number() })),
+});
+export type PersonWork = z.infer<typeof personWork>;
+
+/** Une intervention de la personne, avec sa part d'heures. */
+export const personIntervention = z.object({
+  id: uuid,
+  date: isoDate,
+  procedure: z.string(),
+  hours: z.number(),
+  parcels: z.array(z.string()),
+  equipments: z.array(z.string()),
+});
+export type PersonIntervention = z.infer<typeof personIntervention>;
