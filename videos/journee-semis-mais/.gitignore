@@ -1,0 +1,7 @@
+# Images brutes de capture, rendus et caches HyperFrames : régénérables.
+assets/raw/
+renders/
+.hyperframes/
+.media/
+.thumbnails/
+.waveform-cache/
