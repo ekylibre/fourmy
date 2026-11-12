@@ -135,7 +135,7 @@ describe("intervention d'entretien (lot K)", () => {
   const BRAKES = "0193a000-0000-7000-8000-00000000c102";
   const PART = "00000000-0000-7000-8000-000000000301"; // article de démonstration servant de pièce
 
-  it("depuis une échéance : opération cochée, pièce ajoutée, compteur, contrôle avec anomalie", async () => {
+  it("depuis une échéance : opération cochée, pièce ajoutée, compteur, contrôle avec anomalie", { timeout: 40_000 }, async () => {
     const plan: EquipmentMaintenance = {
       ...maintenance,
       equipmentId: TRACTOR,
@@ -165,9 +165,15 @@ describe("intervention d'entretien (lot K)", () => {
     // Le contrôle des freins : coché, résultat « anomalie » avec une note.
     await user.click(within(card).getByRole("checkbox", { name: "Contrôle des freins" }));
     await user.click(within(card).getByRole("radio", { name: "Anomalie" }));
-    await user.type(within(card).getByRole("textbox", { name: "Anomalie : Contrôle des freins" }), "plaquettes usées");
-    await user.type(within(card).getByRole("textbox", { name: "Compteur de Tracteur Claas Arion 430" }), "4330");
-    await user.type(screen.getByRole("textbox", { name: "Atelier externe" }), "Garage du Lot");
+    // Collé plutôt que tapé : chaque frappe redessine tout le formulaire, très lent sur les
+    // machines de la CI chargées par les tests de l'API (le test y dépassait 20 s).
+    const fill = async (box: HTMLElement, text: string) => {
+      await user.click(box);
+      await user.paste(text);
+    };
+    await fill(within(card).getByRole("textbox", { name: "Anomalie : Contrôle des freins" }), "plaquettes usées");
+    await fill(within(card).getByRole("textbox", { name: "Compteur de Tracteur Claas Arion 430" }), "4330");
+    await fill(screen.getByRole("textbox", { name: "Atelier externe" }), "Garage du Lot");
     // La vidange, cochée par l'adresse, a apporté sa pièce dans les intrants (une seule fois).
     expect(screen.getAllByRole("combobox", { name: "Produit" })).toHaveLength(1);
     expect(screen.queryByRole("combobox", { name: "Matériels" })).not.toBeInTheDocument(); // pas d'outils pour un entretien
