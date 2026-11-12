@@ -94,7 +94,8 @@ par `seed:dev` (e-mail prérempli en développement). Parcours de bout en bout :
 API + `vite preview` démarrés, puis `DATABASE_URL=… corepack pnpm --filter @fourmy/web e2e`.
 Les navigateurs pilotables s'installent une fois :
 `corepack pnpm --filter @fourmy/web exec playwright install chromium firefox`
-(Firefox ne rejoue que le plan 3D).
+(Firefox ne rejoue que le plan 3D, avec `E2E_FIREFOX=1`, sur un poste avec carte
+graphique ; la CI n'a pas de WebGL sous Firefox).
 
 ### Site public, version et nouveautés
 

@@ -20,6 +20,18 @@ export async function login(page: import("@playwright/test").Page) {
 export async function navTo(page: import("@playwright/test").Page, item: string, group?: string): Promise<void> {
   const nav = page.getByRole("navigation", { name: "Menu principal" });
   const link = nav.getByRole("link", { name: item, exact: true });
-  if (group && !(await link.isVisible())) await nav.getByRole("button", { name: group, exact: true }).click();
-  await link.click();
+  // Le sous-menu s'ouvre avec une animation : un clic pendant celle-ci peut se perdre
+  // (constaté en CI). On attend le lien, on vérifie que l'adresse a changé, sinon on recommence.
+  for (let attempt = 0; ; attempt++) {
+    if (group && !(await link.isVisible())) await nav.getByRole("button", { name: group, exact: true }).click();
+    await link.waitFor({ state: "visible" });
+    const path = new URL((await link.getAttribute("href"))!, page.url()).pathname;
+    await link.click();
+    try {
+      await page.waitForURL((u) => u.pathname === path, { timeout: 5_000 });
+      return;
+    } catch (e) {
+      if (attempt >= 2) throw e;
+    }
+  }
 }

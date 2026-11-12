@@ -22,7 +22,8 @@ test("outils carto : découper, fusionner, annuler, dessiner, mesurer", async ({
   await page.getByLabel("Date de la frise").fill("2023-06-15");
   await navTo(page, "Plan 2D", "Cartes");
   await page.getByRole("link", { name: /Outils de dessin/ }).click();
-  await expect(surfaces(page)).toHaveText("Surfaces (9)", { timeout: 30_000 });
+  // Premier test de la suite : chargement à froid (carte, tuiles IGN), plus long en CI.
+  await expect(surfaces(page)).toHaveText("Surfaces (9)", { timeout: 60_000 });
 
   // Choisir une parcelle dans la liste : la carte se centre dessus.
   const rows = page.getByRole("table", { name: "Surfaces" }).locator("tbody tr");
