@@ -650,3 +650,41 @@ en parallèle de P2 et P3.
     (transport simulé), acceptation, usage unique, compte existant et autre
     email refusés, révocation, expiration, effacement ;
   - `apps/web/test/team.test.tsx`.
+
+### Lot P4 (2026-11-12)
+
+- **Extraction** : `people`, `personAddresses`, `personContracts`
+  (`packages/migrator-ekylibre/src/extract.ts`), en lecture seule.
+- **Correspondance** (`src/people.ts`, fonctions pures) :
+  - adresse postale : ligne 1 = nom ; dernière ligne au format
+    « Commune, CP » ou « CP Commune » ;
+  - pour chaque canal, l'adresse par défaut, sinon la plus récente ;
+  - email du compte utilisateur à défaut ;
+  - portable illisible ignoré ;
+  - contrat le plus récent, nature traduite ;
+  - photo lue dans les fichiers du tenant (`EKYLIBRE_FILES_DIR` ou
+    l'option `filesDir`, chemins Paperclip).
+- **Écriture** (`src/migrate.ts`) :
+  - une personne par Worker, avec le même identifiant qu'avant, ou par
+    utilisateur sans Worker ;
+  - tous les champs en `coalesce(Fourmy, Ekylibre)` ;
+  - `external_ids` fusionnés.
+- **Rapport** : `people`, `people_completed`, `people_email`,
+  `people_mobile`, `people_address`, `people_birth_date`,
+  `people_contract`, `people_photo`, `people_photo_missing`,
+  `ekylibre_admins`. Il ne contient aucune valeur.
+- **Fixtures** : prénom, nom, photo, Certiphyto et liens Ekylibre retirés
+  à l'export ; `person_private` n'est pas exporté.
+- **Vérifié** le 2026-11-12 sur Entre-deux-Terres, dans une base jetable :
+  - 14 personnes (9 intervenants, 7 utilisateurs) ;
+  - 8 emails, 1 portable, 2 adresses, 1 date de naissance ;
+  - un email modifié dans Fourmy est gardé au réimport ;
+  - les 138 intervenants des interventions restent rattachés à des
+    personnes.
+- **Tests** : `packages/migrator-ekylibre/test/people.test.ts`.
+- **Utilisateurs Ekylibre** : chacun devient une personne **sans
+  compte**. S'il est déjà membre de la ferme sous le même email (par
+  exemple le responsable qui a importé la ferme), c'est sa personne qui est
+  complétée, sans doublon. Un utilisateur qui est aussi intervenant garde
+  la fiche de l'intervenant (son historique) : s'il a aussi un compte
+  Fourmy, invitez cette fiche pour relier les deux.

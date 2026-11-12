@@ -260,6 +260,11 @@ l'intervention (`docs/parcours-attelages.md` §4.2).
 1. **Personnes** : une liste de personnes par ferme (nom, rôle, lien
    éventuel avec un compte) ; les intervenants d'Ekylibre sont **migrés**
    (nom seulement). Les fixtures restent anonymisées.
+   **Revue le 2026-11-12** : les intervenants **et** les utilisateurs
+   d'Ekylibre sont repris avec leur identité, leurs coordonnées, leur
+   contrat et leur photo, sans écraser une valeur de Fourmy ; les
+   coordonnées ne sont lues que par le responsable et la personne
+   elle-même. Voir [`equipe-personnes-design.md`](equipe-personnes-design.md).
 2. **Motifs de traitement** : **liste fermée, facultative** (herbicide,
    fongicide, insecticide, régulateur de croissance, biostimulant…), rien de
    coché par défaut ; les « actions » d'Ekylibre ne sont pas migrées.

@@ -326,3 +326,68 @@ export const phytoReference = (s: Sql) =>
     JOIN products tp ON tp.id = tgt.product_id AND tp.type IN ('LandParcel', 'Plant')
     WHERE i.state IN ('done', 'validated') AND i.stopped_at IS NOT NULL
     GROUP BY 1 ORDER BY 1`;
+
+// ---------------------------------------------------------------------------
+// Personnes (lot P4, docs/equipe-personnes-design.md §7)
+// ---------------------------------------------------------------------------
+
+/** Fiche « entité » d'un intervenant (Worker) ou d'un utilisateur Ekylibre. */
+export type PersonRow = {
+  entity_id: number;
+  /** Les Workers de cette entité (une personne Fourmy chacun, comme avant). */
+  worker_ids: number[] | null;
+  user_id: number | null;
+  first_name: string | null;
+  last_name: string | null;
+  full_name: string | null;
+  born_at: Date | null;
+  picture_file_name: string | null;
+  user_email: string | null;
+  administrator: boolean | null;
+};
+export const people = (s: Sql) =>
+  s<PersonRow[]>`
+    WITH w AS (
+      SELECT person_id AS entity_id, array_agg(id ORDER BY id) AS worker_ids
+      FROM products WHERE type = 'Worker' AND person_id IS NOT NULL GROUP BY person_id
+    ), u AS (
+      SELECT DISTINCT ON (person_id) person_id AS entity_id, id AS user_id, email, administrator
+      FROM users WHERE person_id IS NOT NULL ORDER BY person_id, id
+    )
+    SELECT e.id AS entity_id, w.worker_ids, u.user_id, nullif(btrim(e.first_name), '') AS first_name,
+           nullif(btrim(e.last_name), '') AS last_name, nullif(btrim(e.full_name), '') AS full_name,
+           e.born_at, nullif(e.picture_file_name, '') AS picture_file_name, u.email AS user_email, u.administrator
+    FROM entities e LEFT JOIN w ON w.entity_id = e.id LEFT JOIN u ON u.entity_id = e.id
+    WHERE w.entity_id IS NOT NULL OR u.entity_id IS NOT NULL
+    ORDER BY e.id`;
+
+/** Adresses des personnes : email, portable, postale (non supprimées). */
+export type AddressRow = {
+  entity_id: number;
+  canal: "email" | "mobile" | "mail";
+  coordinate: string | null;
+  by_default: boolean | null;
+  lines: (string | null)[];
+  mail_country: string | null;
+  updated_at: Date | null;
+};
+export const personAddresses = (s: Sql) =>
+  s<AddressRow[]>`
+    SELECT a.entity_id, a.canal, nullif(btrim(a.coordinate), '') AS coordinate, a.by_default,
+           ARRAY[a.mail_line_1, a.mail_line_2, a.mail_line_3, a.mail_line_4, a.mail_line_5, a.mail_line_6] AS lines,
+           a.mail_country, a.updated_at
+    FROM entity_addresses a
+    WHERE a.deleted_at IS NULL AND a.canal IN ('email', 'mobile', 'mail')
+      AND (a.entity_id IN (SELECT person_id FROM products WHERE type = 'Worker')
+           OR a.entity_id IN (SELECT person_id FROM users))
+    ORDER BY a.entity_id, a.canal, a.by_default DESC NULLS LAST, a.updated_at DESC NULLS LAST, a.id DESC`;
+
+/** Contrats (Ekylibre 5) : dates et nature seulement, ni salaire ni durée. Vide sans la table. */
+export type ContractRow = { entity_id: number; nature: string | null; started_at: Date | null; stopped_at: Date | null };
+export async function personContracts(s: Sql): Promise<ContractRow[]> {
+  const [ok] = await s<{ ok: boolean }[]>`SELECT to_regclass('worker_contracts') IS NOT NULL AS ok`;
+  if (!ok?.ok) return [];
+  return s<ContractRow[]>`
+    SELECT entity_id, nature, started_at, stopped_at FROM worker_contracts
+    WHERE entity_id IS NOT NULL ORDER BY entity_id, started_at DESC NULLS LAST, id DESC`;
+}

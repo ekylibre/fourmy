@@ -2,6 +2,8 @@ import postgres, { type Sql } from "postgres";
 import { signedQuantity, buildEvent, proposeComposition, type DomainCtx } from "@fourmy/domain";
 import { idsFor, uuidv5 } from "./ids.js";
 import * as x from "./extract.js";
+import { personName, privateOf, readPicture } from "./people.js";
+import { createHash } from "node:crypto";
 import {
   toLiters,
   articleKind,
@@ -43,6 +45,8 @@ export interface MigrateOptions {
   farmId?: string;
   /** Identifiant du suivi, pour le connaître avant la fin (import asynchrone). */
   runId?: string;
+  /** Fichiers du tenant Ekylibre (Paperclip) : photos des personnes. Sinon EKYLIBRE_FILES_DIR. */
+  filesDir?: string;
 }
 
 export interface Report {
@@ -110,6 +114,9 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
       harvests: await x.harvests(s),
       phytoRef: await x.phytoReference(s),
       openWeatherKey: await x.openWeatherKey(s),
+      people: await x.people(s),
+      personAddresses: await x.personAddresses(s),
+      personContracts: await x.personContracts(s),
     }));
 
     const runId = opts.runId ?? uuidv5(`${instance}:run:${new Date().toISOString()}`);
@@ -499,6 +506,91 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
             VALUES (${id("products", p.product_id)}, ${farmId}, ${p.product_name?.trim() || `Personne ${p.product_id}`})
             ON CONFLICT (id) DO NOTHING`;
           inc("people");
+        }
+
+        // Personnes (lot P4, docs/equipe-personnes-design.md §7) : identité,
+        // coordonnées, contrat et photo des intervenants et des utilisateurs.
+        // Une valeur déjà présente dans Fourmy l'emporte toujours.
+        const filesDir = opts.filesDir ?? process.env.EKYLIBRE_FILES_DIR;
+        const addressesOf = new Map<number, x.AddressRow[]>();
+        for (const a of data.personAddresses) addressesOf.set(a.entity_id, [...(addressesOf.get(a.entity_id) ?? []), a]);
+        const contractsOf = new Map<number, x.ContractRow[]>();
+        for (const c of data.personContracts) contractsOf.set(c.entity_id, [...(contractsOf.get(c.entity_id) ?? []), c]);
+        for (const e of data.people) {
+          const workers = e.worker_ids ?? [];
+          // Utilisateur sans fiche d'intervenant, déjà membre de la ferme sous le même email :
+          // on complète sa personne plutôt que d'en créer une seconde.
+          const member = !workers.length && e.user_email
+            ? (await tx<{ id: string }[]>`
+                SELECT p.id FROM people p JOIN users u ON u.id = p.user_id
+                WHERE p.farm_id = ${farmId} AND lower(u.email) = lower(${e.user_email})`)[0]
+            : undefined;
+          const personIds = workers.length ? workers.map((w) => id("products", w)) : [member?.id ?? id("entities", e.entity_id)];
+          for (const w of workers) migratedPeople.add(w); // désignables comme intervenants
+          const priv = privateOf(e, addressesOf.get(e.entity_id) ?? [], contractsOf.get(e.entity_id) ?? []);
+          const picture = readPicture(filesDir, tenant, e);
+          if (e.picture_file_name && !picture) inc("people_photo_missing");
+          if (e.user_id && e.administrator) inc("ekylibre_admins");
+          const external = {
+            ekylibreEntity: e.entity_id,
+            ...(workers.length ? { ekylibreWorker: workers[0] } : {}),
+            ...(e.user_id ? { ekylibreUser: e.user_id } : {}),
+          };
+          for (const pid of personIds) {
+            const name = personName(e) ?? `Personne ${workers[0] ?? e.entity_id}`;
+            const [r] = await tx<{ inserted: boolean }[]>`
+              INSERT INTO people (id, farm_id, name, first_name, last_name, external_ids)
+              VALUES (${pid}, ${farmId}, ${name}, ${e.first_name}, ${e.last_name}, ${tx.json(external)})
+              ON CONFLICT (id) DO UPDATE SET
+                first_name = coalesce(people.first_name, excluded.first_name),
+                last_name = coalesce(people.last_name, excluded.last_name),
+                name = CASE WHEN people.first_name IS NULL AND people.last_name IS NULL
+                             AND (excluded.first_name IS NOT NULL OR excluded.last_name IS NOT NULL)
+                            THEN excluded.name ELSE people.name END,
+                external_ids = people.external_ids || excluded.external_ids, updated_at = now()
+              RETURNING (xmax = 0) AS inserted`;
+            inc(r?.inserted ? "people" : "people_completed");
+            const a = priv.address;
+            const c = priv.contract;
+            if (priv.email || priv.mobile || a || priv.birthDate || c) {
+              await tx`
+                INSERT INTO person_private (person_id, farm_id, email, mobile, address_line1, address_line2, postal_code, city, country,
+                                            birth_date, contract_type, contract_started_on, contract_ended_on)
+                VALUES (${pid}, ${farmId}, ${priv.email}, ${priv.mobile}, ${a?.line1 ?? null}, ${a?.line2 ?? null}, ${a?.postalCode ?? null},
+                        ${a?.city ?? null}, ${a?.country ?? null}, ${priv.birthDate}, ${c?.type ?? null}, ${c?.startedOn ?? null}, ${c?.endedOn ?? null})
+                ON CONFLICT (person_id) DO UPDATE SET
+                  email = coalesce(person_private.email, excluded.email),
+                  mobile = coalesce(person_private.mobile, excluded.mobile),
+                  address_line1 = coalesce(person_private.address_line1, excluded.address_line1),
+                  address_line2 = coalesce(person_private.address_line2, excluded.address_line2),
+                  postal_code = coalesce(person_private.postal_code, excluded.postal_code),
+                  city = coalesce(person_private.city, excluded.city),
+                  country = coalesce(person_private.country, excluded.country),
+                  birth_date = coalesce(person_private.birth_date, excluded.birth_date),
+                  contract_type = coalesce(person_private.contract_type, excluded.contract_type),
+                  contract_started_on = coalesce(person_private.contract_started_on, excluded.contract_started_on),
+                  contract_ended_on = coalesce(person_private.contract_ended_on, excluded.contract_ended_on),
+                  updated_at = now()`;
+              if (priv.email) inc("people_email");
+              if (priv.mobile) inc("people_mobile");
+              if (a) inc("people_address");
+              if (priv.birthDate) inc("people_birth_date");
+              if (c) inc("people_contract");
+            }
+            if (picture) {
+              const [cur] = await tx<{ photo_id: string | null }[]>`SELECT photo_id FROM people WHERE id = ${pid}`;
+              if (!cur?.photo_id) {
+                const photoId = id("entity_pictures", `${e.entity_id}:${pid}`);
+                await tx`
+                  INSERT INTO person_photos (id, farm_id, media_type, bytes, size, sha256)
+                  VALUES (${photoId}, ${farmId}, ${picture.mediaType}, ${picture.bytes}, ${picture.bytes.length},
+                          ${createHash("sha256").update(picture.bytes).digest("hex")})
+                  ON CONFLICT (id) DO NOTHING`;
+                await tx`UPDATE people SET photo_id = ${photoId} WHERE id = ${pid}`;
+                inc("people_photo");
+              }
+            }
+          }
         }
 
         // Attelages (FR-ATT-10) : participations par intervention et par produit,
