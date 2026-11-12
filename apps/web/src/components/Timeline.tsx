@@ -21,7 +21,7 @@ export function Timeline() {
   return (
     <div className="fy-timeline">
       <Group gap="sm" px="md" py={6} wrap="nowrap" align="center">
-        <Text size="xs" c="dimmed" fw={600} tt="uppercase" style={{ letterSpacing: "0.06em" }}>
+        <Text size="xs" c="dimmed" fw={600} tt="uppercase" style={{ letterSpacing: "0.06em" }} visibleFrom="sm">
           Frise
         </Text>
         <Tooltip label="Jour précédent">
@@ -47,6 +47,8 @@ export function Timeline() {
         <Slider
           aria-label="Curseur de la frise"
           style={{ flex: 1, minWidth: 120 }}
+          // Sur téléphone, le curseur et ses années ne tiennent pas : la date et les flèches suffisent.
+          visibleFrom="sm"
           min={0}
           max={max}
           value={toDays(day)}

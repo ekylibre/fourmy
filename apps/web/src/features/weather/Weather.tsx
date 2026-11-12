@@ -298,7 +298,7 @@ export function SprayingConditions({ farmId, days = 3, from }: { farmId: string;
             // Temps du jour : dominant des heures de jour (8 h – 20 h).
             const icon = dominantIcon(slots.filter((x) => (x.icon ?? "").endsWith("d")).map((x) => x.icon));
             return (
-              <Group key={label} gap={6} wrap="nowrap" align="center">
+              <Group key={label} gap={6} align="center">
                 <Group gap={6} w={210} wrap="nowrap" style={{ flex: "none" }}>
                   <WeatherIcon code={icon} size={22} />
                   <Stack gap={0}>

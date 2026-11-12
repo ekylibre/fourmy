@@ -83,7 +83,7 @@ export function CoverLossWidget({ farmId, day }: { farmId: string; day: string }
                 </Text>
               </Table.Td>
               <Table.Td>
-                <Group gap="xs" justify="flex-end" wrap="nowrap">
+                <Group gap="xs" justify="flex-end">
                   <Button component={Link} to={harvestLink(farmId, a, location.search)} size="compact-sm" variant="light">
                     Saisir la récolte
                   </Button>
