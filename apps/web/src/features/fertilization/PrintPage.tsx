@@ -62,7 +62,8 @@ function Header({ title, farmName, campaign, from, to }: { title: string; farmNa
       </Title>
       <Text size="sm">
         Exploitation : <b>{farmName}</b> · Campagne {campaign}
-        {from && to ? ` (du ${formatDate(from)} au ${formatDate(to)})` : ""}
+        {/* La fin de campagne est exclusive (01/09) : on affiche la veille (31/08). */}
+        {from && to ? ` (du ${formatDate(from)} au ${formatDate(new Date(Date.parse(to) - 86_400_000).toISOString().slice(0, 10))})` : ""}
       </Text>
       <Text size="xs" c="dimmed">
         Programme d'actions national nitrates (arrêté du 19/12/2011 modifié le 30/01/2023, annexe I, partie IV) ; référentiel régional Nouvelle-Aquitaine du

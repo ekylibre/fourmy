@@ -681,11 +681,40 @@ export async function fertilizationRecord(db: Database, farmId: string, campaign
           WHERE pr.farm_id = ${farmId}
           ORDER BY lp.id, pr.created_at`,
     );
+    // Parcelles fertilisées pendant la campagne sans production de cette campagne (apport d'automne
+    // après la récolte, avant la culture suivante) : elles figurent quand même au cahier.
+    const produced = parcels.map((p) => p.id);
+    const orphans = await rows<(typeof parcels)[number]>(
+      tx,
+      sql`SELECT DISTINCT ON (lp.id) lp.id, lp.name,
+                 (SELECT v.area_m2 FROM land_parcel_versions v WHERE v.land_parcel_id = lp.id AND v.valid @> i.started_at LIMIT 1) AS area_m2,
+                 ps.soil_type, z.status AS zone, z.zones, z.insee, NULL::text AS reference, NULL::text AS cultivation, NULL::text AS species,
+                 NULL::uuid AS plan_id, NULL::numeric AS dose, NULL::int AS version
+          FROM interventions i
+          JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_type = 'land_parcel'
+          JOIN land_parcels lp ON lp.id = t.ref_id
+          LEFT JOIN parcel_soils ps ON ps.land_parcel_id = lp.id
+          LEFT JOIN parcel_nitrate_zones z ON z.land_parcel_id = lp.id
+          WHERE i.farm_id = ${farmId} AND i.status = 'done' AND i.procedure = ANY(${arr(FERTILIZING)}::text[])
+            AND i.started_at >= ${w.from}::date AND i.started_at < ${w.to}::date
+            AND NOT (lp.id = ANY(${arr(produced)}::uuid[]))
+            -- Une parcelle qui recouvre une parcelle cultivée de la campagne en est le précédent :
+            -- ses apports d'interculture sont déjà repris par cette parcelle-là (couvert, APLSH).
+            AND NOT EXISTS (
+              SELECT 1 FROM land_parcel_versions v1, land_parcel_versions v2
+              WHERE v1.land_parcel_id = lp.id AND v1.valid @> i.started_at
+                AND v2.land_parcel_id = ANY(${arr(produced)}::uuid[]) AND v2.valid @> make_date(${campaign}, 6, 1)::timestamptz
+                AND ST_Intersects(v1.shape, v2.shape)
+                AND ST_Area(ST_Intersection(v1.shape, v2.shape)::geography) > 0.5 * ST_Area(v1.shape::geography))
+          ORDER BY lp.id, i.started_at`,
+    );
+    const withoutCrop = new Set(orphans.map((p) => p.id));
+    parcels.push(...orphans);
     const ids = parcels.map((p) => p.id);
     // Précédent (couverture des sols) : la parcelle de la campagne d'avant qui recouvre celle-ci,
     // la même ou une autre (Ekylibre crée une parcelle par campagne).
     const prevs = new Map<string, Awaited<ReturnType<typeof previousOf>>>();
-    for (const p of parcels) if (p.zone === "in" || p.zone === "partial") prevs.set(p.id, await previousOf(tx, farmId, p.id, campaign));
+    for (const p of parcels) if ((p.zone === "in" || p.zone === "partial") && !withoutCrop.has(p.id)) prevs.set(p.id, await previousOf(tx, farmId, p.id, campaign));
     const prevIds = [...prevs.values()].map((x) => x?.parcel_id).filter((x): x is string => !!x && !ids.includes(x));
     const prevEvents = prevIds.length
       ? await rows<{ parcel_id: string; procedure: string; day: string; worked: string | null; area_m2: string | null; article_id: string | null; quantity: string | null; unit: string | null; role: string | null }>(
@@ -803,7 +832,7 @@ export async function fertilizationRecord(db: Database, farmId: string, campaign
         areaHa: Math.round(areaHa * 100) / 100,
         soilType: p.soil_type,
         zone: p.zone,
-        crop: cropLabel(crop),
+        crop: withoutCrop.has(p.id) ? "aucune culture saisie pour cette campagne (apport en interculture)" : cropLabel(crop),
         variety: p.species && p.species !== p.cultivation ? p.species : null,
         sownOn: sown,
         harvestedOn: harvests,
