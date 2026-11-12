@@ -313,7 +313,45 @@ Se connecter avec le compte salarié de test (rattaché en T-TEAM-1).
 | T-PERF-1/2 | OK | interventions de la campagne en 15 ms ; parcours sur 90 jours en 21 ms | |
 | T-FERT-8 | OK | plans imprimables : 60 à 160 ms par plan ; plan établi de Lespourcy repris | |
 
-**Non joués ce jour** (couverts en partie par les tests automatiques ou la recette du 11/11) :
+**Troisième passage : scénarios restants**
+
+| ID | Résultat | Constat | P | Correctif |
+|---|---|---|---|---|
+| T-PARC-2 | **KO → corrigé** | au clic, la parcelle de la ferme n'était pas trouvée : seules les versions sans fin comptaient, or les parcelles reprises d'Ekylibre en ont une (une par campagne) | P2 | version valide dans l'année d'abord ; test ajouté |
+| T-PARC-2/3 | externe | API Carto de l'IGN injoignable (tout apicarto.ign.fr en 404 le 12/11) : PAC et cadastre indisponibles, message « injoignable en partie » affiché | | à revérifier |
+| T-ACT-2 | OK | activité créée (couleur de la référence), doublon refusé (409), renommée, supprimée ; « Maïs » (116 productions) non supprimable (422) | | |
+| T-ACT-3 / RG-ACT-7 | OK | certification AB sur Lespourcy → feu rouge « organic » sur un produit non bio ; certification retirée | | |
+| T-PHY-3 | **KO → corrigé** | mélange Taste + Choriste (catégorie 3) bien interdit, mais le message citait « CARAKOL 3 et ELUMIS » (noms du référentiel pour le même AMM) | P2 | noms des articles de la ferme ; test mis à jour |
+| T-PHY-4/5 | OK | « Recharger » l'eau : 135 éléments en 0,4 s ; ZNT de 5 m **rouge** sur Lespourcy (cours d'eau qui borde ou traverse la zone) — à faire confirmer par l'exploitant (fossé ou cours d'eau ?) | | donnée |
+| T-PHY-10 | OK | applicateur « non renseigné » d'un attelage sans intervenant (registre 2025) | | |
+| T-FERT-6 | OK | apport du 25/09 saisi le 12/11 : « en retard » | | |
+| T-FERT-7 | OK | justificatif > 10 Mio refusé, faux PDF refusé, PDF accepté puis retiré | | |
+| T-MAT-3 | OK | onglets Technique (vide avant import), Historique, Général ; marque et modèle de l'Arion non renseignés (donnée) | | |
+| T-MAT-5 | OK | logo > 1 Mo refusé, GIF refusé, PNG accepté puis retiré | | |
+| T-MAT-6 | OK | import de la base Arion 430 de la ferme : 59 opérations (3 non applicables), 11 fluides, 54 pièces, avertissement sur le n° de série | | |
+| T-ENT-1 | OK | après import, **50 opérations en retard** (dernière réalisation = mise en service 2013, 0 h, compteur 4 300 h) : à amorcer avec l'exploitant | | |
+| T-ENT-1 | OK | « Amorcer » à 4 250 h le 01/10 : contrôles des 10 h dépassés de 40 h | | |
+| T-ENT-2 | OK | « Réaliser » : intervention préventive, relevé 4 305 h (origine intervention), opération à « bientôt » (prochaine à 4 315 h) | | |
+| T-ENT-3 | OK | pièces à commander sur 6 mois : 22 références (besoin, stock, à commander) | | |
+| T-GPS-3/5 | OK | parcours rattaché à une intervention planifiée : reste planifiée, attelage et période ajoutés ; second rattachement 409 ; annulation → parcours libéré | | |
+| T-GPS-4 | OK | parcours rattaché 409, liste vide ou > 50 refusée ; « plusieurs matériels » non testable (un seul matériel suivi) | | |
+| T-3D-1/4 | OK | 15/07 : « 6 en maturation · 5 en végétation · dont 2 d'après le modèle », météo, NDVI Sentinel-2 du 11/07, mention Copernicus, aucune erreur | | |
+| T-3D-3 | OK | dernière position des 3 tracteurs suivis ; rien au-delà de 30 jours | | |
+| T-3D-5 | OK | rangs à 190° acceptés (ramenés à 10°), inter-rang de 20 m refusé, retour à l'automatique | | |
+| T-SAT-2 | OK | 2 parcelles « trop petites » | | |
+| T-SAT-3 | OK | « Ce n'est pas une récolte » : 8 → 7 signalements | | |
+| T-ROLE-6/8 | OK | salarié : fichiers de modulation (200), brouillon GPS (200) ; réglages GPS et doses (403) | | |
+| T-UX-2 | OK | 1 024 px : aucune page ne déborde | | |
+| T-ERR-1 | **KO → corrigé** | hors ligne, le bouton tournait sans rien dire (envoi mis en pause par React Query) | P2 | message « Pas de réseau : l'enregistrement partira dès le retour de la connexion » |
+| — | observé | « Réalisée d'emblée » = création puis réalisation : une coupure entre les deux laisse une intervention planifiée (un nouvel envoi la complète, même identifiant) | P3 | |
+
+**Restent non joués** :
+- T-3D-6 (Firefox : la version pilotable n'est pas installée ; à vérifier à la main) ;
+- T-INTG-2 (le test Copernicus redemande le secret, qui n'est jamais réaffiché ; non ressaisi) ;
+- T-MOD-1 (« Moduler » depuis un apport du plan : vérifié par la recette du 11/11) ;
+- T-FERT-1 (recette du 11/11).
+
+**Non joués au premier passage** (couverts en partie par les tests automatiques ou la recette du 11/11) :
 - T-PARC-2/3, T-CARTO-2 (e2e carto), T-ACT-2/3 ;
 - T-PHY-3/4/5/10 ;
 - T-FERT-1 (recette du 11/11), T-FERT-6/7 ;
