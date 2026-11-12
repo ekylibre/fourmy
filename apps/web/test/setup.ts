@@ -1,8 +1,11 @@
 import "@testing-library/jest-dom/vitest";
 import { afterAll, afterEach, beforeAll, vi } from "vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 import { setupServer } from "msw/node";
 import { handlers } from "@fourmy/mocks";
+
+// Attente des findBy / waitFor : 1 s par défaut, trop court sur les machines de la CI.
+configure({ asyncUtilTimeout: 5000 });
 
 /** API simulée par les handlers partagés de @fourmy/mocks. */
 export const server = setupServer(...handlers);

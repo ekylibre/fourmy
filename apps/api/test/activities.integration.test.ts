@@ -3,7 +3,7 @@ import postgres from "postgres";
 import { createDb } from "@fourmy/db";
 import { createApp } from "../src/app.js";
 import { computeInterventionIft } from "../src/repos/ift.js";
-import { addMember, setupFarm, teardown } from "./helpers.js";
+import { addMember, ensurePhytoReferential, setupFarm, teardown } from "./helpers.js";
 
 /**
  * Activités (lot C des retours du 08/11/2026) : création depuis une
@@ -30,6 +30,7 @@ describe.skipIf(!url)("activités (intégration)", () => {
   let base = "";
 
   beforeAll(async () => {
+    await ensurePhytoReferential(sql);
     const owner = await setupFarm(sql, "Ferme test activités");
     farmId = owner.farmId;
     headers = owner.headers;

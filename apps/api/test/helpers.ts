@@ -44,3 +44,14 @@ export async function teardown(sql: Sql, farmId: string, userIds: string[]) {
   await sql`DELETE FROM farms WHERE id = ${farmId}`;
   if (userIds.length) await sql`DELETE FROM users WHERE id IN ${sql(userIds)}`;
 }
+
+/**
+ * Référentiel phytosanitaire présent pour les tests qui contrôlent un
+ * traitement : une base vierge (CI) n'a pas de version Lexicon chargée, et le
+ * contrôle répond alors « Lexicon non chargé ». Version de test ajoutée si
+ * aucune n'existe, jamais retirée : plusieurs fichiers de test tournent en
+ * parallèle, et une base de développement garde sa vraie version.
+ */
+export async function ensurePhytoReferential(sql: Sql): Promise<void> {
+  await sql`INSERT INTO lexicon_packages (name, version, source, rows) VALUES ('phytosanitary', 'test-fourmy', 'test', 0) ON CONFLICT DO NOTHING`;
+}

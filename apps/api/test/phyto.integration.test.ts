@@ -3,7 +3,7 @@ import postgres from "postgres";
 import { createApp } from "../src/app.js";
 import { createDb } from "@fourmy/db";
 import { computeInterventionIft } from "../src/repos/ift.js";
-import { setupFarm, teardown } from "./helpers.js";
+import { ensurePhytoReferential, setupFarm, teardown } from "./helpers.js";
 
 /**
  * Réglementation phytosanitaire (lot 2) de bout en bout côté API : un
@@ -26,17 +26,12 @@ describe.skipIf(!url)("réglementation phyto (intégration)", () => {
   let userId = "";
   let headers: Record<string, string> = {};
   let base = "";
-  let insertedPackage = false;
 
   beforeAll(async () => {
     ({ farmId, userId, headers } = await setupFarm(sql, "Ferme test phyto"));
     base = `/api/v1/farms/${farmId}`;
     // Référentiel : produit herbicide sur maïs (dose max 3 L/ha, ZNT 20 m, DAR 30 j, 1 application).
-    const [pkg] = await sql`SELECT 1 FROM lexicon_packages WHERE name = 'phytosanitary'`;
-    if (!pkg) {
-      await sql`INSERT INTO lexicon_packages (name, version, source, rows) VALUES ('phytosanitary', 'test-fourmy', 'test', 0)`;
-      insertedPackage = true;
-    }
+    await ensurePhytoReferential(sql);
     await sql`INSERT INTO taxonomy (reference_name, parent, rank, label) VALUES
       ('zea_mays', 'zea', 'specie', 'Maïs'), ('zea', 'poaceae', 'genus', 'Maïs'), ('poaceae', 'plant', 'family', 'Poacées'), ('plant', NULL, NULL, 'Plante')
       ON CONFLICT (reference_name) DO NOTHING`;
@@ -71,7 +66,6 @@ describe.skipIf(!url)("réglementation phyto (intégration)", () => {
     await sql`DELETE FROM phyto_usages WHERE product_id = ${PRODUCT}`;
     await sql`DELETE FROM phyto_risks WHERE product_id = ${PRODUCT}`;
     await sql`DELETE FROM phyto_products WHERE id = ${PRODUCT}`;
-    if (insertedPackage) await sql`DELETE FROM lexicon_packages WHERE version = 'test-fourmy'`;
     await sql.end();
   });
 

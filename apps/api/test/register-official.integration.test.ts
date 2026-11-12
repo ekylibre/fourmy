@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import postgres from "postgres";
 import { createApp } from "../src/app.js";
-import { addMember, setupFarm, teardown } from "./helpers.js";
+import { addMember, ensurePhytoReferential, setupFarm, teardown } from "./helpers.js";
 
 /**
  * Registre phyto au format réglementaire (lot X) : SIRET de la ferme,
@@ -33,6 +33,7 @@ describe.skipIf(!url)("registre phyto réglementaire (intégration)", () => {
     app.request(`${base}${path}`, { method, headers: h, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
 
   beforeAll(async () => {
+    await ensurePhytoReferential(sql);
     ({ farmId, userId, headers } = await setupFarm(sql, "Ferme test registre réglementaire"));
     worker = await addMember(sql, farmId, "worker");
     base = `/api/v1/farms/${farmId}`;
@@ -42,6 +43,10 @@ describe.skipIf(!url)("registre phyto réglementaire (intégration)", () => {
         VALUES (${crypto.randomUUID()}, ${id}, ST_GeomFromText(${`MULTIPOLYGON(((${x} 44.8,${x + 0.0013} 44.8,${x + 0.0013} 44.8009,${x} 44.8009,${x} 44.8)))`}, 4326), 10000, tstzrange('2026-01-01', NULL))`;
     }
     await sql`INSERT INTO campaigns (id, farm_id, year, starts_on, stops_on) VALUES (${ids.campaign}, ${farmId}, 2026, '2026-01-01', '2026-12-31')`;
+    // Production de référence Lexicon de la vigne (base vierge en CI : rien n'est chargé ;
+    // une base de développement a déjà la vraie ligne, gardée telle quelle).
+    await sql`INSERT INTO lexicon_productions (reference_name, family, specie, usage, label)
+      VALUES ('vine', 'vine_farming', 'vitis', 'fruit', 'Vigne') ON CONFLICT DO NOTHING`;
     await sql`INSERT INTO activities (id, farm_id, name, family, reference) VALUES
       (${ids.vineActivity}, ${farmId}, 'Vignes AOP', 'vine_farming', 'vine'),
       (${ids.meadowActivity}, ${farmId}, 'Prairie temporaire', 'plant_farming', NULL)`;
