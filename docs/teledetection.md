@@ -193,9 +193,9 @@ perdu son couvert alors qu'aucune intervention ne l'explique.
 
 - **Vigne** : un pixel de 10 m mélange les rangs, l'enherbement et le sol.
   Lire des tendances, pas des valeurs absolues.
-- **Vérification manuelle** : l'encadré Satellite de la carte et du plan 3D
-  n'a pas encore été vérifié à l'écran sur la ferme de Pierre. Les images et
-  les valeurs l'ont été côté API.
+- **Vérification à l'écran** : faite le 2026-11-12 sur la ferme pilote
+  (onglet Végétation, encadré Satellite du plan 3D, NDVI du 11/07/2026 ;
+  `claudedocs/plan_de_test_global.md` §8).
 - **Signalements** (lot Z) : récoltes et destructions du couvert seulement.
   Un semis non saisi (levée sans semis) ou une confirmation par le NDMI ou
   Sentinel-1 (maïs sec sur pied ou champ récolté) restent à faire.

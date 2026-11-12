@@ -32,7 +32,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | [`docs/parcours-attelages.md`](docs/parcours-attelages.md) · [`docs/parcours-attelages-design.md`](docs/parcours-attelages-design.md) | Parcours GPS d'un matériel, intervention tirée des parcours, attelages dans l'intervention : exigences et design |
 | [`docs/materiels-entretien.md`](docs/materiels-entretien.md) · [`docs/materiels-entretien-design.md`](docs/materiels-entretien-design.md) | Matériels et entretien : exigences (et bilan de réalisation), design (et écarts à la réalisation) |
 
-## État du projet (2026-11-10)
+## État du projet (2026-11-12)
 
 | Étape | État |
 |---|---|
@@ -49,36 +49,26 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | Interventions et procédures simplifiées (étape 1) | ✅ 6 formes, catalogue, périodes, personnes, motifs, annulation, habitudes de la ferme ; migrateur et formulaire web |
 | Comptes better-auth (étape 2) | ✅ comptes locaux, sessions cookie + bearer (mobile), page Équipe (membres, personnes ↔ comptes) |
 | Intégrations par ferme | ✅ module Intégrations (Traccar) : accès chiffrés par ferme, testés avant enregistrement, worker de synchro chaque minute |
-| Déploiement | 🟡 Dokploy prêt (dev.fourmy.org, fourmy.org, www) ; premier déploiement au prochain push |
+| Déploiement | ✅ Dokploy : dev.fourmy.org et fourmy.org en ligne depuis le 07/11 (image construite par la CI) ; sauvegardes de la base à mettre en place |
 | Site public fourmy.org | ✅ présentation, fonctionnalités illustrées, roadmap, nouveautés automatiques, contact ; page Fourmy d'ekylibre.com sur une branche |
 | zero-mobile (étape 3) | ✅ branche `fourmy-backend` : compte Fourmy, catalogue, formulaire générique par forme, push par intervention ; vérifié contre l'API — reste le passage sur appareil |
 | Retours de test des pilotes (interventions, phyto, activités, parcelles) | ✅ lots A à H : saisie pleine page, contrôle réglementaire, précautions et mélanges, activités, certifications, parcelles depuis la carte (PAC, cadastre) |
 | Matériels et entretien (lots I à M) | ✅ fiche et relevés d'heures, plan d'entretien et échéances, import de la base matériel, interventions d'entretien, heures estimées par Traccar, pièces à commander, alertes, avatar 3D et rejeu dans le plan 3D (`docs/materiels.md`) |
 | Parcours GPS et attelages (lots N à R) | ✅ attelages dans l'intervention (mode libre conservé), parcours GPS par matériel, intervention tirée des parcours, attelages types, applicateur au registre phyto, reprise Ekylibre et synchro mobile (`docs/parcours-attelages.md` §8) |
 | Retours de test du 10/11/2026 (lots S à X) | ✅ menus en sections, intégrations par thème, formulaire d'intervention réordonné, choix des colonnes des listes, widget Parcours GPS du tableau de bord, registre phyto au format réglementaire (OEPP, BBCH, SIRET), stations Weenat et Sencrop (`claudedocs/workflow_retours_10112026.md`) |
-| Jours 6-7 — migration réelle + recette | ⏳ à faire |
+| Télédétection, croissance, irrigation, 3D (lots Y à AC) | ✅ Sentinel-2 par ferme (NDVI, NDRE, NDMI), récoltes probables, végétation et météo du plan 3D, modèle de croissance, bilan hydrique et irrigations (`docs/teledetection.md`, `docs/modele-croissance.md`, `docs/jumeau-3d.md`) |
+| Modulation (lot AD) | ✅ cartes de modulation par zones, export ISO-XML et Shapefile, envoi agrirouter (non essayé sur un vrai compte ; `docs/modulation.md`) |
+| Fertilisation azotée (lots AE à AQ) | ✅ zonage nitrates, sols et analyses, plan prévisionnel de fumure (Nouvelle-Aquitaine), contrôles à la saisie, cahier d'enregistrement ; saisie des engrais en kg ou en litres (`docs/fertilisation.md`) |
+| Migration réelle et recette | ✅ trois fermes reprises (08/11) ; recettes des 11 et 12/11 sur la ferme pilote de grandes cultures (`claudedocs/plan_de_test_global.md`), spécification métier (`docs/specifications-metier.md`) |
 
 ### À reprendre
 
-1. zero-mobile : build EAS et parcours sur appareil (carte, précache), note de
-   version pour les pilotes, puis fusion de `fourmy-backend`.
-2. Finitions agent 0 : documentation OpenAPI.
-3. Export PDF du registre phyto (JSON et CSV disponibles).
-4. Matériels : documents et photos (lot fichiers), rattachement des
-   entretiens migrés au plan, relevé en fin de chantier dans le formulaire,
-   attelage 3D d'après l'attribut `tool` de Traccar (bilan :
-   `docs/materiels-entretien.md` §9).
-5. Parcours et attelages : zero-mobile doit suivre le contrat des attelages
-   (pull et push), lien des parcours vers le rejeu, relier les outils
-   annoncés par les boîtiers (`external_ids.traccarTool`) ; bilan :
-   `docs/parcours-attelages.md` §8.
-6. Registre phyto : SIRET des fermes et culture des activités non
-   reconnues à saisir chez les pilotes ; cas B à D de l'arrêté (espaces
-   fermés, semences), prestation de service, délai de rentrée
-   (`docs/phyto.md`, registre au format réglementaire).
-7. Stations météo : valider Weenat et Sencrop sur de vrais comptes
-   (horodatage Weenat, unités du vent, jours par appel Sencrop ;
-   `docs/meteo.md`).
+La liste complète des points ouverts (94 au 12/11/2026, par thème et par
+priorité) est dans `claudedocs/points_ouverts.md` ; elle alimente la
+roadmap du projet GitHub. Avant l'envoi à la ferme pilote : sauvegardes,
+worker vérifié sur dev.fourmy.org, outils Traccar reliés, données de la
+ferme à compléter (SIRET, sols, 14-48 liquide dans Ekylibre, Arion 430) et
+accord écrit pour les captures et la vidéo.
 
 ### Démarrage local
 

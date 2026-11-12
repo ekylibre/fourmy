@@ -286,7 +286,8 @@ DoD · US couvertes**.
 
 Synchro Lyvre, MCP/Aiffel, système de plugins, élevage N1, PAC, fertilisation
 (réalisée depuis, lots AE à AQ : [`fertilisation.md`](fertilisation.md)),
-capteurs, planification, déclaration de récolte, registre de cave, et les
+capteurs (stations Weenat et Sencrop réalisées depuis, lot W ; capteurs
+génériques à venir), planification, déclaration de récolte, registre de cave, et les
 méthodes du service Python `services/agro`. Points d'entrée prévus en
 architecture §8.
 

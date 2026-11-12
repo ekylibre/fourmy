@@ -834,7 +834,8 @@ L'encadré « Directive nitrates » du formulaire se met à jour pendant la sais
   - HVE (indicateurs) ;
   - Telepac ;
   - consoles ISOBUS (FR-GPS-3) ;
-  - suivi en direct ;
+  - outils de relief : profil, pente, ombrage, courbes de niveau (FR-VIZ-4, US-4) ;
+  - suivi en direct (aujourd'hui : dernière position connue seulement) ;
   - sauvegardes de la base en production ;
   - export RGPD.
 
@@ -860,7 +861,7 @@ L'encadré « Directive nitrates » du formulaire se met à jour pendant la sais
    - les imports sont réservés à `owner` dans le code, mais à un « admin » dans certains documents ;
    - tout membre, salarié compris, peut écarter une récolte probable.
 6. **Alertes d'entretien** : récapitulatif horaire réalisé, quotidien dans la conception.
-7. **Parcours GPS** : travail détecté seulement par `working`, alors que FR-GPS-11 prévoyait une déduction par la vitesse.
+7. **Parcours GPS** : décision prise le 09/11 (travail détecté seulement par `working`), à confirmer avec la ferme pilote : certaines journées sans ce signal ne donnent que des déplacements.
 8. **Registre réglementaire** : dose en kg/hL ou L/hL, séparateur GPS, libellé BBCH, contrôle de Luhn du SIRET.
 9. **Exigences** :
    - l'exigence IFT parle d'un compte serveur, alors que l'API est ouverte ;

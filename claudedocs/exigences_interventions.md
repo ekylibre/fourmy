@@ -244,5 +244,5 @@ conception :
 1. **Lexicon** : l'API osfarm (port 8888 en local) expose-t-elle bien les
    usages, les risques et les cours d'eau et points d'eau, ou faut-il lire sa
    base ? À vérifier avant `/sc:design`.
-2. **Compte API IFT** : Ekylibre SAS doit créer le compte sur
-   api.agriculture.gouv.fr (recette puis production) ; à prévoir avant le lot 2.
+2. **Compte API IFT** : sans objet. L'API IFT du ministère est ouverte et
+   sans compte (`docs/phyto.md`) ; c'est elle qui est utilisée.

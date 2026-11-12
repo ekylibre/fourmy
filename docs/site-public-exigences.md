@@ -146,8 +146,9 @@
    Le bouton « Se connecter » pointe vers dev.fourmy.org en attendant.
 5. **Roadmap** : contenu initial à valider (je propose une première version
    tirée du README et de `docs/interventions.md`).
-6. **Historique Git dans Dokploy** : vérifier que la construction dispose de
-   l'historique complet (sinon le fournir à la construction).
+6. **Historique Git dans Dokploy** : réglé. Dokploy clone sans historique,
+   l'image du site est donc construite par la CI (`docs/deploiement.md`) ;
+   premier déploiement le 2026-11-07.
 7. **ekylibre.com** : textes de la page `/fourmy/` à relire par l'équipe
    (ton éditeur), et date de bascule (le site est publié dès le push sur
    `main` d'ekylibre-sas).

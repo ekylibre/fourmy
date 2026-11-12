@@ -109,6 +109,7 @@ obligatoire mais demande l'identification individuelle pour les bovins.
   (consommations, récoltes) et alimente les registres réglementaires.
 - **FR-INT-4 (S)** Pré-remplir une intervention à partir d'une trace GPS
   de matériel (parcelle, durée, surface travaillée).
+  *Réalisé (lot P, 2026-11-10) : intervention tirée des parcours GPS, rattachement à une intervention existante.*
 - **FR-INT-5 (M)** Les types d'interventions sont extensibles par plugin.
 
 ### 4.4 Stocks et articles
@@ -126,6 +127,7 @@ obligatoire mais demande l'identification individuelle pour les bovins.
 - **FR-MAT-1 (M)** Inventaire des matériels avec leur état dans le temps.
 - **FR-MAT-2 (M)** Rattacher un traceur GPS à un matériel.
 - **FR-MAT-3 (S)** Bâtiments géolocalisés, avec un modèle 3D optionnel.
+  *Réalisé : bâtiments BD TOPO extrudés au plan 3D, hauteurs complétables.*
 - **FR-MAT-4 à FR-MAT-86** : fiche matériel, relevés d'heures (manuels ou
   estimés par Traccar), plan d'entretien à échéances, interventions
   d'entretien, pièces, logo 2D et avatar 3D.
@@ -137,14 +139,17 @@ obligatoire mais demande l'identification individuelle pour les bovins.
 ### 4.6 Traces GPS
 - **FR-GPS-1 (M)** Ingérer les traces des matériels depuis **Traccar**
   (client pilote).
+  *Réalisé : synchronisation Traccar chaque minute, parcours toutes les 5 min.*
 - **FR-GPS-2 (M)** Afficher et rejouer les traces sur la carte, filtrées par
   matériel, période et parcelle.
+  *Réalisé : carte 2D, plan 3D et rejeu (caméra derrière le matériel, drone ou libre le 2026-11-12).*
 - **FR-GPS-3 (L)** Ingérer les données des consoles de tracteurs
   (ISO-XML / ISOBUS, ADAPT).
 
 ### 4.7 Capteurs
 - **FR-CAP-1 (S)** Ingérer les mesures des stations et capteurs (Weenat et
   Sencrop, d'après les plugins existants).
+  *Réalisé (lot W, 2026-11-10) : Weenat et Sencrop ; pas encore essayés sur de vrais comptes.*
 - **FR-CAP-2 (S)** Rattacher un capteur à une parcelle ou un bâtiment, et
   afficher ses séries dans le temps.
 
@@ -156,11 +161,14 @@ obligatoire mais demande l'identification individuelle pour les bovins.
 ### 4.9 Visualisation du jumeau (carte et 3D)
 - **FR-VIZ-1 (M)** Carte 2D de travail quotidien : parcellaire, productions,
   interventions, traces GPS, capteurs, en couches activables.
+  *Réalisé.*
 - **FR-VIZ-2 (M)** **Rejouer la ferme dans le temps** : une frise permet de
   voir l'état de la ferme et le déplacement des matériels à n'importe quelle
   date.
+  *Réalisé : frise, date dans l'adresse (`?at=`).*
 - **FR-VIZ-3 (M)** **Vue 3D** avec relief réel (LiDAR HD, RGE ALTI de l'IGN)
   et bâtiments.
+  *Réalisé avec RGE ALTI, orthophoto et BD TOPO ; LiDAR HD pas encore.*
 - **FR-VIZ-4 (S)** Outils de relief inspirés de CutSheetRX (Senter Farms) :
   ombrage, pente, courbes de niveau, profil altimétrique tracé à la main,
   lecture de l'altitude au survol.
@@ -204,7 +212,7 @@ conception : [`teledetection-design.md`](teledetection-design.md).
   (compenser, valoriser, uniforme ; bornes et largeur de la machine), export
   ISO-XML (TaskData, grille de type 1) et Shapefile. *Réalisé (lot AD,
   [`modulation.md`](modulation.md)).*
-- **FR-TWIN-7 (C)** Import des TimeLogs ISOBUS : **remplacé** le 2026-11-11
+- **FR-TWIN-7 (S, remplacée)** Import des TimeLogs ISOBUS : **remplacé** le 2026-11-11
   par la **connexion à agrirouter** (consentement OAuth de la ferme, envoi
   des cartes de modulation aux consoles reliées). *Réalisé (lot AD).* La
   réception (TimeLogs, doses appliquées) passera aussi par agrirouter.
@@ -213,6 +221,7 @@ conception : [`teledetection-design.md`](teledetection-design.md).
 ### 4.10 Réglementaire
 - **FR-REG-1 (M)** **Registre phytosanitaire** produit à partir des
   interventions.
+  *Réalisé ; format réglementaire (OEPP, BBCH, SIRET) le 2026-11-10 ; export PDF à venir.*
 - **FR-REG-2 (M)** **PAC** : parcellaire et assolement déclaratifs.
 - **FR-REG-3 (M)** **Fertilisation** : plan prévisionnel et cahier
   d'enregistrement, notamment en zone vulnérable nitrates.
@@ -233,13 +242,16 @@ conception : [`teledetection-design.md`](teledetection-design.md).
 ### 4.11 Migration depuis Ekylibre
 - **FR-MIG-1 (M)** Importer une instance Ekylibre existante : parcellaire
   historique, productions, interventions, stocks, matériels, animaux.
+  *Réalisé : trois fermes reprises le 2026-11-08.*
 - **FR-MIG-2 (M)** Validation sur l'instance du client pilote
   (`haurigot.ekylibre-dev.com`), y compris ses données Traccar. Le pilote est
   **testeur de Fourmy** ; son instance Ekylibre reste en production.
+  *Réalisé (ferme pilote de grandes cultures, recettes des 11 et 12/11/2026).*
 - **FR-MIG-4 (M)** La migration est **en lecture seule** côté Ekylibre :
   aucune écriture, aucune modification de l'instance source. Elle peut être
   rejouée autant de fois que nécessaire.
 - **FR-MIG-3 (S)** Rapport de migration : volume importé, rejets et écarts.
+  *Réalisé.*
 
 ### 4.12 Plugins
 - **FR-PLG-1 (M)** Des **tiers** (éditeurs, constructeurs, coopératives)
@@ -276,8 +288,10 @@ conception : [`teledetection-design.md`](teledetection-design.md).
   auto-hébergé, authentification autonome.
 - **FR-ACC-3 (M)** Rôles minimum : exploitant (tout) et salarié (saisie et
   consultation).
+  *Réalisé : responsable et salarié, vérifiés à l'écran et dans l'API le 2026-11-12.*
 - **FR-ACC-4 (S)** Multi-exploitation : un utilisateur peut accéder à
   plusieurs fermes.
+  *Partiel : un compte peut être membre de plusieurs fermes (page Fermes).*
 
 ## 5. Exigences non fonctionnelles
 
@@ -394,8 +408,9 @@ Les 7 jours visent la **première tranche** ci-dessous ; le reste suit.
    (US-4, US-9).
 
 **Hors des 7 jours** : synchro Lyvre, MCP / Aiffel, système de plugins,
-élevage N1, PAC, fertilisation, capteurs, planification, déclaration de
-récolte et registre de cave.
+élevage N1, PAC, planification, déclaration de récolte et registre de cave.
+(La fertilisation et les stations météo, d'abord hors tranche, sont livrées
+depuis : FR-REG-3, FR-CAP-1.)
 
 **US-9 — Voir sa cuverie dans le plan 3D (vigneron)**
 - Les cuves apparaissent dans leurs bâtiments, sur le plan 3D de la ferme.
