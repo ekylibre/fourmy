@@ -343,11 +343,11 @@ Se connecter avec le compte salarié de test (rattaché en T-TEAM-1).
 | T-ROLE-6/8 | OK | salarié : fichiers de modulation (200), brouillon GPS (200) ; réglages GPS et doses (403) | | |
 | T-UX-2 | OK | 1 024 px : aucune page ne déborde | | |
 | T-ERR-1 | **KO → corrigé** | hors ligne, le bouton tournait sans rien dire (envoi mis en pause par React Query) | P2 | message « Pas de réseau : l'enregistrement partira dès le retour de la connexion » |
+| T-INTG-2 | **OK, affichage corrigé** | « Tester et enregistrer » avec le champ secret laissé vide : le secret enregistré est repris (indice « …TdMy », jamais réaffiché) ; jeton obtenu, 14 acquisitions sur 30 jours en 0,6 s. Mais le résultat du test n'était **pas affiché** (l'écran ne montrait que le rapport Traccar) | P3 | encadré « Connexion réussie : 14 acquisition(s) Sentinel-2… la dernière le 10/11/2026 » ; test ajouté. Le nombre d'images exploitables annoncé par la conception (RG-SAT-1) n'est pas calculé par le test |
 | T-3D-6 | **KO → corrigé** | Firefox 157 (Playwright) : plan 3D et rejeu drone sans erreur, mais « Relief de repli » et bandes noires : la Géoplateforme répond par moments 400 « LayerNotDefined » pour la couche du relief (puis 429 en rafale) | P2 | ce 400 passager est retenté comme un 503 ; plus aucun repli au second essai ; projet Firefox ajouté aux e2e (plan 3D) |
 | — | observé | « Réalisée d'emblée » = création puis réalisation : une coupure entre les deux laisse une intervention planifiée (un nouvel envoi la complète, même identifiant) | P3 | |
 
 **Restent non joués** :
-- T-INTG-2 (le test Copernicus redemande le secret, qui n'est jamais réaffiché ; non ressaisi) ;
 - T-MOD-1 (« Moduler » depuis un apport du plan : vérifié par la recette du 11/11) ;
 - T-FERT-1 (recette du 11/11).
 
