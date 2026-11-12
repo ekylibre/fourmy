@@ -320,6 +320,10 @@ function ProviderCard({
     matched?: { device: string; equipment: string }[];
     unmatched?: { device: string; reason: string }[];
     inserted?: number;
+    // Test de Copernicus : acquisitions Sentinel-2 des 30 derniers jours au-dessus de la ferme.
+    acquisitions?: number | null;
+    dates?: string[];
+    note?: string;
   } | null;
 
   return (
@@ -416,6 +420,13 @@ function ProviderCard({
             {new Date(integration.lastSyncAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
             {typeof report?.inserted === "number" ? ` — ${report.inserted} position(s) ajoutée(s)` : ""}
           </Text>
+        )}
+        {test && (typeof report?.acquisitions === "number" || report?.note) && (
+          <Alert color="lichen" title="Connexion réussie">
+            {typeof report?.acquisitions === "number"
+              ? `${report.acquisitions} acquisition(s) Sentinel-2 au-dessus de la ferme sur les 30 derniers jours${report.dates?.length ? `, la dernière le ${formatDate(report.dates.at(-1)!)}` : ""}.`
+              : report?.note}
+          </Alert>
         )}
         {integration?.lastError && (
           <Alert color="brique" title="Dernière synchronisation en échec">
