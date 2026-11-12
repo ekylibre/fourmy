@@ -244,9 +244,85 @@ Se connecter avec le compte salarié de test (rattaché en T-TEAM-1).
 
 ## 8. Journal de recette (à remplir)
 
-| ID | Date | Résultat (OK / KO / N.A.) | Anomalie | Priorité | Correctif (commit) |
-|---|---|---|---|---|---|
-| | | | | | |
+### Passage du 2026-11-12 (copie `fourmy_recette`, Chrome + Playwright pour le téléphone)
+
+**Niveau 1, suites automatiques** : tout vert.
+- Lint et types : 56 tâches.
+- Paquets : 16, dont domain 240.
+- Web : 156 tests, puis 158 après les correctifs.
+- API : 213 tests.
+- e2e Playwright : 10 scénarios ; les 11 captures sont ignorées comme prévu.
+
+**Niveaux 2 et 3, joués à l'écran**
+
+| ID | Résultat | Constat | P | Correctif |
+|---|---|---|---|---|
+| T-ACC-1 | OK | refus lisible, puis `/farms` avec le badge Responsable | | |
+| T-ACC-2 | OK | « Ferme inaccessible » sur une ferme dont on n'est pas membre | | |
+| T-DASH-1/2/3 | OK | modèle de croissance (16/06), récoltes probables et parcours GPS (28/10) | | |
+| T-GEN-2 | OK | `/registre` et `/carte` redirigés ; `?vue=kanban` accepté | | |
+| T-INT-1 | **KO → corrigé** | la recherche perdait des lettres en frappe rapide (champ lu dans l'URL) | P2 | champ à état propre, URL écrite après 250 ms ; test ajouté |
+| T-INT-4 | **KO → corrigé** | Entrée dans « Matériels » envoyait le formulaire : **deux interventions créées** (deux identifiants) | P1 | Entrée n'envoie plus depuis un champ ; un identifiant par formulaire ; garde contre le double envoi ; Entrée choisit la 1re proposition ; test ajouté |
+| T-INT-4 | OK | 14-48 en L/ha : 120 L → 23,5 kg N/ha (densité 1,4) ; feu rouge nitrates (période d'interdiction) | | |
+| T-INT-6 | OK | réalisation refusée sans semence ; feu rouge → motif → enregistré ; stock −941,4 L ; azote 23,5 enregistré | | |
+| T-INT-6 | **KO → corrigé** | message « Un semis, plantation demande au moins un semence ou plant » | P3 | messages réécrits (genre, article) |
+| T-INT-7 | OK | 120 → 100 L/ha : solde net −784,48 L, audit « corrected », 19,6 kg N/ha | | |
+| T-INT-8 | OK | annulation motivée : solde 0, contre-passé au 10/11 | | |
+| T-INT-9 | OK | planifiée annulée avec motif (pas de suppression proposée : annulation) | | |
+| T-INT-2 | OK | calendrier (attelages repris) et kanban | | |
+| — | non reproduit | « parcelle inconnue » sur la fiche juste après une modification, une fois, pendant un rechargement à chaud de Vite | P3 | à surveiller |
+| — | observé | « La modification ne change rien » : refus voulu ; préfixe « Règle métier — » un peu technique | P3 | |
+| T-PHY-1/2 | OK | autorisation, dose rouge à 30 kg/ha, 2e application rouge, DAR, DRE, créneaux de pulvérisation | | |
+| T-PHY-6 | OK pour le registre | IFT 2025 « en attente » : le worker ne tourne pas dans cet environnement local (voulu, pour ne pas solliciter Copernicus et Traccar de la ferme) | | |
+| T-PHY-7 | OK | 40 lignes, SIRET signalé ; CSV : BOM, « ; », 26 colonnes, GPS entre guillemets | | |
+| T-PHY-8 | OK | 13 chiffres refusés, 14 acceptés : 40 lignes complètes | | |
+| T-FERT-2 | OK | 14-48 absent des fertilisants à compléter | | |
+| T-FERT-3 | OK (v1) | sol saisi → 247 kg N/ha → « Établi · version 1 » ; starter 17 kg repris ; révision non jouée (tests auto) | | |
+| T-FERT-4 | OK | fenêtre « Feu rouge réglementaire », motif sur la fiche et au cahier | | |
+| T-FERT-5 | **KO → corrigé** | un apport d'automne (10/11/2026), entre la récolte et la culture suivante non encore créée, n'apparaissait dans **aucun bloc de parcelle** du cahier (2026 ni 2027), seulement dans « épandages interdits » | P2 | la parcelle figure au cahier (« aucune culture saisie pour cette campagne ») ; vérifié : 50 L/ha le 15/10 → 9,8 kg N/ha au cahier 2027 ; test ajouté. Limite : si la parcelle de la campagne suivante existe déjà, l'apport reste compté au précédent (couvert, APLSH), pas en ligne d'apport |
+| T-FERT-5 | à décider | l'apport historique du 16/04/2026 (14-48) est saisi en **kg/ha** : 120 kg → 16,8 kg N/ha ; s'il s'agissait de 120 L, il faut le passer en L/ha (23,5) | | donnée |
+| — | **KO → corrigé** | en-tête du cahier « du 01/09/2026 au 01/09/2027 » (au lieu du 31/08) | P3 | affiché au 31/08 |
+| T-MAT-2 | OK | 4 300 < 4 321 refusé avec le voisin ; correction motivée, ancien relevé barré | | |
+| — | observé | le motif de correction n'apparaît pas dans la colonne Note ; cadre vide au-dessus du tableau des relevés | P3 | |
+| T-GPS-1/2 | OK | 30 derniers jours par défaut ; brouillon à attelages, rien enregistré, indices ; outil « Tigre » non relié → procédure suggérée fausse (donnée à relier) | | |
+| T-3D-2 | OK | rejeu du 28/10 en vue drone ×900, tracé progressif | | |
+| T-TEAM-1 | OK | salarié rattaché | | |
+| T-ROLE-1 | OK | menu sans Équipe ni Interopérabilité, badge Salarié | | |
+| T-ROLE-2 | OK | URL directes refusées | | |
+| — | observé | `/team` et `/integrations` affichent « Impossible de charger les données — Accès refusé … (owner) » au lieu d'un message comme `/imports` | P3 | |
+| T-ROLE-3/4/5/7 | OK | salarié : crée et annule une intervention (201/200), exporte le registre ; 403 sur sol, suppression de relevé, SIRET, modulation, membres ; Sol et plan en lecture seule | | |
+| T-UX-1 | **KO → corrigé** | téléphone (390 px) : pages à 422–656 px. Causes : frise (années superposées), « Se déconnecter », barre de semaine, créneaux de pulvérisation, boutons des récoltes probables, tableau des parcours | P2 | frise réduite à la date sur téléphone, icône de déconnexion, logo masqué, lignes qui passent à la ligne, tableau défilant ; écrans principaux à 390 px |
+| — | observé | impression du cahier plus large que le téléphone (589 px) : acceptable pour un document à imprimer | P3 | |
+| T-ERR-2 | OK | aucune erreur de Fourmy dans la console (une erreur d'extension du navigateur) | | |
+
+**Second passage, le même jour, après les correctifs**
+
+| ID | Résultat | Constat | P |
+|---|---|---|---|
+| T-MOD-2/3 | OK | 3 zones NDVI calculées et enregistrées (1 245 kg sur 7,85 ha, machine 50–400 kg/ha) ; ISO-XML et Shapefile : archives zip valides | |
+| — | observé | sur une image de sol presque nu (NDVI 0,17–0,27), zones très inégales (4,75 / 0,62 / 2,48 ha) : rien ne prévient que l'image ne se prête pas à la modulation ; l'image proposée par défaut est la plus récente, même postérieure à la frise | P3 |
+| T-MOD-4 | OK | « agrirouter n'est pas encore configuré sur ce serveur » | |
+| T-INTG-1 / T-SEC-1 | OK | intégrations par thème ; aucun secret réaffiché (seul l'identifiant client Copernicus, qui n'est pas secret) | |
+| T-IMP-1 | OK | seul un nom de base est demandé ; import de dossier matériel présent | |
+| T-ENT-1 | N.A. | aucun plan d'entretien chez la ferme pilote : la base matériel de l'Arion n'est pas importée (à faire avec l'exploitant) | |
+| T-STK-2 | OK | « Aucune cuve à cette date. » | |
+| T-SAT-1 | OK | courbe, repères d'interventions, mention Copernicus, cartes de modulation de la parcelle | |
+| T-CRO-1 | OK | stades datés (observés / « vers le … »), 13 % de réserve, 49 jours de stress dont 22 autour de la floraison, invitation à déclarer l'irrigation | |
+| T-CRO-2 | OK (API) | réserve de 5 mm refusée (400), 150 mm acceptée, retour au défaut | |
+| T-PHY-9 | OK | IFT recalculé à la demande : 0,917, en 0,5 s | |
+| T-PERF-1/2 | OK | interventions de la campagne en 15 ms ; parcours sur 90 jours en 21 ms | |
+| T-FERT-8 | OK | plans imprimables : 60 à 160 ms par plan ; plan établi de Lespourcy repris | |
+
+**Non joués ce jour** (couverts en partie par les tests automatiques ou la recette du 11/11) :
+- T-PARC-2/3, T-CARTO-2 (e2e carto), T-ACT-2/3 ;
+- T-PHY-3/4/5/10 ;
+- T-FERT-1 (recette du 11/11), T-FERT-6/7 ;
+- T-MOD-1 ;
+- T-MAT-3/4/5, T-ENT-2 à 4 (aucun plan d'entretien) ;
+- T-GPS-3/4/5 (« Ajouter à une intervention » vérifié le 12/11 pendant le tournage) ;
+- T-3D-1/3/4/5, T-3D-6 (Firefox) ;
+- T-SAT-2/3, T-INTG-2, T-ROLE-6/8/9 ;
+- T-UX-2, T-ERR-1.
 
 **Fiche d'anomalie** : ID du scénario, étapes, attendu, obtenu, capture, URL, console, priorité.
 

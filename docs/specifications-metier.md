@@ -178,7 +178,7 @@ Le plan de test qui s'appuie sur ces règles est dans `claudedocs/plan_de_test_g
     | `harvest` | ≥ 1 parcelle et ≥ 1 sortie avec destination (lieu, ou cuve pour la vendange) |
     | `maintenance` | ≥ 1 matériel ou bâtiment, sans parcelle ; nature préventive ou curative ; problème obligatoire en curatif |
 
-  Les intrants et sorties doivent appartenir aux natures acceptées par la procédure. (interventions §3)
+  Ces minimums sont exigés à la **réalisation** ; une intervention planifiée peut être incomplète. Les intrants et sorties doivent appartenir aux natures acceptées par la procédure. (interventions §3 ; intervention-rules.ts)
 - **RG-INT-2** : les matériels, produits et intervenants ne sont pas filtrés : ceux les plus utilisés avec la procédure sur 3 ans sont proposés en tête (« Habituels »). (interventions §3.2)
 - **RG-INT-3** : une nouvelle intervention est **réalisée** si son début est passé, **à planifier** sinon ; c'est modifiable. Les périodes (au moins une) sont ordonnées et sans chevauchement. Chaque période a une durée qui calcule sa fin, et déplacer le début garde la durée. (interventions §10)
 - **RG-INT-4 (ordre du formulaire)** :
@@ -215,7 +215,7 @@ Le plan de test qui s'appuie sur ces règles est dans `claudedocs/plan_de_test_g
 
   (interventions §4.3 ; commit b302414)
 - **RG-INT-8** : motifs de traitement : une liste fermée et facultative (herbicide, fongicide, insecticide…), rien de coché par défaut. L'irrigation exige une dose en mm à la réalisation (voir RG-IRR-9). (interventions §4.1, §7.2)
-- **RG-INT-9** : une intervention porte un identifiant client et s'enregistre en tout ou rien. Un renvoi ne crée pas de doublon. (interventions §4.3)
+- **RG-INT-9** : une intervention porte un identifiant client, tiré une fois par formulaire, et s'enregistre en tout ou rien. Un renvoi (double clic, réseau) ne crée pas de doublon. La touche Entrée dans un champ n'envoie pas le formulaire. (interventions §4.3 ; recette du 12/11)
 
 ### 6.2 Statuts, vues et recherche
 
