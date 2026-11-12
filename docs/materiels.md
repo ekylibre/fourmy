@@ -331,6 +331,10 @@ d'intervention s'adapte à cette forme.
     un peu derrière l'essieu, plancher à 62 % du diamètre arrière, grandes
     vitres dès le haut des roues ; pneus avant larges (88 % des arrière) ;
     masse de lestage devant le nez.
+  - Détails : relevage trois points (bras inférieurs jusqu'au point
+    d'attelage, bras de relevage, chandelles, troisième point), prise de
+    force, barre d'attelage, marchepied à deux marches, réservoir,
+    montants de portes, phares de travail sur le toit.
   - Ajusté par les données de l'avatar : longueur, largeur, hauteur,
     empattement, diamètre des roues, couleurs (carrosserie et ses nuances,
     vitres, pneus, jantes), logo.
@@ -345,11 +349,36 @@ d'intervention s'adapte à cette forme.
 - **Gabarits** :
   - tracteur ;
   - automoteur ;
-  - outil traîné ;
+  - **outils portés** (2026-11-12), accrochés au relevage : leur origine
+    est le point d'attelage, au bout des bras inférieurs du tracteur :
+    - semoir monograine : poutre porte-outils, un élément par rang de
+      0,75 m (trémie, disque ouvreur, roues plombeuses), trémie centrale
+      d'engrais, traceurs repliés ;
+    - herse rotative : caisson, dents, boîtier central, déflecteurs,
+      rouleau packer ;
+    - charrue réversible : retournement, age en diagonale déportée à
+      droite, un corps par 40 cm de largeur de travail (dessus et
+      dessous), roue de jauge ;
+    - pulvérisateur porté : cuve à pans coupés, rampe dépliée à la
+      largeur de travail ;
+    - distributeur d'engrais : trémie en V, deux disques à pales ;
+    - rouleau ;
+    - outil porté à dents (vibroculteur, chisel) : trois rangées de dents
+      en S, émietteur ;
+  - déchaumeur à disques, traîné : timon, deux trains de disques, roues
+    de transport, rouleau ;
+  - outil traîné (générique) ;
   - pulvérisateur traîné, avec sa rampe dépliée à la largeur de travail ;
-  - outil porté ;
   - remorque ;
   - équipement fixe.
+- **Gabarit proposé d'après le nom** : la reprise d'Ekylibre ne donne
+  souvent que « outil traîné » (`trailed_equipment`). Le nom propose alors
+  un gabarit d'outil (« Monosem » → semoir, « Tigre » → herse rotative,
+  « RB47 » → charrue, « UF1201 » → pulvérisateur, « ZAV » → distributeur,
+  « Discover » → déchaumeur…), et une largeur écrite dans le nom
+  (« Lansaman 4.5m ») donne la largeur de travail. Le gabarit choisi sur
+  la fiche l'emporte. Ferme pilote de grandes cultures : 9 outils sur 13
+  reconnus.
 - **Valeurs** : chacune indique sa provenance. La valeur saisie l'emporte
   sur la fiche technique, qui l'emporte sur le défaut du gabarit.
   - **Dimensions** : longueur, empattement, largeur, et hauteur (hauteur

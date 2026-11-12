@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { WebIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
-import { buildAvatarGlb, inspectGlb, pngRatio, resolveAvatar, templateForKind, tyreDiameterM } from "../src/index.js";
+import { AVATAR_TEMPLATES, buildAvatarGlb, inspectGlb, pngRatio, resolveAvatar, templateForKind, templateFromName, tyreDiameterM, widthFromName } from "../src/index.js";
 
 // Extrait (anonyme) d'une fiche technique au format de la base matériel.
 const technical = {
@@ -67,5 +67,37 @@ describe("modèle glTF", () => {
     expect(s.bounds.max[1] - s.bounds.min[1]).toBeCloseTo(24, 0); // rampe dépliée
     await expect(inspectGlb(new TextEncoder().encode("pas un modèle"))).rejects.toThrow(/GLB/);
     expect(pngRatio(PNG)).toBe(1);
+  });
+
+  it("gabarit d'outil proposé d'après le nom ; la saisie l'emporte ; largeur lue dans le nom", () => {
+    const cases: [string, string | null][] = [
+      ["Monosem NG+3", "sower"],
+      ["Maschio Tigre 300", "rotary_harrow"],
+      ["Grégoire et Besson RB47", "plough"],
+      ["Amazone UF1201", "mounted_sprayer"],
+      ["Amazone ZAV 1700", "fertilizer_spreader"],
+      ["Khun Discover XS32", "disc_harrow"],
+      ["Rouleau Croskill 6 m", "roller"],
+      ["Vibroculteur 4 m", "mounted_tool"],
+      ["ETA", null],
+    ];
+    for (const [name, template] of cases) expect(templateFromName(name), name).toBe(template);
+    expect(resolveAvatar({ kind: "trailed_equipment", name: "Monosem NG+3" }).params.template).toBe("sower");
+    expect(resolveAvatar({ kind: "trailed_equipment", name: "Monosem NG+3", saved: { template: "trailed_tool" } }).params.template).toBe("trailed_tool");
+    expect(resolveAvatar({ kind: "tractor", name: "Semoir ?" }).params.template).toBe("tractor"); // un tracteur reste un tracteur
+    expect(widthFromName("Lansaman 4.5m")).toBe(4.5);
+    expect(widthFromName("Rouleau 6,30 m")).toBe(6.3);
+    expect(widthFromName("Maschio Tigre 300")).toBeNull();
+    expect(resolveAvatar({ kind: "trailed_equipment", name: "Lansaman 4.5m" }).params).toMatchObject({ widthM: 4.5, workingWidthM: 4.5 });
+  });
+
+  it("chaque gabarit se construit, léger (moins de 20 000 triangles)", async () => {
+    for (const template of AVATAR_TEMPLATES) {
+      const { params } = resolveAvatar({ kind: "trailed_equipment", saved: { template } });
+      const { glb } = await buildAvatarGlb(params, null);
+      const { triangles } = await inspectGlb(glb);
+      expect(triangles, template).toBeGreaterThan(10);
+      expect(triangles, template).toBeLessThan(20_000);
+    }
   });
 });

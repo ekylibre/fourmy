@@ -4,7 +4,22 @@
  * de chaque valeur. Fonctions pures (API et navigateur).
  */
 
-export const AVATAR_TEMPLATES = ["tractor", "self_propelled", "trailed_tool", "trailed_sprayer", "mounted_tool", "trailer", "box"] as const;
+export const AVATAR_TEMPLATES = [
+  "tractor",
+  "self_propelled",
+  "sower",
+  "rotary_harrow",
+  "plough",
+  "mounted_sprayer",
+  "fertilizer_spreader",
+  "disc_harrow",
+  "roller",
+  "mounted_tool",
+  "trailed_tool",
+  "trailed_sprayer",
+  "trailer",
+  "box",
+] as const;
 export type AvatarTemplate = (typeof AVATAR_TEMPLATES)[number];
 
 export const AVATAR_TEMPLATE_LABELS: Record<AvatarTemplate, string> = {
@@ -12,7 +27,14 @@ export const AVATAR_TEMPLATE_LABELS: Record<AvatarTemplate, string> = {
   self_propelled: "Automoteur",
   trailed_tool: "Outil traîné",
   trailed_sprayer: "Pulvérisateur traîné",
-  mounted_tool: "Outil porté",
+  sower: "Semoir monograine",
+  rotary_harrow: "Herse rotative",
+  plough: "Charrue",
+  mounted_sprayer: "Pulvérisateur porté",
+  fertilizer_spreader: "Distributeur d'engrais",
+  disc_harrow: "Déchaumeur à disques",
+  roller: "Rouleau",
+  mounted_tool: "Outil porté à dents",
   trailer: "Remorque",
   box: "Équipement fixe",
 };
@@ -42,13 +64,48 @@ const DEFAULTS: Record<AvatarTemplate, Omit<AvatarParams, "template" | "colors" 
   self_propelled: { lengthM: 7.5, widthM: 3, heightM: 3.6, wheelbaseM: 3.8, frontWheelDiameterM: 1.7, rearWheelDiameterM: 1.3, workingWidthM: 0, hitchOffsetM: 0 },
   trailed_tool: { lengthM: 3, widthM: 3, heightM: 1.3, wheelbaseM: 0, frontWheelDiameterM: 0, rearWheelDiameterM: 0.8, workingWidthM: 3, hitchOffsetM: 1.5 },
   trailed_sprayer: { lengthM: 5.5, widthM: 2.5, heightM: 2.6, wheelbaseM: 0, frontWheelDiameterM: 0, rearWheelDiameterM: 1.5, workingWidthM: 24, hitchOffsetM: 1.8 },
-  mounted_tool: { lengthM: 1.4, widthM: 3, heightM: 1.1, wheelbaseM: 0, frontWheelDiameterM: 0, rearWheelDiameterM: 0, workingWidthM: 3, hitchOffsetM: 0 },
+  mounted_tool: { lengthM: 1.9, widthM: 3, heightM: 1.1, wheelbaseM: 0, frontWheelDiameterM: 0, rearWheelDiameterM: 0, workingWidthM: 3, hitchOffsetM: 0 },
+  sower: { lengthM: 1.6, widthM: 3, heightM: 1.6, wheelbaseM: 0, frontWheelDiameterM: 0, rearWheelDiameterM: 0, workingWidthM: 3, hitchOffsetM: 0 },
+  rotary_harrow: { lengthM: 1.7, widthM: 3, heightM: 1.2, wheelbaseM: 0, frontWheelDiameterM: 0, rearWheelDiameterM: 0, workingWidthM: 3, hitchOffsetM: 0 },
+  plough: { lengthM: 4, widthM: 1.8, heightM: 1.6, wheelbaseM: 0, frontWheelDiameterM: 0, rearWheelDiameterM: 0, workingWidthM: 1.6, hitchOffsetM: 0 },
+  mounted_sprayer: { lengthM: 1.6, widthM: 2.5, heightM: 2, wheelbaseM: 0, frontWheelDiameterM: 0, rearWheelDiameterM: 0, workingWidthM: 12, hitchOffsetM: 0 },
+  fertilizer_spreader: { lengthM: 1.3, widthM: 2.3, heightM: 1.35, wheelbaseM: 0, frontWheelDiameterM: 0, rearWheelDiameterM: 0, workingWidthM: 24, hitchOffsetM: 0 },
+  disc_harrow: { lengthM: 4, widthM: 3.2, heightM: 1.2, wheelbaseM: 0, frontWheelDiameterM: 0, rearWheelDiameterM: 0.8, workingWidthM: 3.2, hitchOffsetM: 1.3 },
+  roller: { lengthM: 1.3, widthM: 3, heightM: 1, wheelbaseM: 0, frontWheelDiameterM: 0, rearWheelDiameterM: 0, workingWidthM: 3, hitchOffsetM: 0 },
   trailer: { lengthM: 6, widthM: 2.5, heightM: 2.4, wheelbaseM: 0, frontWheelDiameterM: 0, rearWheelDiameterM: 1.1, workingWidthM: 0, hitchOffsetM: 1.6 },
   box: { lengthM: 2, widthM: 2, heightM: 2, wheelbaseM: 0, frontWheelDiameterM: 0, rearWheelDiameterM: 0, workingWidthM: 0, hitchOffsetM: 0 },
 };
 const DEFAULT_COLORS: AvatarParams["colors"] = { body: "#7A8C80", cab: "#2B3A42", wheels: "#1E1E1E", accent: "#C9CDC9" };
 /** Tracteur : couleurs du dessin « tracteur bleu » du kit Ekylibre (carrosserie turquoise, vitres teintées, pneus bordeaux, jantes orangées). */
 const TRACTOR_COLORS: AvatarParams["colors"] = { body: "#3FBEE0", cab: "#5C2930", wheels: "#4F1F26", accent: "#E89E00" };
+
+/**
+ * Gabarit d'un outil d'après son nom ou son modèle : la reprise d'Ekylibre ne
+ * donne souvent que « trailed_equipment ». Proposition seulement : la fiche
+ * permet d'en choisir un autre. null si rien ne se reconnaît.
+ */
+export function templateFromName(text: string | null | undefined): AvatarTemplate | null {
+  if (!text) return null;
+  const t = text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+  const rules: [RegExp, AvatarTemplate][] = [
+    [/semoir|monosem|\bng ?\+|maxima|planter|precea|optima|seeder|\bdrill/, "sower"],
+    [/herse rot|rotative|\btigre\b|maschio|power harrow|\bhr ?\d/, "rotary_harrow"],
+    [/charrue|gregoire|besson|\brb ?\d|lemken|kverneland|plough|\bplow/, "plough"],
+    [/pulve|sprayer|\buf ?\d|tecnoma|berthoud|hardi/, "mounted_sprayer"],
+    [/engrais|epandeur|\bzav?\b|\bza-?[mvx]|bogballe|sulky|rauch|vicon/, "fertilizer_spreader"],
+    [/dechaumeur|disques|discover|cover.?crop|carrier|rubin|\bxs ?\d/, "disc_harrow"],
+    [/rouleau|croskill|cultipacker/, "roller"],
+    [/vibroculteur|cultivateur|chisel|scarificateur|herse a dents|canadien/, "mounted_tool"],
+  ];
+  return rules.find(([re]) => re.test(t))?.[1] ?? null;
+}
+
+/** Largeur de travail écrite dans le nom (« Lansaman 4.5m », « 3 m ») ; null sinon. */
+export function widthFromName(text: string | null | undefined): number | null {
+  const m = text?.match(/(\d+(?:[.,]\d+)?)\s?m\b/i);
+  const v = m ? Number(m[1]!.replace(",", ".")) : NaN;
+  return v >= 0.5 && v <= 60 ? v : null;
+}
 
 /** Gabarit déduit de la nature Ekylibre du matériel. */
 export function templateForKind(kind: string): AvatarTemplate {
@@ -102,9 +159,19 @@ export interface ResolvedAvatar {
 }
 
 /** Paramètres de l'avatar : saisie > fiche technique > défaut du gabarit. */
-export function resolveAvatar(input: { kind: string; technical?: unknown; brandColor?: string | null; saved?: AvatarInput | null; logoId?: string | null }): ResolvedAvatar {
+export function resolveAvatar(input: {
+  kind: string;
+  /** Nom et modèle du matériel : proposent un gabarit d'outil et une largeur de travail. */
+  name?: string | null;
+  technical?: unknown;
+  brandColor?: string | null;
+  saved?: AvatarInput | null;
+  logoId?: string | null;
+}): ResolvedAvatar {
   const saved = input.saved ?? {};
-  const template = saved.template ?? templateForKind(input.kind);
+  const byKind = templateForKind(input.kind);
+  const byName = byKind === "trailed_tool" || byKind === "trailed_sprayer" ? templateFromName(input.name) : null;
+  const template = saved.template ?? byName ?? byKind;
   const d = DEFAULTS[template];
   const t = input.technical;
   const fromTech: Partial<Record<keyof typeof d, number | null>> =
@@ -121,7 +188,12 @@ export function resolveAvatar(input: { kind: string; technical?: unknown; brandC
             rearWheelDiameterM: rear,
           };
         })()
-      : { lengthM: techMeters(t, "dimensions", "longueur"), widthM: techMeters(t, "dimensions", "largeur"), heightM: techMeters(t, "dimensions", "hauteur"), workingWidthM: techMeters(t, "dimensions", "largeur_travail") };
+      : {
+          lengthM: techMeters(t, "dimensions", "longueur"),
+          widthM: techMeters(t, "dimensions", "largeur") ?? widthFromName(input.name),
+          heightM: techMeters(t, "dimensions", "hauteur"),
+          workingWidthM: techMeters(t, "dimensions", "largeur_travail") ?? widthFromName(input.name),
+        };
   const provenance: Record<string, Provenance> = { template: saved.template ? "input" : "default" };
   const pick = <K extends keyof typeof d>(k: K): number => {
     const s = saved[k];

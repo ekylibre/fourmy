@@ -80,6 +80,7 @@ describe.skipIf(!url)("avatar 3D (intégration)", () => {
     });
     expect(done.status).toBe(200);
     const h = await (await app.request(`${base()}/tracks/hitches?equipment=${tractor}&from=2026-11-03T00:00:00.000Z&to=2026-11-04T00:00:00.000Z`, { headers })).json();
-    expect(h.items).toEqual([expect.objectContaining({ toolId: plough, toolName: "Charrue", from: periods[0]!.startedAt, hitchOffsetM: 1.5 })]);
+    // « Charrue » : gabarit de charrue portée proposé d'après le nom, accrochée au relevage (pas de timon).
+    expect(h.items).toEqual([expect.objectContaining({ toolId: plough, toolName: "Charrue", from: periods[0]!.startedAt, hitchOffsetM: 0 })]);
   });
 });
