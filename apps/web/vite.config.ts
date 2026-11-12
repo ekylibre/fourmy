@@ -20,5 +20,8 @@ export default defineConfig({
     setupFiles: ["./test/setup.ts"],
     css: false,
     include: ["test/**/*.test.{ts,tsx}"],
+    // Les machines de la CI sont plus lentes que les postes : les parcours de
+    // formulaire longs (plan de fumure, modulation, entretien) dépassaient 5 s.
+    testTimeout: 20_000,
   },
 });
