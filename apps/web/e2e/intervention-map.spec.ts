@@ -41,8 +41,12 @@ test("choisir les parcelles sur la carte et dessiner une zone partielle", async 
   // Zone partielle dans la plus grande parcelle (Parcelle 008, ~2 ha).
   await form.getByRole("button", { name: "Voir Parcelle 008 sur la carte" }).click();
   await form.getByRole("button", { name: "Zone partielle" }).click();
-  const cx = box.x + box.width / 2;
-  const cy = box.y + box.height / 2;
+  // Re-mesurer : cliquer « Voir… » sous la carte fait défiler la page, la
+  // carte n'est plus là où elle était au Maj + glisser.
+  await map.scrollIntoViewIfNeeded();
+  const zbox = (await map.boundingBox())!;
+  const cx = zbox.x + zbox.width / 2;
+  const cy = zbox.y + zbox.height / 2;
   for (const [dx, dy] of [[-30, -25], [30, -25], [30, 25], [-30, 25], [-30, -25]] as const) await page.mouse.click(cx + dx, cy + dy);
   const zone = form.getByText(/^zone .* sur .* ha$/);
   await expect(zone).toBeVisible();
