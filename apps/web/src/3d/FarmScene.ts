@@ -42,6 +42,7 @@ import {
   TimeIntervalCollection,
   VerticalOrigin,
   Viewer,
+  UrlTemplateImageryProvider,
   WebMapTileServiceImageryProvider,
   WebMercatorTilingScheme,
   sampleTerrain,
@@ -150,16 +151,23 @@ const COLORS = {
   transport: Color.fromCssColorString("#3B5A78"),
 };
 
-const IGN_ORTHO = new WebMapTileServiceImageryProvider({
-  url: "https://data.geopf.fr/wmts",
-  layer: "ORTHOIMAGERY.ORTHOPHOTOS",
-  style: "normal",
-  format: "image/jpeg",
-  tileMatrixSetID: "PM",
-  tilingScheme: new WebMercatorTilingScheme(),
-  maximumLevel: 19,
-  credit: "© IGN — Géoplateforme",
-});
+/**
+ * Orthophotos IGN : par le relais de l'API quand on lui donne son modèle
+ * d'URL (cache du serveur, « Ma ferme » F4 bis), sinon directement en WMTS.
+ */
+const ignOrtho = (template?: string) =>
+  template
+    ? new UrlTemplateImageryProvider({ url: template, tilingScheme: new WebMercatorTilingScheme(), maximumLevel: 19, credit: "© IGN — Géoplateforme" })
+    : new WebMapTileServiceImageryProvider({
+        url: "https://data.geopf.fr/wmts",
+        layer: "ORTHOIMAGERY.ORTHOPHOTOS",
+        style: "normal",
+        format: "image/jpeg",
+        tileMatrixSetID: "PM",
+        tilingScheme: new WebMercatorTilingScheme(),
+        maximumLevel: 19,
+        credit: "© IGN — Géoplateforme",
+      });
 
 const safeRing = (ring: Pt[]) => {
   if (ring.length < 3) throw new Error("anneau de moins de 3 sommets");
@@ -170,6 +178,8 @@ const safeRing = (ring: Pt[]) => {
 const ringPositions = (ring: Pt[]) => Cartesian3.fromDegreesArray(ring.flatMap((p) => [p[0], p[1]]));
 
 export interface FarmSceneOptions {
+  /** Modèle d'URL des orthophotos ({z}/{x}/{y}) ; sans lui, l'IGN directement. */
+  orthoTiles?: string;
   /** Charge une tuile de relief (authentifiée) : grille 65 × 65, et sa source. */
   loadTerrainTile: (level: number, x: number, y: number) => Promise<{ heights: Float32Array; source: string }>;
   onTankClick: (tankId: string | null) => void;
@@ -242,7 +252,7 @@ export class FarmScene {
       console.error("[vue 3D]", error);
       opts.onRenderError?.(error);
     });
-    this.ortho = this.viewer.imageryLayers.addImageryProvider(IGN_ORTHO);
+    this.ortho = this.viewer.imageryLayers.addImageryProvider(ignOrtho(opts.orthoTiles));
     this.defaultFog = this.viewer.scene.fog.density;
     this.viewer.scene.globe.depthTestAgainstTerrain = true; // clic sur le relief, cuves masquées par les collines
     this.viewer.clock.onTick.addEventListener((clock) => {

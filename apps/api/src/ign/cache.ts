@@ -4,6 +4,7 @@ import type { DomainCtx } from "@fourmy/domain";
 import { coveragePlan, estimateBytes, planTileCount, type PolygonRings, type TileKey } from "@fourmy/geo-ign";
 import {
   DEFAULT_FARM_IGN,
+  ignLayer,
   IGN_SERVER_CONFIRM_BYTES,
   type FarmIgnSettings,
   type IgnCacheJob,
@@ -29,7 +30,7 @@ export async function ignSettingsTx(tx: Tx): Promise<FarmIgnSettings> {
   const [s] = await rows<{ ign: Partial<FarmIgnSettings> }>(tx, sql`SELECT ign FROM farm_settings`);
   const merged = { ...DEFAULT_FARM_IGN, ...(s?.ign ?? {}) };
   // Une couche retirée du produit ne doit pas casser une ferme qui l'avait choisie.
-  const layers = merged.layers.filter((l): l is IgnLayer => l === "ortho" || l === "plan");
+  const layers = merged.layers.filter((l): l is IgnLayer => (ignLayer.options as string[]).includes(l));
   return { ...merged, layers: layers.length ? layers : DEFAULT_FARM_IGN.layers };
 }
 

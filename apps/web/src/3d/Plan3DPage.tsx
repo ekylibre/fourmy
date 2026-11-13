@@ -10,6 +10,7 @@ import { formatLiters } from "@fourmy/ui-lyvre";
 import { api, ApiError, farmPath } from "../app/api";
 import { useAt } from "../app/at";
 import { useFarm } from "../app/farm";
+import { ignTiles } from "../app/ign";
 import { formatDate } from "../app/labels";
 import { useSnapshot } from "../app/queries";
 import { ErrorAlert, Loading } from "../components/states";
@@ -89,6 +90,7 @@ export function Plan3DPage() {
     if (!container.current) return;
     let lastTick = 0;
     const s = new FarmScene(container.current, {
+      orthoTiles: ignTiles(farm.id, "ortho"),
       onRenderError: (e) => setRenderError(e ?? new Error("Erreur de rendu")),
       loadTerrainTile: async (level, x, y) => {
         const res = await fetch(`${location.origin}/api/v1${farmPath(farm.id, `/terrain/heightmap/${level}/${x}/${y}`)}`, {

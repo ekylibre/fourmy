@@ -1,11 +1,15 @@
 import { sql } from "drizzle-orm";
 import { withFarm, type Database } from "@fourmy/db";
 import { autoPlaceTanks, fromLocal, outerRing, pointInPolygon, ringCentroid, tankDimensions, toLocal, type DomainCtx, type Pt } from "@fourmy/domain";
-import { expand, fetchBuildings, Lru, type Bounds, type IgnBuilding } from "@fourmy/geo-ign";
+import { expand, IGN_LAYER_ZOOMS, intersects, Lru, tilesInBox, type Bounds, type IgnBuilding } from "@fourmy/geo-ign";
 import type { GeoJsonGeometry } from "@fourmy/contracts";
+import { db as appDb } from "../db.js";
+import { getTile } from "../ign/store.js";
 import { listContainersAt } from "./containers.js";
 import { listParcelsAt } from "./parcels.js";
 import { listPlacesAt } from "./places.js";
+
+const BUILDINGS_ZOOM = IGN_LAYER_ZOOMS.buildings.zone![0];
 
 /**
  * Plan 3D de la ferme à une date (ADR-8/10) : emprise, parcelles, bâtiments
@@ -37,12 +41,41 @@ export async function farmExtent(db: Database, farmId: string): Promise<Bounds |
   return bounds;
 }
 
-/** Bâtiments BD TOPO autour de la ferme, en cache 1 h (contexte et hauteurs). */
+/** Emprise d'une géométrie GeoJSON (tous niveaux d'imbrication). */
+function geometryBounds(coords: unknown, b: Bounds = { west: Infinity, south: Infinity, east: -Infinity, north: -Infinity }): Bounds {
+  if (Array.isArray(coords) && typeof coords[0] === "number") {
+    const [lon, lat] = coords as number[];
+    b.west = Math.min(b.west, lon!);
+    b.east = Math.max(b.east, lon!);
+    b.south = Math.min(b.south, lat!);
+    b.north = Math.max(b.north, lat!);
+  } else if (Array.isArray(coords)) for (const c of coords) geometryBounds(c, b);
+  return b;
+}
+
+/**
+ * Bâtiments BD TOPO autour de la ferme (contexte et hauteurs) : tuiles de
+ * zoom 14 lues dans le cache disque (préchargées par le worker), ou
+ * demandées à l'IGN ; puis gardées 1 h en mémoire par ferme.
+ */
 const ignBuildings = new Lru<string, { items: IgnBuilding[]; at: number }>(100);
 export async function ignBuildingsAround(farmId: string, bounds: Bounds, fetchImpl?: typeof fetch): Promise<IgnBuilding[]> {
   const cached = ignBuildings.get(farmId);
   if (cached && Date.now() - cached.at < 3_600_000) return cached.items;
-  const items = await fetchBuildings(expand(bounds, 300), fetchImpl);
+  const area = expand(bounds, 300);
+  const tiles = tilesInBox(area.west, area.south, area.east, area.north, BUILDINGS_ZOOM);
+  const byId = new Map<string, IgnBuilding>();
+  for (let i = 0; i < tiles.length; i += 4) {
+    const loaded = await Promise.all(
+      tiles.slice(i, i + 4).map(async (t) => {
+        const tile = await getTile(appDb(), "buildings", t.z, t.x, t.y, fetchImpl);
+        return tile ? (JSON.parse(tile.bytes.toString("utf8")) as IgnBuilding[]) : [];
+      }),
+    );
+    // Un bâtiment à cheval sur deux tuiles revient deux fois : dédoublonné.
+    for (const b of loaded.flat()) byId.set(b.id, b);
+  }
+  const items = [...byId.values()].filter((b) => intersects(geometryBounds(b.geometry.coordinates), area));
   ignBuildings.set(farmId, { items, at: Date.now() });
   return items;
 }

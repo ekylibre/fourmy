@@ -951,9 +951,8 @@ entier.
 
 ## 12 quinquies. Écarts du lot F4 (2026-11-13)
 
-- **Raster seulement : orthophotos et Plan IGN.** Le relief, les bâtiments
-  et l'hydrographie gardent leur chargement à la demande (cache mémoire) ;
-  leur passage par `IgnStore` est un lot à part (F4 bis). Le contrat
+- **Raster seulement : orthophotos et Plan IGN.** Le relief et les
+  bâtiments ont suivi en F4 bis (§12 sexies). Le contrat
   `ignLayer` ne liste donc que `ortho` et `plan` ; une couche inconnue lue
   dans `farm_settings.ign` est ignorée.
 - **Worker : 4 requêtes en parallèle** (et non 8), réglable par
@@ -977,6 +976,36 @@ entier.
   l'IGN directement.
 - **Déploiement** : le dossier `/var/cache/fourmy/ign` est créé dans l'image
   (propriétaire `node`) pour que le volume nommé en hérite.
+
+## 12 sexies. Lot F4 bis : relief et bâtiments (2026-11-13)
+
+- **Relief** : `terrain.ts` garde son cache mémoire, sa limite de 4 appels
+  et ses reprises, mais lit et écrit d'abord le disque (`elevation`, grilles
+  65 × 65 en float32 brut, schéma géographique de Cesium). Préchargement :
+  niveaux 10 à 14 sur la zone, 15 et 16 autour des parcelles (la 3D ne
+  demande rien de plus fin à l'IGN). Environ 7 Mo pour 10 km.
+- **Bâtiments** : une requête WFS par tuile Web Mercator de zoom 14, gardée
+  en GeoJSON sur le disque (`buildings`). `ignBuildingsAround` assemble les
+  tuiles de l'emprise et dédoublonne par `cleabs`, au lieu d'une seule
+  requête plafonnée à 500 bâtiments. Requêtes paginées (500 par page,
+  20 pages au plus : 10 000 bâtiments par tuile, assez hors centre-ville).
+  Mesuré le 2026-11-13 : 324 bâtiments en 0,8 s pour une tuile rurale ;
+  premier appel parfois au-delà de 30 s (serveur froid), rattrapé par les
+  reprises du worker.
+- **Hydrographie : rien à faire.** Elle est déjà gardée en base
+  (`water_syncs`) et rafraîchie tous les 30 jours par le worker. Elle n'est
+  pas une couche du préchargement.
+- **3D : orthophotos par le relais** (`UrlTemplateImageryProvider`), comme
+  les cartes. `ignTiles` et `ignSource` sont dans `app/ign.ts`, pour ne pas
+  charger MapLibre avec la 3D.
+- Le relais `/ign/tiles` ne sert que les fonds (`ortho`, `plan`) ; relief et
+  bâtiments passent par les routes de la 3D.
+- Couches par défaut : les quatre, y compris pour les fermes qui avaient
+  gardé le réglage par défaut du lot F4 (migration 0052).
+- `ensureTile` vérifie aussi la présence du fichier : un volume perdu ou
+  remplacé est reconstitué au préchargement suivant, sans vider `ign_tiles`.
+- Tests : chaque lancement de l'API a son propre dossier de cache
+  (`vitest.config.ts`), supprimé à la fin.
 
 ## 13. Décisions de conception à valider
 

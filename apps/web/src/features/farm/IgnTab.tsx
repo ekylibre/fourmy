@@ -102,7 +102,7 @@ function IgnSettingsForm({ state }: { state: IgnCacheState }) {
           </Group>
         )}
         <Text size="xs" c="dimmed">
-          Le relief, les bâtiments et les cours d'eau de la vue 3D restent chargés à la demande pour l'instant.
+          Les cours d'eau (zones non traitées) sont déjà gardés par Fourmy et mis à jour tous les 30 jours : ils ne font pas partie de ce téléchargement.
         </Text>
       </Stack>
     </Paper>

@@ -1,9 +1,12 @@
+import { tileBounds } from "./tiles.js";
+
 /**
- * Plan de préchargement des tuiles IGN (« Ma ferme », lot F4,
+ * Plan de préchargement des tuiles IGN (« Ma ferme », lots F4 et F4 bis,
  * claudedocs/conception_ma_ferme.md §4.3). Fonctions pures, sans réseau.
  *
- * Schéma XYZ en Web Mercator (grille PM du WMTS de l'IGN) : y compté depuis
- * le nord. À ne pas confondre avec le schéma géographique de Cesium (tiles.ts).
+ * Deux schémas, y compté depuis le nord dans les deux : XYZ en Web Mercator
+ * (grille PM du WMTS de l'IGN, bâtiments) et géographique de Cesium (relief,
+ * tiles.ts : niveau 0 = 2 × 1 tuiles de 180°).
  */
 
 export interface TileKey {
@@ -18,15 +21,23 @@ export interface LonLat {
 /** Anneaux [lon, lat] ; seul l'anneau extérieur compte (les trous sont couverts). */
 export type PolygonRings = number[][][];
 
-export type IgnRasterLayer = "ortho" | "plan";
+export type IgnCoverageLayer = "ortho" | "plan" | "elevation" | "buildings";
+export type TileScheme = "mercator" | "geographic";
 
-/** Niveaux préchargés par couche (décision 11) : la zone des sites, puis le détail autour des parcelles. */
-export const IGN_LAYER_ZOOMS: Record<IgnRasterLayer, { zone: [number, number]; detail: number[] }> = {
-  ortho: { zone: [8, 16], detail: [17, 18] },
-  plan: { zone: [8, 16], detail: [17] },
+/**
+ * Niveaux préchargés par couche (décision 11) : la zone des sites, puis le
+ * détail autour des parcelles. Relief : la 3D ne demande pas plus fin que 16
+ * à l'IGN (au-delà, interpolé). Bâtiments : une requête WFS par tuile de
+ * zoom 14 (environ 1,7 km de côté en France).
+ */
+export const IGN_LAYER_ZOOMS: Record<IgnCoverageLayer, { scheme: TileScheme; zone: [number, number] | null; detail: number[] }> = {
+  ortho: { scheme: "mercator", zone: [8, 16], detail: [17, 18] },
+  plan: { scheme: "mercator", zone: [8, 16], detail: [17] },
+  elevation: { scheme: "geographic", zone: [10, 14], detail: [15, 16] },
+  buildings: { scheme: "mercator", zone: [14, 14], detail: [] },
 };
-/** Taille moyenne retenue pour l'estimation, en octets. */
-export const IGN_TILE_BYTES: Record<IgnRasterLayer, number> = { ortho: 25_000, plan: 15_000 };
+/** Taille moyenne retenue pour l'estimation, en octets (relief : grille 65 × 65 en float32). */
+export const IGN_TILE_BYTES: Record<IgnCoverageLayer, number> = { ortho: 25_000, plan: 15_000, elevation: 16_900, buildings: 10_000 };
 
 const MAX_LAT = 85.05112878;
 const M_PER_DEG = 111_320;
@@ -52,6 +63,19 @@ export function validTile(z: number, x: number, y: number, maxZoom = 19): boolea
   return x >= 0 && x < n && y >= 0 && y < n;
 }
 
+/** Tuile du schéma géographique de Cesium qui contient un point. */
+export function lonLatToGeoTile(lon: number, lat: number, z: number): { x: number; y: number } {
+  const size = 180 / 2 ** z;
+  const x = Math.floor((lon + 180) / size);
+  const y = Math.floor((90 - lat) / size);
+  return { x: Math.min(2 ** (z + 1) - 1, Math.max(0, x)), y: Math.min(2 ** z - 1, Math.max(0, y)) };
+}
+
+const SCHEMES: Record<TileScheme, { tile: typeof lonLatToTile; bounds: typeof mercatorTileBounds }> = {
+  mercator: { tile: lonLatToTile, bounds: mercatorTileBounds },
+  geographic: { tile: lonLatToGeoTile, bounds: tileBounds },
+};
+
 /** Projection locale en mètres autour d'une origine (assez juste à l'échelle d'une ferme). */
 function localProjector(origin: LonLat) {
   const kx = M_PER_DEG * Math.cos((origin.lat * Math.PI) / 180);
@@ -59,9 +83,9 @@ function localProjector(origin: LonLat) {
 }
 
 /** Tuiles d'un niveau qui recouvrent une emprise en degrés. */
-function tilesInBox(west: number, south: number, east: number, north: number, z: number): TileKey[] {
-  const a = lonLatToTile(west, north, z);
-  const b = lonLatToTile(east, south, z);
+export function tilesInBox(west: number, south: number, east: number, north: number, z: number, scheme: TileScheme = "mercator"): TileKey[] {
+  const a = SCHEMES[scheme].tile(west, north, z);
+  const b = SCHEMES[scheme].tile(east, south, z);
   const out: TileKey[] = [];
   for (let x = a.x; x <= b.x; x++) for (let y = a.y; y <= b.y; y++) out.push({ z, x, y });
   return out;
@@ -74,11 +98,11 @@ function boxAround(c: LonLat, radiusM: number) {
 }
 
 /** Tuiles du niveau z qui touchent le cercle (centre, rayon). */
-export function tilesInCircle(center: LonLat, radiusM: number, z: number): TileKey[] {
+export function tilesInCircle(center: LonLat, radiusM: number, z: number, scheme: TileScheme = "mercator"): TileKey[] {
   const b = boxAround(center, radiusM);
   const project = localProjector(center);
-  return tilesInBox(b.west, b.south, b.east, b.north, z).filter((t) => {
-    const tb = mercatorTileBounds(t.z, t.x, t.y);
+  return tilesInBox(b.west, b.south, b.east, b.north, z, scheme).filter((t) => {
+    const tb = SCHEMES[scheme].bounds(t.z, t.x, t.y);
     const [x0, y0] = project(tb.west, tb.south);
     const [x1, y1] = project(tb.east, tb.north);
     const dx = Math.max(x0, 0, -x1);
@@ -132,7 +156,7 @@ function rectRingDistance(rect: [Pt, Pt], ring: Pt[]): number {
 }
 
 /** Tuiles du niveau z qui touchent les polygones élargis de `marginM`. */
-export function tilesNearPolygons(polygons: PolygonRings[], marginM: number, z: number): TileKey[] {
+export function tilesNearPolygons(polygons: PolygonRings[], marginM: number, z: number, scheme: TileScheme = "mercator"): TileKey[] {
   const seen = new Map<string, TileKey>();
   for (const poly of polygons) {
     const outer = poly[0];
@@ -149,10 +173,10 @@ export function tilesNearPolygons(polygons: PolygonRings[], marginM: number, z: 
     const ring = (outer as Pt[]).map(([lon, lat]) => project(lon, lat));
     const dLat = marginM / M_PER_DEG;
     const dLon = marginM / (M_PER_DEG * Math.cos((origin.lat * Math.PI) / 180));
-    for (const t of tilesInBox(west - dLon, south - dLat, east + dLon, north + dLat, z)) {
+    for (const t of tilesInBox(west - dLon, south - dLat, east + dLon, north + dLat, z, scheme)) {
       const key = `${t.x}/${t.y}`;
       if (seen.has(key)) continue;
-      const tb = mercatorTileBounds(t.z, t.x, t.y);
+      const tb = SCHEMES[scheme].bounds(t.z, t.x, t.y);
       if (rectRingDistance([project(tb.west, tb.south), project(tb.east, tb.north)], ring) <= marginM) seen.set(key, t);
     }
   }
@@ -162,44 +186,51 @@ export function tilesNearPolygons(polygons: PolygonRings[], marginM: number, z: 
 export interface CoverageInput {
   sites: { location: LonLat; radiusM: number }[];
   parcels: PolygonRings[];
-  layers: IgnRasterLayer[];
+  layers: IgnCoverageLayer[];
   detailMarginM: number;
 }
 
 /** Plan de préchargement : union sans doublon sur tous les sites, par couche. */
-export function coveragePlan(input: CoverageInput): Map<IgnRasterLayer, TileKey[]> {
-  const byZoom = new Map<number, TileKey[]>();
-  const zoneTiles = (z: number) => {
-    const seen = new Map<string, TileKey>();
-    for (const s of input.sites) for (const t of tilesInCircle(s.location, s.radiusM, z)) seen.set(`${t.x}/${t.y}`, t);
-    return [...seen.values()];
+export function coveragePlan(input: CoverageInput): Map<IgnCoverageLayer, TileKey[]> {
+  // Les tuiles d'un niveau ne dépendent que du schéma : calculées une fois pour toutes les couches.
+  const memo = new Map<string, TileKey[]>();
+  const cached = (key: string, compute: () => TileKey[]) => {
+    if (!memo.has(key)) memo.set(key, compute());
+    return memo.get(key)!;
   };
-  const detailTiles = (z: number) => tilesNearPolygons(input.parcels, input.detailMarginM, z);
-  const plan = new Map<IgnRasterLayer, TileKey[]>();
+  const zoneTiles = (z: number, scheme: TileScheme) =>
+    cached(`zone/${scheme}/${z}`, () => {
+      const seen = new Map<string, TileKey>();
+      for (const s of input.sites) for (const t of tilesInCircle(s.location, s.radiusM, z, scheme)) seen.set(`${t.x}/${t.y}`, t);
+      return [...seen.values()];
+    });
+  const detailTiles = (z: number, scheme: TileScheme, exclude: TileKey[]) =>
+    cached(`detail/${scheme}/${z}`, () => {
+      const inZone = new Set(exclude.map((t) => `${t.x}/${t.y}`));
+      return tilesNearPolygons(input.parcels, input.detailMarginM, z, scheme).filter((t) => !inZone.has(`${t.x}/${t.y}`));
+    });
+  const plan = new Map<IgnCoverageLayer, TileKey[]>();
   for (const layer of input.layers) {
-    const { zone, detail } = IGN_LAYER_ZOOMS[layer];
+    const { scheme, zone, detail } = IGN_LAYER_ZOOMS[layer];
     const tiles: TileKey[] = [];
-    for (let z = zone[0]; z <= zone[1]; z++) {
-      if (!byZoom.has(z)) byZoom.set(z, zoneTiles(z));
-      tiles.push(...byZoom.get(z)!);
-    }
+    if (zone) for (let z = zone[0]; z <= zone[1]; z++) tiles.push(...zoneTiles(z, scheme));
     for (const z of detail) {
-      const key = -z; // le détail d'un niveau ne dépend pas de la couche
-      if (!byZoom.has(key)) byZoom.set(key, detailTiles(z));
-      tiles.push(...byZoom.get(key)!);
+      // Un niveau à la fois dans la zone et dans le détail : pas de doublon.
+      const overlap = zone && z >= zone[0] && z <= zone[1] ? zoneTiles(z, scheme) : [];
+      tiles.push(...detailTiles(z, scheme, overlap));
     }
     plan.set(layer, tiles);
   }
   return plan;
 }
 
-export function planTileCount(plan: Map<IgnRasterLayer, TileKey[]>): number {
+export function planTileCount(plan: Map<IgnCoverageLayer, TileKey[]>): number {
   let n = 0;
   for (const tiles of plan.values()) n += tiles.length;
   return n;
 }
 
-export function estimateBytes(plan: Map<IgnRasterLayer, TileKey[]>): number {
+export function estimateBytes(plan: Map<IgnCoverageLayer, TileKey[]>): number {
   let bytes = 0;
   for (const [layer, tiles] of plan) bytes += tiles.length * IGN_TILE_BYTES[layer];
   return bytes;
