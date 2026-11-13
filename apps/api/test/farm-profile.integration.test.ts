@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import postgres from "postgres";
 import { createApp } from "../src/app.js";
+import { createDb } from "@fourmy/db";
 import { geocodeConfig, geocodeDeps, resetGeocode } from "../src/geocode.js";
+import { sprayingForecast } from "../src/repos/weather.js";
 import { addMember, setupFarm, teardown } from "./helpers.js";
 
 /**
@@ -138,6 +140,39 @@ describe.skipIf(!url)("Ma ferme (intégration)", () => {
     expect(hqDelete.status).toBe(409);
     expect((await app.request(`${base()}/farm/sites/${site.id}`, { method: "DELETE", headers: owner.headers })).status).toBe(204);
     expect((await get()).parcelsOutside).toBe(1);
+  });
+
+  it("enregistre les préférences d'affichage (F2), réservées au responsable", async () => {
+    expect((await get()).display).toEqual({ basemap: "ortho", areaUnit: "ha" });
+    expect((await send("PUT", "/settings/display", { basemap: "plan", areaUnit: "a" }, worker.headers)).status).toBe(403);
+    expect((await send("PUT", "/settings/display", { basemap: "satellite", areaUnit: "a" })).status).toBe(400);
+    const ok = await send("PUT", "/settings/display", { basemap: "plan", areaUnit: "a" });
+    expect(await ok.json()).toEqual({ basemap: "plan", areaUnit: "a" });
+    expect((await get(worker.headers)).display).toEqual({ basemap: "plan", areaUnit: "a" });
+  });
+
+  it("prend le siège comme point météo d'une ferme sans parcelle (E11)", async () => {
+    const empty = await setupFarm(sql, "Ferme sans parcelle");
+    const db = createDb(url);
+    const asked: string[] = [];
+    const fakeFetch = (async (input: string | URL) => {
+      const u = new URL(String(input));
+      asked.push(`${u.searchParams.get("latitude")},${u.searchParams.get("longitude")}`);
+      const from = new Date(`${u.searchParams.get("start_date")}T00:00:00Z`).getTime();
+      const to = new Date(`${u.searchParams.get("end_date")}T23:00:00Z`).getTime();
+      const time: string[] = [];
+      for (let t = from; t <= to; t += 3_600_000) time.push(new Date(t).toISOString().slice(0, 16));
+      const v = (x: number) => time.map(() => x);
+      return Response.json({ hourly: { time, temperature_2m: v(15), relative_humidity_2m: v(80), wind_speed_10m: v(5), wind_gusts_10m: v(10), precipitation: v(0) } });
+    }) as typeof fetch;
+    try {
+      expect(await sprayingForecast(db, empty.farmId, 1, fakeFetch)).toBeNull();
+      await sql`UPDATE farm_sites SET location = ST_SetSRID(ST_MakePoint(-0.5788, 44.8382), 4326), location_source = 'manual' WHERE farm_id = ${empty.farmId}`;
+      expect(await sprayingForecast(db, empty.farmId, 1, fakeFetch)).not.toBeNull();
+      expect(asked[0]).toMatch(/^44\.838\d*,-0\.578\d*$/);
+    } finally {
+      await teardown(sql, empty.farmId, [empty.userId]);
+    }
   });
 
   it("relaie le géocodage de l'IGN et le met en cache", async () => {

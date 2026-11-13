@@ -13,6 +13,7 @@ import {
 } from "@fourmy/weather";
 import { decryptSecret } from "../secrets.js";
 import { stationHours } from "./weather-stations.js";
+import { headquartersPoint } from "./farm-profile.js";
 
 /**
  * Météo des interventions (lot 3) côté serveur : les clés des fournisseurs
@@ -57,7 +58,8 @@ async function weatherPoint(tx: Tx, targets: InterventionTarget[] = [], at = new
   if (p?.lat == null || p.lon == null) {
     // Parcelles sans version à la date : leur dernière forme connue.
     if (ids.length) return weatherPoint(tx, [], at);
-    return null;
+    // Ferme sans parcelle : le siège, s'il est placé (E11).
+    return headquartersPoint(tx);
   }
   return { lat: p.lat, lon: p.lon };
 }
