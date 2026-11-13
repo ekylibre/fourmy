@@ -401,8 +401,11 @@ sa procédure.
 ### 6.1 Routes
 
 - `/f/:farm/team` : la grille.
+  **Depuis le 2026-11-13**, la grille est l'onglet Équipe de « Ma ferme »
+  (`/f/:farm/farm?tab=team`), ouvert à tous les membres ; `/team` y mène et
+  l'entrée de menu a disparu (`claudedocs/besoins_navigation_compte.md`).
 - `/f/:farm/team/:personId?tab=general|work` : la fiche. Elle remplace la
-  page actuelle (`TeamPage.tsx`).
+  page actuelle (`TeamPage.tsx`). Son lien de retour mène à l'onglet Équipe.
 - `/invitation/:token` : page publique, hors gabarit de ferme.
   - Elle montre la ferme et le prénom.
   - Sans compte : formulaire « choisir un mot de passe ».

@@ -33,8 +33,13 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | [`docs/materiels-entretien.md`](docs/materiels-entretien.md) · [`docs/materiels-entretien-design.md`](docs/materiels-entretien-design.md) | Matériels et entretien : exigences (et bilan de réalisation), design (et écarts à la réalisation) |
 | [`docs/equipe-personnes-design.md`](docs/equipe-personnes-design.md) | Équipe et personnes : fiche personne, données personnelles, rôle lecture seule, temps de travaux, invitations, import Ekylibre, synchro mobile |
 | [`docs/routage-osrm.md`](docs/routage-osrm.md) | Routage tracteur (OSRM auto-hébergé) : trajets du rejeu recalés sur la route |
+| [`docs/specifications-metier.md`](docs/specifications-metier.md) | Spécification métier : toutes les règles de gestion (RG-…), par domaine |
+| [`claudedocs/besoins_ma_ferme.md`](claudedocs/besoins_ma_ferme.md) · [`claudedocs/conception_ma_ferme.md`](claudedocs/conception_ma_ferme.md) | « Ma ferme » : fiche de l'exploitation, sites, cache IGN sur le serveur, copie hors ligne dans le navigateur |
+| [`claudedocs/besoins_itineraires_techniques.md`](claudedocs/besoins_itineraires_techniques.md) · [`claudedocs/conception_itineraires_techniques.md`](claudedocs/conception_itineraires_techniques.md) | Itinéraires techniques d'une parcelle et d'une activité (TIKA, fork `ekylibre/itineraire-technique` et reversement à OSFarm) |
+| [`claudedocs/besoins_navigation_compte.md`](claudedocs/besoins_navigation_compte.md) | Navigation : menu du compte, onglets Équipe et Préférences de « Ma ferme », version en pied de menu |
+| [`claudedocs/points_ouverts.md`](claudedocs/points_ouverts.md) | Points ouverts, par thème et priorité (alimente la roadmap GitHub) |
 
-## État du projet (2026-11-12)
+## État du projet (2026-11-13)
 
 | Étape | État |
 |---|---|
@@ -49,7 +54,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | Agent E — interface web | ✅ React + Mantine (charte Lyvre) : tableau de bord, carte IGN + traces, interventions, stocks, cuverie, registre, imports ; parcours e2e en CI |
 | Agent F — plan 3D | ✅ relief et photo IGN, bâtiments (hauteurs BD TOPO), cuverie placée et remplie selon la frise, rejeu 3D des traces, placement manuel des cuves |
 | Interventions et procédures simplifiées (étape 1) | ✅ 6 formes, catalogue, périodes, personnes, motifs, annulation, habitudes de la ferme ; migrateur et formulaire web |
-| Comptes better-auth (étape 2) | ✅ comptes locaux, sessions cookie + bearer (mobile), page Équipe (membres, personnes ↔ comptes) |
+| Comptes better-auth (étape 2) | ✅ comptes locaux, sessions cookie + bearer (mobile), équipe (membres, personnes ↔ comptes) |
 | Intégrations par ferme | ✅ module Intégrations (Traccar) : accès chiffrés par ferme, testés avant enregistrement, worker de synchro chaque minute |
 | Déploiement | ✅ Dokploy : dev.fourmy.org et fourmy.org en ligne depuis le 07/11 (image construite par la CI) ; sauvegardes de la base à mettre en place |
 | Site public fourmy.org | ✅ présentation, fonctionnalités illustrées, roadmap, nouveautés automatiques, contact ; page Fourmy d'ekylibre.com sur une branche |
@@ -61,19 +66,23 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | Télédétection, croissance, irrigation, 3D (lots Y à AC) | ✅ Sentinel-2 par ferme (NDVI, NDRE, NDMI), récoltes probables, végétation et météo du plan 3D, modèle de croissance, bilan hydrique et irrigations (`docs/teledetection.md`, `docs/modele-croissance.md`, `docs/jumeau-3d.md`) |
 | Modulation (lot AD) | ✅ cartes de modulation par zones, export ISO-XML et Shapefile, envoi agrirouter (non essayé sur un vrai compte ; `docs/modulation.md`) |
 | Fertilisation azotée (lots AE à AQ) | ✅ zonage nitrates, sols et analyses, plan prévisionnel de fumure (Nouvelle-Aquitaine), contrôles à la saisie, cahier d'enregistrement ; saisie des engrais en kg ou en litres (`docs/fertilisation.md`) |
-| Équipe et personnes (lots P1 à P5) | ✅ page Équipe en pavés et fiche personne (photo, coordonnées réservées, contrat, Certiphyto), rôle lecture seule, temps de travaux d'après les interventions, invitations par email ou lien, import Ekylibre des personnes, fiche et heures pour le mobile (`docs/equipe-personnes-design.md`) |
+| Équipe et personnes (lots P1 à P5) | ✅ équipe en pavés (onglet de « Ma ferme » depuis le 13/11) et fiche personne (photo, coordonnées réservées, contrat, Certiphyto), rôle lecture seule, temps de travaux d'après les interventions, invitations par email ou lien, import Ekylibre des personnes, fiche et heures pour le mobile (`docs/equipe-personnes-design.md`) |
 | Plan 3D et matériels (12/11) | ✅ vue pleine hauteur, couches en barre d'icônes, plein écran, barre de temps ; outil Traccar attelé au rejeu ; trajets recalés par OSRM ; types de matériel porteurs de l'avatar, largeur de rampe (`docs/jumeau-3d.md`, `docs/routage-osrm.md`, `docs/materiels.md`) |
+| « Ma ferme » (lots F1 à F5, 13/11) | ✅ fiche de l'exploitation (identité, certifications, logo, reprise Ekylibre), sites géocodés, réglages regroupés, cache IGN sur le serveur (fonds, relief, bâtiments) préchargé par le worker, copie hors ligne dans le navigateur (`claudedocs/conception_ma_ferme.md`) |
+| Itinéraires techniques (lots T0 à T3, 13/11) | ✅ frise TIKA d'une parcelle (campagne ou rotation) et d'une activité (vue fusionnée, groupes, descente sur une parcelle) ; fork TIKA `v1.3.0-ekylibre.3`, reversement à OSFarm à faire (`claudedocs/conception_itineraires_techniques.md`) |
+| Navigation et compte (13/11) | ✅ menu du compte en haut à droite (profil, ferme, mot de passe, déconnexion), équipe et préférences dans « Ma ferme », version en pied de menu (`claudedocs/besoins_navigation_compte.md`) |
 | Migration réelle et recette | ✅ trois fermes reprises (08/11) ; recettes des 11 et 12/11 sur la ferme pilote de grandes cultures (`claudedocs/plan_de_test_global.md`), spécification métier (`docs/specifications-metier.md`) |
 
 ### À reprendre
 
-La liste complète des points ouverts (94 au 12/11/2026, par thème et par
+La liste complète des points ouverts (108 au 13/11/2026, par thème et par
 priorité) est dans `claudedocs/points_ouverts.md` ; elle alimente la
 roadmap du projet GitHub [Fourmy — Roadmap](https://github.com/orgs/ekylibre/projects/2)
 (issues pour P1 et P2, brouillons pour P3). Avant l'envoi à la ferme pilote : sauvegardes,
-worker vérifié sur dev.fourmy.org, outils Traccar reliés, données de la
-ferme à compléter (SIRET, sols, 14-48 liquide dans Ekylibre, Arion 430) et
-accord écrit pour les captures et la vidéo.
+déploiement des lots du 12 et 13/11 et worker vérifié sur dev.fourmy.org,
+outils Traccar reliés, données de la ferme à compléter (SIRET, sols, 14-48
+liquide dans Ekylibre, Arion 430) et validation par la ferme pilote des
+phrases qui lui sont prêtées (l'accord écrit pour les captures est obtenu).
 
 ### Démarrage local
 
@@ -85,6 +94,19 @@ corepack pnpm build && corepack pnpm migrate
 corepack pnpm --filter @fourmy/api seed:dev  # compte dev@fourmy.local, owner de toutes les fermes + référentiel Lexicon
 corepack pnpm dev                              # API :3000, web :5173 (relaie /api)
 ```
+
+- **API qui ne démarre pas en `dev`** (constaté le 2026-11-13 sous Node 25 :
+  `Cannot find module '…/src/app.js'`, le mode `--experimental-strip-types`
+  ne relie pas les imports `.js` aux sources `.ts`) : lancer l'API compilée,
+  `corepack pnpm --filter @fourmy/api start`, après `corepack pnpm build`.
+  Une modification de l'API demande alors de reconstruire et de relancer.
+- **Worker** (`corepack pnpm --filter @fourmy/api worker`) : il traite le
+  préchargement IGN de « Ma ferme », les parcours et les synchros. Sans lui,
+  un téléchargement IGN reste en attente (la page le signale au bout de
+  3 minutes). Ne pas lancer les tests de l'API pendant qu'il tourne sur la
+  même base : il prend les tâches créées par les tests.
+- La version en pied de menu est servie en local par Vite (`/version.json`,
+  calculée depuis l'historique Git).
 
 Le **référentiel Lexicon** (productions de référence et images des activités,
 E-Phy, taxonomie) est copié dans la base : par le worker en production
