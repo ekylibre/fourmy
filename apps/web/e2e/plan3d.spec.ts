@@ -29,21 +29,27 @@ test("plan 3D : cuverie placée, remplissage qui suit la frise", async ({ page }
   await tanks.click();
   await expect(page.getByText("5 cuve(s) placée(s) · 1 non localisée(s)")).toBeVisible({ timeout: 30_000 });
   const cuve1 = page.getByRole("button", { name: "Cuve 1", exact: true }).locator("xpath=../..");
+  // Rouvrir la cuverie après un changement de date. Selon le moment, le
+  // panneau s'est refermé ou non : un simple clic pouvait le fermer au lieu
+  // de l'ouvrir. On ne clique que s'il est fermé, et on réessaie.
+  const inTanks = (check: () => Promise<void>) =>
+    expect(async () => {
+      if ((await tanks.getAttribute("aria-expanded")) !== "true") await tanks.click();
+      await check();
+    }).toPass({ timeout: 30_000 });
   await expect(cuve1).toContainText("60 %");
 
   // Un an plus tôt : la Cuve 1 n'a pas encore reçu de vendange.
-  // (La frise est hors de la fenêtre : elle se ferme, on la rouvre.)
   await page.getByLabel("Date de la frise").fill("2020-12-31");
   // Changer la date fait recalculer la scène Cesium (rendu logiciel en CI, lent) :
   // même délai que pour l'ouverture.
   await expect(page.getByRole("heading", { name: "Plan 3D au 31/12/2020" })).toBeVisible({ timeout: 30_000 });
-  await tanks.click();
-  await expect(cuve1).toContainText("0 %", { timeout: 30_000 });
+  await inTanks(() => expect(cuve1).toContainText("0 %", { timeout: 2_000 }));
 
   // Clic sur une cuve dans le panneau : son contenu s'affiche.
   await page.getByLabel("Date de la frise").fill("2021-12-31");
   await expect(page.getByRole("heading", { name: "Plan 3D au 31/12/2021" })).toBeVisible({ timeout: 30_000 });
-  await tanks.click();
+  await inTanks(() => expect(page.getByRole("button", { name: "Cuve 1", exact: true })).toBeVisible({ timeout: 2_000 }));
   await page.getByRole("button", { name: "Cuve 1", exact: true }).click();
   await expect(page.getByText("30 hL", { exact: true })).toBeVisible({ timeout: 30_000 });
   // Échap ferme la fenêtre : la cuverie disparaît, la barre de rejeu reste.
