@@ -6,22 +6,26 @@ import { ErrorAlert, Loading } from "../../components/states";
 import { IdentityTab } from "./IdentityTab";
 import { SitesTab } from "./SitesTab";
 import { IgnTab } from "./IgnTab";
-import { BrandsTab, DisplaySettings, MaintenanceTab, TracksTab } from "./SettingsTabs";
+import { DisplaySettings, PreferencesTab, type PreferenceSection } from "./SettingsTabs";
+import { TeamPage } from "../team/TeamPage";
 
 /**
  * « Ma ferme » (lot F1) : fiche de l'exploitation, `?tab=` pour ouvrir un
  * onglet précis (E22). Tous les membres la consultent, le responsable la
- * modifie (E3).
+ * modifie (E3). Onglets Équipe et Préférences : claudedocs/besoins_navigation_compte.md.
  */
-const TABS = ["identity", "sites", "ign", "maintenance", "tracks", "brands"] as const;
+const TABS = ["identity", "team", "sites", "ign", "preferences"] as const;
 type Tab = (typeof TABS)[number];
+/** Anciens onglets, devenus des sections de Préférences : les liens existants restent valables. */
+const LEGACY_SECTIONS: Record<string, PreferenceSection> = { maintenance: "maintenance", tracks: "tracks", brands: "brands" };
 
 export function FarmProfilePage() {
   const farm = useFarm();
   const profile = useFarmProfile(farm.id);
   const [params, setParams] = useSearchParams();
-  const raw = params.get("tab");
-  const tab: Tab = TABS.includes(raw as Tab) ? (raw as Tab) : "identity";
+  const raw = params.get("tab") ?? "";
+  const section = LEGACY_SECTIONS[raw] ?? null;
+  const tab: Tab = section ? "preferences" : TABS.includes(raw as Tab) ? (raw as Tab) : "identity";
 
   if (profile.isLoading) return <Loading />;
   if (profile.error) return <ErrorAlert error={profile.error} />;
@@ -52,12 +56,12 @@ export function FarmProfilePage() {
       >
         <Tabs.List mb="md">
           <Tabs.Tab value="identity">Identité</Tabs.Tab>
+          <Tabs.Tab value="team">Équipe</Tabs.Tab>
           <Tabs.Tab value="sites">Sites et cartes</Tabs.Tab>
           <Tabs.Tab value="ign">Données IGN</Tabs.Tab>
-          {p.canEdit && <Tabs.Tab value="maintenance">Entretien</Tabs.Tab>}
-          {p.canEdit && <Tabs.Tab value="tracks">Parcours</Tabs.Tab>}
-          <Tabs.Tab value="brands">Marques</Tabs.Tab>
+          <Tabs.Tab value="preferences">Préférences</Tabs.Tab>
         </Tabs.List>
+        <Tabs.Panel value="team">{tab === "team" && <TeamPage embedded />}</Tabs.Panel>
         <Tabs.Panel value="ign">{tab === "ign" && <IgnTab />}</Tabs.Panel>
         <Tabs.Panel value="identity">
           <IdentityTab key={JSON.stringify(p.identity)} profile={p} />
@@ -68,19 +72,7 @@ export function FarmProfilePage() {
             <SitesTab profile={p} />
           </Stack>
         </Tabs.Panel>
-        {p.canEdit && (
-          <Tabs.Panel value="maintenance">
-            <MaintenanceTab />
-          </Tabs.Panel>
-        )}
-        {p.canEdit && (
-          <Tabs.Panel value="tracks">
-            <TracksTab />
-          </Tabs.Panel>
-        )}
-        <Tabs.Panel value="brands">
-          <BrandsTab canEdit={p.canEdit} />
-        </Tabs.Panel>
+        <Tabs.Panel value="preferences">{tab === "preferences" && <PreferencesTab canEdit={p.canEdit} section={section} />}</Tabs.Panel>
       </Tabs>
     </Stack>
   );

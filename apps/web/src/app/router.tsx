@@ -27,7 +27,6 @@ import { LoginPage } from "../features/login/LoginPage";
 import { InvitationPage } from "../features/invitation/InvitationPage";
 import { RegisterPage } from "../features/register/RegisterPage";
 import { StockPage } from "../features/stock/StockPage";
-import { TeamPage } from "../features/team/TeamPage";
 import { PersonSheetPage } from "../features/team/PersonSheetPage";
 import { IntegrationsPage } from "../features/integrations/IntegrationsPage";
 import { AgrirouterCallbackPage } from "../features/integrations/AgrirouterCallbackPage";
@@ -115,6 +114,14 @@ function LegacyRedirect() {
 
 const legacy = (path: string) => ({ path, element: <LegacyRedirect /> });
 
+/** /team → onglet Équipe de « Ma ferme », en gardant la date (?at=). */
+function TeamRedirect() {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  params.set("tab", "team");
+  return <Navigate to={`${location.pathname.replace(/\/team\/?$/, "/farm")}?${params}`} replace />;
+}
+
 export const routes = [
   { path: "/", element: <Navigate to="/farms" replace /> },
   { path: "/login", element: <LoginPage /> },
@@ -176,7 +183,8 @@ export const routes = [
       { path: "land-parcels/:parcelId", element: <Suspense fallback={<Loading />}><ParcelSheetPage /></Suspense> },
       { path: "imports", element: <ImportsPage /> },
       { path: "farm", element: <FarmProfilePage /> },
-      { path: "team", element: <TeamPage /> },
+      // L'équipe est un onglet de « Ma ferme » (besoins_navigation_compte.md) : l'ancienne adresse y mène.
+      { path: "team", element: <TeamRedirect /> },
       { path: "team/:personId", element: <PersonSheetPage /> },
       { path: "integrations", element: <IntegrationsPage /> },
       { path: "prescriptions", element: <PrescriptionsPage /> },

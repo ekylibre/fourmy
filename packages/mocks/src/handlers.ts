@@ -177,6 +177,8 @@ export const handlers = [
     return HttpResponse.json(demoParcelSeries(String(params.id), q.get("from") ?? "2025-06-02", q.get("to") ?? "2026-06-01", demoIndexParam(q)));
   }),
   http.get("*/health", () => HttpResponse.json({ status: "ok", service: "mock" })),
+  // Version du pied de menu (servie par le site en production, par Vite en local).
+  http.get("*/version.json", () => HttpResponse.json({ version: "0.112.1", date: "2026-11-13T18:00:00+01:00" })),
   http.get("*/api/v1/me/farms", () => HttpResponse.json({ userId: "mock", items: demoMyFarms })),
   http.get(`*${base}/snapshot`, () => HttpResponse.json(demoSnapshot)),
   http.get(`*${base}/land-parcels/names`, () => HttpResponse.json({ items: demoLandParcelsAt.map((p) => ({ id: p.id, name: p.name })) })),

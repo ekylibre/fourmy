@@ -63,6 +63,7 @@ export function PersonSheetPage() {
   const tab = params.get("tab") === "work" ? "work" : "general";
   const back = new URLSearchParams(location.search);
   back.delete("tab");
+  back.set("tab", "team");
 
   const photo = useMutation({
     mutationFn: async (file: File | null) => putPhoto(farm.id, personId, file ? await squarePhoto(file) : null),
@@ -88,7 +89,7 @@ export function PersonSheetPage() {
     <Stack>
       <Button
         component={Link}
-        to={`/f/${farm.id}/team${back.size ? `?${back}` : ""}`}
+        to={`/f/${farm.id}/farm?${back}`}
         variant="subtle"
         size="compact-sm"
         leftSection={<ArrowLeft size={14} />}

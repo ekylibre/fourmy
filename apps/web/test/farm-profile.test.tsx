@@ -143,7 +143,9 @@ describe("Ma ferme", () => {
     const user = userEvent.setup();
     renderApp(`/f/${FARM}/maintenance`);
     await user.click(await screen.findByRole("link", { name: "seuils et alertes d'entretien" }, { timeout: 10_000 }));
-    expect(await screen.findByRole("tab", { name: "Entretien", selected: true })).toBeInTheDocument();
+    // L'ancien onglet Entretien est une section de Préférences.
+    expect(await screen.findByRole("tab", { name: "Préférences", selected: true })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Entretien" })).toBeInTheDocument();
     expect(await screen.findByLabelText("« Bientôt » : heures avant l'échéance")).toBeInTheDocument();
   });
 
