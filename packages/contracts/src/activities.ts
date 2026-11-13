@@ -36,6 +36,8 @@ export const ACTIVITY_FAMILY_LABELS: Record<ActivityFamily, string> = {
 
 /** Familles dont les activités portent des productions sur des parcelles. */
 export const PARCEL_FAMILIES: ActivityFamily[] = ["plant_farming", "vine_farming", "animal_farming", "plant_nursery"];
+/** Familles végétales : celles qui ont un itinéraire technique (élevage exclu). */
+export const PLANT_FAMILIES: ActivityFamily[] = ["plant_farming", "vine_farming", "plant_nursery"];
 
 const color = z.string().regex(/^#[0-9a-fA-F]{6}$/, "couleur #RRGGBB attendue");
 

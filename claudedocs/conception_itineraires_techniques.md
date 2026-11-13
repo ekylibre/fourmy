@@ -394,7 +394,7 @@ Ordre : C7 et C2 (le cœur du DOM), puis C3, C4, C1, C5, C6, C8 et C9. Chaque
 | **T0. Fork TIKA** ✓ | fork `ekylibre/itineraire-technique`, C1 à C9 dans le fork, étiquette `v1.3.0-ekylibre.1` (§12 ter) | — |
 | **T1. Modèle et API** | `domain/itinerary.ts`, contrats, `repos/itinerary.ts`, deux routes, index des cibles, tests | — (en parallèle de T0) |
 | **T2. Fiche parcelle** ✓ | `toTikaSystem`, `TikaChart`, onglet, campagne et rotation, frise et cercle, clic vers la fiche (§12 quater) | T1, première étiquette du fork (C1 à C5, C7) |
-| **T3. Activité** | lien depuis Activités, page fusionnée, liste des parcelles, descente | T2 |
+| **T3. Activité** ✓ | lien depuis Activités, page fusionnée, liste des parcelles, descente (§12 quinquies) | T2 |
 | **T4. Reversement** | demandes de fusion restantes chez OSFarm ; retour au paquet npm d'OSFarm une fois tout publié | T0 |
 
 ## 12 bis. Écarts du lot T1 (2026-11-13)
@@ -484,6 +484,24 @@ Vérifié : installation depuis l'étiquette, import par le nom du paquet
 - **Marque regroupée** (vue fusionnée) : `ItineraryView` délègue à l'écran
   (`onGroup`) ; la vue parcelle n'en a pas, une marque y est toujours une
   intervention.
+
+## 12 quinquies. Écarts du lot T3 (2026-11-13)
+
+- **Clic sur une marque regroupée** : une fenêtre liste ses interventions
+  (date, libellé, statut, parcelles), chacune vers sa fiche, et propose de
+  descendre sur l'une de ses parcelles. Pour cela, une marque regroupée
+  porte ses **membres** (`ItineraryMark.members`, calculés par
+  `groupMarks`) : sans eux, le web n'aurait que des identifiants.
+- **Familles végétales** (`PLANT_FAMILIES`) déplacées dans les contrats :
+  l'API (404 hors végétal) et la page Activités (lien « Itinéraire »)
+  partagent la même liste.
+- **Lien « Itinéraire »** visible par tout membre (lecture), à côté des
+  boutons réservés au responsable.
+- **Descente sur une parcelle** dans la même page (liste des parcelles à
+  gauche, ou bouton du groupe), avec retour à la vue fusionnée ; la
+  campagne reste celle de la frise de l'application.
+- **Parcelles sans intervention** : avertissement au-dessus de la frise,
+  avec leurs noms ; leur nombre d'interventions (0) apparaît dans la liste.
 
 ## 13. Décisions de conception
 

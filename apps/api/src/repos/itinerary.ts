@@ -3,7 +3,7 @@ import { withFarm, type Database, type Tx } from "@fourmy/db";
 import {
   ACTIVITY_FAMILY_LABELS,
   getProcedure,
-  PARCEL_FAMILIES,
+  PLANT_FAMILIES,
   TREATMENT_PURPOSE_LABELS,
   unitLabel,
   type ActivityFamily,
@@ -25,8 +25,6 @@ import { readInterventionsWhere } from "./interventions.js";
 
 const rows = async <T>(tx: Tx, q: SQL) => (await tx.execute(q)) as unknown as T[];
 const pgArray = (values: string[]) => `{${values.join(",")}}`;
-/** Familles végétales : celles qui portent des parcelles, sauf l'élevage. */
-export const PLANT_FAMILIES: ActivityFamily[] = PARCEL_FAMILIES.filter((f) => f !== "animal_farming");
 
 /** Fenêtres des campagnes (table `campaigns`, sinon l'année civile), en jours. */
 async function windows(tx: Tx, years: number[]): Promise<CampaignWindow[]> {

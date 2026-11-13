@@ -51,3 +51,44 @@ test("itinéraire technique d'une parcelle : frise, liste, clic vers la fiche", 
   await expect(chart.locator(".transcript:visible .rotation_item")).toHaveCount(3, { timeout: 30_000 });
   expect(errors).toEqual([]);
 });
+
+test("itinéraire d'une activité : vue fusionnée, groupe, descente sur une parcelle", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await login(page);
+  await page.getByRole("link", { name: /Ferme pilote — viticulture/ }).click();
+  await expect(page.getByRole("heading", { name: "Aujourd'hui" })).toBeVisible();
+  const farmId = new URL(page.url()).pathname.split("/")[2]!;
+
+  // Depuis la page Activités, la campagne 2023.
+  await page.goto(`/f/${farmId}/activities?at=2023-06-10`);
+  const vigne = page.getByRole("region", { name: "Activité Vigne" }).or(page.locator('[aria-label="Activité Vigne"]'));
+  await vigne.getByRole("link", { name: "Itinéraire" }).click();
+  await expect(page.getByRole("heading", { name: /Itinéraire technique — Vigne 2023/ })).toBeVisible();
+  const parcels = page.getByRole("table", { name: "Parcelles de l'activité" });
+  await expect(parcels.locator("tr").first()).toBeVisible();
+
+  // Frise fusionnée : une intervention regroupée de la liste ouvre la liste de ses interventions.
+  const chart = page.getByTestId("tika-chart");
+  await expect(chart.locator("canvas").first()).toBeVisible({ timeout: 30_000 });
+  const step = chart.locator(".transcript .rotation_item:visible").first();
+  await step.click();
+  await step.locator(".intervention", { hasText: /\d+ parcelles/ }).first().click();
+  const dialog = page.getByRole("dialog", { name: /\d+ interventions regroupées/ });
+  await expect(dialog).toBeVisible();
+  if (process.env.SHOT_GROUP) await page.screenshot({ path: process.env.SHOT_GROUP });
+  const links = dialog.getByRole("link");
+  expect(await links.count()).toBeGreaterThan(1);
+
+  // Descente sur une parcelle du groupe, puis retour.
+  const first = dialog.getByRole("button").filter({ hasText: /^Parcelle/ }).first();
+  const name = (await first.textContent())!;
+  await first.click();
+  await expect(page.getByText(`Parcelle sélectionnée : ${name}`, { exact: true })).toBeVisible();
+  if (process.env.SHOT_ACTIVITY) await page.screenshot({ path: process.env.SHOT_ACTIVITY });
+  await expect(chart.locator(".transcript .rotation_item:visible").first()).toContainText("Vigne");
+  await page.getByRole("button", { name: "Retour à la vue de l'activité" }).click();
+  await expect(page.getByText(`Parcelle sélectionnée : ${name}`, { exact: true })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

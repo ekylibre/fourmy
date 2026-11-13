@@ -1,4 +1,4 @@
-import { ITINERARY_LANE_LABELS, type ItineraryDetail, type ItineraryMark, type ItineraryStep, type TechnicalItinerary } from "@fourmy/contracts";
+import { ITINERARY_LANE_LABELS, type ItineraryDetail, type ItineraryMember, type ItineraryMark, type ItineraryStep, type TechnicalItinerary } from "@fourmy/contracts";
 
 /**
  * Conversion d'un itinéraire de Fourmy au format JSON de TIKA
@@ -23,6 +23,8 @@ export type TikaInterventionJson = {
 export type TikaRef = {
   interventionIds: string[];
   parcels: { id: string; name: string }[];
+  /** Groupe de la vue fusionnée : ses interventions. */
+  members?: ItineraryMember[];
 };
 
 export type TikaStepJson = {
@@ -72,7 +74,7 @@ function toIntervention(m: ItineraryMark): TikaInterventionJson {
     type: m.lane === "works" ? "intervention_top" : "intervention_bottom",
     description: lines(m.details),
     status: m.status,
-    ref: { interventionIds: m.interventionIds, parcels: m.parcels },
+    ref: { interventionIds: m.interventionIds, parcels: m.parcels, ...(m.members ? { members: m.members } : {}) },
   };
 }
 

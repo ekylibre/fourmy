@@ -5,8 +5,8 @@ import { Alert, Badge, Button, ColorInput, Group, Modal, MultiSelect, Paper, Sel
 import { useDebouncedValue } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Map as MapIcon, Pencil, Plus } from "lucide-react";
-import { ACTIVITY_FAMILIES, ACTIVITY_FAMILY_LABELS, PARCEL_FAMILIES, type Activity, type ActivityFamily, type ReferenceProduction } from "@fourmy/contracts";
+import { ChartGantt, Map as MapIcon, Pencil, Plus } from "lucide-react";
+import { ACTIVITY_FAMILIES, ACTIVITY_FAMILY_LABELS, PARCEL_FAMILIES, PLANT_FAMILIES, type Activity, type ActivityFamily, type ReferenceProduction } from "@fourmy/contracts";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
@@ -94,14 +94,28 @@ export function ActivitiesPage() {
                       <CertificationRecap parcelIds={a.parcelIds} year={year} />
                     </Stack>
                   </Group>
-                  {owner && (
+                  {(owner || PLANT_FAMILIES.includes(a.family)) && (
                     <Group gap="xs" mt="sm">
-                      <Button size="compact-sm" variant="light" leftSection={<Pencil size={14} />} onClick={() => setEditing(a)}>
-                        Modifier
-                      </Button>
-                      {PARCEL_FAMILIES.includes(a.family) && (
+                      {owner && (
+                        <Button size="compact-sm" variant="light" leftSection={<Pencil size={14} />} onClick={() => setEditing(a)}>
+                          Modifier
+                        </Button>
+                      )}
+                      {owner && PARCEL_FAMILIES.includes(a.family) && (
                         <Button size="compact-sm" variant="subtle" leftSection={<MapIcon size={14} />} onClick={() => setParcelsOf(a)}>
                           Parcelles {year}
+                        </Button>
+                      )}
+                      {/* Itinéraire technique (lot T3) : tout membre, activités végétales. */}
+                      {PLANT_FAMILIES.includes(a.family) && (
+                        <Button
+                          size="compact-sm"
+                          variant="subtle"
+                          leftSection={<ChartGantt size={14} />}
+                          component={Link}
+                          to={`/f/${farm.id}/activities/${a.id}/itinerary?at=${day}`}
+                        >
+                          Itinéraire
                         </Button>
                       )}
                     </Group>

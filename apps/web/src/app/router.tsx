@@ -39,6 +39,8 @@ import { UNAUTHORIZED_EVENT, useSession } from "./session";
 const MapPage = lazy(() => import("../features/map/MapPage").then((m) => ({ default: m.MapPage })));
 // Cesium (plusieurs Mo) : le plan 3D n'est chargé que s'il est ouvert.
 const InterventionPage = lazy(() => import("../features/interventions/InterventionPage").then((m) => ({ default: m.InterventionPage })));
+// Itinéraire technique d'une activité (TIKA et ECharts) : chargé à la demande.
+const ActivityItineraryPage = lazy(() => import("../features/itinerary/ActivityItineraryPage").then((m) => ({ default: m.ActivityItineraryPage })));
 const CartoLabPage = lazy(() => import("../carto/CartoLabPage").then((m) => ({ default: m.CartoLabPage })));
 const PrintPage = lazy(() => import("../features/fertilization/PrintPage").then((m) => ({ default: m.PrintPage })));
 const PlanPage = lazy(() => import("../features/fertilization/PlanPage").then((m) => ({ default: m.PlanPage })));
@@ -164,6 +166,7 @@ export const routes = [
       { path: "fertilization", element: <FertilizationPage /> },
       { path: "fertilization/plans/:planId", element: <Suspense fallback={<Loading />}><PlanPage /></Suspense> },
       { path: "activities", element: <ActivitiesPage /> },
+      { path: "activities/:activityId/itinerary", element: <Suspense fallback={<Loading />}><ActivityItineraryPage /></Suspense> },
       { path: "equipments", element: <EquipmentsPage /> },
       { path: "equipments/crew-templates", element: <CrewTemplatesPage /> },
       { path: "equipments/:equipmentId", element: <EquipmentSheetPage /> },

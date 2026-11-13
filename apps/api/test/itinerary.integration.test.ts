@@ -117,6 +117,9 @@ describe.skipIf(!url)("itinéraires techniques (intégration, ferme pilote)", ()
     for (const m of grouped) {
       expect(m.label).toMatch(/\d+ parcelles?$/);
       expect(m.from <= m.at && m.at <= m.to).toBe(true);
+      // Chaque intervention du groupe, pour l'ouvrir depuis la vue fusionnée.
+      expect(m.members!.map((x) => x.interventionId)).toEqual(m.interventionIds);
+      expect(m.members!.every((x) => x.parcels.length > 0)).toBe(true);
     }
     // Chaque intervention n'apparaît qu'une fois.
     const ids = marks.flatMap((m) => m.interventionIds);
