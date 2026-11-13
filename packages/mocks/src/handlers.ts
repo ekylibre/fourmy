@@ -55,6 +55,36 @@ const demoSession = () => ({
   user: demoUser,
 });
 
+export const DEMO_HQ_ID = "00000000-0000-7000-8000-00000000f001";
+const DEMO_GEOCODE = {
+  label: "1 Place Pey Berland 33000 Bordeaux",
+  line1: "1 Place Pey Berland",
+  postalCode: "33000",
+  city: "Bordeaux",
+  inseeCode: "33063",
+  location: { lat: 44.838168, lon: -0.578803 },
+  score: 0.977,
+  type: "housenumber",
+};
+const demoFarmProfile = () => ({
+  identity: { name: "Ferme de démonstration", legalName: null, legalForm: null, siret: null, vatNumber: null, nafCode: null, pacage: null, cvi: null, ede: null, phone: null, email: null, legalRep: null },
+  certifications: [],
+  sites: [
+    {
+      id: DEMO_HQ_ID,
+      name: "Siège",
+      isHeadquarters: true,
+      address: { line1: null, line2: null, postalCode: null, city: null, inseeCode: null },
+      location: null,
+      locationSource: null,
+      geocode: null,
+      radiusM: 10000,
+    },
+  ],
+  parcelsOutside: null,
+  canEdit: true,
+});
+
 export const handlers = [
   http.get("*/api/auth/get-session", () => HttpResponse.json(signedIn ? demoSession() : null)),
   http.post("*/api/auth/sign-in/email", async ({ request }) => {
@@ -75,6 +105,20 @@ export const handlers = [
     return HttpResponse.json({ enabled: false, from: u.searchParams.get("from"), to: u.searchParams.get("to"), items: [] });
   }),
   http.get(`*${base}/integrations`, () => HttpResponse.json({ providers: INTEGRATION_PROVIDERS, items: [] })),
+  // « Ma ferme » (lot F1) : siège sans point, aucune certification ; les écritures renvoient ce qu'elles reçoivent.
+  http.get(`*${base}/farm`, () => HttpResponse.json(demoFarmProfile())),
+  http.put(`*${base}/farm/identity`, async ({ request }) => HttpResponse.json(await request.json())),
+  http.post(`*${base}/farm/certifications`, async ({ request }) => HttpResponse.json({ id: crypto.randomUUID(), ...((await request.json()) as object) }, { status: 201 })),
+  http.put(`*${base}/farm/certifications/:id`, async ({ request, params }) => HttpResponse.json({ id: params.id, ...((await request.json()) as object) })),
+  http.delete(`*${base}/farm/certifications/:id`, () => new HttpResponse(null, { status: 204 })),
+  http.post(`*${base}/farm/sites`, async ({ request }) => HttpResponse.json({ id: crypto.randomUUID(), isHeadquarters: false, ...((await request.json()) as object) }, { status: 201 })),
+  http.put(`*${base}/farm/sites/:id`, async ({ request, params }) => HttpResponse.json({ id: params.id, isHeadquarters: params.id === DEMO_HQ_ID, ...((await request.json()) as object) })),
+  http.delete(`*${base}/farm/sites/:id`, () => new HttpResponse(null, { status: 204 })),
+  http.get(`*${base}/geocode`, ({ request }) => {
+    const q = new URL(request.url).searchParams.get("q") ?? "";
+    return HttpResponse.json(q.trim().length < 3 ? [] : [DEMO_GEOCODE]);
+  }),
+  http.get(`*${base}/geocode/reverse`, () => HttpResponse.json(DEMO_GEOCODE)),
   // Fertilisants (lot AE) : aucun dans la démo.
   http.get(`*${base}/fertilizers`, () => HttpResponse.json({ items: [] })),
   // Fertilisation azotée (lots AF, AI) : paramètres par défaut, aucun justificatif.

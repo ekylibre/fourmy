@@ -1,4 +1,5 @@
-import { Badge, Group, Paper, SimpleGrid, Stack, Table, Text, Title } from "@mantine/core";
+import { Badge, Button, Group, Paper, SimpleGrid, Stack, Table, Text, Title } from "@mantine/core";
+import { Building } from "lucide-react";
 import { formatHa, formatLiters } from "@fourmy/ui-lyvre";
 import { useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
@@ -10,6 +11,7 @@ import { SprayingConditions } from "../weather/Weather";
 import { TrackSummaryWidget } from "./TrackSummaryWidget";
 import { CoverLossWidget } from "../remote-sensing/CoverLossAlerts";
 import { CropModelWidget } from "../crop-model/CropModelWidget";
+import { CertificationsDue } from "../farm/CertificationsDue";
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -51,7 +53,13 @@ export function DashboardPage() {
 
   return (
     <Stack>
-      <Title order={1}>{isToday ? "Aujourd'hui" : `Au ${formatDate(at)}`}</Title>
+      <Group justify="space-between">
+        <Title order={1}>{isToday ? "Aujourd'hui" : `Au ${formatDate(at)}`}</Title>
+        <Button component={Link} to={`/f/${farm.id}/farm`} variant="light" leftSection={<Building size={16} />}>
+          Ma ferme
+        </Button>
+      </Group>
+      <CertificationsDue day={day} />
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>
         <Kpi label="Parcelles" value={String(s.landParcels.length)} hint={formatHa(totalArea)} />
         <Kpi
