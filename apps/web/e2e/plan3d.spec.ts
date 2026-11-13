@@ -54,7 +54,9 @@ test("plan 3D : cuverie placée, remplissage qui suit la frise", async ({ page }
   await expect(page.getByText("30 hL", { exact: true })).toBeVisible({ timeout: 30_000 });
   // Échap ferme la fenêtre : la cuverie disparaît, la barre de rejeu reste.
   await page.keyboard.press("Escape");
-  await expect(page.getByText("5 cuve(s) placée(s) · 1 non localisée(s)")).toBeHidden();
+  // L'animation de fermeture suit les images de la page : avec le rendu
+  // Cesium logiciel de la CI, elle dépasse parfois 5 s.
+  await expect(page.getByText("5 cuve(s) placée(s) · 1 non localisée(s)")).toBeHidden({ timeout: 30_000 });
   await expect(page.getByRole("combobox", { name: "Matériel" })).toBeVisible();
 
   // Zoom au plus près : le relief s'arrête au niveau 22 (au-delà, l'API

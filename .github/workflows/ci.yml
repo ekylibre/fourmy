@@ -70,10 +70,13 @@ jobs:
           for i in $(seq 1 30); do curl -sf localhost:3000/health && curl -sf localhost:4173/ >/dev/null && break; sleep 1; done
       - run: pnpm --filter @fourmy/web e2e
       - run: pnpm --filter @fourmy/site e2e
-      - if: failure()
+      # Aussi quand un test ne passe qu'au nouvel essai (job vert) : sa trace
+      # d'échec est gardée (retain-on-failure), c'est elle qu'il faut lire.
+      - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: e2e-traces
+          if-no-files-found: ignore
           path: |
             apps/web/test-results
             api.log
