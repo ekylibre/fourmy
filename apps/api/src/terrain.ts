@@ -1,4 +1,6 @@
-import { ancestor, childFromAncestor, fetchHeightmap, IgnHttpError, Lru, tileBounds } from "@fourmy/geo-ign";
+import { ancestor, childFromAncestor, IgnHttpError, Lru } from "@fourmy/geo-ign";
+import { db } from "./db.js";
+import { getTile, HEIGHTMAP_SIZE, IgnUnavailable } from "./ign/store.js";
 
 /**
  * Service de relief (ADR-9 révisée). La Géoplateforme limite le débit (429
@@ -11,8 +13,11 @@ import { ancestor, childFromAncestor, fetchHeightmap, IgnHttpError, Lru, tileBou
  *    en parallèle, nouvelles tentatives espacées sur 429 / 503 ;
  *  - en dernier recours, relief plat à l'altitude de référence de la ferme
  *    (et non au niveau de la mer, qui creuserait des trous de 30 m).
+ * Depuis « Ma ferme » F4 bis, les grilles passent par le cache disque du
+ * serveur (ign/store.ts) : préchargées par le worker, elles survivent aux
+ * redémarrages, et une grille périmée sert encore si l'IGN ne répond pas.
  */
-export const HEIGHTMAP_SIZE = 65;
+export { HEIGHTMAP_SIZE };
 export const MAX_IGN_LEVEL = 16;
 const MAX_CONCURRENT = 4;
 
@@ -40,15 +45,26 @@ async function withRetry<T>(fn: () => Promise<T>, attempts: number, baseDelayMs:
     try {
       return await fn();
     } catch (e) {
-      const retryable = e instanceof IgnHttpError && (e.status === 429 || e.status >= 500);
+      const status = e instanceof IgnHttpError || e instanceof IgnUnavailable ? e.status : null;
+      const retryable = status !== null && (status === 429 || status >= 500);
       if (!retryable || n >= attempts - 1) throw e;
-      const wait = e.retryAfterS ? e.retryAfterS * 1000 : baseDelayMs * 2 ** n + Math.random() * baseDelayMs;
+      const retryAfterS = (e as IgnHttpError | IgnUnavailable).retryAfterS;
+      const wait = retryAfterS ? retryAfterS * 1000 : baseDelayMs * 2 ** n + Math.random() * baseDelayMs;
       await sleep(Math.min(wait, 5000));
     }
   }
 }
 
 export const terrainConfig = { retryBaseDelayMs: 400, attempts: 3 };
+
+/** Grille depuis le cache disque, ou l'IGN (copie alignée : le Buffer lu peut ne pas l'être). */
+async function storedGrid(z: number, x: number, y: number, fetchImpl: typeof fetch): Promise<Float32Array> {
+  const tile = await getTile(db(), "elevation", z, x, y, fetchImpl);
+  if (!tile || tile.bytes.length !== HEIGHTMAP_SIZE * HEIGHTMAP_SIZE * 4) throw new IgnUnavailable(`Relief IGN : grille absente pour ${z}/${x}/${y}`);
+  const grid = new Float32Array(HEIGHTMAP_SIZE * HEIGHTMAP_SIZE);
+  new Uint8Array(grid.buffer).set(tile.bytes);
+  return grid;
+}
 
 /** Grille IGN d'une tuile de niveau ≤ 16 : cache, regroupement, limite, reprises. */
 function ignGrid(z: number, x: number, y: number, fetchImpl: typeof fetch): Promise<Float32Array> {
@@ -57,9 +73,7 @@ function ignGrid(z: number, x: number, y: number, fetchImpl: typeof fetch): Prom
   if (cached) return Promise.resolve(cached);
   const pending = inflight.get(key);
   if (pending) return pending;
-  const p = limited(() =>
-    withRetry(() => fetchHeightmap(tileBounds(z, x, y), HEIGHTMAP_SIZE, fetchImpl), terrainConfig.attempts, terrainConfig.retryBaseDelayMs),
-  )
+  const p = limited(() => withRetry(() => storedGrid(z, x, y, fetchImpl), terrainConfig.attempts, terrainConfig.retryBaseDelayMs))
     .then((grid) => {
       grids.set(key, grid);
       return grid;

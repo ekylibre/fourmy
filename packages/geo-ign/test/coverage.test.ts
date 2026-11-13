@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { coveragePlan, estimateBytes, lonLatToTile, mercatorTileBounds, planTileCount, tilesInCircle, tilesNearPolygons, validTile } from "../src/index.js";
+import { coveragePlan, estimateBytes, lonLatToGeoTile, lonLatToTile, tileBounds, mercatorTileBounds, planTileCount, tilesInCircle, tilesNearPolygons, validTile } from "../src/index.js";
 
 const farm = { lon: -0.0728, lat: 44.626 };
 const square = (lon: number, lat: number, d: number) => [[[lon, lat], [lon + d, lat], [lon + d, lat + d], [lon, lat + d], [lon, lat]]];
@@ -62,5 +62,27 @@ describe("plan de préchargement", () => {
     const one = coveragePlan({ sites: [{ location: farm, radiusM: 5000 }], parcels: [], layers: ["plan"], detailMarginM: 0 });
     const two = coveragePlan({ sites: [{ location: farm, radiusM: 5000 }, { location: farm, radiusM: 5000 }], parcels: [], layers: ["plan"], detailMarginM: 0 });
     expect(two.get("plan")).toHaveLength(one.get("plan")!.length);
+  });
+  it("relief : schéma géographique de Cesium, zone 10 à 14, détail 15 et 16 autour des parcelles", () => {
+    const parcels = [square(farm.lon, farm.lat, 0.003)];
+    const plan = coveragePlan({ sites: [{ location: farm, radiusM: 10_000 }], parcels, layers: ["elevation"], detailMarginM: 200 });
+    const tiles = plan.get("elevation")!;
+    expect(new Set(tiles.map((t) => t.z))).toEqual(new Set([10, 11, 12, 13, 14, 15, 16]));
+    // La tuile géographique qui contient la ferme est bien dans le plan, aux bonnes coordonnées.
+    const g = lonLatToGeoTile(farm.lon, farm.lat, 14);
+    const b = tileBounds(14, g.x, g.y);
+    expect(farm.lon).toBeGreaterThanOrEqual(b.west);
+    expect(farm.lat).toBeLessThanOrEqual(b.north);
+    expect(tiles.some((t) => t.z === 14 && t.x === g.x && t.y === g.y)).toBe(true);
+    // ≈ 300 tuiles au niveau 14 pour 10 km ; quelques mégaoctets en tout.
+    expect(tiles.filter((t) => t.z === 14).length).toBeGreaterThan(250);
+    expect(tiles.filter((t) => t.z === 14).length).toBeLessThan(450);
+    expect(estimateBytes(plan)).toBeLessThan(20e6);
+  });
+  it("bâtiments : tuiles Web Mercator de zoom 14 seulement", () => {
+    const plan = coveragePlan({ sites: [{ location: farm, radiusM: 10_000 }], parcels: [square(farm.lon, farm.lat, 0.003)], layers: ["buildings"], detailMarginM: 200 });
+    const tiles = plan.get("buildings")!;
+    expect(tiles.every((t) => t.z === 14)).toBe(true);
+    expect(tiles.length).toBe(tilesInCircle(farm, 10_000, 14).length);
   });
 });

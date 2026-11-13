@@ -1,21 +1,88 @@
 import { createHash, randomBytes } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { sql } from "drizzle-orm";
 import type { IgnLayer } from "@fourmy/contracts";
 import type { Database } from "@fourmy/db";
+import { fetchBuildings, fetchHeightmap, IgnHttpError, mercatorTileBounds, tileBounds } from "@fourmy/geo-ign";
 
 /**
- * Cache des tuiles IGN sur le disque du serveur (« Ma ferme », lot F4,
- * claudedocs/conception_ma_ferme.md §5.3). Les fichiers sont rangés en
- * `{dossier}/{couche}/{z}/{x}/{y}.{ext}` et indexés dans `ign_tiles`, table
- * commune à toutes les fermes (données publiques). Utilisé par le relais de
- * l'API et par le préchargement du worker.
+ * Cache des tuiles IGN sur le disque du serveur (« Ma ferme », lots F4 et
+ * F4 bis, claudedocs/conception_ma_ferme.md §5.3). Les fichiers sont rangés
+ * en `{dossier}/{couche}/{z}/{x}/{y}.{ext}` et indexés dans `ign_tiles`,
+ * table commune à toutes les fermes (données publiques). Utilisé par le
+ * relais des fonds de carte, le relief et les bâtiments de la 3D, et le
+ * préchargement du worker.
+ *
+ * Schémas : Web Mercator XYZ pour les fonds et les bâtiments (zoom 14),
+ * géographique de Cesium pour le relief (grille 65 × 65 en float32).
  */
 
-export const IGN_LAYERS: Record<IgnLayer, { wmts: string; format: string; ext: string; contentType: string }> = {
-  ortho: { wmts: "ORTHOIMAGERY.ORTHOPHOTOS", format: "image/jpeg", ext: "jpg", contentType: "image/jpeg" },
-  plan: { wmts: "GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2", format: "image/png", ext: "png", contentType: "image/png" },
+/** Taille des grilles de relief servies à Cesium. */
+export const HEIGHTMAP_SIZE = 65;
+
+type Fetched = { status: 200; bytes: Buffer; etag: string | null } | { status: 304 } | { status: 404 };
+type Fetcher = (z: number, x: number, y: number, etag: string | null, fetchImpl: Fetch) => Promise<Fetched>;
+type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
+
+const WMTS: Record<"ortho" | "plan", { name: string; format: string }> = {
+  ortho: { name: "ORTHOIMAGERY.ORTHOPHOTOS", format: "image/jpeg" },
+  plan: { name: "GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2", format: "image/png" },
+};
+
+export function wmtsUrl(layer: "ortho" | "plan", z: number, x: number, y: number): string {
+  const l = WMTS[layer];
+  return `https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=${l.name}&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX=${z}&TILEROW=${y}&TILECOL=${x}&FORMAT=${encodeURIComponent(l.format)}`;
+}
+
+const wmtsFetcher =
+  (layer: "ortho" | "plan"): Fetcher =>
+  async (z, x, y, etag, fetchImpl) => {
+    let res: Response;
+    try {
+      res = await fetchImpl(wmtsUrl(layer, z, x, y), { headers: etag ? { "if-none-match": etag } : {}, signal: AbortSignal.timeout(ignStoreConfig.timeoutMs) });
+    } catch (e) {
+      throw new IgnUnavailable(`IGN injoignable : ${(e as Error).message}`);
+    }
+    if (res.status === 304) return { status: 304 };
+    // Hors couverture : l'IGN répond 400 ou 404 ; rien à mettre en cache.
+    if (res.status === 404 || res.status === 400) return { status: 404 };
+    if (!res.ok) throw new IgnUnavailable(`IGN : HTTP ${res.status}`, res.status, Number(res.headers.get("retry-after")) || null);
+    const type = res.headers.get("content-type") ?? "";
+    if (!type.startsWith("image/")) throw new IgnUnavailable(`IGN : réponse ${type || "sans type"} au lieu d'une image`);
+    return { status: 200, bytes: Buffer.from(await res.arrayBuffer()), etag: res.headers.get("etag") };
+  };
+
+/** Les erreurs des clients de geo-ign deviennent IgnUnavailable (statut gardé pour les reprises). */
+async function viaGeoIgn(run: () => Promise<Buffer>): Promise<Fetched> {
+  try {
+    return { status: 200, bytes: await run(), etag: null };
+  } catch (e) {
+    if (e instanceof IgnHttpError) throw new IgnUnavailable(e.message, e.status, e.retryAfterS);
+    throw new IgnUnavailable(`IGN injoignable : ${(e as Error).message}`);
+  }
+}
+
+export const IGN_LAYERS: Record<IgnLayer, { ext: string; contentType: string; raster: boolean; fetch: Fetcher }> = {
+  ortho: { ext: "jpg", contentType: "image/jpeg", raster: true, fetch: wmtsFetcher("ortho") },
+  plan: { ext: "png", contentType: "image/png", raster: true, fetch: wmtsFetcher("plan") },
+  elevation: {
+    ext: "f32",
+    contentType: "application/octet-stream",
+    raster: false,
+    fetch: (z, x, y, _etag, fetchImpl) =>
+      viaGeoIgn(async () => {
+        const grid = await fetchHeightmap(tileBounds(z, x, y), HEIGHTMAP_SIZE, fetchImpl as typeof fetch);
+        return Buffer.from(grid.buffer, grid.byteOffset, grid.byteLength);
+      }),
+  },
+  buildings: {
+    ext: "json",
+    contentType: "application/json",
+    raster: false,
+    fetch: (z, x, y, _etag, fetchImpl) =>
+      viaGeoIgn(async () => Buffer.from(JSON.stringify(await fetchBuildings(mercatorTileBounds(z, x, y), fetchImpl as typeof fetch)))),
+  },
 };
 
 export const ignStoreConfig = {
@@ -25,9 +92,18 @@ export const ignStoreConfig = {
   maxAgeDays: 180,
 };
 /** Injection pour les tests : pas d'appel réseau vers l'IGN. */
-export const ignStoreDeps = { fetch: (input: string, init?: RequestInit) => fetch(input, init) };
+export const ignStoreDeps: { fetch: Fetch } = { fetch: (input, init) => fetch(input, init) };
 
-export class IgnUnavailable extends Error {}
+/** L'IGN ne répond pas ; `status` (429, 5xx) et `retryAfterS` servent aux reprises. */
+export class IgnUnavailable extends Error {
+  constructor(
+    message: string,
+    readonly status: number | null = null,
+    readonly retryAfterS: number | null = null,
+  ) {
+    super(message);
+  }
+}
 
 export interface StoredTile {
   bytes: Buffer;
@@ -39,11 +115,6 @@ export interface StoredTile {
 type Row = { bytes: number; sha1: string; ign_etag: string | null; fetched_at: Date; last_read_at: Date };
 
 export const tilePath = (layer: IgnLayer, z: number, x: number, y: number) => join(ignStoreConfig.dir, layer, String(z), String(x), `${y}.${IGN_LAYERS[layer].ext}`);
-
-export function wmtsUrl(layer: IgnLayer, z: number, x: number, y: number): string {
-  const l = IGN_LAYERS[layer];
-  return `https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=${l.wmts}&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX=${z}&TILEROW=${y}&TILECOL=${x}&FORMAT=${encodeURIComponent(l.format)}`;
-}
 
 async function indexRow(db: Database, layer: IgnLayer, z: number, x: number, y: number): Promise<Row | null> {
   const [r] = (await db.execute(sql`
@@ -80,29 +151,6 @@ export async function flushReads(db: Database): Promise<void> {
     .catch((e) => console.warn(`[ign] dernière lecture non enregistrée : ${(e as Error).message}`));
 }
 
-// --- Téléchargement
-
-type Fetched = { status: 200; bytes: Buffer; etag: string | null } | { status: 304 } | { status: 404 };
-
-async function fetchFromIgn(layer: IgnLayer, z: number, x: number, y: number, etag: string | null): Promise<Fetched> {
-  let res: Response;
-  try {
-    res = await ignStoreDeps.fetch(wmtsUrl(layer, z, x, y), {
-      headers: etag ? { "if-none-match": etag } : {},
-      signal: AbortSignal.timeout(ignStoreConfig.timeoutMs),
-    });
-  } catch (e) {
-    throw new IgnUnavailable(`IGN injoignable : ${(e as Error).message}`);
-  }
-  if (res.status === 304) return { status: 304 };
-  // Hors couverture : l'IGN répond 400 ou 404 ; rien à mettre en cache.
-  if (res.status === 404 || res.status === 400) return { status: 404 };
-  if (!res.ok) throw new IgnUnavailable(`IGN : HTTP ${res.status}`);
-  const type = res.headers.get("content-type") ?? "";
-  if (!type.startsWith("image/")) throw new IgnUnavailable(`IGN : réponse ${type || "sans type"} au lieu d'une image`);
-  return { status: 200, bytes: Buffer.from(await res.arrayBuffer()), etag: res.headers.get("etag") };
-}
-
 /** Écriture atomique : fichier temporaire dans le même dossier, puis rename. */
 async function writeTile(db: Database, layer: IgnLayer, z: number, x: number, y: number, bytes: Buffer, etag: string | null): Promise<string> {
   const path = tilePath(layer, z, x, y);
@@ -132,16 +180,16 @@ const inflight = new Map<string, Promise<StoredTile | null>>();
  * 180 jours. IGN indisponible : la tuile périmée si on l'a, sinon
  * IgnUnavailable. Null : hors couverture de l'IGN.
  */
-export function getTile(db: Database, layer: IgnLayer, z: number, x: number, y: number): Promise<StoredTile | null> {
+export function getTile(db: Database, layer: IgnLayer, z: number, x: number, y: number, fetchImpl: Fetch = ignStoreDeps.fetch): Promise<StoredTile | null> {
   const key = `${layer}/${z}/${x}/${y}`;
   const pending = inflight.get(key);
   if (pending) return pending;
-  const p = loadTile(db, layer, z, x, y).finally(() => inflight.delete(key));
+  const p = loadTile(db, layer, z, x, y, fetchImpl).finally(() => inflight.delete(key));
   inflight.set(key, p);
   return p;
 }
 
-async function loadTile(db: Database, layer: IgnLayer, z: number, x: number, y: number): Promise<StoredTile | null> {
+async function loadTile(db: Database, layer: IgnLayer, z: number, x: number, y: number, fetchImpl: Fetch): Promise<StoredTile | null> {
   const row = await indexRow(db, layer, z, x, y);
   const onDisk = row ? await readFileOrNull(tilePath(layer, z, x, y)) : null;
   if (row && onDisk) {
@@ -150,7 +198,7 @@ async function loadTile(db: Database, layer: IgnLayer, z: number, x: number, y: 
   }
   let got: Fetched;
   try {
-    got = await fetchFromIgn(layer, z, x, y, onDisk ? row!.ign_etag : null);
+    got = await IGN_LAYERS[layer].fetch(z, x, y, onDisk ? row!.ign_etag : null, fetchImpl);
   } catch (e) {
     if (row && onDisk) return { bytes: onDisk, sha1: row.sha1, fetchedAt: row.fetched_at, cache: "STALE" };
     throw e;
@@ -166,13 +214,14 @@ async function loadTile(db: Database, layer: IgnLayer, z: number, x: number, y: 
 
 /**
  * Préchargement : s'assure qu'une tuile est en cache et récente, sans lire
- * le fichier si l'index dit qu'elle l'est. `present` : rien à faire ;
- * `fetched` : téléchargée ; `empty` : hors couverture de l'IGN.
+ * le fichier si l'index et le disque disent qu'elle l'est (un volume perdu ou
+ * remplacé ne laisse donc pas de trou). `present` : rien à faire ; `fetched` :
+ * téléchargée ; `empty` : hors couverture de l'IGN.
  */
-export async function ensureTile(db: Database, layer: IgnLayer, z: number, x: number, y: number): Promise<"present" | "fetched" | "empty"> {
+export async function ensureTile(db: Database, layer: IgnLayer, z: number, x: number, y: number, fetchImpl: Fetch = ignStoreDeps.fetch): Promise<"present" | "fetched" | "empty"> {
   const row = await indexRow(db, layer, z, x, y);
-  if (row && fresh(row)) return "present";
-  const t = await getTile(db, layer, z, x, y);
+  if (row && fresh(row) && (await stat(tilePath(layer, z, x, y)).catch(() => null))) return "present";
+  const t = await getTile(db, layer, z, x, y, fetchImpl);
   if (!t) return "empty";
   return t.cache === "MISS" ? "fetched" : "present";
 }

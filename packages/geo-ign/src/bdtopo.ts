@@ -1,4 +1,5 @@
 import type { Bounds } from "./tiles.js";
+import { IgnHttpError } from "./elevation.js";
 
 /**
  * Bâtiments de la BD TOPO (WFS de la Géoplateforme) : emprise, hauteur,
@@ -14,7 +15,7 @@ export interface IgnBuilding {
   rnbIds: string | null;
 }
 
-export function buildingsUrl(b: Bounds, count = 500, base = GEOPF_WFS): string {
+export function buildingsUrl(b: Bounds, count = 500, base = GEOPF_WFS, startIndex = 0): string {
   const p = new URLSearchParams({
     SERVICE: "WFS",
     VERSION: "2.0.0",
@@ -26,6 +27,7 @@ export function buildingsUrl(b: Bounds, count = 500, base = GEOPF_WFS): string {
     OUTPUTFORMAT: "application/json",
     COUNT: String(count),
   });
+  if (startIndex) p.set("STARTINDEX", String(startIndex));
   return `${base}?${p.toString()}`;
 }
 
@@ -43,8 +45,18 @@ export function parseBuildings(json: { features?: Feature[] }): IgnBuilding[] {
     }));
 }
 
+const PAGE = 500;
+const MAX_PAGES = 20;
+
+/** Bâtiments d'une emprise, page par page (une emprise en ville dépasse vite une page). */
 export async function fetchBuildings(b: Bounds, fetchImpl: typeof fetch = fetch): Promise<IgnBuilding[]> {
-  const res = await fetchImpl(buildingsUrl(b), { signal: AbortSignal.timeout(30_000) });
-  if (!res.ok) throw new Error(`BD TOPO indisponible (${res.status})`);
-  return parseBuildings((await res.json()) as { features?: Feature[] });
+  const items: IgnBuilding[] = [];
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const res = await fetchImpl(buildingsUrl(b, PAGE, GEOPF_WFS, page * PAGE), { signal: AbortSignal.timeout(30_000) });
+    if (!res.ok) throw new IgnHttpError(`BD TOPO indisponible (${res.status})`, res.status, Number(res.headers.get("retry-after")) || null);
+    const json = (await res.json()) as { features?: Feature[] };
+    items.push(...parseBuildings(json));
+    if ((json.features?.length ?? 0) < PAGE) break;
+  }
+  return items;
 }

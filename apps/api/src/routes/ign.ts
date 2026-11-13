@@ -20,7 +20,8 @@ export const ignRoutes = new Hono<Env>()
   .get("/ign/tiles/:layer/:z/:x/:y", async (c) => {
     const layer = c.req.param("layer");
     const [z, x, y] = ["z", "x", "y"].map((k) => Number(c.req.param(k)));
-    if (!(layer in IGN_LAYERS) || !validTile(z!, x!, y!)) return problem(c, 404, "Tuile inconnue");
+    // Le relais ne sert que les fonds de carte ; relief et bâtiments passent par la 3D.
+    if (!IGN_LAYERS[layer as IgnLayer]?.raster || !validTile(z!, x!, y!)) return problem(c, 404, "Tuile inconnue");
     let tile;
     try {
       tile = await getTile(db(), layer as IgnLayer, z!, x!, y!);
