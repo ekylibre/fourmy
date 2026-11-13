@@ -4,6 +4,7 @@ import { createApp } from "../src/app.js";
 import { createDb } from "@fourmy/db";
 import { geocodeConfig, geocodeDeps, resetGeocode } from "../src/geocode.js";
 import { sprayingForecast } from "../src/repos/weather.js";
+import { placeHeadquartersFromAddress } from "../src/repos/farm-profile.js";
 import { addMember, setupFarm, teardown } from "./helpers.js";
 
 /**
@@ -194,6 +195,27 @@ describe.skipIf(!url)("Ma ferme (intégration)", () => {
       expect(asked[0]).toMatch(/^44\.838\d*,-0\.578\d*$/);
     } finally {
       await teardown(sql, empty.farmId, [empty.userId]);
+    }
+  });
+
+  it("géocode le siège importé d'Ekylibre, sans toucher à un point déjà placé (F3)", async () => {
+    const other = await setupFarm(sql, "Ferme importée");
+    const db = createDb(url);
+    try {
+      expect(await placeHeadquartersFromAddress(db, other.farmId)).toBeNull(); // pas d'adresse
+      await sql`UPDATE farm_sites SET address_line1 = 'place pey berland', postal_code = '33000', city = 'Bordeaux' WHERE farm_id = ${other.farmId}`;
+      geocodeDeps.fetch = async () => new Response(JSON.stringify({ features: [{ ...IGN_FEATURE, properties: { ...IGN_FEATURE.properties, type: "street", score: 0.5 } }] }));
+      expect(await placeHeadquartersFromAddress(db, other.farmId)).toMatch(/approximative/);
+      const [hq] = await sql`SELECT location_source, geocode_type, insee_code, ST_Y(location) AS lat FROM farm_sites WHERE farm_id = ${other.farmId}`;
+      expect(hq).toMatchObject({ location_source: "geocoded", geocode_type: "street", insee_code: "33063" });
+      expect(Number(hq!.lat)).toBeCloseTo(44.838, 3);
+      // Déjà placé : rien à faire, aucun appel.
+      geocodeDeps.fetch = async () => {
+        throw new Error("ne doit pas être appelé");
+      };
+      expect(await placeHeadquartersFromAddress(db, other.farmId)).toBeNull();
+    } finally {
+      await teardown(sql, other.farmId, [other.userId]);
     }
   });
 

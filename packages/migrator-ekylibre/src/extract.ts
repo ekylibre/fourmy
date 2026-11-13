@@ -391,3 +391,18 @@ export async function personContracts(s: Sql): Promise<ContractRow[]> {
     SELECT entity_id, nature, started_at, stopped_at FROM worker_contracts
     WHERE entity_id IS NOT NULL ORDER BY entity_id, started_at DESC NULLS LAST, id DESC`;
 }
+
+/** Société de la base (entité `of_company`) et son adresse postale par défaut (« Ma ferme », F3). */
+export const company = (s: Sql) =>
+  s<import("./identity.js").CompanyRow[]>`
+    SELECT e.id, nullif(btrim(e.full_name), '') AS full_name, e.siret_number, e.vat_number, e.activity_code, e.legal_position_code,
+           a.lines, a.mail_country
+    FROM entities e
+    LEFT JOIN LATERAL (
+      SELECT ARRAY[mail_line_1, mail_line_2, mail_line_3, mail_line_4, mail_line_5, mail_line_6] AS lines, mail_country
+      FROM entity_addresses
+      WHERE entity_id = e.id AND canal = 'mail' AND deleted_at IS NULL
+      ORDER BY by_default DESC NULLS LAST, id LIMIT 1
+    ) a ON true
+    WHERE e.of_company
+    ORDER BY e.id LIMIT 1`;

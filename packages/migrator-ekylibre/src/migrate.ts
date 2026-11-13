@@ -3,6 +3,7 @@ import { signedQuantity, buildEvent, proposeComposition, type DomainCtx } from "
 import { idsFor, uuidv5 } from "./ids.js";
 import * as x from "./extract.js";
 import { personName, privateOf, readPicture } from "./people.js";
+import { companyIdentity, mergeWithoutOverwrite } from "./identity.js";
 import { createHash } from "node:crypto";
 import {
   toLiters,
@@ -117,6 +118,7 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
       people: await x.people(s),
       personAddresses: await x.personAddresses(s),
       personContracts: await x.personContracts(s),
+      company: (await x.company(s))[0] ?? null,
     }));
 
     const runId = opts.runId ?? uuidv5(`${instance}:run:${new Date().toISOString()}`);
@@ -128,7 +130,7 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
     const counts: Record<string, number> = {};
     const rejected: Report["rejected"] = [];
     const warnings: Report["warnings"] = [];
-    const inc = (k: string) => (counts[k] = (counts[k] ?? 0) + 1);
+    const inc = (k: string, n = 1) => (counts[k] = (counts[k] ?? 0) + n);
     const reject = (entity: string, eid: string | number, reason: string) =>
       rejected.push({ entity, id: String(eid), reason });
 
@@ -149,6 +151,35 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
           INSERT INTO farms (id, name) VALUES (${farmId}, ${opts.farmName ?? tenant})
           ON CONFLICT (id) DO UPDATE SET name = coalesce(${opts.farmName ?? null}, farms.name), updated_at = now()`;
         inc("farms");
+
+        // ---- Identité de la société (« Ma ferme », F3) : sans rien écraser --
+        if (data.company) {
+          const company = companyIdentity(data.company);
+          const companyId = String(data.company.id);
+          for (const message of company.invalid) warnings.push({ entity: "farm_identity", id: companyId, message });
+          const [current] = await tx<{ legal_name: string | null; legal_form: string | null; siret: string | null; vat_number: string | null; naf_code: string | null }[]>`
+            SELECT legal_name, legal_form, siret, vat_number, naf_code FROM farms WHERE id = ${farmId}`;
+          const identity = mergeWithoutOverwrite(current!, company.identity as typeof current & object);
+          if (Object.keys(identity.updates).length) {
+            await tx`UPDATE farms SET ${tx(identity.updates)}, updated_at = now() WHERE id = ${farmId}`;
+            inc("farm_identity_fields", Object.keys(identity.updates).length);
+          }
+          for (const c of identity.conflicts) warnings.push({ entity: "farm_identity", id: companyId, message: `Écart non appliqué, ${c}` });
+          // Adresse du siège : reprise seulement s'il n'en a aucune (on ne mélange pas deux adresses).
+          if (company.address) {
+            const [hq] = await tx<{ id: string; address_line1: string | null; address_line2: string | null; postal_code: string | null; city: string | null }[]>`
+              SELECT id, address_line1, address_line2, postal_code, city FROM farm_sites WHERE is_headquarters`;
+            if (hq) {
+              const empty = !hq.address_line1 && !hq.address_line2 && !hq.postal_code && !hq.city;
+              if (empty) {
+                await tx`UPDATE farm_sites SET ${tx(company.address)}, updated_at = now() WHERE id = ${hq.id}`;
+                inc("farm_address");
+              } else if (mergeWithoutOverwrite(hq, { id: hq.id, ...company.address }).conflicts.length) {
+                warnings.push({ entity: "farm_identity", id: companyId, message: "Écart non appliqué, adresse du siège : celle de Fourmy est gardée." });
+              }
+            }
+          }
+        }
 
         const campaignByYear = new Map<number, string>();
         for (const c of data.campaigns) {
