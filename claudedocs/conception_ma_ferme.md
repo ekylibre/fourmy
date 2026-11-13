@@ -891,9 +891,8 @@ abusif. D'où, d'abord, un worker prudent (4 requêtes en parallèle).
 
 **Confirmation de l'IGN obtenue le 2026-11-13 pour le cache des tuiles sur
 le serveur et pour le préchargement.** Le worker passe donc à 8 requêtes en
-parallèle, comme prévu au départ. Reste à vérifier la mention d'attribution
-exacte sur les fiches catalogue des couches (l'application affiche
-« © IGN — Géoplateforme »). Constat : l'IGN ne renvoie pas d'`ETag` sur les
+parallèle, comme prévu au départ. La mention d'attribution affichée par
+l'application, « © IGN — Géoplateforme », convient. Constat : l'IGN ne renvoie pas d'`ETag` sur les
 tuiles WMTS ; une tuile de plus de 180 jours est donc retéléchargée en
 entier.
 
