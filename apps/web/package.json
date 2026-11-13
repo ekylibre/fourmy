@@ -6,10 +6,10 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/copy-cesium.mjs && vite",
-    "build": "node scripts/copy-cesium.mjs && tsc --noEmit && vite build",
+    "build": "node scripts/copy-cesium.mjs && tsc --noEmit && tsc --noEmit -p sw && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint src",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p sw",
+    "lint": "eslint src sw",
     "test": "vitest run",
     "e2e": "playwright test"
   },

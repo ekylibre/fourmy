@@ -176,3 +176,37 @@ export async function cancelJob(db: Database, farmId: string, id: string): Promi
     await tx.execute(sql`UPDATE ign_cache_jobs SET status = 'cancelled', finished_at = now(), locked_until = NULL WHERE id = ${id}`);
   });
 }
+
+/** Entrée du manifeste de la copie navigateur : URL servie par l'API, version, taille. */
+export interface IgnManifestEntry {
+  url: string;
+  etag: string;
+  bytes: number;
+}
+
+/**
+ * Manifeste de la copie hors ligne (F5, §6.4) : les tuiles du plan de la
+ * ferme **déjà sur le serveur**, pour que le navigateur ne déclenche jamais
+ * d'appel à l'IGN. Fonds de carte par le relais, relief par la route de la
+ * 3D ; les bâtiments arrivent avec la réponse du plan 3D.
+ */
+export async function cacheManifest(db: Database, farmId: string): Promise<{ entries: IgnManifestEntry[]; bytes: number }> {
+  return withFarm(db, farmId, async (tx) => {
+    const plan = await farmPlanTx(tx, await ignSettingsTx(tx));
+    const entries: IgnManifestEntry[] = [];
+    const base = `/api/v1/farms/${farmId}`;
+    for (const [layer, keys] of plan ?? []) {
+      if (layer === "buildings") continue;
+      const path = layer === "elevation" ? "/terrain/heightmap" : `/ign/tiles/${layer}`;
+      for (let i = 0; i < keys.length; i += 5000) {
+        const batch = keys.slice(i, i + 5000);
+        const found = await rows<{ z: number; x: number; y: number; sha1: string; bytes: number }>(tx, sql`
+          SELECT t.z, t.x, t.y, t.sha1, t.bytes
+          FROM unnest(${pgArray(batch.map((k) => k.z))}::int[], ${pgArray(batch.map((k) => k.x))}::int[], ${pgArray(batch.map((k) => k.y))}::int[]) AS k(z, x, y)
+          JOIN ign_tiles t ON t.layer = ${layer} AND t.z = k.z AND t.x = k.x AND t.y = k.y`);
+        for (const t of found) entries.push({ url: `${base}${path}/${t.z}/${t.x}/${t.y}`, etag: `"${t.sha1}"`, bytes: t.bytes });
+      }
+    }
+    return { entries, bytes: entries.reduce((n, e) => n + e.bytes, 0) };
+  });
+}

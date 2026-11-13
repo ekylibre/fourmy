@@ -6,19 +6,15 @@ import { Link } from "react-router";
 import { IGN_LAYER_LABELS, type FarmIgnSettings, type IgnCacheJob, type IgnCacheState, type IgnLayer } from "@fourmy/contracts";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
-import { formatDateTime } from "../../app/labels";
+import { formatBytes, formatDateTime } from "../../app/labels";
 import { ErrorAlert, Loading } from "../../components/states";
+import { OfflinePanel } from "./OfflinePanel";
 
 /**
  * Onglet « Données IGN » de « Ma ferme » (lot F4, E12, E13, N3, R6) : couches
  * et marge à précharger, estimation, lancement sur le serveur, progression.
  * Les cartes de la ferme lisent ensuite les tuiles depuis le cache du serveur.
  */
-
-export function formatBytes(bytes: number): string {
-  if (bytes >= 1e9) return `${(bytes / 1e9).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} Go`;
-  return `${Math.max(1, Math.round(bytes / 1e6)).toLocaleString("fr-FR")} Mo`;
-}
 
 const STATUS: Record<IgnCacheJob["status"], { label: string; color: string }> = {
   pending: { label: "En attente", color: "gray" },
@@ -46,6 +42,7 @@ export function IgnTab() {
     <Stack>
       <IgnSettingsForm state={s} />
       <IgnCachePanel state={s} />
+      {s.plan && <OfflinePanel serverTiles={s.cached.tiles} />}
     </Stack>
   );
 }

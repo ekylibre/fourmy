@@ -1007,6 +1007,44 @@ entier.
 - Tests : chaque lancement de l'API a son propre dossier de cache
   (`vitest.config.ts`), supprimé à la fin.
 
+## 12 septies. Lot F5 : copie dans le navigateur (2026-11-13)
+
+- **Option A retenue** (une entrée du Cache Storage par tuile), sans
+  prototyper B. Mesuré dans Chromium : 6 000 tuiles de 20 Ko (120 Mo)
+  écrites en 0,6 s, lecture en 0,09 ms, quota de 11 Go ; c'est le
+  téléchargement qui coûte, pas le stockage. B (archive PMTiles dans OPFS)
+  demandait le binaire Go dans l'image, la réécriture de l'archive à chaque
+  ajout au cache serveur, et l'accès à l'OPFS depuis le service worker n'est
+  pas établi sur Safari. À reconsidérer seulement si des fermes dépassent
+  largement 50 000 tuiles.
+- **MapLibre et le service worker : vérifié** par un parcours e2e
+  (`e2e/offline.spec.ts`) : réseau coupé, page rechargée, les tuiles
+  demandées par le worker de MapLibre sont servies par la copie. Pas besoin
+  d'`addProtocol`.
+- **Manifeste** : fonds de carte par le relais, relief par
+  `/terrain/heightmap` (même URL que la 3D) ; les bâtiments viennent avec
+  la réponse de `/plan3d`, gardée comme les autres lectures. Une seule
+  entrée d'index (`/__fourmy/offline-index`) dans le cache de la ferme
+  garde l'`ETag` de chaque tuile : une mise à jour ne télécharge que ce qui
+  a changé et supprime ce qui est sorti du plan.
+- **Lectures de l'API gardées** (`fourmy-api-v1`, réseau d'abord) : seulement
+  pour une ferme qui a une copie, plus la session et la liste des fermes.
+  Sans copie, rien de l'API n'est gardé sur le poste.
+- **Déconnexion** : le service worker (sur `POST /api/auth/sign-out`) et la
+  page effacent les copies, les lectures gardées et les marques. Poste
+  partagé : rien ne reste.
+- **Coquille** : fichiers de `/assets/` (noms hachés) en cache d'abord ;
+  page, Cesium, kit et icône en réseau d'abord. Il faut un passage en ligne
+  après la mise en place du service worker pour qu'ils soient gardés.
+- **Service worker en production seulement** (`vite preview` et l'image) :
+  en dev, Vite sert les sources. Publié en `/sw.js`, servi `no-cache` par
+  nginx. Code dans `apps/web/sw/` (lib `WebWorker`, tsconfig à part).
+- **Confirmation au-delà de 500 Mo**, place vérifiée avant de commencer
+  (`navigator.storage.estimate`), stockage persistant demandé. Copie
+  ouverte à tout membre (lecture), pas seulement au responsable.
+- **Effacement par le navigateur** : une marque dans `localStorage` permet
+  d'afficher « Copie hors ligne effacée par le navigateur ».
+
 ## 13. Décisions de conception à valider
 
 1. **Identité sur `farms`** plutôt que dans une table `farm_profile` (§3.1).
