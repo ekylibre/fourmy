@@ -16,6 +16,7 @@ import {
   updateSite,
 } from "../repos/farm-profile.js";
 import { setLogo } from "../repos/equipments.js";
+import { queueAutoRefresh } from "../ign/cache.js";
 import { logoUpload } from "./equipments.js";
 import { BadRequest, domainCtx, problem, uuidParam } from "./helpers.js";
 
@@ -43,6 +44,11 @@ async function geocoding<T>(c: Parameters<typeof problem>[0], run: () => Promise
   }
 }
 
+/** Un site a changé : relance du préchargement IGN si la ferme l'a demandé (E12). Sans effet sur la réponse. */
+async function refreshIgn(c: Parameters<typeof domainCtx>[0]) {
+  await queueAutoRefresh(db(), c.get("farmId"), domainCtx(c)).catch((e) => console.warn(`[ign] relance automatique : ${(e as Error).message}`));
+}
+
 export const farmProfileRoutes = new Hono<Env>()
   .get("/farm", async (c) => c.json(await getProfile(db(), c.get("farmId"), c.get("role") === "owner")))
   .put("/farm/identity", requireOwner, async (c) => c.json(await putIdentity(db(), c.get("farmId"), domainCtx(c), await body(c, farmProfileIdentity))))
@@ -56,10 +62,19 @@ export const farmProfileRoutes = new Hono<Env>()
     await deleteFarmCertification(db(), c.get("farmId"), domainCtx(c), uuidParam(c, "id"));
     return c.body(null, 204);
   })
-  .post("/farm/sites", requireOwner, async (c) => c.json(await createSite(db(), c.get("farmId"), domainCtx(c), await body(c, farmSiteWrite)), 201))
-  .put("/farm/sites/:id", requireOwner, async (c) => c.json(await updateSite(db(), c.get("farmId"), domainCtx(c), uuidParam(c, "id"), await body(c, farmSiteWrite))))
+  .post("/farm/sites", requireOwner, async (c) => {
+    const site = await createSite(db(), c.get("farmId"), domainCtx(c), await body(c, farmSiteWrite));
+    await refreshIgn(c);
+    return c.json(site, 201);
+  })
+  .put("/farm/sites/:id", requireOwner, async (c) => {
+    const site = await updateSite(db(), c.get("farmId"), domainCtx(c), uuidParam(c, "id"), await body(c, farmSiteWrite));
+    await refreshIgn(c);
+    return c.json(site);
+  })
   .delete("/farm/sites/:id", requireOwner, async (c) => {
     await deleteSite(db(), c.get("farmId"), domainCtx(c), uuidParam(c, "id"));
+    await refreshIgn(c);
     return c.body(null, 204);
   })
   .put("/farm/logo", requireOwner, async (c) => c.json(await setLogo(db(), c.get("farmId"), domainCtx(c), { farm: true }, await logoUpload(c))))

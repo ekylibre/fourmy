@@ -60,9 +60,13 @@ services:
       AGRIROUTER_SOFTWARE_VERSION_ID: ${AGRIROUTER_SOFTWARE_VERSION_ID:-}
       AGRIROUTER_REDIRECT_URI: ${AGRIROUTER_REDIRECT_URI:-${PUBLIC_URL}/agrirouter/callback}
       AGRIROUTER_ENVIRONMENT: ${AGRIROUTER_ENVIRONMENT:-production}
+    # Cache des tuiles IGN (« Ma ferme », F4) : relu par l'API, rempli aussi par le worker.
+    volumes:
+      - fourmy_ign_cache:/var/cache/fourmy/ign
 
   # Tâches de fond : intégrations des fermes (Traccar : chaque minute), Lexicon,
-  # eau, IFT, météo, heures estimées des matériels, alertes d'entretien.
+  # eau, IFT, météo, heures estimées des matériels, alertes d'entretien,
+  # préchargement et quota du cache IGN.
   worker:
     build:
       context: ..
@@ -96,6 +100,11 @@ services:
       FOURMY_SMTP_USER: ${FOURMY_SMTP_USER:-}
       FOURMY_SMTP_PASSWORD: ${FOURMY_SMTP_PASSWORD:-}
       FOURMY_SMTP_FROM: ${FOURMY_SMTP_FROM:-}
+      # Préchargement des tuiles IGN : quota disque (Go) et requêtes parallèles vers l'IGN.
+      FOURMY_IGN_CACHE_MAX_GB: ${FOURMY_IGN_CACHE_MAX_GB:-20}
+      FOURMY_IGN_PRELOAD_CONCURRENCY: ${FOURMY_IGN_PRELOAD_CONCURRENCY:-4}
+    volumes:
+      - fourmy_ign_cache:/var/cache/fourmy/ign
 
   web:
     build:
@@ -123,3 +132,4 @@ services:
 
 volumes:
   fourmy_pgdata:
+  fourmy_ign_cache:
