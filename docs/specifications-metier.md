@@ -25,10 +25,12 @@ Le plan de test qui s'appuie sur ces règles est dans `claudedocs/plan_de_test_g
 
 1. [Principes transverses](#1-principes-transverses)
 2. [Comptes, rôles et fermes](#2-comptes-rôles-et-fermes)
+   - [2 bis. Ma ferme](#2-bis-ma-ferme)
 3. [Reprise d'Ekylibre](#3-reprise-dekylibre)
 4. [Campagnes, activités et certifications](#4-campagnes-activités-et-certifications)
 5. [Parcelles et cartographie](#5-parcelles-et-cartographie)
 6. [Interventions](#6-interventions)
+   - [6 bis. Itinéraires techniques](#6-bis-itinéraires-techniques)
 7. [Stocks](#7-stocks)
 8. [Phytosanitaire : contrôles, registre et IFT](#8-phytosanitaire--contrôles-registre-et-ift)
 9. [Météo](#9-météo)
@@ -65,7 +67,7 @@ Le plan de test qui s'appuie sur ces règles est dans `claudedocs/plan_de_test_g
 
 ## 2. Comptes, rôles et fermes
 
-- **RG-ACC-1** : l'inscription libre est fermée. L'administrateur crée les comptes en ligne de commande, avec un mot de passe lu sur l'entrée standard. Le responsable rattache un compte à sa ferme depuis **Équipe**, avec un rôle. (architecture §5.1 ; deploiement)
+- **RG-ACC-1** : l'inscription libre est fermée. L'administrateur crée les comptes en ligne de commande, avec un mot de passe lu sur l'entrée standard. Le responsable rattache un compte à sa ferme depuis l'onglet **Équipe** de « Ma ferme », avec un rôle. (architecture §5.1 ; deploiement)
 - **RG-ACC-2** : pour accéder à une ferme, il faut en être membre. Sinon, l'API répond 403 et le web affiche « Ferme inaccessible ». (architecture §5.1)
 - **RG-ACC-3 (responsable)** : tous les droits.
 - **RG-ACC-4 (salarié)** : il consulte tout et peut :
@@ -90,10 +92,27 @@ Le plan de test qui s'appuie sur ces règles est dans `claudedocs/plan_de_test_g
   - l'historique profond Sentinel-2.
 
   (context.ts `requireOwner` ; documents de domaine)
-- **RG-ACC-6** : le menu masque **Équipe** et **Interopérabilité** au salarié. Les écrans réservés au responsable montrent des champs désactivés plutôt que des erreurs. (Layout.tsx)
+- **RG-ACC-6** : le menu masque **Interopérabilité** au salarié. L'onglet **Équipe** de « Ma ferme » est ouvert à tous les membres, sans les coordonnées des autres ; seul le responsable y ajoute et invite. Dans l'onglet **Préférences**, les sections Entretien et Parcours n'apparaissent qu'au responsable. Les écrans réservés au responsable montrent des champs désactivés plutôt que des erreurs. (Layout.tsx ; besoins_navigation_compte)
 - **RG-ACC-7** : la session web tient dans un cookie HttpOnly de même origine. Une requête avec cookie venant d'une origine non approuvée est refusée. Le mobile utilise un jeton signé. (architecture §5.1)
 - **RG-ACC-8** : un compte peut être membre de plusieurs fermes. La page `/farms` les liste avec le rôle. (FR-ACC-4) 🟡 *(le modèle le permet ; la livraison n'est pas annoncée)*
-- ⏳ SSO/OIDC en SaaS ; export complet et suppression RGPD d'une ferme (NFR-SEC-2).
+- **RG-ACC-9 (menu du compte)** : un rond en haut à droite, avec la photo de sa fiche personne, sinon ses initiales. Il donne :
+  - le nom, l'e-mail et le rôle sur la ferme ouverte (Responsable, Salarié ou Lecture seule) ;
+  - la ferme ouverte, et « Changer de ferme » si le compte en a plusieurs ;
+  - Ma ferme, Changer de mot de passe et Se déconnecter.
+
+  L'en-tête ne montre ni le nom de la ferme ni le rôle. (besoins_navigation_compte)
+- **RG-ACC-10 (mot de passe)** : on le change en donnant l'actuel, avec 10 caractères au moins pour le nouveau. Les sessions ouvertes sur d'autres appareils sont fermées ; celle en cours reste ouverte. (besoins_navigation_compte)
+- ⏳ Mot de passe oublié (attend le SMTP) ; SSO/OIDC en SaaS ; export complet et suppression RGPD d'une ferme (NFR-SEC-2).
+
+## 2 bis. Ma ferme
+
+- **RG-FARM-1** : « Ma ferme » est la fiche de la ferme ouverte, ouverte depuis le menu du compte. Onglets : Identité, Équipe, Sites et cartes, Données IGN, Préférences. Tous les membres la consultent ; le responsable la modifie. Les anciens liens (`/team`, `?tab=maintenance`, `tracks`, `brands`) mènent à leur nouvelle place. (besoins_ma_ferme ; besoins_navigation_compte)
+- **RG-FARM-2 (identité)** : raison sociale, forme juridique, SIRET (clé de Luhn), TVA, NAF, PACAGE, CVI, EDE, contacts, certifications avec alerte d'échéance à 60 jours sur le tableau de bord. L'import Ekylibre remplit les champs vides sans écraser ce qui est saisi et signale les écarts. (besoins_ma_ferme §4.1)
+- **RG-FARM-3 (sites)** : un siège, plus d'autres sites si besoin. Chaque site a une adresse, un point (géocodé puis déplaçable sur la carte) et un rayon de 1 à 30 km (10 km par défaut). Le point du siège sert à la météo et au centrage des cartes sans parcelle. (besoins_ma_ferme §4.2, §4.5)
+- **RG-FARM-4 (données IGN)** : le serveur télécharge à l'avance, autour des sites, les orthophotos, le Plan IGN, le relief et les bâtiments : zoom 18 autour des parcelles (marge réglable), zoom 16 au plus ailleurs. Confirmation au-delà de 2 Go. La progression s'affiche par couche ; une tâche qui attend le worker plus de 3 minutes est signalée (« Le téléchargement ne démarre pas »). (conception_ma_ferme §5.4)
+- **RG-FARM-5 (hors ligne)** : un membre peut garder la ferme dans son navigateur (fonds de carte, relief, lectures de l'API), avec confirmation au-delà de 500 Mo. La copie est effacée à la déconnexion. Consultation seulement. (conception_ma_ferme §12 septies)
+- **RG-FARM-6 (réglages)** : dans « Sites et cartes », le fond de carte par défaut et l'unité de surface (ha ou a) ; dans « Préférences », les seuils et alertes d'entretien, les réglages des parcours GPS (responsable seulement) et les couleurs et logos des marques. Logo de la ferme (Identité) sur les documents imprimés, sinon celui de Fourmy. (besoins_ma_ferme §4.4, §4.6)
+- ⏳ Copie hors ligne sur le mobile ; en-tête imprimé du registre phyto.
 
 ## 3. Reprise d'Ekylibre
 
@@ -252,6 +271,15 @@ Le plan de test qui s'appuie sur ces règles est dans `claudedocs/plan_de_test_g
 - **RG-INT-15** : une planifiée se modifie directement. Une réalisée donne une **correction tracée** : l'audit garde l'avant et l'après, et la correction contre-passe le **solde net** des mouvements avant de réaliser la nouvelle version. Une correction rejouée n'est pas réappliquée. (interventions §10)
 - **RG-INT-16** : une campagne close reste corrigeable, avec un avertissement. Ce que le formulaire n'affiche pas est conservé : surfaces, zones, lots, lieux. (interventions §10)
 - **RG-INT-17 (critère de recette)** : après correction d'une dose, le stock et le registre montrent la nouvelle quantité, et l'historique l'ancienne. (exigences_interventions INT-UI-3)
+
+## 6 bis. Itinéraires techniques
+
+- **RG-ITK-1** : l'itinéraire d'une parcelle (onglet de sa fiche) et celui d'une activité végétale (lien « Itinéraire » de la page Activités) se lisent sur une frise TIKA. Visualisation des interventions existantes seulement. Ouvert à tout membre. (besoins_itineraires_techniques)
+- **RG-ITK-2 (couloirs)** : au-dessus de la culture, les travaux (travail du sol, semis, récolte) ; au-dessous, les intrants (fertilisation, protection). Les couverts sont des cultures secondaires sur la même frise. L'entretien des matériels est exclu. (conception_itineraires_techniques §3)
+- **RG-ITK-3 (périodes)** : la campagne de la frise de l'application par défaut ; « Rotation » sur 3, 5, 10 ou 20 ans pour une parcelle. Frise ou cercle. (besoins_itineraires_techniques §4)
+- **RG-ITK-4 (activité)** : frise fusionnée de toutes ses parcelles, chantiers proches regroupés (« … · 3 parcelles ») ; un clic sur un groupe liste ses interventions et permet de descendre sur une parcelle. (besoins_itineraires_techniques §5)
+- **RG-ITK-5** : un clic sur une intervention ouvre sa fiche. Le survol donne le détail. La liste textuelle des étapes est masquée au départ et s'ouvre par le bouton « Afficher la transcription ». (besoins_itineraires_techniques N6, révisé le 13/11)
+- ⏳ Itinéraire prévisionnel, comparaison prévu / réalisé, éditeur, export vers Triple Performance.
 
 ## 7. Stocks
 
@@ -816,7 +844,7 @@ L'encadré « Directive nitrates » du formulaire se met à jour pendant la sais
 
 ## 21. Site public fourmy.org
 
-- **RG-SITE-1** : « Se connecter » ouvre l'application. La version est calculée depuis Git (`feat` → mineure, `fix` → correctif) et c'est la même sur l'API et sur le site. (site-public-exigences)
+- **RG-SITE-1** : « Se connecter » ouvre l'application. La version est calculée depuis Git (`feat` → mineure, `fix` → correctif) et c'est la même sur l'API et sur le site. L'application l'affiche en pied de menu, lue sur le site (`/version.json`), avec un lien vers les nouveautés. (site-public-exigences ; deploiement)
 - **RG-SITE-2** : le changelog ne retient que `feat` et `fix`, avec la ligne `Public:` à la place du titre si elle existe. La construction échoue si un nom de pilote ou un identifiant interne y figure. (site-public-exigences AU-2/3)
 - **RG-SITE-3** : formulaire de contact (nom, e-mail, profil, message, consentement), avec un champ piège et une limite de débit. Rien n'est stocké. Sans SMTP : « indisponible ». Pas de cookie ni de traceur tiers. (site-public-exigences)
 - **RG-SITE-4** : captures et vidéos montrant une ferme pilote seulement avec son **accord écrit**, et les paroles qui lui sont prêtées validées par elle. (site-public-exigences ; videos/journee-semis-mais)

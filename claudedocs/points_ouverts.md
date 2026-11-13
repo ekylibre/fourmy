@@ -15,7 +15,9 @@ Chaque point se lit ainsi : **titre** : description. *nature · priorité · sou
 
 ## Mise à jour du 2026-11-13
 
-- **Fait** : 17 (reprise du SIRET depuis Ekylibre, par l'import de l'identité de la ferme).
+- **Fait** :
+  - 17 : reprise du SIRET depuis Ekylibre, par l'import de l'identité de la ferme ;
+  - 104 : `docs/interventions.md` §7.1 renvoie déjà à la conception de l'équipe.
 - **Avancés** :
   - 15 : le contrôle de Luhn du SIRET est fait ;
   - 35 : le champ « Outil annoncé par Traccar » existe sur la fiche de l'outil, il reste à le renseigner ;
@@ -26,7 +28,8 @@ Chaque point se lit ainsi : **titre** : description. *nature · priorité · sou
   - 95 à 97 : déploiement et mobile ;
   - 98 à 104 : « Ma ferme » et équipe ;
   - 105 à 110 : itinéraires techniques, nouveau thème 15.
-- **Projet GitHub** : les nouveaux points P1 et P2 (95, 98, 104 et 105) n'ont pas encore d'issue. Le brouillon du point 17 est à clore.
+- **Projet GitHub** : les nouveaux points P1 et P2 (95, 98 et 105) n'ont pas encore d'issue. Le brouillon du point 17 est à clore.
+- **Aussi livré le 13/11** (sans point ouvert) : menu du compte et changement de mot de passe, onglets Équipe et Préférences dans « Ma ferme », version en pied de menu, attente du préchargement IGN signalée, liste de TIKA masquée au départ.
 
 ## Récapitulatif
 
@@ -34,7 +37,7 @@ Chaque point se lit ainsi : **titre** : description. *nature · priorité · sou
 |---|---|---|---|---|
 | 1. Mise en production et exploitation | 3 | 2 | 2 | 7 |
 | 2. Mobile | 0 | 2 | 2 | 4 |
-| 3. Interventions, interface web, ferme et équipe | 0 | 3 | 9 | 12 |
+| 3. Interventions, interface web, ferme et équipe | 0 | 2 | 9 | 11 |
 | 4. Phyto et registre | 0 | 2 | 1 | 3 |
 | 5. Fertilisation | 0 | 4 | 6 | 10 |
 | 6. Matériels et entretien | 0 | 0 | 7 | 7 |
@@ -47,9 +50,9 @@ Chaque point se lit ainsi : **titre** : description. *nature · priorité · sou
 | 13. Dette technique et qualité | 0 | 3 | 6 | 9 |
 | 14. Nouveaux domaines | 0 | 0 | 7 | 7 |
 | 15. Itinéraires techniques | 0 | 1 | 5 | 6 |
-| **Total** | **10** | **31** | **68** | **109** |
+| **Total** | **10** | **30** | **68** | **108** |
 
-Plus un point fait (17), hors du total.
+Plus deux points faits (17 et 104), hors du total.
 
 ## 1. Mise en production et exploitation
 
@@ -95,7 +98,7 @@ Plus un point fait (17), hors du total.
 101. **Archive PMTiles pour la copie navigateur**, seulement si des fermes dépassent largement 50 000 tuiles. *évolution · P3 · conception_ma_ferme §12 septies*
 102. **Coût de main-d'œuvre**, à rouvrir avec le coût des chantiers. *évolution · P3 · besoins_equipe_personnes §6*
 103. **Export de paie des temps de travaux**. *évolution · P3 · besoins_equipe_personnes décision 8*
-104. **Décision §7.1 de `docs/interventions.md`** : la faire renvoyer vers `besoins_equipe_personnes.md`. *doc · P2 · besoins_equipe_personnes §7*
+104. ~~**Décision §7.1 de `docs/interventions.md`**~~ : **fait**. Elle renvoie à `docs/equipe-personnes-design.md` depuis la revue du 12/11. *doc · P2 · besoins_equipe_personnes §7*
 
 ## 4. Phyto et registre
 

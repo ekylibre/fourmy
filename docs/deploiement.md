@@ -23,7 +23,7 @@ demandera d'abord de les retirer. Dokploy y accède par l'application GitHub
 | `db` | `timescale/timescaledb-ha:pg17` | PostgreSQL + PostGIS + TimescaleDB, volume `fourmy_pgdata` |
 | `api` | `Dockerfile`, cible `api` | API Hono ; applique les migrations au démarrage ; relaie les tuiles IGN (fonds de carte, relief et bâtiments de la 3D) et les garde dans le volume `fourmy_ign_cache` |
 | `worker` | même image, `node apps/api/dist/worker.js` | synchronise les intégrations des fermes (Traccar : chaque minute ; stations Weenat et Sencrop : chaque heure), les parcours GPS (toutes les 5 minutes), le référentiel phyto Lexicon (chaque jour), l'eau autour des fermes (BD TOPO, tous les 30 jours), l'IFT et la météo des interventions réalisées, les heures estimées des matériels depuis Traccar (toutes les 15 minutes) les alertes d'entretien par e-mail (au plus une fois par heure), le préchargement des tuiles IGN autour des fermes (volume `fourmy_ign_cache`, partagé avec `api`) et le quota de ce cache (chaque jour) |
-| `web` | `Dockerfile`, cible `web` (nginx) | application React + relais `/api` → `api` ; service worker `/sw.js` (copie hors ligne des fermes), servi sans cache |
+| `web` | `Dockerfile`, cible `web` (nginx) | application React + relais `/api` → `api` ; service worker `/sw.js` (copie hors ligne des fermes), servi sans cache ; relais `/version.json` → `site` (version affichée en pied de menu) |
 | `site` | `ghcr.io/ekylibre/fourmy-site:main`, construite par la CI depuis `docker/site.Dockerfile` (nginx) | site public fourmy.org ; relaie seulement `/api/public/` (formulaire de contact) ; `www` → apex |
 
 Sont exposés **`web`** (dev.fourmy.org, l'application) et **`site`**
@@ -61,8 +61,8 @@ Aucun secret dans le dépôt : ils sont générés directement dans Dokploy.
    DNS du domaine pointe vers le serveur.
 4. Créer les comptes (mot de passe sur l'entrée standard, jamais en argument) :
    `printf '%s' "$MOT_DE_PASSE" | docker compose exec -T api node apps/api/dist/cli/create-user.js --email … --name …`
-5. Rattacher chaque compte à sa ferme : page **Équipe** (responsable), ou au
-   premier démarrage par l'administrateur en base.
+5. Rattacher chaque compte à sa ferme : « Ma ferme », onglet **Équipe**
+   (responsable), ou au premier démarrage par l'administrateur en base.
 
 ## Fermes
 
@@ -94,6 +94,13 @@ puis tirée par Dokploy (`pull_policy: always`).
 - Après publication, la CI relance Dokploy via le secret GitHub
   `DOKPLOY_DEPLOY_WEBHOOK` (webhook du service Compose). Sans ce secret, le
   déploiement est à relancer à la main.
+- **Version dans l'application** : l'image `web` est construite par Dokploy,
+  sans historique. Elle lit donc la version sur le site : son nginx relaie
+  `/version.json` vers le service `site` du même compose (nom résolu à la
+  demande, par le DNS de Docker). Sans le site, nginx démarre quand même et
+  l'application affiche « Version de développement ». Contrôle :
+  `https://dev.fourmy.org/version.json` doit donner le même numéro que
+  `https://fourmy.org/version.json` (0.113.0 vérifié le 2026-11-13).
 - Les adresses intégrées au site viennent des variables GitHub
   `FOURMY_PUBLIC_APP_URL` et `FOURMY_PUBLIC_SITE_URL` (dev.fourmy.org et
   fourmy.org par défaut). La prod (Eyona) aura sa propre image ou ses propres
