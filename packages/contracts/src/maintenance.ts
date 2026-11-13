@@ -115,7 +115,7 @@ export const equipmentPart = z.object({
   reference: z.string().nullable(),
   family: z.string().nullable(),
   quantity: z.number().nullable(),
-  catalog: z.record(z.string().nullable()).nullable(),
+  catalog: z.record(z.string(), z.string().nullable()).nullable(),
   note: z.string().nullable(),
   operations: z.array(z.string()),
 });
@@ -162,7 +162,7 @@ export type EquipmentModelSummary = z.infer<typeof equipmentModelSummary>;
 /** Import d'un dossier de la base matériel : chemins relatifs → contenu texte. */
 export const equipmentBundleWrite = z.object({
   equipmentId: uuid.nullable().optional(),
-  files: z.record(z.string().max(5_000_000)).refine((f) => Object.keys(f).length <= 20, "20 fichiers au plus."),
+  files: z.record(z.string(), z.string().max(5_000_000)).refine((f) => Object.keys(f).length <= 20, "20 fichiers au plus."),
 });
 export type EquipmentBundleWrite = z.infer<typeof equipmentBundleWrite>;
 

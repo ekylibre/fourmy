@@ -276,7 +276,7 @@ export const planDraft = z.object({
   tillers: z.number().int().min(0).max(30).nullable().optional(),
   unfavourable: z.boolean().optional(),
   valueA: z.number().min(0).max(400).nullable().optional(),
-  overrides: z.record(z.enum(BALANCE_TERMS), z.object({ value: z.number().min(-500).max(1000), reason: z.string().trim().min(3).max(300) })).optional(),
+  overrides: z.partialRecord(z.enum(BALANCE_TERMS), z.object({ value: z.number().min(-500).max(1000), reason: z.string().trim().min(3).max(300) })).optional(),
   applications: z.array(plannedApplication).max(8).optional(),
   external: z
     .object({ doseKgNHa: z.number().min(0).max(500), tool: z.string().trim().min(1).max(120), advisor: z.string().trim().max(120).nullable().default(null), computedOn: isoDate })

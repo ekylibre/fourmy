@@ -66,7 +66,7 @@ export const containerContents = z.object({
       lotId: uuid,
       lotCode: z.string(),
       share: z.number().min(0).max(1),
-      attrs: z.record(z.unknown()).optional(), // millésime, cépages, appellation
+      attrs: z.record(z.string(), z.unknown()).optional(), // millésime, cépages, appellation
     }),
   ),
   lastMovements: z.array(

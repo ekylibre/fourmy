@@ -11,7 +11,7 @@ export const article = z
     kind: z.enum(["phyto", "fertilizer", "seed", "harvest", "wine", "part", "fluid", "other"]),
     unit: z.string().min(1),
     amm: z.string().optional(), // n° AMM pour les phytos
-    custom: z.record(z.unknown()).optional(),
+    custom: z.record(z.string(), z.unknown()).optional(),
   })
   .merge(auditFields);
 export type Article = z.infer<typeof article>;
@@ -23,7 +23,7 @@ export const lot = z
     farmId,
     articleId: uuid,
     code: z.string(),
-    attrs: z.record(z.unknown()).optional(),
+    attrs: z.record(z.string(), z.unknown()).optional(),
   })
   .merge(auditFields);
 export type Lot = z.infer<typeof lot>;

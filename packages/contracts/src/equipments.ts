@@ -89,7 +89,7 @@ export const equipmentOptionWrite = z.object({
 });
 export type EquipmentOptionWrite = z.infer<typeof equipmentOptionWrite>;
 
-const externalIds = z.record(z.string().max(120)).default({});
+const externalIds = z.record(z.string(), z.string().max(120)).default({});
 
 /** Création ou modification de la fiche (responsable). */
 export const equipmentWrite = z.object({
@@ -197,7 +197,7 @@ export const equipmentSheet = equipmentSummary.extend({
   commissionedAt: isoDateTime.nullable(),
   aggregates: z.array(equipmentAggregate),
   technical: z.unknown().nullable(),
-  externalIds: z.record(z.string()),
+  externalIds: z.record(z.string(), z.string()),
   notes: z.string().nullable(),
   brandInfo: farmBrand.nullable(),
   options: z.array(equipmentOption),
@@ -253,8 +253,8 @@ export type AvatarWrite = z.infer<typeof avatarWrite>;
 
 export const avatarInfo = z.object({
   /** Paramètres résolus (saisie > fiche technique > défaut). */
-  params: z.record(z.unknown()),
-  provenance: z.record(z.enum(["input", "technical", "default"])),
+  params: z.record(z.string(), z.unknown()),
+  provenance: z.record(z.string(), z.enum(["input", "technical", "default"])),
   saved: avatarWrite.nullable(),
   hash: z.string(),
   /** Modèle GLB importé à la place de l'avatar généré. */
