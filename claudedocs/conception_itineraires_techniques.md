@@ -397,6 +397,32 @@ Ordre : C7 et C2 (le cœur du DOM), puis C3, C4, C1, C5, C6, C8 et C9. Chaque
 | **T3. Activité** | lien depuis Activités, page fusionnée, liste des parcelles, descente | T2 |
 | **T4. Reversement** | demandes de fusion restantes chez OSFarm ; retour au paquet npm d'OSFarm une fois tout publié | T0 |
 
+## 12 bis. Écarts du lot T1 (2026-11-13)
+
+- **Dates au jour, heure de Paris** (`AAAA-MM-JJ`) dans les étapes et les
+  marques, pas des instants ISO : un semis à 0 h 30 compte pour son jour.
+- **Couverts** : le semis (`plant_cover_sowing`) va au couvert s'il tombe à
+  15 jours au plus de la date de semis déclarée ; un travail (forme `work`)
+  pendant la présence du couvert lui revient aussi (destruction). Les
+  couverts sont rattachés en premier, sur toutes les campagnes, pour qu'une
+  intervention d'été ne soit pas aussi comptée dans la culture précédente.
+- **Campagnes** : sans culture ni intervention, elle n'apparaît pas ; sans
+  culture mais avec des interventions, l'étape s'appelle « Sans culture
+  déclarée » ; plusieurs productions la même campagne donnent une étape
+  « Blé + Pois ».
+- **Libellé d'un groupe** : le libellé commun s'il est le même partout,
+  sinon celui de la procédure, suivi du nombre de parcelles ; les variantes
+  sont listées dans les détails.
+- **Exclusion** : forme `maintenance` ou catégorie `equipment`. La catégorie
+  `general` ne sert qu'aux procédures hors catalogue (reprises d'Ekylibre) :
+  elles restent dans les travaux.
+- **Libellés d'unités** déplacés du web vers les contrats (`units.ts`) pour
+  servir aussi à l'API ; le web les réexporte sans changement.
+- **Donnée réelle** : des matériels d'attelage sans fiche (identifiant vide)
+  existent dans les données reprises ; ils sont écartés des libellés.
+- **Mesuré sur la ferme pilote** : 10 ans d'une parcelle en 81 ms (8 étapes,
+  82 marques), activité de 9 parcelles en 23 ms.
+
 ## 13. Décisions de conception
 
 1. **Modèle de Fourmy côté API, format TIKA côté web** (§2), plutôt qu'une

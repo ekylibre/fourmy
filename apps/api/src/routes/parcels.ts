@@ -4,7 +4,8 @@ import { createParcelFromMap, identifyPoint, parcelSheet, refreshReferences } fr
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import { listParcelsAt, listParcelNames, createParcel, versionParcel } from "../repos/parcels.js";
-import { atOrNow, BadRequest, domainCtx, problem, uuidParam } from "./helpers.js";
+import { parcelItinerary } from "../repos/itinerary.js";
+import { atOrNow, BadRequest, domainCtx, intQuery, problem, uuidParam } from "./helpers.js";
 
 /** Parcellaire versionné (FR-PARC-1/2). Écritures réservées au rôle owner. */
 export const parcelRoutes = new Hono<Env>()
@@ -32,6 +33,12 @@ export const parcelRoutes = new Hono<Env>()
     return c.json(created, 201);
   })
   .get("/land-parcels/:id/sheet", async (c) => c.json(await parcelSheet(db(), c.get("farmId"), uuidParam(c, "id"))))
+  // Itinéraire technique (lot T1) : `year` (campagne, défaut l'année en cours), `years` (1 à 20).
+  .get("/land-parcels/:id/itinerary", async (c) => {
+    const year = intQuery(c.req.query("year"), new Date().getFullYear(), 1900, 2200, "year");
+    const years = intQuery(c.req.query("years"), 1, 1, 20, "years");
+    return c.json(await parcelItinerary(db(), c.get("farmId"), uuidParam(c, "id"), year, years));
+  })
   .post("/land-parcels/:id/references/refresh", requireOwner, async (c) => {
     try {
       return c.json(await refreshReferences(db(), c.get("farmId"), uuidParam(c, "id")));

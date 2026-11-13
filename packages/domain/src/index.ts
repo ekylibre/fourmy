@@ -29,3 +29,4 @@ export * from "./modulation.js";
 export * from "./fertilization/index.js";
 export * from "./work-time.js";
 export * from "./farm.js";
+export * from "./itinerary.js";

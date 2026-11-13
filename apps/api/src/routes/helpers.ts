@@ -36,6 +36,14 @@ export function window(c: Context<Env>, maxDays: number): { from: string; to: st
   return { from: new Date(f).toISOString(), to: new Date(t).toISOString() };
 }
 
+/** Entier de la requête dans [min, max] ; absent : la valeur par défaut. */
+export function intQuery(raw: string | undefined, fallback: number, min: number, max: number, name: string): number {
+  if (raw === undefined || raw === "") return fallback;
+  const v = Number(raw);
+  if (!Number.isInteger(v) || v < min || v > max) throw new BadRequest(`${name} : entier de ${min} à ${max} attendu`);
+  return v;
+}
+
 export function uuidParam(c: Context<Env>, name: string, source: "param" | "query" = "param"): string {
   const v = source === "param" ? c.req.param(name) : c.req.query(name);
   if (!isUuid(v)) throw new BadRequest(`${name} doit être un UUID`);

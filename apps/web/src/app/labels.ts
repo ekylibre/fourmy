@@ -1,3 +1,5 @@
+import { unitLabel } from "@fourmy/contracts";
+
 /** Libellés français des codes métier (procédures Ekylibre, natures, unités). */
 
 import { PROCEDURE_LABELS } from "@fourmy/contracts";
@@ -37,25 +39,8 @@ export const ARTICLE_KIND_LABELS: Record<string, string> = {
   other: "Autre",
 };
 
-const UNITS: Record<string, string> = {
-  liter: "L",
-  hectoliter: "hL",
-  kilogram: "kg",
-  ton: "t",
-  gram: "g",
-  unity: "u",
-  thousand: "milliers",
-  liter_per_hectare: "L/ha",
-  kilogram_per_hectare: "kg/ha",
-  ton_per_hectare: "t/ha",
-  thousand_per_hectare: "milliers/ha",
-  unity_per_hectare: "u/ha",
-};
-
-export function unitLabel(unit: string | null | undefined): string {
-  if (!unit) return "";
-  return UNITS[unit] ?? unit.replace(/_per_/g, "/").replace(/_/g, " ");
-}
+// Libellés d'unités : partagés avec l'API (itinéraires techniques), dans les contrats.
+export { unitLabel };
 
 /** Unités proposées à la saisie d'un intrant, selon l'unité de l'article. */
 export function doseUnits(articleUnit: string): { value: string; label: string }[] {
