@@ -8,7 +8,7 @@ import { formatHa } from "@fourmy/ui-lyvre";
 import type { Area } from "@fourmy/carto";
 import { CartoEditor } from "../../carto/editor";
 import { WMTS } from "../map/ParcelMap"; // règle aussi le worker de MapLibre
-import { zonesFor, type ParcelShape, type WorkingZone } from "./zones";
+import { parcelsInBox, zonesFor, type ParcelShape, type WorkingZone } from "./zones";
 
 export interface PickerParcel extends ParcelShape {
   name: string;
@@ -158,14 +158,16 @@ export function ParcelPicker({ parcels, selected, zones, onSelect, onZones, onCl
     const move = (e: MapMouseEvent) => start && setBox({ x0: start.x, y0: start.y, x1: e.point.x, y1: e.point.y });
     const up = (e: MapMouseEvent) => {
       if (!start) return;
-      const hits = m.queryRenderedFeatures(
-        [
-          [Math.min(start.x, e.point.x), Math.min(start.y, e.point.y)],
-          [Math.max(start.x, e.point.x), Math.max(start.y, e.point.y)],
-        ],
-        { layers: ["parcels-fill"] },
-      );
-      const ids = [...new Set(hits.map((f) => f.properties?.id as string))];
+      // Calcul sur les contours, pas sur ce que la carte a déjà dessiné
+      // (queryRenderedFeatures) : juste après l'ouverture, des parcelles
+      // pouvaient manquer.
+      const corners = [
+        [start.x, start.y],
+        [e.point.x, start.y],
+        [e.point.x, e.point.y],
+        [start.x, e.point.y],
+      ].map(([x, y]) => m.unproject([x!, y!]).toArray());
+      const ids = parcelsInBox(corners, latest.current.parcels);
       const { selected: current, onSelect: select } = latest.current;
       select([...new Set([...current, ...ids])]);
       start = null;

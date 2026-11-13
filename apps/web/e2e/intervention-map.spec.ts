@@ -26,6 +26,9 @@ test("choisir les parcelles sur la carte et dessiner une zone partielle", async 
   const map = form.getByTestId("parcel-picker-map");
   await expect(map).toBeVisible();
   await expect(form.getByRole("button", { name: "Zone partielle" })).toBeEnabled({ timeout: 30_000 });
+  // Le bloc météo, au-dessus de la carte, n'apparaît qu'une fois sa réponse
+  // reçue et pousse alors la carte vers le bas : l'attendre avant de mesurer.
+  await expect(form.getByLabel("Conditions de pulvérisation")).toBeVisible({ timeout: 15_000 });
   const box = (await map.boundingBox())!;
 
   // Maj + glisser sur toute la carte : toutes les parcelles visibles.
@@ -41,8 +44,12 @@ test("choisir les parcelles sur la carte et dessiner une zone partielle", async 
   // Zone partielle dans la plus grande parcelle (Parcelle 008, ~2 ha).
   await form.getByRole("button", { name: "Voir Parcelle 008 sur la carte" }).click();
   await form.getByRole("button", { name: "Zone partielle" }).click();
-  const cx = box.x + box.width / 2;
-  const cy = box.y + box.height / 2;
+  // Re-mesurer : cliquer « Voir… » sous la carte fait défiler la page, la
+  // carte n'est plus là où elle était au Maj + glisser.
+  await map.scrollIntoViewIfNeeded();
+  const zbox = (await map.boundingBox())!;
+  const cx = zbox.x + zbox.width / 2;
+  const cy = zbox.y + zbox.height / 2;
   for (const [dx, dy] of [[-30, -25], [30, -25], [30, 25], [-30, 25], [-30, -25]] as const) await page.mouse.click(cx + dx, cy + dy);
   const zone = form.getByText(/^zone .* sur .* ha$/);
   await expect(zone).toBeVisible();

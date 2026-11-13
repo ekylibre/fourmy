@@ -1,6 +1,6 @@
 import type { MultiPolygon, Polygon } from "geojson";
 import { areaM2 } from "@fourmy/carto";
-import { treatedAreaM2, zonesFor, type ParcelShape } from "../src/features/interventions/zones";
+import { parcelsInBox, treatedAreaM2, zonesFor, type ParcelShape } from "../src/features/interventions/zones";
 
 const square = (x0: number, y0: number, x1: number, y1: number): Polygon => ({
   type: "Polygon",
@@ -29,6 +29,13 @@ describe("zones de travail partielles", () => {
 
   it("une zone hors des parcelles ne touche rien", () => {
     expect(zonesFor(square(0.52, 44.8, 0.521, 44.801), [west, east])).toEqual([]);
+  });
+
+  it("Maj + glisser : les parcelles touchées par le rectangle, même partiellement", () => {
+    const box = (x0: number, y0: number, x1: number, y1: number): [number, number][] => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+    expect(parcelsInBox(box(0.4999, 44.7999, 0.5015, 44.8011), [west, east, far])).toEqual(["w", "e"]);
+    expect(parcelsInBox(box(0.4999, 44.7999, 0.512, 44.8011), [west, east, far])).toEqual(["w", "e", "f"]);
+    expect(parcelsInBox(box(0.52, 44.8, 0.521, 44.801), [west, east, far])).toEqual([]);
   });
 
   it("surface traitée : la zone quand elle existe, sinon la parcelle", () => {
