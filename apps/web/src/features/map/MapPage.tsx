@@ -1,3 +1,4 @@
+import { useArea, useMapPrefs } from "../../app/prefs";
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { PencilRuler } from "lucide-react";
@@ -5,7 +6,6 @@ import { Badge, Button, Grid, Group, Paper, SegmentedControl, Select, Stack, Tab
 import { useQuery } from "@tanstack/react-query";
 import type { FeatureCollection, Geometry } from "geojson";
 import type { TrackCoverage, TrackReplay } from "@fourmy/contracts";
-import { formatHa } from "@fourmy/ui-lyvre";
 import { api, farmPath } from "../../app/api";
 import { useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
@@ -21,11 +21,15 @@ import { ParcelIndex, SatelliteControl } from "../remote-sensing/SatelliteContro
 
 /** Carte 2D : parcellaire à la date de la frise, bâtiments, trace GPS du jour (US-1). */
 export function MapPage() {
+  const area = useArea();
   const farm = useFarm();
   const location = useLocation();
   const { at, day } = useAt();
   const snap = useSnapshot(farm.id, at);
-  const [basemap, setBasemap] = useState<Basemap>("ortho");
+  // Le fond de la ferme par défaut (E9) ; un choix ici reste propre à cet écran.
+  const mapPrefs = useMapPrefs();
+  const [chosenBasemap, setBasemap] = useState<Basemap | null>(null);
+  const basemap = chosenBasemap ?? mapPrefs.basemap;
   const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
   const [equipment, setEquipment] = useState<string | null>(null);
   const [showTrack, setShowTrack] = useState(false);
@@ -131,6 +135,7 @@ export function MapPage() {
                 places={layers.places}
                 track={trackLayer}
                 basemap={basemap}
+                home={mapPrefs.home}
                 onSelect={setSelected}
                 satellite={satellite}
                 fillOpacity={satellite ? 0 : sat === "parcels" ? 0.75 : 0.4}
@@ -152,14 +157,14 @@ export function MapPage() {
                 ))}
               </Group>
               <Text size="sm" c="dimmed" mt="xs">
-                {s.landParcels.length} parcelles · {formatHa(s.landParcels.reduce((a, p) => a + p.version.areaM2, 0))}
+                {s.landParcels.length} parcelles · {area(s.landParcels.reduce((a, p) => a + p.version.areaM2, 0))}
               </Text>
             </Paper>
             <SatelliteControl farmId={farm.id} enabled={rsEnabled} data={rs.data} layer={sat} onChange={setSat} index={idx} onIndexChange={setIdx} />
             {selected && (
               <Paper p="md">
                 <Title order={4}>{String(selected.name)}</Title>
-                <Text>{formatHa(Number(selected.areaM2))}</Text>
+                <Text>{area(Number(selected.areaM2))}</Text>
                 <Text c="dimmed">{NATURE_LABELS[String(selected.nature)] ?? "Sans production cette campagne"}</Text>
                 {typeof selected.variety === "string" && selected.variety !== "null" && <Badge color="lichen">{selected.variety}</Badge>}
                 {rsEnabled && <ParcelIndex item={selectedIndex} index={index} />}
@@ -218,7 +223,7 @@ export function MapPage() {
                       <Table.Tr key={p.landParcelId}>
                         <Table.Td>{p.parcelName}</Table.Td>
                         <Table.Td ta="right" className="lv-num">
-                          {formatHa(p.areaM2)}
+                          {area(p.areaM2)}
                         </Table.Td>
                         <Table.Td ta="right" className="lv-num">
                           {Math.round(p.durationS / 60)} min

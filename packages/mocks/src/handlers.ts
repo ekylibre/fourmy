@@ -1,5 +1,5 @@
 import { http, HttpResponse } from "msw";
-import { INTEGRATION_PROVIDERS, VEGETATION_INDICES, type VegetationIndex } from "@fourmy/contracts";
+import { DEFAULT_TRACK_SETTINGS, INTEGRATION_PROVIDERS, VEGETATION_INDICES, type VegetationIndex } from "@fourmy/contracts";
 import {
   demoSnapshot,
   demoActivities,
@@ -82,6 +82,7 @@ const demoFarmProfile = () => ({
     },
   ],
   parcelsOutside: null,
+  display: { basemap: "ortho", areaUnit: "ha" },
   canEdit: true,
 });
 
@@ -107,6 +108,8 @@ export const handlers = [
   http.get(`*${base}/integrations`, () => HttpResponse.json({ providers: INTEGRATION_PROVIDERS, items: [] })),
   // « Ma ferme » (lot F1) : siège sans point, aucune certification ; les écritures renvoient ce qu'elles reçoivent.
   http.get(`*${base}/farm`, () => HttpResponse.json(demoFarmProfile())),
+  http.get(`*${base}/settings/maintenance`, () => HttpResponse.json({ soonHours: 50, soonMonths: 1, notify: [] })),
+  http.get(`*${base}/settings/tracks`, () => HttpResponse.json(DEFAULT_TRACK_SETTINGS)),
   http.put(`*${base}/farm/identity`, async ({ request }) => HttpResponse.json(await request.json())),
   http.post(`*${base}/farm/certifications`, async ({ request }) => HttpResponse.json({ id: crypto.randomUUID(), ...((await request.json()) as object) }, { status: 201 })),
   http.put(`*${base}/farm/certifications/:id`, async ({ request, params }) => HttpResponse.json({ id: params.id, ...((await request.json()) as object) })),

@@ -1,3 +1,4 @@
+import { useArea } from "../../app/prefs";
 import { useState } from "react";
 import { Link } from "react-router";
 import { Alert, Badge, Button, ColorInput, Group, Modal, MultiSelect, Paper, Select, SimpleGrid, Stack, Switch, Text, TextInput, Title } from "@mantine/core";
@@ -6,7 +7,6 @@ import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Map as MapIcon, Pencil, Plus } from "lucide-react";
 import { ACTIVITY_FAMILIES, ACTIVITY_FAMILY_LABELS, PARCEL_FAMILIES, type Activity, type ActivityFamily, type ReferenceProduction } from "@fourmy/contracts";
-import { formatHa } from "@fourmy/ui-lyvre";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
@@ -22,6 +22,7 @@ import { activeDuring, CertificationBadges, CertificationRecap, ParcelCertificat
  * contrôlée, culture IFT, image) et ses parcelles par campagne.
  */
 export function ActivitiesPage() {
+  const area = useArea();
   const farm = useFarm();
   const { at, day } = useAt();
   const year = Number(day.slice(0, 4));
@@ -87,7 +88,7 @@ export function ActivitiesPage() {
                       )}
                       {PARCEL_FAMILIES.includes(a.family) && (
                         <Text size="sm" className="lv-num">
-                          {a.parcelIds.length} parcelle(s){a.areaM2 ? ` · ${formatHa(a.areaM2)}` : ""}
+                          {a.parcelIds.length} parcelle(s){a.areaM2 ? ` · ${area(a.areaM2)}` : ""}
                         </Text>
                       )}
                       <CertificationRecap parcelIds={a.parcelIds} year={year} />
@@ -266,6 +267,7 @@ function ParcelsModal({ activity, year, at, onClose }: { activity: Activity | nu
 }
 
 function ParcelsForm({ activity, year, at, onDone }: { activity: Activity; year: number; at: string; onDone: () => void }) {
+  const area = useArea();
   const farm = useFarm();
   const snap = useSnapshot(farm.id, at);
   const [selected, setSelected] = useState<string[]>(activity.parcelIds);
@@ -278,7 +280,7 @@ function ParcelsForm({ activity, year, at, onDone }: { activity: Activity; year:
   );
   if (!snap.data) return <Loading />;
   // Parcelles à la date de la frise, plus celles déjà rattachées (d'une autre date).
-  const known = new Map(snap.data.landParcels.map((p) => [p.id, `${p.name} (${formatHa(p.version.areaM2)})`]));
+  const known = new Map(snap.data.landParcels.map((p) => [p.id, `${p.name} (${area(p.version.areaM2)})`]));
   const data = [...known].map(([value, label]) => ({ value, label }));
   for (const id of activity.parcelIds) if (!known.has(id)) data.push({ value: id, label: "Parcelle d'une autre date" });
   return (

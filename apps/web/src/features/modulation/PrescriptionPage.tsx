@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMapPrefs } from "../../app/prefs";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { Alert, Anchor, Badge, Button, Checkbox, Group, NumberInput, Paper, SegmentedControl, SimpleGrid, Stack, Table, Text, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
@@ -25,6 +26,7 @@ const EMPTY = { type: "FeatureCollection" as const, features: [] };
 
 /** Fiche d'une carte de modulation : zones et doses, téléchargements, envoi aux machines par agrirouter. */
 export function PrescriptionPage() {
+  const mapPrefs = useMapPrefs();
   const farm = useFarm();
   const { prescriptionId = "" } = useParams();
   const location = useLocation();
@@ -86,7 +88,7 @@ export function PrescriptionPage() {
 
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
         <Paper withBorder style={{ height: 380, overflow: "hidden" }}>
-          <ParcelMap parcels={zonesCollection(p.zones, p.zoneCount)} places={EMPTY} track={EMPTY} basemap="ortho" minHeight={0} fillOpacity={0.6} />
+          <ParcelMap parcels={zonesCollection(p.zones, p.zoneCount)} places={EMPTY} track={EMPTY} basemap={mapPrefs.basemap} minHeight={0} fillOpacity={0.6} />
         </Paper>
         <Paper p="md" withBorder>
           <Table aria-label="Zones et doses" className="lv-num">

@@ -1,24 +1,19 @@
 import { useSearchParams } from "react-router";
 import { Badge, Group, Stack, Tabs, Title } from "@mantine/core";
-import { useQuery } from "@tanstack/react-query";
-import type { FarmProfile } from "@fourmy/contracts";
-import { api, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
+import { useFarmProfile } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
 import { IdentityTab } from "./IdentityTab";
 import { SitesTab } from "./SitesTab";
+import { BrandsTab, DisplaySettings, MaintenanceTab, TracksTab } from "./SettingsTabs";
 
 /**
  * « Ma ferme » (lot F1) : fiche de l'exploitation, `?tab=` pour ouvrir un
  * onglet précis (E22). Tous les membres la consultent, le responsable la
  * modifie (E3).
  */
-const TABS = ["identity", "sites"] as const;
+const TABS = ["identity", "sites", "maintenance", "tracks", "brands"] as const;
 type Tab = (typeof TABS)[number];
-
-export function useFarmProfile(farmId: string) {
-  return useQuery({ queryKey: ["farm-profile", farmId], queryFn: () => api.get<FarmProfile>(farmPath(farmId, "/farm")) });
-}
 
 export function FarmProfilePage() {
   const farm = useFarm();
@@ -56,13 +51,32 @@ export function FarmProfilePage() {
       >
         <Tabs.List mb="md">
           <Tabs.Tab value="identity">Identité</Tabs.Tab>
-          <Tabs.Tab value="sites">Sites</Tabs.Tab>
+          <Tabs.Tab value="sites">Sites et cartes</Tabs.Tab>
+          {p.canEdit && <Tabs.Tab value="maintenance">Entretien</Tabs.Tab>}
+          {p.canEdit && <Tabs.Tab value="tracks">Parcours</Tabs.Tab>}
+          <Tabs.Tab value="brands">Marques</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="identity">
           <IdentityTab key={JSON.stringify(p.identity)} profile={p} />
         </Tabs.Panel>
         <Tabs.Panel value="sites">
-          <SitesTab profile={p} />
+          <Stack>
+            <DisplaySettings key={JSON.stringify(p.display)} profile={p} />
+            <SitesTab profile={p} />
+          </Stack>
+        </Tabs.Panel>
+        {p.canEdit && (
+          <Tabs.Panel value="maintenance">
+            <MaintenanceTab />
+          </Tabs.Panel>
+        )}
+        {p.canEdit && (
+          <Tabs.Panel value="tracks">
+            <TracksTab />
+          </Tabs.Panel>
+        )}
+        <Tabs.Panel value="brands">
+          <BrandsTab canEdit={p.canEdit} />
         </Tabs.Panel>
       </Tabs>
     </Stack>

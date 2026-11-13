@@ -1,10 +1,10 @@
+import { useArea, useMapPrefs } from "../../app/prefs";
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { Alert, Badge, Button, Checkbox, Grid, Group, Modal, Paper, SegmentedControl, Select, Stack, Table, Text, TextInput, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Intervention, TrackDraft, TrackSession, TrackSessionDetail, TrackSessionList } from "@fourmy/contracts";
-import { formatHa } from "@fourmy/ui-lyvre";
 import type { FeatureCollection, Geometry } from "geojson";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useColumns, type ColumnDef } from "../../app/columns";
@@ -221,6 +221,7 @@ const SESSION_COLUMNS: ColumnDef[] = [
 ];
 
 function SessionRow({ s, farmId, onTool, show, checked, onToggle }: { s: TrackSession; farmId: string; onTool: boolean; show: (key: string) => boolean; checked: boolean; onToggle: () => void }) {
+  const area = useArea();
   return (
     <Table.Tr aria-label={`Parcours du ${date(s.startedAt)} ${hhmm(s.startedAt)}`}>
       <Table.Td>
@@ -247,7 +248,7 @@ function SessionRow({ s, farmId, onTool, show, checked, onToggle }: { s: TrackSe
           <Group gap={4}>
             {s.parcels.map((p) => (
               <Badge key={p.landParcelId} variant="outline" color="gray" tt="none" fw={500}>
-                {p.name} · {formatHa(p.areaM2)}
+                {p.name} · {area(p.areaM2)}
               </Badge>
             ))}
           </Group>
@@ -255,7 +256,7 @@ function SessionRow({ s, farmId, onTool, show, checked, onToggle }: { s: TrackSe
       )}
       {show("area") && (
         <Table.Td ta="right" className="lv-num">
-          {s.coveredAreaM2 === null ? "—" : formatHa(s.coveredAreaM2)}
+          {s.coveredAreaM2 === null ? "—" : area(s.coveredAreaM2)}
         </Table.Td>
       )}
       {show("distance") && (
@@ -296,6 +297,8 @@ function SessionRow({ s, farmId, onTool, show, checked, onToggle }: { s: TrackSe
 
 /** Trace, couverture et parcelles des parcours cochés (au plus 10). */
 function SelectionMap({ farmId, ids, viewer }: { farmId: string; ids: string[]; viewer: string }) {
+  const mapPrefs = useMapPrefs();
+  const area = useArea();
   const details = useQueries({
     queries: ids.slice(0, 10).map((id) => ({
       queryKey: ["track-session", farmId, id],
@@ -328,16 +331,16 @@ function SelectionMap({ farmId, ids, viewer }: { farmId: string; ids: string[]; 
       })),
     ),
   };
-  const area = loaded.reduce((n, s) => n + (s.coveredAreaM2 ?? 0), 0);
+  const covered = loaded.reduce((n, s) => n + (s.coveredAreaM2 ?? 0), 0);
   return (
     <Stack gap="xs">
       <Paper withBorder style={{ height: 360, overflow: "hidden" }} aria-label="Carte des parcours">
         <MapBoundary>
-          <ParcelMap parcels={parcels} places={EMPTY} zones={zones} track={track} minHeight={0} basemap="ortho" />
+          <ParcelMap parcels={parcels} places={EMPTY} zones={zones} track={track} minHeight={0} basemap={mapPrefs.basemap} />
         </MapBoundary>
       </Paper>
       <Text size="xs" c="dimmed" className="lv-num">
-        {ids.length} parcours · {formatHa(area)} couverts{ids.length > 10 ? " (10 premiers sur la carte)" : ""}. Orange : travail ; pointillés : déplacement.
+        {ids.length} parcours · {area(covered)} couverts{ids.length > 10 ? " (10 premiers sur la carte)" : ""}. Orange : travail ; pointillés : déplacement.
       </Text>
     </Stack>
   );

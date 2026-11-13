@@ -41,6 +41,8 @@ export interface ParcelMapProps {
   satellite?: { href: string; bbox: [number, number, number, number] } | null;
   /** Opacité du remplissage des parcelles (0,4 par défaut ; plus faible sous une image satellite). */
   fillOpacity?: number;
+  /** Point du siège : centre de la carte tant qu'il n'y a rien à cadrer (E10). */
+  home?: { lat: number; lon: number } | null;
 }
 
 function bbox(...fcs: FeatureCollection[]): [[number, number], [number, number]] | null {
@@ -70,6 +72,7 @@ export function ParcelMap({
   highlight = EMPTY,
   satellite = null,
   fillOpacity = 0.4,
+  home = null,
 }: ParcelMapProps) {
   const clickRef = useRef(onMapClick);
   clickRef.current = onMapClick;
@@ -182,9 +185,12 @@ export function ParcelMap({
       bounds.current = b;
       m.fitBounds(b, { padding: 40, duration: 0 });
       fitted.current = true;
+    } else if (!b && !fitted.current && home && !moved.current) {
+      // Rien à cadrer (ferme sans parcelle) : le siège, sans marquer le cadrage fait.
+      m.jumpTo({ center: [home.lon, home.lat], zoom: 14 });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parcels, places, zones, water, buffer, highlight, ready]);
+  }, [parcels, places, zones, water, buffer, highlight, ready, home?.lat, home?.lon]);
 
   useEffect(() => {
     const m = map.current;

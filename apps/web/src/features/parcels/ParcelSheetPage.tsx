@@ -1,3 +1,4 @@
+import { useArea, useMapPrefs } from "../../app/prefs";
 import { lazy, Suspense, useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import { Alert, Badge, Button, Grid, Group, Paper, Stack, Table, Tabs, Text, Title } from "@mantine/core";
@@ -6,7 +7,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import type { FeatureCollection, Geometry } from "geojson";
 import type { ParcelSheet } from "@fourmy/contracts";
-import { formatHa } from "@fourmy/ui-lyvre";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { formatDateTime, procedureLabel } from "../../app/labels";
@@ -51,6 +51,8 @@ export function ParcelSheetPage() {
 }
 
 function Sheet({ sheet: s }: { sheet: ParcelSheet }) {
+  const mapPrefs = useMapPrefs();
+  const area = useArea();
   const farm = useFarm();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -95,7 +97,7 @@ function Sheet({ sheet: s }: { sheet: ParcelSheet }) {
         <Stack gap={4}>
           <Title order={1}>{s.name}</Title>
           <Group gap="xs">
-            <Text className="lv-num">{formatHa(s.areaM2)}</Text>
+            <Text className="lv-num">{area(s.areaM2)}</Text>
             {s.productions[0]?.activity && <ActivityBadge activity={s.productions[0].activity} />}
             <CertificationBadges certs={current} />
           </Group>
@@ -124,7 +126,7 @@ function Sheet({ sheet: s }: { sheet: ParcelSheet }) {
             <Grid.Col span={{ base: 12, md: 7 }}>
               <Paper withBorder style={{ height: 420, overflow: "hidden" }}>
                 <MapBoundary>
-                  <ParcelMap parcels={parcel} places={EMPTY} track={EMPTY} water={water} basemap="ortho" minHeight={0} />
+                  <ParcelMap parcels={parcel} places={EMPTY} track={EMPTY} water={water} basemap={mapPrefs.basemap} minHeight={0} />
                 </MapBoundary>
               </Paper>
             </Grid.Col>
@@ -165,7 +167,7 @@ function Sheet({ sheet: s }: { sheet: ParcelSheet }) {
                     Identité
                   </Title>
                   <Stack gap={2}>
-                    <Text size="sm">Surface : {formatHa(s.areaM2)}</Text>
+                    <Text size="sm">Surface : {area(s.areaM2)}</Text>
                     <Text size="sm">Depuis le {formatDateTime(s.since).slice(0, 10)}{s.until ? `, jusqu'au ${formatDateTime(s.until).slice(0, 10)}` : ""}</Text>
                     {s.pacIslet && <Text size="sm">Parcelle PAC (RPG) : {s.pacIslet}</Text>}
                     <Text size="sm" className="lv-num">
@@ -205,7 +207,7 @@ function Sheet({ sheet: s }: { sheet: ParcelSheet }) {
                       <Table.Tr key={year}>
                         <Table.Td className="lv-num">{year}</Table.Td>
                         <Table.Td>{c ? `${c.cropLabel ?? c.cropCode} (${c.cropCode})` : "—"}</Table.Td>
-                        <Table.Td ta="right" className="lv-num">{c?.areaM2 ? formatHa(c.areaM2) : "—"}</Table.Td>
+                        <Table.Td ta="right" className="lv-num">{c?.areaM2 ? area(c.areaM2) : "—"}</Table.Td>
                         <Table.Td>{p?.activity ? <ActivityBadge activity={p.activity} /> : "—"}</Table.Td>
                       </Table.Tr>
                     );
@@ -237,8 +239,8 @@ function Sheet({ sheet: s }: { sheet: ParcelSheet }) {
                             {c.idu}
                           </Text>
                         </Table.Td>
-                        <Table.Td ta="right" className="lv-num">{c.areaM2 ? formatHa(c.areaM2) : "—"}</Table.Td>
-                        <Table.Td ta="right" className="lv-num">{c.overlapM2 ? formatHa(c.overlapM2) : "—"}</Table.Td>
+                        <Table.Td ta="right" className="lv-num">{c.areaM2 ? area(c.areaM2) : "—"}</Table.Td>
+                        <Table.Td ta="right" className="lv-num">{c.overlapM2 ? area(c.overlapM2) : "—"}</Table.Td>
                       </Table.Tr>
                     ))}
                   </Table.Tbody>

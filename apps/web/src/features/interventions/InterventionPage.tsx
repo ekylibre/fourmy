@@ -1,3 +1,4 @@
+import { useArea, useMapPrefs } from "../../app/prefs";
 import { MaintenanceSummary } from "../maintenance/MaintenanceFields";
 import { useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
@@ -11,7 +12,6 @@ import type { FeatureCollection, Geometry } from "geojson";
 import type { ComplianceResult, Intervention, InterventionDetail, InterventionWaterMap, Snapshot, TrackReplay, TrackSession } from "@fourmy/contracts";
 import { TREATMENT_PURPOSE_LABELS } from "@fourmy/contracts";
 import { displayStatus } from "@fourmy/domain";
-import { formatHa } from "@fourmy/ui-lyvre";
 import { api, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { formatDateTime, formatNumber, formatPeriod, procedureLabel, unitLabel } from "../../app/labels";
@@ -52,6 +52,8 @@ export function InterventionPage() {
 }
 
 function InterventionSheet({ intervention: i }: { intervention: InterventionDetail }) {
+  const mapPrefs = useMapPrefs();
+  const area = useArea();
   const farm = useFarm();
   const location = useLocation();
   const day = interventionDay(i);
@@ -244,7 +246,7 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
 
             <Paper p="md" withBorder>
               <Title order={4} mb="xs">
-                {parcelTargets.length ? `Parcelles (${formatHa(treatedM2)} traités)` : "Cibles"}
+                {parcelTargets.length ? `Parcelles (${area(treatedM2)} traités)` : "Cibles"}
               </Title>
               <Table aria-label="Cibles">
                 <Table.Tbody>
@@ -262,7 +264,7 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
                           </Group>
                         </Table.Td>
                         <Table.Td ta="right" className="lv-num">
-                          {t.kind === "land_parcel" && areaOf(t) !== null ? formatHa(areaOf(t)!) : ""}
+                          {t.kind === "land_parcel" && areaOf(t) !== null ? area(areaOf(t)!) : ""}
                           {t.workedAreaM2 ? " (surface travaillée)" : ""}
                         </Table.Td>
                       </Table.Tr>
@@ -283,7 +285,7 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
                   <Text span fw={600}>
                     {formatNumber(i.irrigation.depthMm, 1)} mm
                   </Text>
-                  {treatedM2 > 0 && ` soit ${Math.round(irrigationVolumeM3(i.irrigation.depthMm, treatedM2)).toLocaleString("fr-FR")} m³ sur ${formatHa(treatedM2)}`}
+                  {treatedM2 > 0 && ` soit ${Math.round(irrigationVolumeM3(i.irrigation.depthMm, treatedM2)).toLocaleString("fr-FR")} m³ sur ${area(treatedM2)}`}
                   {i.irrigation.method && ` · ${IRRIGATION_METHOD_LABELS[i.irrigation.method]}`}
                 </Text>
               </Paper>
@@ -403,7 +405,7 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
                     buffer={bufferLayer}
                     track={trackLayer}
                     minHeight={0}
-                    basemap="ortho"
+                    basemap={mapPrefs.basemap}
                   />
                 </MapBoundary>
               </Paper>
@@ -530,6 +532,7 @@ function CrewsView({ i, names }: { i: Intervention; names: { equipment: Map<stri
 
 /** Parcours GPS rattachés (FR-GPS-23), avec la trace recalculée si elle a changé depuis (FR-GPS-15). */
 function LinkedTrackSessions({ farmId, interventionId, names }: { farmId: string; interventionId: string; names: Map<string, string> }) {
+  const area = useArea();
   const list = useQuery({
     queryKey: ["intervention-track-sessions", farmId, interventionId],
     queryFn: () => api.get<{ items: TrackSession[] }>(farmPath(farmId, `/interventions/${interventionId}/track-sessions`)),
@@ -559,7 +562,7 @@ function LinkedTrackSessions({ farmId, interventionId, names }: { farmId: string
               </Table.Td>
               <Table.Td>{s.parcels.map((p) => p.name).join(", ") || "—"}</Table.Td>
               <Table.Td ta="right" className="lv-num">
-                {s.coveredAreaM2 === null ? "—" : formatHa(s.coveredAreaM2)}
+                {s.coveredAreaM2 === null ? "—" : area(s.coveredAreaM2)}
               </Table.Td>
               <Table.Td>
                 {s.drift && (
