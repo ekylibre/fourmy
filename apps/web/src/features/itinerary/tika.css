@@ -1,0 +1,9 @@
+/*
+ * Ajustements de TIKA dans Fourmy : la liste prend la police de l'application
+ * (TIKA demande « Segoe UI » sans repli, d'où une police à empattements hors
+ * Windows).
+ */
+.fourmy-tika .mainITKContainer .left-transcript,
+.fourmy-tika .mainITKContainer .bottom-transcript {
+  font-family: var(--mantine-font-family, inherit);
+}

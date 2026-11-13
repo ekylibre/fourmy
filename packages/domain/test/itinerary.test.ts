@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { PROCEDURES } from "@fourmy/contracts";
-import { buildActivityItinerary, buildParcelItinerary, cropSpan, groupMarks, laneOf, type ItineraryIntervention } from "../src/index.js";
+import { buildActivityItinerary, buildParcelItinerary, cropSpan, groupMarks, laneOf, TIKA_DEFAULT_COLORS, toTikaSystem, type ItineraryIntervention } from "../src/index.js";
 
 /** Itinéraires techniques (conception §3) : couloirs, dates des cultures, rattachement, regroupement. */
 const w2026 = { year: 2026, from: "2025-09-01", to: "2026-09-01" };
@@ -168,5 +168,42 @@ describe("vue fusionnée", () => {
       { id: "p3", name: "Coteau", areaM2: 20_000, interventions: 0 },
       { id: "p1", name: "Grande pièce", areaM2: 50_000, interventions: 2 },
     ]);
+  });
+});
+
+describe("conversion au format TIKA", () => {
+  it("étapes, couloirs, couvert en culture secondaire, statut et ref pour la fiche", () => {
+    const it = buildParcelItinerary({
+      title: "Grande pièce",
+      campaigns: [{ window: w2026, crops: [{ name: "Maïs", color: null, attributes: [{ label: "Surface", value: "5 ha" }] }], cover: { name: "Couvert : moutarde", sownOn: "2025-09-05", destroyedOn: "2026-02-01", attributes: [] } }],
+      interventions: [
+        iv("plant_cover_sowing", "2025-09-06"),
+        iv("plowing", "2026-03-20"),
+        iv("sowing", "2026-04-15"),
+        iv("fertilizing", "2026-05-01", { status: "planned", details: [{ label: "Intrants", value: "Ammonitrate 150 kg/ha" }] }),
+        iv("harvesting", "2026-08-25"),
+      ],
+    });
+    const t = toTikaSystem(it);
+    expect(t.options).toMatchObject({ view: "horizontal", show_transcript: true, title_top_interventions: "Travaux", title_bottom_interventions: "Intrants", title_steps: "Culture", show_climate_diagram: false });
+    expect(t.steps.map((s) => [s.name, s.secondary_crop, s.color])).toEqual([
+      ["Couvert : moutarde", true, TIKA_DEFAULT_COLORS.cover],
+      ["Maïs", false, TIKA_DEFAULT_COLORS.crop],
+    ]);
+    const mais = t.steps[1]!;
+    expect(mais.description).toBe("Surface : 5 ha");
+    expect(mais.interventions.map((i) => [i.name, i.day, i.type, i.status])).toEqual([
+      ["plowing", -26, "intervention_top", "done"],
+      ["sowing", 0, "intervention_top", "done"],
+      ["fertilizing", 16, "intervention_bottom", "planned"],
+      ["harvesting", 132, "intervention_top", "done"],
+    ]);
+    expect(mais.interventions[2]!.description).toBe("Intrants : Ammonitrate 150 kg/ha");
+    expect(mais.interventions[2]!.ref.interventionIds).toHaveLength(1);
+    expect(toTikaSystem(it, { view: "donut" }).options.view).toBe("donut");
+    // Sans semis ni récolte : la frise le dit.
+    const vine = toTikaSystem(buildParcelItinerary({ title: "x", campaigns: [{ window: w2026, crops: [{ name: "Vigne", color: "#7a3b5c", attributes: [] }], cover: null }], interventions: [] }));
+    expect(vine.steps[0]!.description).toBe("Dates : bornes de la campagne (ni semis ni récolte enregistrés)");
+    expect(vine.steps[0]!.color).toBe("#7a3b5c");
   });
 });
