@@ -236,6 +236,9 @@ function mergeGroup(group: ItineraryMark[], stepFrom: string): ItineraryMark {
       ...(labels.size > 1 ? [{ label: "Variantes", value: [...labels].sort().join(" ; ") }] : []),
     ],
     parcels,
+    members: group.flatMap((m) =>
+      m.interventionIds.map((interventionId) => ({ interventionId, at: m.at, label: m.label, status: m.status, parcels: m.parcels.map((p) => p.name) })),
+    ),
   };
 }
 

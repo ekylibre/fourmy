@@ -33,6 +33,17 @@ export interface ItineraryMark {
   details: ItineraryDetail[];
   /** Parcelles touchées. */
   parcels: { id: string; name: string }[];
+  /** Groupe de la vue fusionnée : chacune de ses interventions, pour l'ouvrir. */
+  members?: ItineraryMember[];
+}
+
+export interface ItineraryMember {
+  interventionId: string;
+  /** AAAA-MM-JJ. */
+  at: string;
+  label: string;
+  status: "done" | "planned";
+  parcels: string[];
 }
 
 export interface ItineraryStep {

@@ -207,3 +207,21 @@ describe("conversion au format TIKA", () => {
     expect(vine.steps[0]!.color).toBe("#7a3b5c");
   });
 });
+
+describe("membres d'un groupe", () => {
+  it("chaque intervention d'une marque regroupée, pour l'ouvrir", () => {
+    const marks = buildParcelItinerary({
+      title: "x",
+      campaigns: [{ window: { year: 2026, from: "2026-01-01", to: "2027-01-01" }, crops: [{ name: "Maïs", color: null, attributes: [] }], cover: null }],
+      interventions: [iv("sowing", "2026-04-12", { parcels: [P1], label: "Semis · DKC" }), iv("sowing", "2026-04-15", { parcels: [P2], label: "Semis · DKC", status: "done" })],
+    }).steps[0]!.marks;
+    const [g] = groupMarks(marks, "2026-04-12");
+    expect(g!.members).toEqual([
+      { interventionId: g!.interventionIds[0], at: "2026-04-12", label: "Semis · DKC", status: "done", parcels: ["Grande pièce"] },
+      { interventionId: g!.interventionIds[1], at: "2026-04-15", label: "Semis · DKC", status: "done", parcels: ["Bas du bois"] },
+    ]);
+    expect(toTikaSystem({ title: "x", campaigns: [2026], steps: [{ kind: "crop", campaign: 2026, name: "Maïs", color: null, from: "2026-04-12", to: "2026-09-01", datesFrom: "interventions", attributes: [], marks: [g!] }] }).steps[0]!.interventions[0]!.ref.members).toHaveLength(2);
+    // Une marque seule n'a pas de membres.
+    expect(marks[0]!.members).toBeUndefined();
+  });
+});

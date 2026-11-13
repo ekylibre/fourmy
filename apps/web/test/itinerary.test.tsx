@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { vi } from "vitest";
@@ -137,5 +137,97 @@ describe("itinéraire technique de la parcelle", () => {
     renderApp(`/f/${FARM}/land-parcels/${PARCEL}?at=2023-06-10&tab=itinerary`);
     expect(await screen.findByText("Aucune culture ni intervention sur cette période.", {}, { timeout: 10_000 })).toBeInTheDocument();
     expect(tika.renders).toHaveLength(0);
+  });
+});
+
+describe("itinéraire technique d'une activité", () => {
+  const ACTIVITY = "00000000-0000-7000-8000-0000000000f1";
+  const P2 = "00000000-0000-7000-8000-0000000000a2";
+  const I2 = "00000000-0000-7000-8000-000000000402";
+  const merged = {
+    title: "Vignes AOP 2023",
+    campaigns: [2023],
+    steps: [
+      {
+        kind: "crop",
+        campaign: 2023,
+        name: "Vignes AOP",
+        color: null,
+        from: "2023-01-01",
+        to: "2023-12-31",
+        datesFrom: "campaign",
+        attributes: [],
+        marks: [
+          {
+            interventionIds: [INTERVENTION, I2],
+            procedure: "vine_pruning",
+            label: "Taille, 2 parcelles",
+            lane: "works",
+            status: "done",
+            at: "2023-01-22",
+            from: "2023-01-20",
+            to: "2023-01-24",
+            day: 21,
+            details: [],
+            parcels: [{ id: PARCEL, name: "Les Rouffiats" }, { id: P2, name: "Le Coteau" }],
+            members: [
+              { interventionId: INTERVENTION, at: "2023-01-20", label: "Taille", status: "done", parcels: ["Les Rouffiats"] },
+              { interventionId: I2, at: "2023-01-24", label: "Taille", status: "done", parcels: ["Le Coteau"] },
+            ],
+          },
+        ],
+      },
+    ],
+    parcels: [
+      { id: P2, name: "Le Coteau", areaM2: 8000, interventions: 1 },
+      { id: PARCEL, name: "Les Rouffiats", areaM2: 12000, interventions: 1 },
+      { id: "00000000-0000-7000-8000-0000000000a3", name: "La Pente", areaM2: 5000, interventions: 0 },
+    ],
+  };
+
+  beforeEach(() => {
+    tika.renders.length = 0;
+  });
+
+  it("depuis Activités : vue fusionnée, parcelles sans intervention signalées, groupe ouvert, descente sur une parcelle", async () => {
+    const parcelCalls: string[] = [];
+    server.use(
+      http.get("*/activities/:id/itinerary", ({ request }) => {
+        expect(new URL(request.url).searchParams.get("year")).toBe("2023");
+        return HttpResponse.json(merged);
+      }),
+      http.get("*/land-parcels/:id/itinerary", ({ params }) => {
+        parcelCalls.push(String(params.id));
+        return HttpResponse.json(itinerary([2023]));
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(`/f/${FARM}/activities?at=2023-06-10`);
+    await user.click(await screen.findByRole("link", { name: "Itinéraire" }, { timeout: 10_000 }));
+
+    expect(await screen.findByRole("heading", { name: "Itinéraire technique — Vignes AOP 2023" })).toBeInTheDocument();
+    expect(screen.getByText("1 parcelle sans intervention enregistrée en 2023")).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "Parcelles de l'activité" })).toHaveTextContent("La Pente");
+    await waitFor(() => expect(tika.renders.at(-1)!.system.steps[0]!.name).toBe("Vignes AOP"));
+
+    // Clic sur la marque regroupée : la liste de ses interventions, chacune vers sa fiche.
+    tika.renders.at(-1)!.click({ ref: merged.steps[0]!.marks[0] });
+    const dialog = await screen.findByRole("dialog", { name: "2 interventions regroupées" });
+    expect(within(dialog).getAllByRole("link", { name: "Taille" }).map((a) => a.getAttribute("href"))).toEqual([
+      `/f/${FARM}/interventions/${INTERVENTION}`,
+      `/f/${FARM}/interventions/${I2}`,
+    ]);
+
+    // Depuis le groupe, descente sur une parcelle ; puis retour à la vue fusionnée.
+    await user.click(within(dialog).getByRole("button", { name: "Le Coteau" }));
+    expect(await screen.findByText("Parcelle sélectionnée : Le Coteau")).toBeInTheDocument();
+    expect(parcelCalls).toEqual([P2]);
+    await waitFor(() => expect(tika.renders.at(-1)!.system.steps[0]!.name).toBe("Vigne 2023"));
+    await user.click(screen.getByRole("button", { name: "Retour à la vue de l'activité" }));
+    await waitFor(() => expect(tika.renders.at(-1)!.system.steps[0]!.name).toBe("Vignes AOP"));
+
+    // Depuis la liste des parcelles aussi.
+    await user.click(screen.getByRole("button", { name: "Itinéraire de Les Rouffiats" }));
+    expect(await screen.findByText("Parcelle sélectionnée : Les Rouffiats")).toBeInTheDocument();
   });
 });
