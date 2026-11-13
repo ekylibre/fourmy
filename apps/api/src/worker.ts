@@ -12,6 +12,8 @@ import { computeTrackSessions } from "./repos/track-sessions.js";
 import { farmsWithAlerts } from "./repos/maintenance.js";
 import { sendMaintenanceAlerts } from "./repos/alerts.js";
 import { appMailer } from "./mail.js";
+import { flushReads } from "./ign/store.js";
+import { purgeIgnCache, runIgnJob } from "./ign/preload.js";
 
 /**
  * Worker : synchronise les intégrations actives de toutes les fermes
@@ -120,6 +122,26 @@ async function alertsTick(): Promise<void> {
   }
 }
 
+// --- Cache IGN (« Ma ferme », lot F4) ---------------------------------------------
+
+/** Préchargement des tuiles IGN : une tâche par tour, menée au bout (ou jusqu'à l'arrêt). */
+async function ignCacheTick(): Promise<void> {
+  const r = await runIgnJob(db(), () => stopping);
+  if (r) console.log(`[worker] cache IGN tâche ${r.jobId.slice(0, 8)} : ${r.status}, ${r.fetched} téléchargée(s), ${r.failed} en échec`);
+}
+
+const IGN_PURGE_EVERY_MS = 24 * 3_600_000;
+let ignPurgedAt = 0;
+/** Quota disque du cache IGN, une fois par jour. */
+async function ignPurgeTick(): Promise<void> {
+  await flushReads(db());
+  if (Date.now() - ignPurgedAt < IGN_PURGE_EVERY_MS) return;
+  ignPurgedAt = Date.now();
+  const r = await purgeIgnCache(db());
+  if (r.deleted) console.log(`[worker] cache IGN : ${r.deleted} tuile(s) purgée(s), ${Math.round(r.freedBytes / 1e6)} Mo libérés`);
+  if (r.protectedDeleted) console.warn(`[worker] cache IGN : quota atteint, ${r.protectedDeleted} tuile(s) d'un plan de ferme supprimée(s)`);
+}
+
 async function tick(): Promise<void> {
   for (const [name, job] of [
     ["lexicon", lexiconTick],
@@ -129,6 +151,8 @@ async function tick(): Promise<void> {
     ["heures", usageTick],
     ["parcours", trackSessionsTick],
     ["alertes", alertsTick],
+    ["cache IGN", ignCacheTick],
+    ["quota IGN", ignPurgeTick],
   ] as const) {
     if (stopping) return;
     await job().catch((e) => console.warn(`[worker] ${name} : ${e instanceof Error ? e.message : e}`));

@@ -21,8 +21,8 @@ demandera d'abord de les retirer. Dokploy y accède par l'application GitHub
 | Service | Image | Rôle |
 |---|---|---|
 | `db` | `timescale/timescaledb-ha:pg17` | PostgreSQL + PostGIS + TimescaleDB, volume `fourmy_pgdata` |
-| `api` | `Dockerfile`, cible `api` | API Hono ; applique les migrations au démarrage |
-| `worker` | même image, `node apps/api/dist/worker.js` | synchronise les intégrations des fermes (Traccar : chaque minute ; stations Weenat et Sencrop : chaque heure), les parcours GPS (toutes les 5 minutes), le référentiel phyto Lexicon (chaque jour), l'eau autour des fermes (BD TOPO, tous les 30 jours), l'IFT et la météo des interventions réalisées, les heures estimées des matériels depuis Traccar (toutes les 15 minutes) et les alertes d'entretien par e-mail (au plus une fois par heure) |
+| `api` | `Dockerfile`, cible `api` | API Hono ; applique les migrations au démarrage ; relaie les tuiles IGN et les garde dans le volume `fourmy_ign_cache` |
+| `worker` | même image, `node apps/api/dist/worker.js` | synchronise les intégrations des fermes (Traccar : chaque minute ; stations Weenat et Sencrop : chaque heure), les parcours GPS (toutes les 5 minutes), le référentiel phyto Lexicon (chaque jour), l'eau autour des fermes (BD TOPO, tous les 30 jours), l'IFT et la météo des interventions réalisées, les heures estimées des matériels depuis Traccar (toutes les 15 minutes) les alertes d'entretien par e-mail (au plus une fois par heure), le préchargement des tuiles IGN autour des fermes (volume `fourmy_ign_cache`, partagé avec `api`) et le quota de ce cache (chaque jour) |
 | `web` | `Dockerfile`, cible `web` (nginx) | application React + relais `/api` → `api` |
 | `site` | `ghcr.io/ekylibre/fourmy-site:main`, construite par la CI depuis `docker/site.Dockerfile` (nginx) | site public fourmy.org ; relaie seulement `/api/public/` (formulaire de contact) ; `www` → apex |
 
@@ -47,6 +47,8 @@ l'API partagent la même origine : cookies de session sans CORS.
 | `AGRIROUTER_CLIENT_ID`, `AGRIROUTER_CLIENT_SECRET`, `AGRIROUTER_APPLICATION_ID`, `AGRIROUTER_SOFTWARE_VERSION_ID` | non | application Fourmy enregistrée chez agrirouter (cartes de modulation vers les machines, [`modulation.md`](modulation.md)) ; sans elles, la connexion agrirouter est désactivée. `AGRIROUTER_REDIRECT_URI` vaut `${PUBLIC_URL}/agrirouter/callback` par défaut et doit être déclarée telle quelle dans le client OAuth ; `AGRIROUTER_ENVIRONMENT` : `production` (défaut) ou `qa` |
 | `FOURMY_OSRM_URL` | non | service OSRM auto-hébergé (profil tracteur) qui recale les déplacements du rejeu 3D sur la route ([`routage-osrm.md`](routage-osrm.md)) ; sans lui, la trace reste brute |
 | `EKYLIBRE_SOURCES_URL` | non | serveur des bases Ekylibre restaurées pour les imports depuis l'interface |
+| `FOURMY_IGN_CACHE_MAX_GB` | non | quota du cache des tuiles IGN, 20 Go par défaut (worker) ; au-delà, les tuiles les moins lues hors des zones des fermes sont supprimées d'abord |
+| `FOURMY_IGN_PRELOAD_CONCURRENCY` | non | requêtes simultanées vers l'IGN pendant un préchargement, 4 par défaut (worker) |
 
 Aucun secret dans le dépôt : ils sont générés directement dans Dokploy.
 
@@ -100,6 +102,10 @@ puis tirée par Dokploy (`pull_policy: always`).
   explicite : rien de faux n'est publié.
 
 ## Sauvegardes (à mettre en place)
+
+Le volume `fourmy_ign_cache` n'a pas besoin de sauvegarde : il se reremplit
+depuis l'IGN. Après sa perte, vider `ign_tiles` (`TRUNCATE ign_tiles`) pour que
+l'état « en cache » des fermes redevienne juste.
 
 Base : sauvegarde Dokploy du volume `fourmy_pgdata` ou `pg_dump` planifié
 vers un stockage externe. Garder `FOURMY_SECRETS_KEY` et `BETTER_AUTH_SECRET`

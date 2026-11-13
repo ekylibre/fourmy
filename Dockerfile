@@ -26,7 +26,11 @@ COPY --from=build /repo/packages ./packages
 COPY --from=build /repo/apps/api ./apps/api
 # Les sources TypeScript et les tests ne servent pas à l'exécution.
 RUN find packages apps -type d \( -name src -o -name test \) -prune -exec rm -rf {} + \
- && chown -R node:node /repo
+ && chown -R node:node /repo \
+ && mkdir -p /var/cache/fourmy/ign && chown -R node:node /var/cache/fourmy
+# Cache des tuiles IGN (volume partagé par l'API et le worker) : le dossier
+# existe dans l'image avec le bon propriétaire, le volume nommé en hérite.
+ENV FOURMY_IGN_CACHE_DIR=/var/cache/fourmy/ign
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=5 \

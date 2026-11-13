@@ -127,6 +127,52 @@ export function formatArea(m2: number, unit: FarmDisplay["areaUnit"] = "ha"): st
     : `${(m2 / 10_000).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ha`;
 }
 
+/** Couches IGN mises en cache sur le serveur (F4). Relief, bâtiments et hydrographie viendront ensuite. */
+export const ignLayer = z.enum(["ortho", "plan"]);
+export type IgnLayer = z.infer<typeof ignLayer>;
+export const IGN_LAYER_LABELS: Record<IgnLayer, string> = { ortho: "Photos aériennes", plan: "Plan IGN" };
+export const farmIgnSettings = z.object({
+  layers: z.array(ignLayer).min(1, "Choisissez au moins une couche.").transform((l) => [...new Set(l)]),
+  detailMarginM: z.number().int().min(0).max(1000),
+  autoRefresh: z.boolean(),
+});
+export type FarmIgnSettings = z.infer<typeof farmIgnSettings>;
+export const DEFAULT_FARM_IGN: FarmIgnSettings = { layers: ["ortho", "plan"], detailMarginM: 200, autoRefresh: false };
+/** Au-delà, le préchargement serveur demande une confirmation (N3). */
+export const IGN_SERVER_CONFIRM_BYTES = 2e9;
+
+export type IgnJobStatus = "pending" | "running" | "done" | "partial" | "failed" | "cancelled";
+export interface IgnLayerProgress {
+  total: number;
+  done: number;
+  /** Téléchargées pendant cette tâche (les autres étaient déjà en cache). */
+  fetched: number;
+  failed: number;
+}
+export interface IgnCacheJob {
+  id: string;
+  status: IgnJobStatus;
+  layers: IgnLayer[];
+  tileCount: number;
+  estimateBytes: number;
+  progress: Partial<Record<IgnLayer, IgnLayerProgress>>;
+  error: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+/** Réponse de GET /ign/cache : réglages, plan actuel, ce qui est déjà sur le serveur. */
+export interface IgnCacheState {
+  settings: FarmIgnSettings;
+  /** Null : aucun site n'a de point, rien à précharger. */
+  plan: { tiles: number; estimateBytes: number; layers: Partial<Record<IgnLayer, number>> } | null;
+  /** Tuiles du plan déjà présentes dans le cache du serveur. */
+  cached: { tiles: number; bytes: number };
+  lastJob: IgnCacheJob | null;
+  confirmAboveBytes: number;
+  canEdit: boolean;
+}
+
 /** Réponse de GET /farm : tout ce qu'affiche la page, en une requête. */
 export interface FarmProfile {
   identity: FarmProfileIdentity;

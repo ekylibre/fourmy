@@ -6,3 +6,4 @@ export { Lru } from "./lru.js";
 export * from "./resample.js";
 export * from "./apicarto.js";
 export * from "./communes.js";
+export * from "./coverage.js";

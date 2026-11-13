@@ -25,6 +25,7 @@ import { prescriptionRoutes } from "./prescriptions.js";
 import { fertilizerRoutes } from "./fertilizers.js";
 import { fertilizationRoutes } from "./fertilization.js";
 import { farmProfileRoutes } from "./farm-profile.js";
+import { ignRoutes } from "./ign.js";
 
 /**
  * Routes métier sous `/api/v1/farms/:farmId` (architecture §5.1), découpées
@@ -32,6 +33,7 @@ import { farmProfileRoutes } from "./farm-profile.js";
  */
 export const farmRoutes = new Hono<Env>()
   .route("/", farmProfileRoutes)
+  .route("/", ignRoutes)
   .route("/", parcelRoutes)
   .route("/", activityRoutes)
   .route("/", certificationRoutes)

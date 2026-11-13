@@ -5,6 +5,7 @@ import { useFarmProfile } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
 import { IdentityTab } from "./IdentityTab";
 import { SitesTab } from "./SitesTab";
+import { IgnTab } from "./IgnTab";
 import { BrandsTab, DisplaySettings, MaintenanceTab, TracksTab } from "./SettingsTabs";
 
 /**
@@ -12,7 +13,7 @@ import { BrandsTab, DisplaySettings, MaintenanceTab, TracksTab } from "./Setting
  * onglet précis (E22). Tous les membres la consultent, le responsable la
  * modifie (E3).
  */
-const TABS = ["identity", "sites", "maintenance", "tracks", "brands"] as const;
+const TABS = ["identity", "sites", "ign", "maintenance", "tracks", "brands"] as const;
 type Tab = (typeof TABS)[number];
 
 export function FarmProfilePage() {
@@ -52,10 +53,12 @@ export function FarmProfilePage() {
         <Tabs.List mb="md">
           <Tabs.Tab value="identity">Identité</Tabs.Tab>
           <Tabs.Tab value="sites">Sites et cartes</Tabs.Tab>
+          <Tabs.Tab value="ign">Données IGN</Tabs.Tab>
           {p.canEdit && <Tabs.Tab value="maintenance">Entretien</Tabs.Tab>}
           {p.canEdit && <Tabs.Tab value="tracks">Parcours</Tabs.Tab>}
           <Tabs.Tab value="brands">Marques</Tabs.Tab>
         </Tabs.List>
+        <Tabs.Panel value="ign">{tab === "ign" && <IgnTab />}</Tabs.Panel>
         <Tabs.Panel value="identity">
           <IdentityTab key={JSON.stringify(p.identity)} profile={p} />
         </Tabs.Panel>

@@ -10,7 +10,7 @@ import { useFarm } from "../app/farm";
 import { formatDate } from "../app/labels";
 import { useSnapshot } from "../app/queries";
 import { ErrorAlert, Loading } from "../components/states";
-import { WMTS } from "../features/map/ParcelMap"; // règle aussi le worker de MapLibre
+import { ignSource } from "../features/map/ParcelMap"; // règle aussi le worker de MapLibre
 import { CartoToolbar } from "./CartoToolbar";
 import { formatArea } from "./format";
 import { useCartoEditor } from "./useCartoEditor";
@@ -31,6 +31,7 @@ function bounds(features: Feature<Polygon>[]): [[number, number], [number, numbe
  */
 export function CartoLabPage() {
   const farm = useFarm();
+  const farmId = farm.id;
   const location = useLocation();
   const { at } = useAt();
   const snap = useSnapshot(farm.id, at);
@@ -47,7 +48,7 @@ export function CartoLabPage() {
       style: {
         version: 8,
         sources: {
-          ortho: { type: "raster", tiles: [WMTS("ORTHOIMAGERY.ORTHOPHOTOS", "image/jpeg")], tileSize: 256, attribution: "© IGN — Géoplateforme", maxzoom: 19 },
+          ortho: ignSource(farmId, "ortho"),
         },
         layers: [{ id: "ortho", type: "raster", source: "ortho" }],
       },
@@ -59,7 +60,7 @@ export function CartoLabPage() {
       setMap(null);
       m.remove();
     };
-  }, []);
+  }, [farmId]);
 
   const parcels = useMemo<Feature<Polygon>[] | null>(() => {
     if (!snap.data) return null;
