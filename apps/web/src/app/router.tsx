@@ -8,6 +8,7 @@ import { Loading } from "../components/states";
 import { CellarPage } from "../features/cellar/CellarPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { FarmsPage } from "../features/farms/FarmsPage";
+import { FarmProfilePage } from "../features/farm/FarmProfilePage";
 import { ImportsPage } from "../features/imports/ImportsPage";
 import { InterventionsPage } from "../features/interventions/InterventionsPage";
 import { InterventionCompletePage, InterventionEditPage, InterventionNewPage } from "../features/interventions/InterventionEditPage";
@@ -171,6 +172,7 @@ export const routes = [
       { path: "land-parcels/new", element: <Suspense fallback={<Loading />}><ParcelCreatePage /></Suspense> },
       { path: "land-parcels/:parcelId", element: <Suspense fallback={<Loading />}><ParcelSheetPage /></Suspense> },
       { path: "imports", element: <ImportsPage /> },
+      { path: "farm", element: <FarmProfilePage /> },
       { path: "team", element: <TeamPage /> },
       { path: "team/:personId", element: <PersonSheetPage /> },
       { path: "integrations", element: <IntegrationsPage /> },

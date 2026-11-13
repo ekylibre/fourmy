@@ -1,7 +1,7 @@
 import { ActionIcon, AppShell, Badge, Box as MBox, Burger, Button, Group, NavLink, Stack, Text, Tooltip } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { useState } from "react";
-import { Box, Boxes, Grid3x3, Leaf, ClipboardList, Database, FileText, LayoutDashboard, LogOut, Map, Plug, Scale, Users, Wine, FlaskConical, Sprout, Tractor, type LucideIcon } from "lucide-react";
+import { Box, Boxes, Building, Grid3x3, Leaf, ClipboardList, Database, FileText, LayoutDashboard, LogOut, Map, Plug, Scale, Users, Wine, FlaskConical, Sprout, Tractor, type LucideIcon } from "lucide-react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { Wordmark } from "@fourmy/ui-lyvre";
 import { useFarm } from "../app/farm";
@@ -31,6 +31,7 @@ export const NAVIGATION: NavEntry[] = [
   { path: "/interventions", label: "Interventions", icon: ClipboardList },
   { path: "/equipments", label: "Matériels", icon: Tractor },
   { path: "/team", label: "Équipe", icon: Users, ownerOnly: true },
+  { path: "/farm", label: "Ma ferme", icon: Building },
   {
     label: "Stocks",
     icon: Boxes,
