@@ -213,7 +213,7 @@ export function partsForecast(ops: readonly ForecastOperation[], horizon: { hour
   const lines = new Map<string, ForecastLine>();
   for (const { op, due, parts } of ops) {
     if (!parts.length || due.status === "not_applicable" || due.status === "on_demand" || due.status === "done") continue;
-    let times = 0;
+    let times: number;
     if (due.status === "overdue" || due.status === "unknown") times = 1;
     else {
       const byHours = due.remainingHours !== null && op.everyHours ? (hoursIn >= due.remainingHours ? 1 + Math.floor((hoursIn - due.remainingHours) / op.everyHours) : 0) : 0;

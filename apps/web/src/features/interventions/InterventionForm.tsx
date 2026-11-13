@@ -632,7 +632,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   const bufferLayer: FeatureCollection | undefined =
     bufferRequest && zntBuffer.data?.buffer ? { type: "FeatureCollection", features: [{ type: "Feature", geometry: zntBuffer.data.buffer, properties: {} }] } : undefined;
 
-  let crewSummary: React.ReactNode = null;
+  let crewSummary: React.ReactNode;
   try {
     crewSummary = inCrews ? <CrewsSummary crews={crewsBody(crews)} /> : null;
   } catch {

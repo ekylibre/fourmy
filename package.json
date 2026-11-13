@@ -20,16 +20,17 @@
     "@types/node": "22.10.5",
     "turbo": "2.11.11",
     "typescript": "5.7.3",
-    "@eslint/js": "9.18.0",
-    "eslint": "9.18.0",
-    "typescript-eslint": "8.20.0",
+    "@eslint/js": "10.0.1",
+    "eslint": "10.14.0",
+    "typescript-eslint": "8.72.2",
     "eslint-plugin-react-hooks": "7.1.1"
   },
   "pnpm": {
     "overrides": {
       "@cesium/engine": "26.4.0",
       "@cesium/widgets": "16.3.0",
-      "@cesium/core": "0.1.0"
+      "@cesium/core": "0.1.0",
+      "minimatch@^10": "11.0.8"
     }
   },
   "//": "pnpm.overrides : cesium 1.146.0 déclare @cesium/engine ^26.4.0, mais engine 26.5.0 (publié avec cesium 1.147) retire des exports réexportés par 1.146 → build cassé. On fige les sous-paquets publiés avec 1.146 ; à retirer en passant à cesium ≥ 1.147."

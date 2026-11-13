@@ -189,7 +189,7 @@ export function CrewsEditor({
   const [saving, setSaving] = useState<number | null>(null);
   const flat = (options: Option[]) => options.flatMap((o) => ("group" in o ? o.items : [o]));
   const templateOptions = (templates?.items ?? []).filter((t) => t.active).map((t) => ({ value: t.id, label: t.name }));
-  let body: InterventionCrew[] | null = null;
+  let body: InterventionCrew[] | null;
   try {
     body = crewsBody(crews);
   } catch {
