@@ -26,6 +26,9 @@ test("choisir les parcelles sur la carte et dessiner une zone partielle", async 
   const map = form.getByTestId("parcel-picker-map");
   await expect(map).toBeVisible();
   await expect(form.getByRole("button", { name: "Zone partielle" })).toBeEnabled({ timeout: 30_000 });
+  // Le bloc météo, au-dessus de la carte, n'apparaît qu'une fois sa réponse
+  // reçue et pousse alors la carte vers le bas : l'attendre avant de mesurer.
+  await expect(form.getByLabel("Conditions de pulvérisation")).toBeVisible({ timeout: 15_000 });
   const box = (await map.boundingBox())!;
 
   // Maj + glisser sur toute la carte : toutes les parcelles visibles.

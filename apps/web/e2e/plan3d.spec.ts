@@ -34,16 +34,18 @@ test("plan 3D : cuverie placée, remplissage qui suit la frise", async ({ page }
   // Un an plus tôt : la Cuve 1 n'a pas encore reçu de vendange.
   // (La frise est hors de la fenêtre : elle se ferme, on la rouvre.)
   await page.getByLabel("Date de la frise").fill("2020-12-31");
-  await expect(page.getByRole("heading", { name: "Plan 3D au 31/12/2020" })).toBeVisible();
+  // Changer la date fait recalculer la scène Cesium (rendu logiciel en CI, lent) :
+  // même délai que pour l'ouverture.
+  await expect(page.getByRole("heading", { name: "Plan 3D au 31/12/2020" })).toBeVisible({ timeout: 30_000 });
   await tanks.click();
-  await expect(cuve1).toContainText("0 %");
+  await expect(cuve1).toContainText("0 %", { timeout: 30_000 });
 
   // Clic sur une cuve dans le panneau : son contenu s'affiche.
   await page.getByLabel("Date de la frise").fill("2021-12-31");
-  await expect(page.getByRole("heading", { name: "Plan 3D au 31/12/2021" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Plan 3D au 31/12/2021" })).toBeVisible({ timeout: 30_000 });
   await tanks.click();
   await page.getByRole("button", { name: "Cuve 1", exact: true }).click();
-  await expect(page.getByText("30 hL", { exact: true })).toBeVisible();
+  await expect(page.getByText("30 hL", { exact: true })).toBeVisible({ timeout: 30_000 });
   // Échap ferme la fenêtre : la cuverie disparaît, la barre de rejeu reste.
   await page.keyboard.press("Escape");
   await expect(page.getByText("5 cuve(s) placée(s) · 1 non localisée(s)")).toBeHidden();
