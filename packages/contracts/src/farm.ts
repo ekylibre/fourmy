@@ -115,6 +115,18 @@ export const farmSiteWrite = z
 export type FarmSiteWrite = z.infer<typeof farmSiteWrite>;
 export type FarmSite = FarmSiteWrite & { id: string; isHeadquarters: boolean };
 
+/** Préférences d'affichage de la ferme (E9, E21 bis). */
+export const farmDisplay = z.object({ basemap: z.enum(["plan", "ortho"]), areaUnit: z.enum(["ha", "a"]) });
+export type FarmDisplay = z.infer<typeof farmDisplay>;
+export const DEFAULT_FARM_DISPLAY: FarmDisplay = { basemap: "ortho", areaUnit: "ha" };
+
+/** Surface lisible dans l'unité choisie : hectares à 2 décimales, ares sans décimale. */
+export function formatArea(m2: number, unit: FarmDisplay["areaUnit"] = "ha"): string {
+  return unit === "a"
+    ? `${Math.round(m2 / 100).toLocaleString("fr-FR")} a`
+    : `${(m2 / 10_000).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ha`;
+}
+
 /** Réponse de GET /farm : tout ce qu'affiche la page, en une requête. */
 export interface FarmProfile {
   identity: FarmProfileIdentity;
@@ -123,6 +135,7 @@ export interface FarmProfile {
   sites: FarmSite[];
   /** Parcelles actuelles hors de toutes les zones (E19) ; null si aucun site n'a de point. */
   parcelsOutside: number | null;
+  display: FarmDisplay;
   canEdit: boolean;
 }
 

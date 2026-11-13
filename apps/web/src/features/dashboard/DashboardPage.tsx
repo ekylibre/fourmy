@@ -1,6 +1,7 @@
+import { useArea } from "../../app/prefs";
 import { Badge, Button, Group, Paper, SimpleGrid, Stack, Table, Text, Title } from "@mantine/core";
 import { Building } from "lucide-react";
-import { formatHa, formatLiters } from "@fourmy/ui-lyvre";
+import { formatLiters } from "@fourmy/ui-lyvre";
 import { useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
 import { formatDate, NATURE_LABELS, procedureLabel } from "../../app/labels";
@@ -33,6 +34,7 @@ function Kpi({ label, value, hint }: { label: string; value: string; hint?: stri
 
 /** Tableau de bord : la ferme à la date de la frise. */
 export function DashboardPage() {
+  const area = useArea();
   const farm = useFarm();
   const { at, day, isToday } = useAt();
   const snap = useSnapshot(farm.id, at);
@@ -61,7 +63,7 @@ export function DashboardPage() {
       </Group>
       <CertificationsDue day={day} />
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>
-        <Kpi label="Parcelles" value={String(s.landParcels.length)} hint={formatHa(totalArea)} />
+        <Kpi label="Parcelles" value={String(s.landParcels.length)} hint={area(totalArea)} />
         <Kpi
           label="Productions de la campagne"
           value={String(s.productions.length)}

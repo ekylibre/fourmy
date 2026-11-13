@@ -1,9 +1,9 @@
+import { useArea } from "../../app/prefs";
 import { useState } from "react";
 import { Link, useLocation } from "react-router";
 import { Anchor, Badge, Group, Paper, SegmentedControl, Stack, Table, Text, Title } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import type { TrackSummary } from "@fourmy/contracts";
-import { formatHa } from "@fourmy/ui-lyvre";
 import { api, farmPath } from "../../app/api";
 import { formatDate } from "../../app/labels";
 import { formatDuration } from "../interventions/periods";
@@ -30,6 +30,7 @@ export function summaryRange(day: string, span: "day" | "week") {
 }
 
 export function TrackSummaryWidget({ farmId, day }: { farmId: string; day: string }) {
+  const area = useArea();
   const [span, setSpan] = useState<"day" | "week">("day");
   const location = useLocation();
   const range = summaryRange(day, span);
@@ -111,7 +112,7 @@ export function TrackSummaryWidget({ farmId, day }: { farmId: string; day: strin
                       </Text>
                       <Text size="xs" c="dimmed" className="lv-num">
                         {km(i.work.distanceM)}
-                        {i.work.coveredAreaM2 > 0 && ` · ${formatHa(i.work.coveredAreaM2)} couverts`}
+                        {i.work.coveredAreaM2 > 0 && ` · ${area(i.work.coveredAreaM2)} couverts`}
                       </Text>
                     </Stack>
                   ) : (

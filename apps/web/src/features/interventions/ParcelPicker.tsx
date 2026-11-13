@@ -1,10 +1,10 @@
+import { useArea } from "../../app/prefs";
 import { whenStyleLoaded } from "../../carto/when-style-loaded";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActionIcon, Button, Group, Paper, Stack, Text, Tooltip } from "@mantine/core";
 import { Map as MlMap, NavigationControl, ScaleControl, type GeoJSONSource, type LngLatBoundsLike, type MapMouseEvent } from "maplibre-gl";
 import type { Feature, FeatureCollection, Geometry, Polygon } from "geojson";
 import { Crosshair, Pentagon, Trash2, X } from "lucide-react";
-import { formatHa } from "@fourmy/ui-lyvre";
 import type { Area } from "@fourmy/carto";
 import { CartoEditor } from "../../carto/editor";
 import { WMTS } from "../map/ParcelMap"; // règle aussi le worker de MapLibre
@@ -50,6 +50,7 @@ function bounds(geometries: Area[]): LngLatBoundsLike | null {
  * celles de la date de l'intervention.
  */
 export function ParcelPicker({ parcels, selected, zones, onSelect, onZones, onClearZone, water = EMPTY, buffer = EMPTY }: ParcelPickerProps) {
+  const area = useArea();
   const container = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MlMap | null>(null);
   const [drawing, setDrawing] = useState(false);
@@ -276,7 +277,7 @@ export function ParcelPicker({ parcels, selected, zones, onSelect, onZones, onCl
                 <Text size="sm">
                   {p?.name ?? "Parcelle d'une autre date"}{" "}
                   <Text span size="xs" c="dimmed" className="lv-num">
-                    {z?.workedAreaM2 ? `zone ${formatHa(z.workedAreaM2)} sur ${formatHa(p?.areaM2 ?? 0)}` : p ? formatHa(p.areaM2) : ""}
+                    {z?.workedAreaM2 ? `zone ${area(z.workedAreaM2)} sur ${area(p?.areaM2 ?? 0)}` : p ? area(p.areaM2) : ""}
                   </Text>
                 </Text>
                 <Group gap={2} wrap="nowrap">

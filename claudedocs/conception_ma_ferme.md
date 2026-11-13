@@ -899,6 +899,24 @@ worker et la durée de conservation.
   `FarmIdentity` existe déjà pour `/settings/identity`. La clé de Luhn et la
   TVA proposée sont dans les contrats, pour servir à la validation zod.
 
+## 12 ter. Écarts du lot F2 (2026-11-13)
+
+- **Fond par défaut : orthophotos**, pas le Plan IGN : c'est le fond
+  qu'ouvraient déjà presque toutes les cartes. Rien ne change pour une ferme
+  qui ne touche pas au réglage.
+- **`formatArea` dans les contrats**, à côté de `farmDisplay`, et un hook
+  `useArea()` côté web. Les surfaces écrites par `formatHa` sur les écrans
+  de travail suivent l'unité ; l'IFT, le registre phyto et le plan de fumure
+  restent en hectares. Les doses par hectare (« /ha ») ne changent pas.
+- **La 3D garde son fond** : la préférence s'applique aux cartes MapLibre.
+  La 3D sera revue avec le relais de tuiles (F4).
+- **Onglets Entretien et Parcours réservés au responsable**, comme leurs
+  formulaires aujourd'hui. L'onglet Marques reprend le panneau de la fiche
+  matériel (couleur, logo), modifiable par le responsable.
+- **Centrage sur le siège (E10)** : `ParcelMap` centre sur le siège tant
+  qu'il n'y a rien à cadrer (Plan 2D, création de parcelle). Non couvert
+  par un test automatique : MapLibre ne tourne pas dans jsdom.
+
 ## 13. Décisions de conception à valider
 
 1. **Identité sur `farms`** plutôt que dans une table `farm_profile` (§3.1).

@@ -21,7 +21,11 @@ import type {
   ProcedureCatalogue,
   Snapshot,
   StockLevel,
+  FarmDisplay,
+  FarmProfile,
+  GeoPoint,
 } from "@fourmy/contracts";
+import { DEFAULT_FARM_DISPLAY, formatArea } from "@fourmy/contracts";
 import { api, farmPath } from "./api";
 
 type Page<T> = { items: T[]; nextCursor: string | null };
@@ -238,4 +242,16 @@ export function useFarmDues(farmId: string, at: string) {
       ),
     staleTime: 60_000,
   });
+}
+
+/** Fiche « Ma ferme » (GET /farm), partagée par la page, les préférences et le tableau de bord. */
+export function useFarmProfile(farmId: string) {
+  return useQuery({ queryKey: ["farm-profile", farmId], queryFn: () => api.get<FarmProfile>(farmPath(farmId, "/farm")), staleTime: 5 * 60_000 });
+}
+
+/** Préférences d'affichage de la ferme (E9, E21 bis) et point du siège (E10) ; valeurs par défaut pendant le chargement. */
+export function useFarmPrefs(farmId: string): FarmDisplay & { home: GeoPoint | null; area: (m2: number) => string } {
+  const p = useFarmProfile(farmId).data;
+  const display = p?.display ?? DEFAULT_FARM_DISPLAY;
+  return { ...display, home: p?.sites.find((s) => s.isHeadquarters)?.location ?? null, area: (m2) => formatArea(m2, display.areaUnit) };
 }

@@ -30,6 +30,7 @@ describe("Ma ferme", () => {
           ],
           sites: [],
           parcelsOutside: null,
+          display: { basemap: "ortho", areaUnit: "ha" },
           canEdit: true,
         }),
       ),
@@ -48,6 +49,7 @@ describe("Ma ferme", () => {
           certifications: [],
           sites: [],
           parcelsOutside: null,
+          display: { basemap: "ortho", areaUnit: "ha" },
           canEdit: false,
         }),
       ),
@@ -110,5 +112,38 @@ describe("Ma ferme", () => {
         geocode: { score: 0.977, type: "housenumber" },
       }),
     );
+  });
+
+  it("affiche les surfaces en ares si la ferme l'a choisi (F2, E21 bis)", async () => {
+    const { demoFarmProfileFor } = await import("./farm-fixtures");
+    server.use(http.get(`*/api/v1/farms/${FARM}/farm`, () => HttpResponse.json(demoFarmProfileFor({ areaUnit: "a" }))));
+    renderApp(`/f/${FARM}`);
+    const kpi = await screen.findByText("Parcelles", {}, { timeout: 10_000 });
+    await waitFor(() => expect(kpi.parentElement!.textContent).toMatch(/\d[\d\s]* a$/));
+  });
+
+  it("enregistre le fond de carte et l'unité par défaut (F2, E9)", async () => {
+    const user = userEvent.setup();
+    let sent: Record<string, unknown> | null = null;
+    server.use(
+      http.put(`*/api/v1/farms/${FARM}/settings/display`, async ({ request }) => {
+        sent = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(sent);
+      }),
+    );
+    renderApp(`/f/${FARM}/farm?tab=sites`);
+    const panel = await screen.findByLabelText("Affichage");
+    await user.click(within(panel).getByText("Plan IGN"));
+    await user.click(within(panel).getByText("Ares"));
+    await user.click(within(panel).getByRole("button", { name: "Enregistrer" }));
+    await waitFor(() => expect(sent).toEqual({ basemap: "plan", areaUnit: "a" }));
+  });
+
+  it("regroupe les réglages : la page Entretien renvoie vers Ma ferme (E22)", async () => {
+    const user = userEvent.setup();
+    renderApp(`/f/${FARM}/maintenance`);
+    await user.click(await screen.findByRole("link", { name: "seuils et alertes d'entretien" }, { timeout: 10_000 }));
+    expect(await screen.findByRole("tab", { name: "Entretien", selected: true })).toBeInTheDocument();
+    expect(await screen.findByLabelText("« Bientôt » : heures avant l'échéance")).toBeInTheDocument();
   });
 });

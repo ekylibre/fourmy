@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { ZodType } from "zod";
-import { farmCertificationWrite, farmProfileIdentity, farmSiteWrite } from "@fourmy/contracts";
+import { farmCertificationWrite, farmDisplay, farmProfileIdentity, farmSiteWrite } from "@fourmy/contracts";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import { GeocodeRateLimited, GeocodeUnavailable, geocodeReverse, geocodeSearch } from "../geocode.js";
@@ -10,6 +10,7 @@ import {
   deleteFarmCertification,
   deleteSite,
   getProfile,
+  putDisplay,
   putIdentity,
   updateFarmCertification,
   updateSite,
@@ -59,6 +60,7 @@ export const farmProfileRoutes = new Hono<Env>()
     await deleteSite(db(), c.get("farmId"), domainCtx(c), uuidParam(c, "id"));
     return c.body(null, 204);
   })
+  .put("/settings/display", requireOwner, async (c) => c.json(await putDisplay(db(), c.get("farmId"), domainCtx(c), await body(c, farmDisplay))))
   .get("/geocode", requireOwner, async (c) =>
     geocoding(c, async () => c.json(await geocodeSearch(c.req.query("q") ?? "", Number(c.req.query("limit") ?? 5) || 5, c.get("userId")))),
   )

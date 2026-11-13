@@ -1,7 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
 import type { DomainCtx } from "@fourmy/domain";
-import type { FarmCertification, FarmCertificationWrite, FarmProfile, FarmProfileIdentity, FarmSite, FarmSiteWrite } from "@fourmy/contracts";
+import { DEFAULT_FARM_DISPLAY, type FarmCertification, type FarmCertificationWrite, type FarmDisplay, type FarmProfile, type FarmProfileIdentity, type FarmSite, type FarmSiteWrite } from "@fourmy/contracts";
 import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
 
 /**
@@ -196,12 +196,39 @@ async function parcelsOutsideTx(tx: Tx): Promise<number | null> {
   return r && r.located > 0 ? r.outside : null;
 }
 
+// ---------------------------------------------------------------------------
+// Préférences d'affichage (F2)
+// ---------------------------------------------------------------------------
+
+async function displayTx(tx: Tx): Promise<FarmDisplay> {
+  const [s] = await rows<{ display: Partial<FarmDisplay> }>(tx, sql`SELECT display FROM farm_settings`);
+  return { ...DEFAULT_FARM_DISPLAY, ...(s?.display ?? {}) };
+}
+
+export async function putDisplay(db: Database, farmId: string, ctx: DomainCtx, body: FarmDisplay): Promise<FarmDisplay> {
+  return withFarm(db, farmId, async (tx) => {
+    const before = await displayTx(tx);
+    await tx.execute(sql`
+      INSERT INTO farm_settings (farm_id, display) VALUES (${farmId}, ${JSON.stringify(body)}::jsonb)
+      ON CONFLICT (farm_id) DO UPDATE SET display = excluded.display, updated_at = now()`);
+    await audit(tx, farmId, ctx, "farm_settings", farmId, "update_display", { before, after: body });
+    return displayTx(tx);
+  });
+}
+
+/** Point du siège, s'il est placé (repli de la météo, E11). */
+export async function headquartersPoint(tx: Tx): Promise<{ lat: number; lon: number } | null> {
+  const [r] = await rows<{ lat: number; lon: number }>(tx, sql`SELECT ST_Y(location) AS lat, ST_X(location) AS lon FROM farm_sites WHERE is_headquarters AND location IS NOT NULL`);
+  return r ? { lat: Number(r.lat), lon: Number(r.lon) } : null;
+}
+
 export async function getProfile(db: Database, farmId: string, canEdit: boolean): Promise<FarmProfile> {
   return withFarm(db, farmId, async (tx) => ({
     identity: await identityTx(tx, farmId),
     certifications: await listFarmCertifications(tx),
     sites: await listSites(tx),
     parcelsOutside: await parcelsOutsideTx(tx),
+    display: await displayTx(tx),
     canEdit,
   }));
 }

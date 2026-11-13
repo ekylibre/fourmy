@@ -298,7 +298,7 @@ function LogoPanel({ sheet: s, owner }: { sheet: EquipmentSheet; owner: boolean 
   );
 }
 
-function BrandPanel({ brand, owner }: { brand: FarmBrand; owner: boolean }) {
+export function BrandPanel({ brand, owner }: { brand: FarmBrand; owner: boolean }) {
   const farm = useFarm();
   const refresh = useRefresh();
   const [color, setColor] = useState(brand.color ?? "");

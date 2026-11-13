@@ -4,7 +4,7 @@ import { FARM_CERTIFICATION_LABELS } from "@fourmy/contracts";
 import { certificationAlerts } from "@fourmy/domain";
 import { useFarm } from "../../app/farm";
 import { formatDate } from "../../app/labels";
-import { useFarmProfile } from "./FarmProfilePage";
+import { useFarmProfile } from "../../app/queries";
 
 /** Certificats de l'exploitation expirés ou à renouveler dans moins de 60 jours (E8), sur le tableau de bord. */
 export function CertificationsDue({ day }: { day: string }) {

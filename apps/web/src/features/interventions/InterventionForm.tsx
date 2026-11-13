@@ -1,3 +1,4 @@
+import { useArea } from "../../app/prefs";
 import { lazy, Suspense, useState } from "react";
 import type { MaintenanceNature, TrackDraft } from "@fourmy/contracts";
 import { draftFrom, draftNature, maintenanceBody, MaintenanceAside, MaintenanceFields, type MaintenanceDraft } from "../maintenance/MaintenanceFields";
@@ -37,7 +38,6 @@ import type {
   Snapshot,
   TreatmentPurpose,
 } from "@fourmy/contracts";
-import { formatHa } from "@fourmy/ui-lyvre";
 import { isIrrigation } from "@fourmy/contracts";
 import { irrigationBody, irrigationDraft, IrrigationFields, type IrrigationDraft } from "./IrrigationFields";
 import { kgN, nitrogenNote, useFertilizers } from "../fertilization/fertilization";
@@ -150,6 +150,7 @@ function withSuggestions<T extends { value: string }>(options: T[], suggested: s
  * réaliser directement (une ou plusieurs périodes de travail).
  */
 export function InterventionForm({ farmId, snapshot, articles, people, catalogue, planned: toComplete, editing, defaultDay, onDone, initial }: InterventionFormProps) {
+  const area = useArea();
   const queryClient = useQueryClient();
   // Formulaire prérempli : intervention à réaliser ou à modifier.
   const planned = toComplete ?? editing;
@@ -570,7 +571,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
           {kind === "input" && row.per === "hectare" && a && row.quantity !== "" && treatedM2 > 0 && (
             <Text size="xs" c="dimmed" className="lv-num">
               ≈ {(Number(row.quantity) * (treatedM2 / 10_000)).toLocaleString("fr-FR", { maximumFractionDigits: 3 })} {unitLabel(unit ?? a.unit)} au total sur{" "}
-              {formatHa(treatedM2)}
+              {area(treatedM2)}
             </Text>
           )}
           {kind === "input" && <NitrogenLine note={nitrogenOf(row)} farmId={farmId} />}
@@ -894,7 +895,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
                       Parcelles{" "}
                       {parcels.length > 0 && (
                         <Text span size="xs" c="dimmed" className="lv-num">
-                          · {parcels.length} parcelle(s), {formatHa(treatedM2)} traités
+                          · {parcels.length} parcelle(s), {area(treatedM2)} traités
                         </Text>
                       )}
                     </Text>
@@ -913,7 +914,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
                     aria-label="Parcelles"
                     searchable
                     selectFirstOptionOnChange
-                    data={snapshot.landParcels.map((p) => ({ value: p.id, label: `${p.name} (${formatHa(p.version.areaM2)})` }))}
+                    data={snapshot.landParcels.map((p) => ({ value: p.id, label: `${p.name} (${area(p.version.areaM2)})` }))}
                     value={parcels}
                     onChange={setParcels}
                   />

@@ -1,3 +1,4 @@
+import { useArea, useMapPrefs } from "../../app/prefs";
 import { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { Alert, Button, Grid, Group, Loader, NumberInput, Paper, Radio, Select, Stack, Text, TextInput, Title } from "@mantine/core";
@@ -6,7 +7,6 @@ import { useMutation } from "@tanstack/react-query";
 import { ArrowLeft, MousePointerClick } from "lucide-react";
 import type { FeatureCollection, Geometry } from "geojson";
 import type { ParcelIdentify } from "@fourmy/contracts";
-import { formatHa } from "@fourmy/ui-lyvre";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
@@ -24,6 +24,8 @@ const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
  * activité) et la parcelle est créée avec sa production pour l'activité.
  */
 export function ParcelCreatePage() {
+  const mapPrefs = useMapPrefs();
+  const area = useArea();
   const farm = useFarm();
   const navigate = useNavigate();
   const location = useLocation();
@@ -103,7 +105,7 @@ export function ParcelCreatePage() {
         <Grid.Col span={{ base: 12, lg: 7 }}>
           <Paper withBorder style={{ height: 560, overflow: "hidden" }} aria-label="Carte de la ferme">
             <MapBoundary>
-              <ParcelMap parcels={parcels} places={EMPTY} track={EMPTY} highlight={highlight} basemap="ortho" minHeight={0} onMapClick={identify} />
+              <ParcelMap parcels={parcels} places={EMPTY} track={EMPTY} highlight={highlight} basemap={mapPrefs.basemap} home={mapPrefs.home} minHeight={0} onMapClick={identify} />
             </MapBoundary>
           </Paper>
           <Group gap={6} mt={4}>
@@ -142,11 +144,11 @@ export function ParcelCreatePage() {
                       {found.cap && (
                         <Radio
                           value="cap"
-                          label={`Parcelle PAC ${found.cap.year} : ${found.cap.cropLabel ?? found.cap.cropCode} (${formatHa(found.cap.areaM2)})`}
+                          label={`Parcelle PAC ${found.cap.year} : ${found.cap.cropLabel ?? found.cap.cropCode} (${area(found.cap.areaM2)})`}
                         />
                       )}
                       {found.cadastre.map((c) => (
-                        <Radio key={c.idu} value={c.idu} label={`Parcelle cadastrale ${c.label}${c.areaM2 ? ` (${formatHa(c.areaM2)})` : ""}`} />
+                        <Radio key={c.idu} value={c.idu} label={`Parcelle cadastrale ${c.label}${c.areaM2 ? ` (${area(c.areaM2)})` : ""}`} />
                       ))}
                       {!found.cap && found.cadastre.length === 0 && <Text size="sm">Aucune parcelle PAC ni cadastrale à ce point.</Text>}
                     </Stack>

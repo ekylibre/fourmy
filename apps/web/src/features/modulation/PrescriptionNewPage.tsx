@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useMapPrefs } from "../../app/prefs";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { Alert, Anchor, Button, Checkbox, Group, NumberInput, Paper, SegmentedControl, Select, SimpleGrid, Stack, Table, Text, TextInput, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
@@ -40,6 +41,7 @@ const DEFAULTS: Record<PrescriptionUnit, { base: number; min: number; max: numbe
  * 3. enregistrement, puis export ou envoi depuis la fiche de la carte.
  */
 export function PrescriptionNewPage() {
+  const mapPrefs = useMapPrefs();
   const farm = useFarm();
   const location = useLocation();
   const navigate = useNavigate();
@@ -206,7 +208,7 @@ export function PrescriptionNewPage() {
         <>
           <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
             <Paper withBorder style={{ height: 380, overflow: "hidden" }}>
-              <ParcelMap parcels={zonesCollection(zones, zoneCount)} places={EMPTY} track={EMPTY} basemap="ortho" minHeight={0} fillOpacity={0.6} />
+              <ParcelMap parcels={zonesCollection(zones, zoneCount)} places={EMPTY} track={EMPTY} basemap={mapPrefs.basemap} minHeight={0} fillOpacity={0.6} />
             </Paper>
             <Paper p="md" withBorder>
               <Title order={2} size="h4" mb="xs">
