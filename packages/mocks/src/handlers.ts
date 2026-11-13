@@ -83,6 +83,7 @@ const demoFarmProfile = () => ({
   ],
   parcelsOutside: null,
   display: { basemap: "ortho", areaUnit: "ha" },
+  logoAssetId: null,
   canEdit: true,
 });
 

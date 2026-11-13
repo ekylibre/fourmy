@@ -229,6 +229,7 @@ export async function getProfile(db: Database, farmId: string, canEdit: boolean)
     sites: await listSites(tx),
     parcelsOutside: await parcelsOutsideTx(tx),
     display: await displayTx(tx),
+    logoAssetId: (await rows<{ logo_asset_id: string | null }>(tx, sql`SELECT logo_asset_id FROM farms WHERE id = ${farmId}`))[0]?.logo_asset_id ?? null,
     canEdit,
   }));
 }

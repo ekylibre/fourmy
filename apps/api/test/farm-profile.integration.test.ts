@@ -151,6 +151,28 @@ describe.skipIf(!url)("Ma ferme (intégration)", () => {
     expect((await get(worker.headers)).display).toEqual({ basemap: "plan", areaUnit: "a" });
   });
 
+  it("dépose, sert et retire le logo de la ferme (F3, E8 bis)", async () => {
+    const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d, 0x49, 0x48, 0x44, 0x52]);
+    const upload = (bytes: Uint8Array, name: string, headers = owner.headers) => {
+      const form = new FormData();
+      form.set("file", new File([bytes], name));
+      return app.request(`${base()}/farm/logo`, { method: "PUT", headers: { authorization: headers.authorization! }, body: form });
+    };
+    expect((await get()).logoAssetId).toBeNull();
+    expect((await upload(PNG, "logo.png", worker.headers)).status).toBe(403);
+    expect((await upload(new TextEncoder().encode("<html><script>alert(1)</script>"), "logo.png")).status).toBe(400);
+    const res = await upload(PNG, "logo.png");
+    expect(res.status).toBe(200);
+    const { logoAssetId } = await res.json();
+    expect((await get(worker.headers)).logoAssetId).toBe(logoAssetId);
+    const served = await app.request(`${base()}/assets/${logoAssetId}`, { headers: worker.headers });
+    expect(served.headers.get("content-type")).toBe("image/png");
+    expect(served.headers.get("content-security-policy")).toContain("sandbox");
+    expect((await app.request(`${base()}/farm/logo`, { method: "DELETE", headers: owner.headers })).status).toBe(200);
+    expect((await get()).logoAssetId).toBeNull();
+    expect((await app.request(`${base()}/assets/${logoAssetId}`, { headers: owner.headers })).status).toBe(404);
+  });
+
   it("prend le siège comme point météo d'une ferme sans parcelle (E11)", async () => {
     const empty = await setupFarm(sql, "Ferme sans parcelle");
     const db = createDb(url);

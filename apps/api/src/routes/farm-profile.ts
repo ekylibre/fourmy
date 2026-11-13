@@ -15,6 +15,8 @@ import {
   updateFarmCertification,
   updateSite,
 } from "../repos/farm-profile.js";
+import { setLogo } from "../repos/equipments.js";
+import { logoUpload } from "./equipments.js";
 import { BadRequest, domainCtx, problem, uuidParam } from "./helpers.js";
 
 /**
@@ -60,6 +62,8 @@ export const farmProfileRoutes = new Hono<Env>()
     await deleteSite(db(), c.get("farmId"), domainCtx(c), uuidParam(c, "id"));
     return c.body(null, 204);
   })
+  .put("/farm/logo", requireOwner, async (c) => c.json(await setLogo(db(), c.get("farmId"), domainCtx(c), { farm: true }, await logoUpload(c))))
+  .delete("/farm/logo", requireOwner, async (c) => c.json(await setLogo(db(), c.get("farmId"), domainCtx(c), { farm: true }, null)))
   .put("/settings/display", requireOwner, async (c) => c.json(await putDisplay(db(), c.get("farmId"), domainCtx(c), await body(c, farmDisplay))))
   .get("/geocode", requireOwner, async (c) =>
     geocoding(c, async () => c.json(await geocodeSearch(c.req.query("q") ?? "", Number(c.req.query("limit") ?? 5) || 5, c.get("userId")))),

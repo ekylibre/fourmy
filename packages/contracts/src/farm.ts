@@ -136,6 +136,8 @@ export interface FarmProfile {
   /** Parcelles actuelles hors de toutes les zones (E19) ; null si aucun site n'a de point. */
   parcelsOutside: number | null;
   display: FarmDisplay;
+  /** Logo de la ferme (fichier servi par /assets/:id), null : celui de Fourmy à l'impression. */
+  logoAssetId: string | null;
   canEdit: boolean;
 }
 
