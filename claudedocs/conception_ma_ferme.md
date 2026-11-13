@@ -881,6 +881,19 @@ Les données Plan IGN et orthophotos sont ouvertes, mais le service d'accès
 peut encadrer le moissonnage. Selon la réponse, on ajustera le débit du
 worker et la durée de conservation.
 
+**Vérifié le 2026-11-13** (CGU cartes.gouv.fr du 15 octobre 2024, page
+« Limites d'usage » du 7 août 2026) : le WMTS n'est **soumis à aucune limite
+de débit** ; les données suivent la licence de chaque jeu, **Licence Ouverte
+Etalab 2.0 par défaut**. Les textes **ne parlent ni de cache serveur ni de
+préchargement** ; ils interdisent seulement de « nuire, entraver ou fausser
+le bon fonctionnement des API » et prévoient un blocage en cas d'usage
+abusif. D'où un worker prudent (4 requêtes en parallèle). **Reste à faire** :
+lire la licence et la mention d'attribution sur les fiches catalogue des deux
+couches, et demander une confirmation écrite à geoplateforme@ign.fr pour le
+cache et le préchargement. Constat : l'IGN ne renvoie pas d'`ETag` sur les
+tuiles WMTS ; une tuile de plus de 180 jours est donc retéléchargée en
+entier.
+
 ## 12 bis. Écarts du lot F1 (2026-11-13)
 
 - **Siège créé par un trigger** `AFTER INSERT ON farms`, pas par
@@ -935,6 +948,35 @@ worker et la durée de conservation.
 - **Géocodage du siège après l'import, par l'API** (le migrateur n'appelle
   pas le réseau). Un résultat approximatif ou introuvable est noté dans le
   compte rendu de l'import.
+
+## 12 quinquies. Écarts du lot F4 (2026-11-13)
+
+- **Raster seulement : orthophotos et Plan IGN.** Le relief, les bâtiments
+  et l'hydrographie gardent leur chargement à la demande (cache mémoire) ;
+  leur passage par `IgnStore` est un lot à part (F4 bis). Le contrat
+  `ignLayer` ne liste donc que `ortho` et `plan` ; une couche inconnue lue
+  dans `farm_settings.ign` est ignorée.
+- **Worker : 4 requêtes en parallèle** (et non 8), réglable par
+  `FOURMY_IGN_PRELOAD_CONCURRENCY`, faute de texte de l'IGN sur le
+  préchargement. **50 s de travail par tour** : la tâche rend la main pour
+  que Traccar et les autres tâches passent, puis reprend au tour suivant.
+- **Hors couverture** (400 ou 404 de l'IGN) : ni erreur ni cache ; le relais
+  répond 404, le préchargement passe à la tuile suivante sans la compter en
+  échec.
+- **Relance automatique** : à chaque écriture d'un site (création,
+  modification, suppression), pas seulement quand le point ou le rayon
+  change. Sans effet si une tâche est déjà active ; les tuiles présentes ne
+  sont pas retéléchargées, une relance de trop coûte seulement la lecture de
+  l'index. Pas de relance automatique au-delà du seuil de confirmation.
+- **Purge des tuiles d'un plan** en dernier recours : journalisée par le
+  worker ; la page le montre par le compte « déjà en cache » qui baisse,
+  sans message dédié.
+- **Pas de `GET /ign/cache/manifest`** : il sert la copie navigateur (F5).
+- **Cartes** : `ParcelMap`, `SitesMap`, `ParcelPicker` et le labo carto
+  lisent le relais (`ignTiles(farmId, layer)`). La 3D Cesium lit encore
+  l'IGN directement.
+- **Déploiement** : le dossier `/var/cache/fourmy/ign` est créé dans l'image
+  (propriétaire `node`) pour que le volume nommé en hérite.
 
 ## 13. Décisions de conception à valider
 

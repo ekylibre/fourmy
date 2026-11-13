@@ -123,6 +123,18 @@ export const handlers = [
     return HttpResponse.json(q.trim().length < 3 ? [] : [DEMO_GEOCODE]);
   }),
   http.get(`*${base}/geocode/reverse`, () => HttpResponse.json(DEMO_GEOCODE)),
+  // Données IGN (lot F4) : siège sans point, donc rien à précharger.
+  http.get(`*${base}/ign/cache`, () =>
+    HttpResponse.json({
+      settings: { layers: ["ortho", "plan"], detailMarginM: 200, autoRefresh: false },
+      plan: null,
+      cached: { tiles: 0, bytes: 0 },
+      lastJob: null,
+      confirmAboveBytes: 2e9,
+      canEdit: true,
+    }),
+  ),
+  http.put(`*${base}/settings/ign`, async ({ request }) => HttpResponse.json(await request.json())),
   // Fertilisants (lot AE) : aucun dans la démo.
   http.get(`*${base}/fertilizers`, () => HttpResponse.json({ items: [] })),
   // Fertilisation azotée (lots AF, AI) : paramètres par défaut, aucun justificatif.

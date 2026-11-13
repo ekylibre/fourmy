@@ -1,4 +1,5 @@
 import { whenStyleLoaded } from "../../carto/when-style-loaded";
+import { useFarmId } from "../../app/farm";
 import { useEffect, useRef, useState } from "react";
 import { Map as MlMap, NavigationControl, ScaleControl, setWorkerUrl, type GeoJSONSource, type LngLatBoundsLike } from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
@@ -13,9 +14,26 @@ setWorkerUrl(maplibreWorkerUrl);
 
 export type Basemap = "plan" | "ortho";
 
-/** Fonds IGN Géoplateforme (WMTS, sans clé) — souverains, à jour. */
-export const WMTS = (layer: string, format: string) =>
-  `https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=${layer}&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=${format}`;
+const IGN_WMTS: Record<Basemap, [string, string]> = {
+  ortho: ["ORTHOIMAGERY.ORTHOPHOTOS", "image/jpeg"],
+  plan: ["GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2", "image/png"],
+};
+
+/**
+ * Fonds IGN Géoplateforme (souverains, à jour). Dans une ferme, les tuiles
+ * passent par le relais de l'API, qui les garde en cache sur le serveur
+ * (« Ma ferme », F4) ; hors d'une ferme, directement depuis l'IGN.
+ */
+export function ignTiles(farmId: string | null, layer: Basemap): string {
+  if (farmId) return `${globalThis.location?.origin ?? ""}/api/v1/farms/${farmId}/ign/tiles/${layer}/{z}/{x}/{y}`;
+  const [name, format] = IGN_WMTS[layer];
+  return `https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=${name}&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=${format}`;
+}
+
+/** Sources raster des fonds IGN, pour le style MapLibre. */
+export function ignSource(farmId: string | null, layer: Basemap) {
+  return { type: "raster" as const, tiles: [ignTiles(farmId, layer)], tileSize: 256, attribution: "© IGN — Géoplateforme", maxzoom: 19 };
+}
 
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 
@@ -74,6 +92,7 @@ export function ParcelMap({
   fillOpacity = 0.4,
   home = null,
 }: ParcelMapProps) {
+  const farmId = useFarmId();
   const clickRef = useRef(onMapClick);
   clickRef.current = onMapClick;
   const container = useRef<HTMLDivElement>(null);
@@ -94,8 +113,8 @@ export function ParcelMap({
       style: {
         version: 8,
         sources: {
-          plan: { type: "raster", tiles: [WMTS("GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2", "image/png")], tileSize: 256, attribution: "© IGN — Géoplateforme", maxzoom: 19 },
-          ortho: { type: "raster", tiles: [WMTS("ORTHOIMAGERY.ORTHOPHOTOS", "image/jpeg")], tileSize: 256, attribution: "© IGN — Géoplateforme", maxzoom: 19 },
+          plan: ignSource(farmId, "plan"),
+          ortho: ignSource(farmId, "ortho"),
           parcels: { type: "geojson", data: EMPTY },
           places: { type: "geojson", data: EMPTY },
           track: { type: "geojson", data: EMPTY },

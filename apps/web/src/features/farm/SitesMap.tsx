@@ -3,7 +3,8 @@ import { LngLatBounds, Map as MlMap, Marker, NavigationControl, ScaleControl, ty
 import type { Feature, FeatureCollection, Polygon } from "geojson";
 import type { GeoPoint } from "@fourmy/contracts";
 import { whenStyleLoaded } from "../../carto/when-style-loaded";
-import { WMTS } from "../map/ParcelMap";
+import { useFarmId } from "../../app/farm";
+import { ignSource } from "../map/ParcelMap";
 
 /**
  * Carte des sites (E6, E18) : un point et le cercle de sa zone par site,
@@ -44,6 +45,7 @@ export function SitesMap({
   edit?: { id: string | null; location: GeoPoint | null; radiusM: number; onMove: (p: GeoPoint) => void };
   height?: number;
 }) {
+  const farmId = useFarmId();
   const container = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MlMap | null>(null);
   const marker = useRef<Marker | null>(null);
@@ -61,7 +63,7 @@ export function SitesMap({
       style: {
         version: 8,
         sources: {
-          plan: { type: "raster", tiles: [WMTS("GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2", "image/png")], tileSize: 256, attribution: "© IGN — Géoplateforme", maxzoom: 19 },
+          plan: ignSource(farmId, "plan"),
           zones: { type: "geojson", data: EMPTY },
           parcels: { type: "geojson", data: EMPTY },
         },
@@ -81,7 +83,7 @@ export function SitesMap({
       setMap(null);
       m.remove();
     };
-  }, [editing]);
+  }, [editing, farmId]);
 
   // Zones, parcelles, points des autres sites. Cadrage au premier affichage,
   // puis à chaque changement des sites placés (vue d'ensemble seulement : en

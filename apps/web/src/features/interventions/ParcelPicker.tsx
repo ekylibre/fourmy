@@ -1,5 +1,6 @@
 import { useArea } from "../../app/prefs";
 import { whenStyleLoaded } from "../../carto/when-style-loaded";
+import { useFarmId } from "../../app/farm";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActionIcon, Button, Group, Paper, Stack, Text, Tooltip } from "@mantine/core";
 import { Map as MlMap, NavigationControl, ScaleControl, type GeoJSONSource, type LngLatBoundsLike, type MapMouseEvent } from "maplibre-gl";
@@ -7,7 +8,7 @@ import type { Feature, FeatureCollection, Geometry, Polygon } from "geojson";
 import { Crosshair, Pentagon, Trash2, X } from "lucide-react";
 import type { Area } from "@fourmy/carto";
 import { CartoEditor } from "../../carto/editor";
-import { WMTS } from "../map/ParcelMap"; // règle aussi le worker de MapLibre
+import { ignSource } from "../map/ParcelMap"; // règle aussi le worker de MapLibre
 import { parcelsInBox, zonesFor, type ParcelShape, type WorkingZone } from "./zones";
 
 export interface PickerParcel extends ParcelShape {
@@ -50,6 +51,7 @@ function bounds(geometries: Area[]): LngLatBoundsLike | null {
  * celles de la date de l'intervention.
  */
 export function ParcelPicker({ parcels, selected, zones, onSelect, onZones, onClearZone, water = EMPTY, buffer = EMPTY }: ParcelPickerProps) {
+  const farmId = useFarmId();
   const area = useArea();
   const container = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MlMap | null>(null);
@@ -81,7 +83,7 @@ export function ParcelPicker({ parcels, selected, zones, onSelect, onZones, onCl
       style: {
         version: 8,
         sources: {
-          ortho: { type: "raster", tiles: [WMTS("ORTHOIMAGERY.ORTHOPHOTOS", "image/jpeg")], tileSize: 256, attribution: "© IGN — Géoplateforme", maxzoom: 19 },
+          ortho: ignSource(farmId, "ortho"),
           parcels: { type: "geojson", data: EMPTY },
           zones: { type: "geojson", data: EMPTY },
           water: { type: "geojson", data: EMPTY },
@@ -184,7 +186,7 @@ export function ParcelPicker({ parcels, selected, zones, onSelect, onZones, onCl
       setMap(null);
       m.remove();
     };
-  }, []);
+  }, [farmId]);
 
   // Parcelles et zones affichées.
   const fitted = useRef(false);

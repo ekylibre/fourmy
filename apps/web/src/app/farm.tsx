@@ -34,6 +34,11 @@ export function useFarm(): MyFarm {
   return farm;
 }
 
+/** Identifiant de la ferme courante, ou null hors d'une ferme (sans lever d'erreur). */
+export function useFarmId(): string | null {
+  return useContext(FarmContext)?.id ?? null;
+}
+
 /** Le compte peut-il saisir sur la ferme ? Non en lecture seule (l'API le refuse de toute façon). */
 export function useCanWrite(): boolean {
   return useFarm().role !== "reader";
