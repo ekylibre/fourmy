@@ -143,9 +143,13 @@ lots.
 - **N5. Volume.** Une parcelle sur dix ans (quelques centaines
   d'interventions) et une activité de 30 parcelles s'affichent en moins
   d'une seconde.
-- **N6. Accessibilité.** La liste textuelle de TIKA reste affichée : elle
-  donne la même information que le graphique, au clavier et au lecteur
-  d'écran.
+- **N6. Accessibilité.** La liste textuelle de TIKA donne la même
+  information que le graphique, au clavier et au lecteur d'écran.
+  - **Révisé le 2026-11-13** : elle est masquée au départ, parce qu'elle
+    doublait l'infobulle du survol.
+  - Le bouton « Afficher la transcription » de TIKA l'ouvre à la demande.
+  - Les interventions restent aussi listées dans l'onglet « Interventions »
+    de la parcelle.
 - **N7. Hors ligne.** Pour une ferme gardée hors ligne (« Ma ferme » F5),
   l'itinéraire se consulte sans réseau, comme les autres lectures.
 - **N8. Échange.** Le JSON produit pour TIKA suit son format publié : il

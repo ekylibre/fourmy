@@ -6,6 +6,18 @@ import { login } from "./shared";
  * de la fiche parcelle dessine la frise (TIKA, ECharts) avec sa liste, et un
  * clic sur une intervention ouvre sa fiche.
  */
+
+/**
+ * Liste textuelle de TIKA : masquée au départ (elle doublait l'infobulle),
+ * ouverte par le bouton « Afficher la transcription » de la barre d'outils.
+ * Ce bouton est dessiné dans le canvas d'ECharts : on fait ce qu'il fait.
+ */
+async function openTranscript(chart: import("@playwright/test").Locator) {
+  await expect(chart.locator(".transcript .rotation_item").first()).toBeAttached({ timeout: 30_000 });
+  await expect(chart.locator(".transcript:visible")).toHaveCount(0);
+  await chart.locator(".mainITKContainer").evaluate((el) => el.classList.add("withTranscript"));
+}
+
 test("itinéraire technique d'une parcelle : frise, liste, clic vers la fiche", async ({ page }) => {
   test.setTimeout(120_000);
   const errors: string[] = [];
@@ -32,7 +44,8 @@ test("itinéraire technique d'une parcelle : frise, liste, clic vers la fiche", 
   const chart = page.getByTestId("tika-chart");
   await expect(chart.locator("canvas").first()).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/interventions? : travaux au-dessus/)).toBeVisible();
-  // Liste textuelle (N6) : l'étape de la campagne, déroulée, puis une intervention.
+  // Liste textuelle (N6), ouverte à la demande : l'étape de la campagne, déroulée, puis une intervention.
+  await openTranscript(chart);
   const step = chart.locator(".transcript .rotation_item:visible").first();
   await expect(step).toContainText("Vigne");
   await step.click();
@@ -48,6 +61,7 @@ test("itinéraire technique d'une parcelle : frise, liste, clic vers la fiche", 
   await page.goBack();
   // Bouton de Mantine : la case radio est masquée, on clique son libellé.
   await page.getByText("Rotation", { exact: true }).click();
+  await openTranscript(chart);
   await expect(chart.locator(".transcript:visible .rotation_item")).toHaveCount(3, { timeout: 30_000 });
   expect(errors).toEqual([]);
 });
@@ -72,6 +86,7 @@ test("itinéraire d'une activité : vue fusionnée, groupe, descente sur une par
   // Frise fusionnée : une intervention regroupée de la liste ouvre la liste de ses interventions.
   const chart = page.getByTestId("tika-chart");
   await expect(chart.locator("canvas").first()).toBeVisible({ timeout: 30_000 });
+  await openTranscript(chart);
   const step = chart.locator(".transcript .rotation_item:visible").first();
   await step.click();
   await step.locator(".intervention", { hasText: /\d+ parcelles/ }).first().click();
@@ -87,6 +102,7 @@ test("itinéraire d'une activité : vue fusionnée, groupe, descente sur une par
   await first.click();
   await expect(page.getByText(`Parcelle sélectionnée : ${name}`, { exact: true })).toBeVisible();
   if (process.env.SHOT_ACTIVITY) await page.screenshot({ path: process.env.SHOT_ACTIVITY });
+  await openTranscript(chart);
   await expect(chart.locator(".transcript .rotation_item:visible").first()).toContainText("Vigne");
   await page.getByRole("button", { name: "Retour à la vue de l'activité" }).click();
   await expect(page.getByText(`Parcelle sélectionnée : ${name}`, { exact: true })).toHaveCount(0);

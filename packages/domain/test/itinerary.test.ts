@@ -185,7 +185,7 @@ describe("conversion au format TIKA", () => {
       ],
     });
     const t = toTikaSystem(it);
-    expect(t.options).toMatchObject({ view: "horizontal", show_transcript: true, title_top_interventions: "Travaux", title_bottom_interventions: "Intrants", title_steps: "Culture", show_climate_diagram: false });
+    expect(t.options).toMatchObject({ view: "horizontal", show_transcript: false, title_top_interventions: "Travaux", title_bottom_interventions: "Intrants", title_steps: "Culture", show_climate_diagram: false });
     expect(t.steps.map((s) => [s.name, s.secondary_crop, s.color])).toEqual([
       ["Couvert : moutarde", true, TIKA_DEFAULT_COLORS.cover],
       ["Maïs", false, TIKA_DEFAULT_COLORS.crop],
