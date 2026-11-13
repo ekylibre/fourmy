@@ -402,33 +402,28 @@ export async function setLogo(
   db: Database,
   farmId: string,
   ctx: DomainCtx,
-  target: { equipmentId: string } | { brandId: string },
+  target: { equipmentId: string } | { brandId: string } | { farm: true },
   upload: LogoUpload | null,
 ): Promise<{ logoAssetId: string | null }> {
   const type = upload ? validateLogo(upload) : null;
   return withFarm(db, farmId, async (tx) => {
-    const isEquipment = "equipmentId" in target;
-    const targetId = isEquipment ? target.equipmentId : target.brandId;
-    const [current] = await rows<{ logo_asset_id: string | null }>(
-      tx,
-      isEquipment ? sql`SELECT logo_asset_id FROM equipments WHERE id = ${targetId}` : sql`SELECT logo_asset_id FROM farm_brands WHERE id = ${targetId}`,
-    );
-    if (!current) throw new NotFound(isEquipment ? "Matériel introuvable" : "Marque introuvable");
+    // Le logo de la ferme (F3) est rangé comme ceux des matériels et des marques.
+    const table = "equipmentId" in target ? sql`equipments` : "brandId" in target ? sql`farm_brands` : sql`farms`;
+    const targetId = "equipmentId" in target ? target.equipmentId : "brandId" in target ? target.brandId : farmId;
+    const entity = "equipmentId" in target ? "equipment" : "brandId" in target ? "farm_brand" : "farm";
+    const [current] = await rows<{ logo_asset_id: string | null }>(tx, sql`SELECT logo_asset_id FROM ${table} WHERE id = ${targetId}`);
+    if (!current) throw new NotFound(entity === "equipment" ? "Matériel introuvable" : entity === "farm_brand" ? "Marque introuvable" : "Ferme introuvable");
     let assetId: string | null = null;
     if (upload && type) {
       const rasterId = type === "image/svg+xml" && upload.raster ? await insertAsset(tx, farmId, "logo_raster", "image/png", upload.raster) : null;
       assetId = await insertAsset(tx, farmId, "logo", type, upload.file, rasterId);
     }
-    await tx.execute(
-      isEquipment
-        ? sql`UPDATE equipments SET logo_asset_id = ${assetId}, updated_at = now() WHERE id = ${targetId}`
-        : sql`UPDATE farm_brands SET logo_asset_id = ${assetId}, updated_at = now() WHERE id = ${targetId}`,
-    );
+    await tx.execute(sql`UPDATE ${table} SET logo_asset_id = ${assetId}, updated_at = now() WHERE id = ${targetId}`);
     if (current.logo_asset_id) {
       await tx.execute(sql`DELETE FROM equipment_assets WHERE raster_id IS NULL AND id IN (SELECT raster_id FROM equipment_assets WHERE id = ${current.logo_asset_id})`);
       await tx.execute(sql`DELETE FROM equipment_assets WHERE id = ${current.logo_asset_id}`);
     }
-    await audit(tx, farmId, ctx, isEquipment ? "equipment" : "farm_brand", targetId, assetId ? "logo_set" : "logo_removed", { type });
+    await audit(tx, farmId, ctx, entity, targetId, assetId ? "logo_set" : "logo_removed", { type });
     return { logoAssetId: assetId };
   });
 }

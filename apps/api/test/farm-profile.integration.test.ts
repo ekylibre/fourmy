@@ -4,6 +4,7 @@ import { createApp } from "../src/app.js";
 import { createDb } from "@fourmy/db";
 import { geocodeConfig, geocodeDeps, resetGeocode } from "../src/geocode.js";
 import { sprayingForecast } from "../src/repos/weather.js";
+import { placeHeadquartersFromAddress } from "../src/repos/farm-profile.js";
 import { addMember, setupFarm, teardown } from "./helpers.js";
 
 /**
@@ -151,6 +152,28 @@ describe.skipIf(!url)("Ma ferme (intégration)", () => {
     expect((await get(worker.headers)).display).toEqual({ basemap: "plan", areaUnit: "a" });
   });
 
+  it("dépose, sert et retire le logo de la ferme (F3, E8 bis)", async () => {
+    const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d, 0x49, 0x48, 0x44, 0x52]);
+    const upload = (bytes: Uint8Array, name: string, headers = owner.headers) => {
+      const form = new FormData();
+      form.set("file", new File([bytes], name));
+      return app.request(`${base()}/farm/logo`, { method: "PUT", headers: { authorization: headers.authorization! }, body: form });
+    };
+    expect((await get()).logoAssetId).toBeNull();
+    expect((await upload(PNG, "logo.png", worker.headers)).status).toBe(403);
+    expect((await upload(new TextEncoder().encode("<html><script>alert(1)</script>"), "logo.png")).status).toBe(400);
+    const res = await upload(PNG, "logo.png");
+    expect(res.status).toBe(200);
+    const { logoAssetId } = await res.json();
+    expect((await get(worker.headers)).logoAssetId).toBe(logoAssetId);
+    const served = await app.request(`${base()}/assets/${logoAssetId}`, { headers: worker.headers });
+    expect(served.headers.get("content-type")).toBe("image/png");
+    expect(served.headers.get("content-security-policy")).toContain("sandbox");
+    expect((await app.request(`${base()}/farm/logo`, { method: "DELETE", headers: owner.headers })).status).toBe(200);
+    expect((await get()).logoAssetId).toBeNull();
+    expect((await app.request(`${base()}/assets/${logoAssetId}`, { headers: owner.headers })).status).toBe(404);
+  });
+
   it("prend le siège comme point météo d'une ferme sans parcelle (E11)", async () => {
     const empty = await setupFarm(sql, "Ferme sans parcelle");
     const db = createDb(url);
@@ -172,6 +195,27 @@ describe.skipIf(!url)("Ma ferme (intégration)", () => {
       expect(asked[0]).toMatch(/^44\.838\d*,-0\.578\d*$/);
     } finally {
       await teardown(sql, empty.farmId, [empty.userId]);
+    }
+  });
+
+  it("géocode le siège importé d'Ekylibre, sans toucher à un point déjà placé (F3)", async () => {
+    const other = await setupFarm(sql, "Ferme importée");
+    const db = createDb(url);
+    try {
+      expect(await placeHeadquartersFromAddress(db, other.farmId)).toBeNull(); // pas d'adresse
+      await sql`UPDATE farm_sites SET address_line1 = 'place pey berland', postal_code = '33000', city = 'Bordeaux' WHERE farm_id = ${other.farmId}`;
+      geocodeDeps.fetch = async () => new Response(JSON.stringify({ features: [{ ...IGN_FEATURE, properties: { ...IGN_FEATURE.properties, type: "street", score: 0.5 } }] }));
+      expect(await placeHeadquartersFromAddress(db, other.farmId)).toMatch(/approximative/);
+      const [hq] = await sql`SELECT location_source, geocode_type, insee_code, ST_Y(location) AS lat FROM farm_sites WHERE farm_id = ${other.farmId}`;
+      expect(hq).toMatchObject({ location_source: "geocoded", geocode_type: "street", insee_code: "33063" });
+      expect(Number(hq!.lat)).toBeCloseTo(44.838, 3);
+      // Déjà placé : rien à faire, aucun appel.
+      geocodeDeps.fetch = async () => {
+        throw new Error("ne doit pas être appelé");
+      };
+      expect(await placeHeadquartersFromAddress(db, other.farmId)).toBeNull();
+    } finally {
+      await teardown(sql, other.farmId, [other.userId]);
     }
   });
 

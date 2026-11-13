@@ -23,7 +23,7 @@ import { farmDues } from "../repos/maintenance.js";
 import { BadRequest, domainCtx, problem, uuidParam } from "./helpers.js";
 
 /** Logo envoyé en multipart : `file` (PNG, JPEG ou SVG) et, pour un SVG, `raster` (PNG). */
-async function logoUpload(c: Context<Env>): Promise<LogoUpload> {
+export async function logoUpload(c: Context<Env>): Promise<LogoUpload> {
   const body = await c.req.parseBody().catch(() => null);
   const file = body?.file;
   if (!(file instanceof File)) throw new BadRequest("Fichier « file » attendu (multipart/form-data).");

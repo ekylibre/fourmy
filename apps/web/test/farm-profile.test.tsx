@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
@@ -145,5 +145,38 @@ describe("Ma ferme", () => {
     await user.click(await screen.findByRole("link", { name: "seuils et alertes d'entretien" }, { timeout: 10_000 }));
     expect(await screen.findByRole("tab", { name: "Entretien", selected: true })).toBeInTheDocument();
     expect(await screen.findByLabelText("« Bientôt » : heures avant l'échéance")).toBeInTheDocument();
+  });
+
+  it("imprime le logo de la ferme, sinon celui de Fourmy, et la raison sociale (F3, R10)", async () => {
+    const { demoFarmProfileFor } = await import("./farm-fixtures");
+    const profile = { ...demoFarmProfileFor(), logoAssetId: "00000000-0000-7000-8000-00000000a0a0" };
+    profile.identity = { ...profile.identity, legalName: "GAEC du Pré", siret: "73282932000074" };
+    server.use(http.get(`*/api/v1/farms/${FARM}/farm`, () => HttpResponse.json(profile)));
+    const first = renderApp(`/f/${FARM}/print/fertilization/record?campaign=2026`);
+    await waitFor(() => expect(screen.getByRole("img", { name: "Logo" })).toHaveAttribute("src", `/api/v1/farms/${FARM}/assets/00000000-0000-7000-8000-00000000a0a0`));
+    expect(await screen.findByText(/\(GAEC du Pré\) · SIRET 73282932000074/)).toBeInTheDocument();
+    first.unmount();
+
+    renderApp(`/f/${FARM}/print/fertilization/record?campaign=2026`);
+    await waitFor(() => expect(screen.getByRole("img", { name: "Logo" })).toHaveAttribute("src", "/favicon.svg"));
+  });
+
+  it("dépose le logo de la ferme depuis l'onglet Identité (F3, E8 bis)", async () => {
+    let received = "";
+    server.use(
+      http.put(`*/api/v1/farms/${FARM}/farm/logo`, async ({ request }) => {
+        // Corps multipart lu tel quel. Sous jsdom, le fichier arrive sans son nom
+        // ni ses octets (File de jsdom vu comme un Blob vide par undici) : on
+        // vérifie le champ et le type, l'API teste le contenu.
+        received = await request.text();
+        return HttpResponse.json({ logoAssetId: "00000000-0000-7000-8000-00000000a0a1" });
+      }),
+    );
+    renderApp(`/f/${FARM}/farm`);
+    expect(await screen.findByRole("img", { name: "Logo de Fourmy (par défaut)" })).toBeInTheDocument();
+    // Champ caché de FileButton : on lui donne le fichier directement.
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+    fireEvent.change(input, { target: { files: [new File([Uint8Array.from([0x89, 0x50, 0x4e, 0x47])], "logo.png", { type: "image/png" })] } });
+    await waitFor(() => expect(received).toMatch(/name="file"[^]*Content-Type: image\/png/));
   });
 });

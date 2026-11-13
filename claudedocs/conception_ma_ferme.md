@@ -917,6 +917,25 @@ worker et la durée de conservation.
   qu'il n'y a rien à cadrer (Plan 2D, création de parcelle). Non couvert
   par un test automatique : MapLibre ne tourne pas dans jsdom.
 
+## 12 quater. Écarts du lot F3 (2026-11-13)
+
+- **Pas de table `farm_logos`** : le logo est rangé dans `equipment_assets`
+  avec ceux des matériels et des marques (`farms.logo_asset_id`), qui
+  vérifient déjà le type sur les octets et servent le SVG sous CSP
+  `sandbox`. Pas de `GET /farm/logo` : le web prend `/assets/:id`, ou le
+  logo de Fourmy (`/favicon.svg`) s'il n'y en a pas.
+- **Impression** : seul le plan de fumure (et son cahier d'enregistrement)
+  a un en-tête imprimé aujourd'hui ; il porte le logo, la raison sociale et
+  le SIRET. Le registre phyto officiel n'a pas d'en-tête imprimé.
+- **Pas d'e-mail d'échéance** : E8 demande l'affichage sur le tableau de
+  bord, fait en F1.
+- **Adresse du siège reprise d'Ekylibre seulement si le siège n'en a
+  aucune** : on ne mélange pas deux adresses champ par champ. Ligne
+  principale : la voie (ligne 4), sinon le lieu-dit (ligne 5).
+- **Géocodage du siège après l'import, par l'API** (le migrateur n'appelle
+  pas le réseau). Un résultat approximatif ou introuvable est noté dans le
+  compte rendu de l'import.
+
 ## 13. Décisions de conception à valider
 
 1. **Identité sur `farms`** plutôt que dans une table `farm_profile` (§3.1).

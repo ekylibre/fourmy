@@ -21,6 +21,7 @@ import { certificationAlerts } from "@fourmy/domain";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { usePeople } from "../../app/queries";
+import { FarmLogoField } from "./FarmLogo";
 
 /**
  * Identité de l'exploitation (E1 à E8) : identité légale, informations
@@ -154,6 +155,8 @@ export function IdentityTab({ profile }: { profile: FarmProfile }) {
         </Stack>
       </form>
 
+      <Divider />
+      <FarmLogoField logoAssetId={profile.logoAssetId} canEdit={profile.canEdit} />
       <Divider />
       <FarmCertifications certs={profile.certifications} canEdit={profile.canEdit} />
     </Stack>

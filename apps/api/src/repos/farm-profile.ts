@@ -1,8 +1,9 @@
 import { sql, type SQL } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
-import type { DomainCtx } from "@fourmy/domain";
+import { geocodeQuality, type DomainCtx } from "@fourmy/domain";
 import { DEFAULT_FARM_DISPLAY, type FarmCertification, type FarmCertificationWrite, type FarmDisplay, type FarmProfile, type FarmProfileIdentity, type FarmSite, type FarmSiteWrite } from "@fourmy/contracts";
 import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
+import { geocodeSearch } from "../geocode.js";
 
 /**
  * « Ma ferme », lot F1 (claudedocs/conception_ma_ferme.md §5) : identité sur
@@ -229,6 +230,34 @@ export async function getProfile(db: Database, farmId: string, canEdit: boolean)
     sites: await listSites(tx),
     parcelsOutside: await parcelsOutsideTx(tx),
     display: await displayTx(tx),
+    logoAssetId: (await rows<{ logo_asset_id: string | null }>(tx, sql`SELECT logo_asset_id FROM farms WHERE id = ${farmId}`))[0]?.logo_asset_id ?? null,
     canEdit,
   }));
+}
+
+/**
+ * Place le siège depuis son adresse s'il n'a pas encore de point (import
+ * Ekylibre). Renvoie un message pour le compte rendu, ou null s'il n'y avait
+ * rien à faire.
+ */
+export async function placeHeadquartersFromAddress(db: Database, farmId: string): Promise<string | null> {
+  const hq = await withFarm(db, farmId, async (tx) => {
+    const [r] = await rows<{ id: string; address_line1: string | null; postal_code: string | null; city: string | null; has_point: boolean }>(
+      tx,
+      sql`SELECT id, address_line1, postal_code, city, location IS NOT NULL AS has_point FROM farm_sites WHERE is_headquarters`,
+    );
+    return r;
+  });
+  if (!hq || hq.has_point) return null;
+  const q = [hq.address_line1, hq.postal_code, hq.city].filter(Boolean).join(" ");
+  if (q.length < 3) return null;
+  const [best] = await geocodeSearch(q, 1, "import");
+  if (!best) return "siège non géocodé : adresse introuvable, à placer sur la carte dans Ma ferme";
+  await withFarm(db, farmId, (tx) =>
+    tx.execute(sql`
+      UPDATE farm_sites SET location = ST_SetSRID(ST_MakePoint(${best.location.lon}, ${best.location.lat}), 4326), location_source = 'geocoded',
+        geocode_score = ${best.score}, geocode_type = ${best.type}, insee_code = coalesce(insee_code, ${best.inseeCode}), updated_at = now()
+      WHERE id = ${hq.id} AND location IS NULL`),
+  );
+  return geocodeQuality(best.score, best.type) === "precise" ? null : `siège géocodé de façon approximative (${best.label}) : vérifiez le point dans Ma ferme`;
 }

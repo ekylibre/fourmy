@@ -17,6 +17,8 @@ import { NA_SOIL_TYPE_LABELS, isNaSoilType } from "@fourmy/fertilization-refs";
 import { api, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { formatDate } from "../../app/labels";
+import { useFarmProfile } from "../../app/queries";
+import { farmLogoSrc } from "../farm/FarmLogo";
 import { ErrorAlert, Loading } from "../../components/states";
 import "./print.css";
 
@@ -55,13 +57,22 @@ export function PrintPage() {
 }
 
 function Header({ title, farmName, campaign, from, to }: { title: string; farmName: string; campaign: number; from?: string; to?: string }) {
+  // Logo de la ferme (sinon celui de Fourmy) et raison sociale (E8 bis, R10).
+  const farm = useFarm();
+  const profile = useFarmProfile(farm.id).data;
+  const legal = profile?.identity.legalName;
   return (
     <Stack gap={2} mb="md">
-      <Title order={1} size="h2">
-        {title}
-      </Title>
+      <Group justify="space-between" align="flex-start" wrap="nowrap">
+        <Title order={1} size="h2">
+          {title}
+        </Title>
+        <img src={farmLogoSrc(farm.id, profile?.logoAssetId ?? null)} alt="Logo" style={{ height: 56, maxWidth: 160, objectFit: "contain" }} />
+      </Group>
       <Text size="sm">
-        Exploitation : <b>{farmName}</b> · Campagne {campaign}
+        Exploitation : <b>{farmName}</b>
+        {legal && legal !== farmName ? ` (${legal})` : ""}
+        {profile?.identity.siret ? ` · SIRET ${profile.identity.siret}` : ""} · Campagne {campaign}
         {/* La fin de campagne est exclusive (01/09) : on affiche la veille (31/08). */}
         {from && to ? ` (du ${formatDate(from)} au ${formatDate(new Date(Date.parse(to) - 86_400_000).toISOString().slice(0, 10))})` : ""}
       </Text>

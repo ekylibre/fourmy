@@ -4,6 +4,7 @@ import { withFarm, type Database } from "@fourmy/db";
 import { migrate } from "@fourmy/migrator-ekylibre";
 import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
 import { configureIntegration, listIntegrations } from "../integrations/repo.js";
+import { placeHeadquartersFromAddress } from "./farm-profile.js";
 
 /**
  * Imports Ekylibre depuis l'API (FR-MIG-1/3). Sécurité : le client ne fournit
@@ -63,7 +64,10 @@ export async function startImport(
   });
 
   const job = migrate({ sourceUrl: src, targetUrl, farmId, runId })
-    .then((report) => importSecrets(db, farmId, runId, report.secrets))
+    .then(async (report) => {
+      await importSecrets(db, farmId, runId, report.secrets);
+      await geocodeImportedHeadquarters(db, farmId, runId);
+    })
     .catch(async (e: unknown) => {
     const sqlc = postgres(targetUrl, { max: 1, onnotice: () => {} });
     try {
@@ -104,6 +108,22 @@ async function importSecrets(
     tx.execute(sql`
       UPDATE import_runs SET report = jsonb_set(coalesce(report, '{}'), '{warnings}',
         coalesce(report->'warnings', '[]') || ${JSON.stringify([{ entity: "integration", id: "openweather", message }])}::jsonb)
+      WHERE id = ${runId}`),
+  );
+}
+
+/**
+ * Siège repris d'Ekylibre avec une adresse mais sans point : on le géocode
+ * (meilleur résultat, origine « géocodé »). Un échec n'invalide pas l'import :
+ * le point reste vide, la page « Ma ferme » le signale (claudedocs/conception_ma_ferme.md §7).
+ */
+async function geocodeImportedHeadquarters(db: Database, farmId: string, runId: string): Promise<void> {
+  const message = await placeHeadquartersFromAddress(db, farmId).catch((e: unknown) => `siège non géocodé : ${e instanceof Error ? e.message : String(e)}`);
+  if (!message) return;
+  await withFarm(db, farmId, (tx) =>
+    tx.execute(sql`
+      UPDATE import_runs SET report = jsonb_set(coalesce(report, '{}'), '{warnings}',
+        coalesce(report->'warnings', '[]') || ${JSON.stringify([{ entity: "farm_identity", id: "headquarters", message }])}::jsonb)
       WHERE id = ${runId}`),
   );
 }
