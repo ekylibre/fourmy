@@ -1,12 +1,13 @@
-import { ActionIcon, AppShell, Badge, Box as MBox, Burger, Button, Group, NavLink, Stack, Text, Tooltip } from "@mantine/core";
+import { Anchor, AppShell, Box as MBox, Burger, Group, NavLink, Stack, Text } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { useState } from "react";
-import { Box, Boxes, Building, Grid3x3, Leaf, ClipboardList, Database, FileText, LayoutDashboard, LogOut, Map, Plug, Scale, Users, Wine, FlaskConical, Sprout, Tractor, type LucideIcon } from "lucide-react";
-import { Link, Outlet, useLocation, useNavigate } from "react-router";
+import { useQuery } from "@tanstack/react-query";
+import { Box, Boxes, Grid3x3, Leaf, ClipboardList, Database, FileText, LayoutDashboard, Map, Plug, Scale, Wine, FlaskConical, Sprout, Tractor, type LucideIcon } from "lucide-react";
+import { Link, Outlet, useLocation } from "react-router";
 import { Wordmark } from "@fourmy/ui-lyvre";
 import { useFarm } from "../app/farm";
-import { useSession, useSignOut } from "../app/session";
 import { Timeline } from "./Timeline";
+import { UserMenu } from "./UserMenu";
 
 type NavItem = { path: string; label: string; icon: LucideIcon; ownerOnly?: boolean };
 type NavGroup = { label: string; icon: LucideIcon; ownerOnly?: boolean; children: NavItem[] };
@@ -15,6 +16,8 @@ type NavEntry = NavItem | NavGroup;
 /**
  * Menu (retours du 10/11/2026) : sections et sous-menus. Les routes ne
  * changent pas ; Entretien et Attelages types restent sous Matériels.
+ * Équipe et Ma ferme sont passés dans le menu du compte (onglets de « Ma
+ * ferme », claudedocs/besoins_navigation_compte.md).
  */
 export const NAVIGATION: NavEntry[] = [
   { path: "", label: "Tableau de bord", icon: LayoutDashboard },
@@ -30,8 +33,6 @@ export const NAVIGATION: NavEntry[] = [
   { path: "/activities", label: "Activités", icon: Sprout },
   { path: "/interventions", label: "Interventions", icon: ClipboardList },
   { path: "/equipments", label: "Matériels", icon: Tractor },
-  { path: "/team", label: "Équipe", icon: Users, ownerOnly: true },
-  { path: "/farm", label: "Ma ferme", icon: Building },
   {
     label: "Stocks",
     icon: Boxes,
@@ -73,9 +74,6 @@ export function Layout() {
   const farm = useFarm();
   const [opened, { toggle, close }] = useDisclosure();
   const location = useLocation();
-  const navigate = useNavigate();
-  const session = useSession();
-  const signOut = useSignOut();
   const base = `/f/${farm.id}`;
   const current = location.pathname.slice(base.length);
   const linkTo = (path: string) => `${base}${path}${location.search}`; // garde ?at=
@@ -93,11 +91,6 @@ export function Layout() {
     />
   );
 
-  const logout = async () => {
-    await signOut();
-    navigate("/login");
-  };
-
   return (
     <AppShell header={{ height: 56 }} navbar={{ width: 240, breakpoint: "sm", collapsed: { mobile: !opened } }} padding={0}>
       <AppShell.Header>
@@ -109,26 +102,8 @@ export function Layout() {
                 <Wordmark />
               </Link>
             </MBox>
-            <Text fw={600} truncate maw={{ base: 96, sm: 260 }}>
-              {farm.name}
-            </Text>
-            <Badge color={farm.role === "owner" ? "lichen" : "ardoise"}>{farm.role === "owner" ? "Responsable" : "Salarié"}</Badge>
           </Group>
-          <Group gap="xs" wrap="nowrap">
-            {session.data && (
-              <Text size="sm" c="dimmed" visibleFrom="sm" truncate maw={220}>
-                {session.data.name ?? session.data.email}
-              </Text>
-            )}
-            <Button variant="subtle" size="xs" onClick={logout} visibleFrom="sm">
-              Se déconnecter
-            </Button>
-            <Tooltip label="Se déconnecter">
-              <ActionIcon variant="subtle" aria-label="Se déconnecter" onClick={logout} hiddenFrom="sm">
-                <LogOut size={18} />
-              </ActionIcon>
-            </Tooltip>
-          </Group>
+          <UserMenu />
         </Group>
       </AppShell.Header>
 
@@ -156,9 +131,7 @@ export function Layout() {
             );
           })}
         </Stack>
-        <Text className="lv-nav-foot" mt="auto" pt="md">
-          FOURMY · JUMEAU NUMÉRIQUE
-        </Text>
+        <AppVersion />
       </AppShell.Navbar>
 
       <AppShell.Main>
@@ -168,5 +141,39 @@ export function Layout() {
         </div>
       </AppShell.Main>
     </AppShell>
+  );
+}
+
+/** Page des nouveautés du site public. */
+export const CHANGELOG_URL = "https://fourmy.org/changelog";
+
+/**
+ * Version de l'application en pied de menu (besoins_navigation_compte.md
+ * §3.4) : lue dans /version.json, publié par le site (même calcul, depuis
+ * l'historique Git) et relayé par le nginx de l'application ; en local,
+ * servi par Vite. Sans réponse : « Version de développement », sans lien.
+ */
+function AppVersion() {
+  const version = useQuery({
+    queryKey: ["app-version"],
+    queryFn: async () => {
+      const r = await fetch("/version.json");
+      if (!r.ok) return null;
+      const body = (await r.json().catch(() => null)) as { version?: unknown } | null;
+      return typeof body?.version === "string" ? body.version : null;
+    },
+    retry: false,
+    staleTime: Infinity,
+  });
+  return (
+    <Text className="lv-nav-foot" mt="auto" pt="md">
+      {version.data ? (
+        <Anchor href={CHANGELOG_URL} target="_blank" rel="noopener" inherit c="inherit" aria-label={`Version ${version.data}, nouveautés sur fourmy.org`}>
+          Version {version.data}
+        </Anchor>
+      ) : (
+        "Version de développement"
+      )}
+    </Text>
   );
 }

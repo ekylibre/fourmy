@@ -153,8 +153,11 @@ test("conditions de pulvérisation (tableau de bord du jour)", async ({ page }) 
 });
 
 test("équipe et intégrations", async ({ page }) => {
-  await page.getByRole("link", { name: "Équipe" }).click();
-  await expect(page.getByRole("heading", { name: "Équipe" })).toBeVisible();
+  // L'équipe est un onglet de « Ma ferme », ouverte par le menu du compte.
+  await page.getByRole("button", { name: /^Compte de / }).click();
+  await page.getByRole("menuitem", { name: "Ma ferme" }).click();
+  await page.getByRole("tab", { name: "Équipe" }).click();
+  await expect(page.getByRole("tab", { name: "Équipe", selected: true })).toBeVisible();
   await snap(page, "equipe");
   await navTo(page, "Intégrations", "Interopérabilité");
   await expect(page.getByRole("heading", { name: /Traccar/ })).toBeVisible();

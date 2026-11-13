@@ -7,8 +7,11 @@ import { FARM, renderApp } from "./render";
 describe("équipe (responsable)", () => {
   it("une grille de pavés, un par personne ; un clic ouvre la fiche", async () => {
     const user = userEvent.setup();
-    renderApp(`/f/${FARM}/team?at=2026-06-30`);
-    expect(await screen.findByRole("heading", { name: "Équipe" })).toBeInTheDocument();
+    // L'ancienne adresse mène à l'onglet Équipe de « Ma ferme », la date gardée.
+    const { router } = renderApp(`/f/${FARM}/team?at=2026-06-30`);
+    expect(await screen.findByRole("tab", { name: "Équipe", selected: true }, { timeout: 10_000 })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/f/${FARM}/farm`);
+    expect(router.state.location.search).toBe("?at=2026-06-30&tab=team");
     const camille = await screen.findByRole("link", { name: "Camille" });
     expect(within(camille).getByText("Sans compte")).toBeInTheDocument();
     expect(within(camille).getByText("Certiphyto à renouveler")).toBeInTheDocument();
@@ -23,8 +26,8 @@ describe("équipe (responsable)", () => {
     const contact = screen.getByLabelText("Coordonnées");
     expect(within(contact).getByText("camille@exemple.test")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Inviter" })).toBeInTheDocument();
-    // Retour à la grille, la date de la frise gardée (le lien du menu porte le même nom).
-    expect(screen.getAllByRole("link", { name: "Équipe" }).map((a) => a.getAttribute("href"))).toContain(`/f/${FARM}/team?at=2026-06-30`);
+    // Retour à l'onglet Équipe de « Ma ferme », la date de la frise gardée.
+    expect(screen.getByRole("link", { name: "Équipe" })).toHaveAttribute("href", `/f/${FARM}/farm?at=2026-06-30&tab=team`);
   });
 
   it("ajoute une personne sans compte (prénom, nom, coordonnées)", async () => {

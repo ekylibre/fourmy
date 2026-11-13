@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Group, Paper, SegmentedControl, Stack, Text, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -78,14 +78,47 @@ export function DisplaySettings({ profile }: { profile: FarmProfile }) {
   );
 }
 
-export function MaintenanceTab() {
-  const farm = useFarm();
-  return <MaintenanceSettingsPanel farmId={farm.id} />;
-}
+export type PreferenceSection = "maintenance" | "tracks" | "brands";
 
-export function TracksTab() {
+/**
+ * Onglet Préférences (besoins_navigation_compte.md §3.2) : entretien et
+ * parcours (responsable seulement), puis marques (lecture pour tous).
+ * `section` : ancien onglet demandé par un lien, l'écran y défile.
+ */
+export function PreferencesTab({ canEdit, section }: { canEdit: boolean; section: PreferenceSection | null }) {
   const farm = useFarm();
-  return <TrackSettingsPanel farmId={farm.id} />;
+  useEffect(() => {
+    if (!section) return;
+    // Après le rendu des sections (les panneaux chargent leurs données).
+    const t = setTimeout(() => document.getElementById(`preferences-${section}`)?.scrollIntoView?.({ block: "start", behavior: "smooth" }), 300);
+    return () => clearTimeout(t);
+  }, [section]);
+  return (
+    <Stack gap="xl">
+      {canEdit && (
+        <section id="preferences-maintenance" aria-labelledby="preferences-maintenance-title">
+          <Title order={3} id="preferences-maintenance-title" mb="sm">
+            Entretien
+          </Title>
+          <MaintenanceSettingsPanel farmId={farm.id} />
+        </section>
+      )}
+      {canEdit && (
+        <section id="preferences-tracks" aria-labelledby="preferences-tracks-title">
+          <Title order={3} id="preferences-tracks-title" mb="sm">
+            Parcours
+          </Title>
+          <TrackSettingsPanel farmId={farm.id} />
+        </section>
+      )}
+      <section id="preferences-brands" aria-labelledby="preferences-brands-title">
+        <Title order={3} id="preferences-brands-title" mb="sm">
+          Marques
+        </Title>
+        <BrandsTab canEdit={canEdit} />
+      </section>
+    </Stack>
+  );
 }
 
 /** Marques des matériels : couleur et logo (servent aussi aux avatars 3D). */

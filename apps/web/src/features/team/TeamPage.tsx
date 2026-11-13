@@ -24,9 +24,10 @@ const hours = (h: number) => `${h.toLocaleString("fr-FR", { maximumFractionDigit
 
 /**
  * Équipe (docs/equipe-personnes-design.md §6) : une grille de pavés, un par
- * personne (avec ou sans compte) ; un clic ouvre sa fiche.
+ * personne (avec ou sans compte) ; un clic ouvre sa fiche. Affichée dans
+ * l'onglet Équipe de « Ma ferme » (`embedded` : sans titre de page).
  */
-export function TeamPage() {
+export function TeamPage({ embedded = false }: { embedded?: boolean }) {
   const farm = useFarm();
   const { day } = useAt();
   const location = useLocation();
@@ -49,8 +50,8 @@ export function TeamPage() {
   if (team.error) return <ErrorAlert error={team.error} />;
   return (
     <Stack>
-      <Group justify="space-between">
-        <Title order={1}>Équipe</Title>
+      <Group justify={embedded ? "flex-end" : "space-between"}>
+        {!embedded && <Title order={1}>Équipe</Title>}
         {farm.role === "owner" && (
           <Button leftSection={<Plus size={16} />} onClick={() => setCreating(true)}>
             Ajouter une personne
