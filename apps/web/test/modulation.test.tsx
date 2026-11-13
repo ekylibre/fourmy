@@ -5,6 +5,13 @@ import { INTEGRATION_PROVIDERS, type Integration, type Prescription, type Zoning
 import { server } from "./setup";
 import { FARM, renderApp } from "./render";
 
+// Pages chargées à la demande (React.lazy) : les compiler avant les tests. Sinon
+// la première navigation vers la fiche peut dépasser le délai des findBy sur
+// une CI chargée (échec aléatoire « Azote 3e apport » introuvable, 12/11/2026).
+beforeAll(async () => {
+  await Promise.all([import("../src/features/modulation/PrescriptionNewPage"), import("../src/features/modulation/PrescriptionPage")]);
+}, 30_000);
+
 // La carte MapLibre n'a pas de WebGL sous jsdom : on vérifie les zones qu'on lui passe.
 vi.mock("../src/features/map/ParcelMap", () => ({
   ParcelMap: ({ parcels }: { parcels: { features: { properties: { name: string; color: string } }[] } }) => (
