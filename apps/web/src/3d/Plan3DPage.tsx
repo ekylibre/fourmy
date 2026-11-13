@@ -49,6 +49,20 @@ export function Plan3DPage() {
   const [tools, setTools] = useState<Hitch[]>([]);
   // Mise en page (retours du 12/11/2026) : vue pleine hauteur, couches en barre d'icônes, plein écran.
   const [openSection, setOpenSection] = useState<string | null>(null);
+  // Échap ferme la rubrique ouverte même quand le focus n'est plus dedans
+  // (clic dans la vue 3D, focus perdu) : Mantine ne l'écoute que dans le panneau.
+  // Dans le panneau ou un champ, on laisse Mantine faire (une liste ouverte se
+  // ferme d'abord).
+  useEffect(() => {
+    if (!openSection) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target instanceof Element ? e.target : null;
+      if (e.key !== "Escape" || t?.closest(".mantine-Popover-dropdown, input, textarea, [role=combobox]")) return;
+      setOpenSection(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [openSection]);
   const [full, setFull] = useState(false);
   useEffect(() => {
     const on = () => setFull(document.fullscreenElement !== null);
