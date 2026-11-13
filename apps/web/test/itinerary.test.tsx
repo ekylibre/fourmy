@@ -107,7 +107,7 @@ describe("itinéraire technique de la parcelle", () => {
     expect(await screen.findByText("Vigne 2023", {}, { timeout: 10_000 })).toBeInTheDocument();
     expect(calls).toEqual(["2023/1"]);
     const first = tika.renders.at(-1)!.system;
-    expect(first.options).toMatchObject({ view: "horizontal", show_transcript: true, title_top_interventions: "Travaux", title_bottom_interventions: "Intrants" });
+    expect(first.options).toMatchObject({ view: "horizontal", show_transcript: false, title_top_interventions: "Travaux", title_bottom_interventions: "Intrants" });
     expect(first.steps[0]!.interventions[0]).toMatchObject({ name: "Pulvérisation · Karaté K", type: "intervention_bottom", day: 160 });
     expect(screen.getByText(/1 intervention : travaux au-dessus/)).toBeInTheDocument();
 

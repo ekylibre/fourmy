@@ -503,6 +503,25 @@ Vérifié : installation depuis l'étiquette, import par le nom du paquet
 - **Parcelles sans intervention** : avertissement au-dessus de la frise,
   avec leurs noms ; leur nombre d'interventions (0) apparaît dans la liste.
 
+## 12 sexies. Liste textuelle masquée au départ (2026-11-13)
+
+- **Constat** : la liste de TIKA, à gauche de la frise, répétait ce que
+  donne l'infobulle au survol.
+- **Côté Fourmy** : `show_transcript: false` dans `toTikaSystem`. La frise
+  prend toute la largeur.
+- **Côté fork TIKA** : avec `show_transcript: false`, TIKA ne construisait
+  pas la liste, mais gardait le bouton « Afficher la transcription ». Un clic
+  ouvrait alors une colonne vide.
+  - La branche `transcription-a-la-demande` construit toujours la liste.
+  - `show_transcript` ne décide plus que de son affichage au départ, et le
+    bouton la montre ou la cache.
+  - Étiquette `v1.3.0-ekylibre.3`.
+  - C'est la 9e contribution à reverser à OSFarm.
+- **Tests e2e** : le bouton est dessiné dans le canvas d'ECharts. Les tests
+  vérifient que la liste est masquée au départ, puis l'ouvrent comme le
+  bouton (classe `withTranscript`).
+- **N6** révisé en conséquence (besoins §7).
+
 ## 13. Décisions de conception
 
 1. **Modèle de Fourmy côté API, format TIKA côté web** (§2), plutôt qu'une

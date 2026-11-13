@@ -225,7 +225,7 @@ Plus un point fait (17), hors du total.
 
 ## 15. Itinéraires techniques
 
-105. **Reverser les contributions TIKA à OSFarm** : huit demandes de fusion en série, depuis le fork `ekylibre/itineraire-technique`, relues par David et Bertrand.
+105. **Reverser les contributions TIKA à OSFarm** : neuf demandes de fusion en série (la 9e, `transcription-a-la-demande`, ajoutée le 13/11), depuis le fork `ekylibre/itineraire-technique`, relues par David et Bertrand.
      - La première (`dom-natif`) est prête mais pas encore ouverte.
      - OSFarm doit choisir comment publier sur npm : une version à chaque fusion, ou une seule version 1.3.0 à la fin.
 

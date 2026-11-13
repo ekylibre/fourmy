@@ -83,7 +83,9 @@ export function toTikaSystem(itinerary: TechnicalItinerary, opts: { view?: "hori
     title: itinerary.title,
     options: {
       view: opts.view ?? "horizontal",
-      show_transcript: true,
+      // Liste textuelle masquée au départ : elle doublait l'infobulle du survol.
+      // Le bouton « Afficher la transcription » de TIKA l'ouvre (fork .3).
+      show_transcript: false,
       title_top_interventions: ITINERARY_LANE_LABELS.works,
       title_bottom_interventions: ITINERARY_LANE_LABELS.inputs,
       title_steps: opts.stepsTitle ?? (itinerary.campaigns.length > 1 ? "Rotation" : "Culture"),
