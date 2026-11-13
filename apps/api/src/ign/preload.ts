@@ -6,14 +6,14 @@ import { farmPlanTx, ignSettingsTx, type IgnPlan } from "./cache.js";
 
 /**
  * Worker du préchargement IGN (« Ma ferme », lot F4, §5.4) : une tâche à la
- * fois, quelques requêtes en parallèle (les CGU de la Géoplateforme ne
- * limitent pas le WMTS, mais interdisent d'en « entraver le bon
- * fonctionnement » : on reste prudent), progression écrite régulièrement,
+ * fois, 8 requêtes en parallèle (cache et préchargement confirmés par
+ * l'IGN le 2026-11-13 ; le WMTS n'a pas de limite de débit), progression
+ * écrite régulièrement,
  * annulation prise en compte entre deux lots. Puis la purge du quota disque.
  */
 
 export const preloadConfig = {
-  concurrency: Number(process.env.FOURMY_IGN_PRELOAD_CONCURRENCY ?? 4),
+  concurrency: Number(process.env.FOURMY_IGN_PRELOAD_CONCURRENCY ?? 8),
   attempts: 3,
   retryDelayMs: 1000,
   progressEvery: 200,

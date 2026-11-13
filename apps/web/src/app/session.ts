@@ -1,3 +1,4 @@
+import { forgetOffline } from "./offline";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createAuthClient } from "better-auth/react";
 
@@ -42,6 +43,7 @@ export function useSignOut() {
   return async () => {
     await authClient.signOut();
     client.clear(); // aucune donnée de ferme ne survit à la déconnexion
+    await forgetOffline().catch(() => {}); // ni sur ce poste (copies hors ligne)
   };
 }
 

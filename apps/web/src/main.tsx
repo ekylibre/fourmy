@@ -4,6 +4,9 @@ import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router/dom";
 import { Providers, createQueryClient } from "./app/providers";
 import { createRouter } from "./app/router";
+import { registerServiceWorker } from "./app/offline";
+
+registerServiceWorker(); // copie hors ligne des fermes (« Ma ferme » F5)
 
 const router = createRouter();
 const queryClient = createQueryClient();

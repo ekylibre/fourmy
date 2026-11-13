@@ -176,6 +176,14 @@ export interface IgnCacheState {
   canEdit: boolean;
 }
 
+/** GET /ign/cache/manifest : tuiles du plan déjà sur le serveur, pour la copie hors ligne (F5). */
+export interface IgnCacheManifest {
+  entries: { url: string; etag: string; bytes: number }[];
+  bytes: number;
+}
+/** Au-delà, la copie dans le navigateur demande une confirmation (N3 bis). */
+export const IGN_BROWSER_CONFIRM_BYTES = 500e6;
+
 /** Réponse de GET /farm : tout ce qu'affiche la page, en une requête. */
 export interface FarmProfile {
   identity: FarmProfileIdentity;

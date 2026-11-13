@@ -87,3 +87,9 @@ export function formatPeriod(startedAt: string, stoppedAt: string): string {
     : formatDateTime(stoppedAt);
   return `${formatDateTime(startedAt)} → ${end}`;
 }
+
+/** Volume lisible : mégaoctets entiers, gigaoctets à une décimale. */
+export function formatBytes(bytes: number): string {
+  if (bytes >= 1e9) return `${(bytes / 1e9).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} Go`;
+  return `${Math.max(1, Math.round(bytes / 1e6)).toLocaleString("fr-FR")} Mo`;
+}

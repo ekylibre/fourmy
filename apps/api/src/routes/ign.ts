@@ -3,7 +3,7 @@ import { farmIgnSettings, type IgnLayer } from "@fourmy/contracts";
 import { validTile } from "@fourmy/geo-ign";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
-import { cancelJob, ConfirmationRequired, createJob, getCacheState, putIgnSettings } from "../ign/cache.js";
+import { cacheManifest, cancelJob, ConfirmationRequired, createJob, getCacheState, putIgnSettings } from "../ign/cache.js";
 import { getTile, IGN_LAYERS, IgnUnavailable } from "../ign/store.js";
 import { BadRequest, domainCtx, problem, uuidParam } from "./helpers.js";
 
@@ -45,6 +45,8 @@ export const ignRoutes = new Hono<Env>()
     }
     return c.body(new Uint8Array(tile.bytes), 200, { ...headers, "content-type": IGN_LAYERS[layer as IgnLayer].contentType });
   })
+  // Copie hors ligne du navigateur (F5) : ouverte à tout membre, comme les tuiles.
+  .get("/ign/cache/manifest", async (c) => c.json(await cacheManifest(db(), c.get("farmId"))))
   .get("/ign/cache", async (c) => c.json(await getCacheState(db(), c.get("farmId"), c.get("role") === "owner")))
   .put("/settings/ign", requireOwner, async (c) => {
     const parsed = farmIgnSettings.safeParse(await c.req.json().catch(() => null));

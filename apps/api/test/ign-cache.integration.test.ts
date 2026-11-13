@@ -141,6 +141,19 @@ describe.skipIf(!url)("Cache IGN (intégration)", () => {
     expect(fetched.size).toBe(0);
   });
 
+  it("manifeste de la copie hors ligne : les tuiles du plan déjà sur le serveur, lisible par un salarié", async () => {
+    const plan = (await state()).plan;
+    const r = await send("GET", "/ign/cache/manifest", undefined, worker.headers);
+    expect(r.status).toBe(200);
+    const m = await r.json();
+    expect(m.entries).toHaveLength(plan.tiles);
+    expect(m.bytes).toBe(plan.tiles * PNG.length);
+    expect(m.entries[0]).toEqual({ url: expect.stringMatching(new RegExp(`^/api/v1/farms/${farmId}/ign/tiles/plan/\\d+/\\d+/\\d+$`)), etag: `"${createHash("sha1").update(PNG).digest("hex")}"`, bytes: PNG.length });
+    // L'URL du manifeste est servie telle quelle par le relais, avec le même ETag.
+    const tile = await app.request(m.entries[0].url, { headers: worker.headers });
+    expect(tile.headers.get("etag")).toBe(m.entries[0].etag);
+  });
+
   it("le relais sert la tuile du cache, avec ETag et 304", async () => {
     const z = 16;
     const x = Math.floor(((HQ.lon + 180) / 360) * 2 ** z);
@@ -221,6 +234,10 @@ describe.skipIf(!url)("Cache IGN (intégration)", () => {
     while (done?.status === "running") done = await runIgnJob(db());
     expect(done).toMatchObject({ status: "done", failed: 0, fetched: plan.tiles });
     expect((await state()).cached.tiles).toBe(plan.tiles);
+    // Manifeste : le relief par la route de la 3D ; les bâtiments n'y sont pas (ils viennent avec /plan3d).
+    const m = await (await send("GET", "/ign/cache/manifest")).json();
+    expect(m.entries).toHaveLength(plan.layers.elevation);
+    expect(m.entries.every((e: { url: string }) => e.url.includes("/terrain/heightmap/"))).toBe(true);
 
     const offline = (async () => {
       throw new Error("pas de réseau");

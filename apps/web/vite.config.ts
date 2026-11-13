@@ -6,6 +6,14 @@ export default defineConfig({
   plugins: [react()],
   // Le worker de MapLibre est un module ESM (new Worker(url, { type: "module" })).
   worker: { format: "es" },
+  // Service worker (« Ma ferme » F5) : publié à la racine, sous un nom fixe
+  // (/sw.js), pour couvrir toute l'application.
+  build: {
+    rollupOptions: {
+      input: { main: "index.html", sw: "sw/sw.ts" },
+      output: { entryFileNames: (chunk) => (chunk.name === "sw" ? "sw.js" : "assets/[name]-[hash].js") },
+    },
+  },
   server: {
     port: 5173,
     proxy: { "/api": { target: process.env.FOURMY_API_URL ?? "http://localhost:3000", changeOrigin: true } },
