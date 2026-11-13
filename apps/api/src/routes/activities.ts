@@ -4,6 +4,7 @@ import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import { createActivity, deleteActivity, listActivities, searchReferences, setActivityParcels, updateActivity } from "../repos/activities.js";
 import { BadRequest, problem, uuidParam } from "./helpers.js";
+import { activityItinerary } from "../repos/itinerary.js";
 
 /** Campagne demandée (`?year=`), l'année en cours par défaut. */
 function yearOf(c: Context<Env>): number {
@@ -20,6 +21,7 @@ function yearOf(c: Context<Env>): number {
  */
 export const activityRoutes = new Hono<Env>()
   .get("/activities", async (c) => c.json({ items: await listActivities(db(), c.get("farmId"), yearOf(c)) }))
+  .get("/activities/:id/itinerary", async (c) => c.json(await activityItinerary(db(), c.get("farmId"), uuidParam(c, "id"), yearOf(c))))
   .get("/activities/references", async (c) =>
     c.json({ items: await searchReferences(db(), c.get("farmId"), c.req.query("q") ?? "", c.req.query("family") || null) }),
   )
