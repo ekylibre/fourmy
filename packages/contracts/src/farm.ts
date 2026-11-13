@@ -163,7 +163,19 @@ export interface IgnCacheJob {
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+  /**
+   * Secondes depuis lesquelles la tâche attend le worker, selon l'horloge de
+   * la base : en attente depuis sa création, ou en cours mais rendue (verrou
+   * expiré) et pas encore reprise. Null si le worker y travaille ou si elle
+   * est terminée.
+   */
+  waitingSeconds: number | null;
 }
+/**
+ * Au-delà, une tâche qui attend le worker est signalée : le worker passe
+ * toutes les minutes environ, il est sans doute arrêté.
+ */
+export const IGN_JOB_STALLED_AFTER_S = 180;
 /** Réponse de GET /ign/cache : réglages, plan actuel, ce qui est déjà sur le serveur. */
 export interface IgnCacheState {
   settings: FarmIgnSettings;

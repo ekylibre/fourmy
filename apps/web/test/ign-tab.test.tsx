@@ -76,6 +76,7 @@ describe("Données IGN", () => {
               createdAt: "2026-11-13T10:00:00Z",
               startedAt: "2026-11-13T10:00:05Z",
               finishedAt: "2026-11-13T10:12:00Z",
+              waitingSeconds: null,
             },
           }),
         ),
@@ -86,6 +87,35 @@ describe("Données IGN", () => {
     expect(screen.getByText(/2 600 \/ 2 600, 12 en échec/)).toBeInTheDocument();
     expect(screen.getByText(/seules les tuiles manquantes seront demandées/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Télécharger maintenant" })).toBeInTheDocument();
+  });
+
+  it("tâche en attente du worker : délai normal, puis avertissement s'il semble arrêté", async () => {
+    const pending = (waitingSeconds: number) =>
+      state({
+        lastJob: {
+          id: "j1",
+          status: "pending",
+          layers: ["ortho"],
+          tileCount: 2600,
+          estimateBytes: 52e6,
+          progress: { ortho: { total: 2600, done: 0, fetched: 0, failed: 0 } },
+          error: null,
+          createdAt: "2026-11-13T10:00:00Z",
+          startedAt: null,
+          finishedAt: null,
+          waitingSeconds,
+        },
+      });
+    let waiting = 20;
+    server.use(http.get(cacheRoute, () => HttpResponse.json(pending(waiting))));
+    const { unmount } = renderApp(`/f/${FARM}/farm?tab=ign`);
+    expect(await screen.findByText("En attente : le téléchargement commence dans la minute.", {}, { timeout: 10_000 })).toBeInTheDocument();
+    expect(screen.queryByText("Le téléchargement ne démarre pas")).not.toBeInTheDocument();
+    unmount();
+    waiting = 420;
+    renderApp(`/f/${FARM}/farm?tab=ign`);
+    expect(await screen.findByText("Le téléchargement ne démarre pas", {}, { timeout: 10_000 })).toBeInTheDocument();
+    expect(screen.getByText(/La demande attend depuis 7 min/)).toBeInTheDocument();
   });
 
   it("en lecture seule pour un salarié : ni réglage ni lancement", async () => {

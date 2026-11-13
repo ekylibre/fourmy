@@ -85,8 +85,12 @@ async function cachedInPlan(tx: Tx, plan: IgnPlan): Promise<{ tiles: number; byt
 type JobRow = {
   id: string; status: IgnCacheJob["status"]; layers: IgnLayer[]; tile_count: number; estimate_bytes: string | number;
   progress: IgnCacheJob["progress"]; error: string | null; created_at: unknown; started_at: unknown; finished_at: unknown;
+  waiting_seconds: number | null;
 };
-const JOB_COLUMNS = sql`id, status, layers, tile_count, estimate_bytes, progress, error, created_at, started_at, finished_at`;
+const JOB_COLUMNS = sql`id, status, layers, tile_count, estimate_bytes, progress, error, created_at, started_at, finished_at,
+  (CASE WHEN status = 'pending' THEN extract(epoch FROM now() - created_at)
+        WHEN status = 'running' AND locked_until < now() THEN extract(epoch FROM now() - locked_until)
+   END)::int AS waiting_seconds`;
 const toJob = (r: JobRow): IgnCacheJob => ({
   id: r.id,
   status: r.status,
@@ -98,6 +102,7 @@ const toJob = (r: JobRow): IgnCacheJob => ({
   createdAt: iso(r.created_at)!,
   startedAt: iso(r.started_at),
   finishedAt: iso(r.finished_at),
+  waitingSeconds: r.waiting_seconds == null ? null : Math.max(0, Number(r.waiting_seconds)),
 });
 
 export async function getCacheState(db: Database, farmId: string, canEdit: boolean): Promise<IgnCacheState> {
