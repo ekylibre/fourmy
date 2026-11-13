@@ -3,7 +3,7 @@ import { Alert, Anchor, Badge, Button, Checkbox, Group, NumberInput, Paper, Prog
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { IGN_LAYER_LABELS, type FarmIgnSettings, type IgnCacheJob, type IgnCacheState, type IgnLayer } from "@fourmy/contracts";
+import { IGN_JOB_STALLED_AFTER_S, IGN_LAYER_LABELS, type FarmIgnSettings, type IgnCacheJob, type IgnCacheState, type IgnLayer } from "@fourmy/contracts";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { formatBytes, formatDateTime } from "../../app/labels";
@@ -214,11 +214,34 @@ function JobDetail({ job }: { job: IgnCacheJob }) {
           ))}
         </Table.Tbody>
       </Table>
+      <WaitingNotice job={job} />
       {job.error && (
         <Text size="sm" c={job.status === "failed" ? "brique" : "orange"}>
           {job.error} {job.status === "partial" && "Relancez le téléchargement : seules les tuiles manquantes seront demandées."}
         </Text>
       )}
     </Stack>
+  );
+}
+
+/**
+ * Tâche qui attend le worker : normal pendant une minute environ (il passe
+ * toutes les minutes), anormal au-delà de quelques minutes (worker arrêté).
+ */
+function WaitingNotice({ job }: { job: IgnCacheJob }) {
+  if (job.waitingSeconds == null) return null;
+  if (job.waitingSeconds >= IGN_JOB_STALLED_AFTER_S) {
+    const minutes = Math.floor(job.waitingSeconds / 60);
+    return (
+      <Alert color="orange" title="Le téléchargement ne démarre pas">
+        {job.status === "pending" ? "La demande attend" : "Le téléchargement est arrêté"} depuis {minutes} min. Le service qui télécharge les données sur le
+        serveur semble arrêté : prévenez l'administrateur de Fourmy. La demande est gardée et reprendra dès son redémarrage.
+      </Alert>
+    );
+  }
+  return (
+    <Text size="sm" c="dimmed">
+      {job.status === "pending" ? "En attente : le téléchargement commence dans la minute." : "En pause : le téléchargement reprend dans la minute."}
+    </Text>
   );
 }

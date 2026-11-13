@@ -17,6 +17,8 @@ export const preloadConfig = {
   attempts: 3,
   retryDelayMs: 1000,
   progressEvery: 200,
+  /** Progression écrite aussi au moins toutes les 5 s : sans cela, rien ne bouge à l'écran avant les 200 premières tuiles. */
+  progressEveryMs: 5_000,
   lockFor: "10 minutes",
   /** Temps de travail par tour du worker : les autres tâches (Traccar…) passent entre deux tours. */
   budgetMs: 50_000,
@@ -78,6 +80,7 @@ export async function runIgnJob(db: Database, stopping: () => boolean = () => fa
   // Reprise d'un tour précédent : les tuiles déjà en cache passent vite (index seul), on garde le compte des téléchargées.
   const progress: Progress = Object.fromEntries([...plan].map(([l, t]) => [l, { total: t.length, done: 0, fetched: previous[l]?.fetched ?? 0, failed: 0 }]));
   let sinceCheckpoint = 0;
+  let checkpointAt = Date.now();
   let lastError: string | null = null;
   for (const [layer, tiles] of plan) {
     const p = progress[layer]!;
@@ -98,8 +101,9 @@ export async function runIgnJob(db: Database, stopping: () => boolean = () => fa
         }),
       );
       sinceCheckpoint += preloadConfig.concurrency;
-      if (sinceCheckpoint >= preloadConfig.progressEvery) {
+      if (sinceCheckpoint >= preloadConfig.progressEvery || Date.now() - checkpointAt >= preloadConfig.progressEveryMs) {
         sinceCheckpoint = 0;
+        checkpointAt = Date.now();
         if (!(await checkpoint(db, job.farm_id, job.id, progress))) return { jobId: job.id, status: "cancelled", ...totals(progress) };
       }
     }

@@ -33,6 +33,7 @@ describe.skipIf(!url)("Cache IGN (intégration)", () => {
   const startedAt = new Date();
   const fetched = new Set<string>();
   let ignDown = false;
+  let onFetch: (() => Promise<void>) | null = null;
   const realFetch = ignStoreDeps.fetch;
   const realDir = ignStoreConfig.dir;
   const base = () => `/api/v1/farms/${farmId}`;
@@ -56,6 +57,11 @@ describe.skipIf(!url)("Cache IGN (intégration)", () => {
     hqId = hq!.id;
     ignStoreDeps.fetch = async (input: string, init?: RequestInit) => {
       if (ignDown) throw new Error("ECONNREFUSED");
+      if (onFetch) {
+        const hook = onFetch;
+        onFetch = null;
+        await hook();
+      }
       const u = new URL(input);
       if (u.pathname === "/wms-r") {
         fetched.add(`elevation/${u.searchParams.get("BBOX")}`);
@@ -83,6 +89,7 @@ describe.skipIf(!url)("Cache IGN (intégration)", () => {
   });
   afterEach(() => {
     ignDown = false;
+    onFetch = null;
   });
   afterAll(async () => {
     ignStoreDeps.fetch = realFetch;
@@ -261,11 +268,47 @@ describe.skipIf(!url)("Cache IGN (intégration)", () => {
     preloadConfig.budgetMs = -1;
     try {
       await send("POST", "/ign/cache/jobs", {});
+      // En attente : le temps d'attente du worker est compté depuis la création.
+      expect((await state()).lastJob.waitingSeconds).toBeGreaterThanOrEqual(0);
       expect(await runIgnJob(db())).toMatchObject({ status: "running" });
-      expect((await state()).lastJob).toMatchObject({ status: "running" });
+      // Rendue au worker : elle attend de nouveau d'être reprise.
+      expect((await state()).lastJob).toMatchObject({ status: "running", waitingSeconds: expect.any(Number) });
     } finally {
       preloadConfig.budgetMs = budget;
     }
     expect(await runIgnJob(db())).toMatchObject({ status: "done" });
+    expect((await state()).lastJob.waitingSeconds).toBeNull();
+  });
+
+  it("signale une tâche qui attend le worker depuis longtemps", async () => {
+    await send("PUT", "/settings/ign", { layers: ["plan"], detailMarginM: 0, autoRefresh: false });
+    expect((await send("PUT", `/farm/sites/${hqId}`, hqBody(1000))).status).toBe(200);
+    expect((await send("POST", "/ign/cache/jobs", {})).status).toBe(202);
+    expect((await state()).lastJob).toMatchObject({ status: "pending", waitingSeconds: expect.any(Number) });
+    // Worker arrêté en pleine tâche : en cours, verrou expiré depuis 5 minutes, jamais reprise.
+    await sql`UPDATE ign_cache_jobs SET status = 'running', started_at = now(), locked_until = now() - interval '5 minutes' WHERE farm_id = ${farmId} AND status = 'pending'`;
+    expect((await state()).lastJob).toMatchObject({ status: "running" });
+    expect((await state()).lastJob.waitingSeconds).toBeGreaterThanOrEqual(300);
+    await runIgnJob(db());
+  });
+
+  it("écrit la progression au moins toutes les 5 s, même avant 200 tuiles", async () => {
+    // Siège déplacé : des tuiles neuves, donc des appels à l'IGN pendant la tâche.
+    await send("PUT", "/settings/ign", { layers: ["plan"], detailMarginM: 0, autoRefresh: false });
+    expect((await send("PUT", `/farm/sites/${hqId}`, hqBody(1000, { lat: HQ.lat + 0.05, lon: HQ.lon + 0.05 }))).status).toBe(200);
+    const saved = { every: preloadConfig.progressEvery, ms: preloadConfig.progressEveryMs };
+    preloadConfig.progressEvery = 1e9;
+    preloadConfig.progressEveryMs = 0;
+    try {
+      expect((await send("POST", "/ign/cache/jobs", {})).status).toBe(202);
+      // Annulée dès la première tuile : seul un point d'étape par le temps peut s'en apercevoir avant la fin.
+      onFetch = async () => {
+        await sql`UPDATE ign_cache_jobs SET status = 'cancelled' WHERE farm_id = ${farmId} AND status = 'running'`;
+      };
+      expect(await runIgnJob(db())).toMatchObject({ status: "cancelled" });
+    } finally {
+      preloadConfig.progressEvery = saved.every;
+      preloadConfig.progressEveryMs = saved.ms;
+    }
   });
 });
