@@ -391,7 +391,7 @@ Ordre : C7 et C2 (le cœur du DOM), puis C3, C4, C1, C5, C6, C8 et C9. Chaque
 
 | Lot | Contenu | Dépend de |
 |---|---|---|
-| **T0. Fork TIKA** | fork `ekylibre/itineraire-technique`, C1 à C9 dans le fork, étiquettes ; demandes de fusion vers OSFarm au fil de l'eau | — |
+| **T0. Fork TIKA** ✓ | fork `ekylibre/itineraire-technique`, C1 à C9 dans le fork, étiquette `v1.3.0-ekylibre.1` (§12 ter) | — |
 | **T1. Modèle et API** | `domain/itinerary.ts`, contrats, `repos/itinerary.ts`, deux routes, index des cibles, tests | — (en parallèle de T0) |
 | **T2. Fiche parcelle** | `toTikaSystem`, `TikaChart`, onglet, campagne et rotation, frise et cercle, clic vers la fiche | T1, première étiquette du fork (C1 à C5, C7) |
 | **T3. Activité** | lien depuis Activités, page fusionnée, liste des parcelles, descente | T2 |
@@ -422,6 +422,45 @@ Ordre : C7 et C2 (le cœur du DOM), puis C3, C4, C1, C5, C6, C8 et C9. Chaque
   existent dans les données reprises ; ils sont écartés des libellés.
 - **Mesuré sur la ferme pilote** : 10 ans d'une parcelle en 81 ms (8 étapes,
   82 marques), activité de 9 parcelles en 23 ms.
+
+## 12 ter. Lot T0 : fork TIKA (2026-11-13)
+
+Fork `ekylibre/itineraire-technique`, étiquette **`v1.3.0-ekylibre.1`**
+(branche `ekylibre`). Fourmy en dépendra par :
+
+```json
+"@osfarm/itineraire-technique": "github:ekylibre/itineraire-technique#v1.3.0-ekylibre.1"
+```
+
+Vérifié : installation depuis l'étiquette, import par le nom du paquet
+(module, `styles.css`, types).
+
+| Branche du fork | Contributions | Résultat |
+|---|---|---|
+| `dom-natif` | C7, C2 | sans jQuery ni Underscore ; élément ou identifiant ; `dispose()` retire tous les écouteurs ; mise en avant limitée au conteneur (elle touchait toute la page) ; l'éditeur libère l'aperçu précédent |
+| `sans-bootstrap` | C3 | grille et règles reprises de Bootstrap dans `styles-rendering`, sous `.mainITKContainer` ; icônes en SVG ; police de la page hôte |
+| `textes-echappes` | C4 | noms et descriptions échappés (liste et infobulles), couleur validée ; `{ allowHTML: true }` pour l'ancien comportement |
+| `module-es` | C1 | source `js/rotation-renderer.mjs` ; `js/chart-render.js` généré sans outil (`npm run build:js`), inchangé pour le wiki et Itinera ; `exports`, ECharts en dépendance pair facultative |
+| `rappels-statut` | C5, C6 | `onInterventionClick(intervention, step)`, `onStepClick(step)`, champ libre `ref` ; `status: "planned"` en creux et pointillés (frise, liste, infobulle) |
+| `types` | C8 | `types/rotation-renderer.d.ts` |
+| `echarts-modulaire` | C9 | `echarts/core` et les seuls modules utilisés : 239 Ko compressés au lieu de 397 Ko |
+
+**Écarts avec §7 :**
+- **Branches en série**, pas parallèles : C7 et C2 réécrivent les mêmes
+  lignes, C5 et C6 aussi ; chaque branche part de la précédente. Les
+  demandes de fusion vers OSFarm se feront dans cet ordre.
+- **C5 et C6 dans une même branche** (un seul commit) pour la même raison.
+- **Pas de légende** pour le statut prévu (C6) : le pointillé, la mention
+  « prévue » de la liste et l'infobulle suffisent.
+- **Mode avant/après (plusieurs itinéraires)** : déjà cassé chez OSFarm
+  (travail en cours, commit `d46e8a7`), laissé tel quel ; Fourmy n'en a pas
+  besoin.
+- **Vérification** : banc Playwright hors du dépôt (captures des fichiers
+  `test/*.json` en frise et en cercle, largeur normale et étroite, avant
+  toute modification), plus des tests de comportement (écouteurs,
+  isolation, échappement, rappels, statut, module empaqueté). Rendu
+  identique au pixel près, sauf l'icône chevron (8 à 24 pixels, trait plus
+  fin).
 
 ## 13. Décisions de conception
 
