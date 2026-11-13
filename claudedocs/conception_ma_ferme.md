@@ -887,13 +887,13 @@ de débit** ; les données suivent la licence de chaque jeu, **Licence Ouverte
 Etalab 2.0 par défaut**. Les textes **ne parlent ni de cache serveur ni de
 préchargement** ; ils interdisent seulement de « nuire, entraver ou fausser
 le bon fonctionnement des API » et prévoient un blocage en cas d'usage
-abusif. D'où un worker prudent (4 requêtes en parallèle).
+abusif. D'où, d'abord, un worker prudent (4 requêtes en parallèle).
 
 **Confirmation de l'IGN obtenue le 2026-11-13 pour le cache des tuiles sur
-le serveur.** Restent à vérifier : si cette confirmation couvre aussi le
-**préchargement en masse** (sinon, garder le débit actuel du worker), et la
-licence et la mention d'attribution exactes sur les fiches catalogue des
-couches (l'application affiche « © IGN — Géoplateforme »). Constat : l'IGN ne renvoie pas d'`ETag` sur les
+le serveur et pour le préchargement.** Le worker passe donc à 8 requêtes en
+parallèle, comme prévu au départ. Reste à vérifier la mention d'attribution
+exacte sur les fiches catalogue des couches (l'application affiche
+« © IGN — Géoplateforme »). Constat : l'IGN ne renvoie pas d'`ETag` sur les
 tuiles WMTS ; une tuile de plus de 180 jours est donc retéléchargée en
 entier.
 
@@ -958,9 +958,9 @@ entier.
   bâtiments ont suivi en F4 bis (§12 sexies). Le contrat
   `ignLayer` ne liste donc que `ortho` et `plan` ; une couche inconnue lue
   dans `farm_settings.ign` est ignorée.
-- **Worker : 4 requêtes en parallèle** (et non 8), réglable par
-  `FOURMY_IGN_PRELOAD_CONCURRENCY`, faute de texte de l'IGN sur le
-  préchargement (la confirmation du 2026-11-13 porte sur le cache). **50 s de travail par tour** : la tâche rend la main pour
+- **Worker : 8 requêtes en parallèle**, réglable par
+  `FOURMY_IGN_PRELOAD_CONCURRENCY` (4 au départ, relevé après la
+  confirmation de l'IGN du 2026-11-13). **50 s de travail par tour** : la tâche rend la main pour
   que Traccar et les autres tâches passent, puis reprend au tour suivant.
 - **Hors couverture** (400 ou 404 de l'IGN) : ni erreur ni cache ; le relais
   répond 404, le préchargement passe à la tuile suivante sans la compter en

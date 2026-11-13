@@ -48,7 +48,7 @@ l'API partagent la même origine : cookies de session sans CORS.
 | `FOURMY_OSRM_URL` | non | service OSRM auto-hébergé (profil tracteur) qui recale les déplacements du rejeu 3D sur la route ([`routage-osrm.md`](routage-osrm.md)) ; sans lui, la trace reste brute |
 | `EKYLIBRE_SOURCES_URL` | non | serveur des bases Ekylibre restaurées pour les imports depuis l'interface |
 | `FOURMY_IGN_CACHE_MAX_GB` | non | quota du cache des tuiles IGN, 20 Go par défaut (worker) ; au-delà, les tuiles les moins lues hors des zones des fermes sont supprimées d'abord |
-| `FOURMY_IGN_PRELOAD_CONCURRENCY` | non | requêtes simultanées vers l'IGN pendant un préchargement, 4 par défaut (worker) |
+| `FOURMY_IGN_PRELOAD_CONCURRENCY` | non | requêtes simultanées vers l'IGN pendant un préchargement, 8 par défaut (worker) |
 
 Aucun secret dans le dépôt : ils sont générés directement dans Dokploy.
 

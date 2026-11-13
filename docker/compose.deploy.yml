@@ -102,7 +102,7 @@ services:
       FOURMY_SMTP_FROM: ${FOURMY_SMTP_FROM:-}
       # Préchargement des tuiles IGN : quota disque (Go) et requêtes parallèles vers l'IGN.
       FOURMY_IGN_CACHE_MAX_GB: ${FOURMY_IGN_CACHE_MAX_GB:-20}
-      FOURMY_IGN_PRELOAD_CONCURRENCY: ${FOURMY_IGN_PRELOAD_CONCURRENCY:-4}
+      FOURMY_IGN_PRELOAD_CONCURRENCY: ${FOURMY_IGN_PRELOAD_CONCURRENCY:-8}
     volumes:
       - fourmy_ign_cache:/var/cache/fourmy/ign
 
