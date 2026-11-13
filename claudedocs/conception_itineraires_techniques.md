@@ -393,7 +393,7 @@ Ordre : C7 et C2 (le cœur du DOM), puis C3, C4, C1, C5, C6, C8 et C9. Chaque
 |---|---|---|
 | **T0. Fork TIKA** ✓ | fork `ekylibre/itineraire-technique`, C1 à C9 dans le fork, étiquette `v1.3.0-ekylibre.1` (§12 ter) | — |
 | **T1. Modèle et API** | `domain/itinerary.ts`, contrats, `repos/itinerary.ts`, deux routes, index des cibles, tests | — (en parallèle de T0) |
-| **T2. Fiche parcelle** | `toTikaSystem`, `TikaChart`, onglet, campagne et rotation, frise et cercle, clic vers la fiche | T1, première étiquette du fork (C1 à C5, C7) |
+| **T2. Fiche parcelle** ✓ | `toTikaSystem`, `TikaChart`, onglet, campagne et rotation, frise et cercle, clic vers la fiche (§12 quater) | T1, première étiquette du fork (C1 à C5, C7) |
 | **T3. Activité** | lien depuis Activités, page fusionnée, liste des parcelles, descente | T2 |
 | **T4. Reversement** | demandes de fusion restantes chez OSFarm ; retour au paquet npm d'OSFarm une fois tout publié | T0 |
 
@@ -461,6 +461,29 @@ Vérifié : installation depuis l'étiquette, import par le nom du paquet
   isolation, échappement, rappels, statut, module empaqueté). Rendu
   identique au pixel près, sauf l'icône chevron (8 à 24 pixels, trait plus
   fin).
+
+## 12 quater. Écarts du lot T2 (2026-11-13)
+
+- **Dépendance** : `github:ekylibre/itineraire-technique#v1.3.0-ekylibre.2`,
+  et `echarts@6.0.0`. La version `.2` du fork met en forme les
+  descriptions des interventions dans la liste (lignes « Libellé : valeur »,
+  libellé en gras), comme pour les étapes et l'infobulle : sans cela, les
+  détails d'une intervention se suivaient sur une seule ligne.
+- **Poids mesuré** : TIKA et ECharts dans un morceau à part, chargé à
+  l'ouverture de l'onglet : 678 Ko, 225 Ko compressés ; rien dans le paquet
+  principal.
+- **Fond clair, en thème sombre aussi** : les textes de la frise de TIKA sont
+  foncés ; l'itinéraire s'affiche sur un panneau blanc, comme un document.
+- **Police de la liste** : TIKA demande « Segoe UI » sans repli (police à
+  empattements hors Windows) ; Fourmy impose la sienne
+  (`features/itinerary/tika.css`).
+- **Types locaux** du format TIKA dans le domaine : des `type` et non des
+  `interface`, parce que les types de TIKA acceptent des champs en plus.
+- **Copie des données** donnée à TIKA (`structuredClone`) : TIKA convertit
+  les dates et modifie les descriptions en place.
+- **Marque regroupée** (vue fusionnée) : `ItineraryView` délègue à l'écran
+  (`onGroup`) ; la vue parcelle n'en a pas, une marque y est toujours une
+  intervention.
 
 ## 13. Décisions de conception
 
