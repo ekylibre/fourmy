@@ -199,6 +199,11 @@ const interventionBody = z.object({
    * déjà rattachés : absent ou vide, les rattachements existants restent.
    */
   trackSessionIds: z.array(uuid).max(50).optional(),
+  /**
+   * Tâche reçue d'agrirouter dont l'intervention est tirée (lot AR4) : le
+   * fichier de la boîte de réception passe « validé » à l'enregistrement.
+   */
+  agrirouterInbox: z.object({ id: uuid, task: z.number().int().min(0).max(999) }).optional(),
 });
 
 /** Planification (POST /interventions). `id` client → idempotent. */

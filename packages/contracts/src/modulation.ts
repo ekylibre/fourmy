@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { VEGETATION_INDICES, type VegetationIndex } from "./remote-sensing.js";
+import type { TrackDraft } from "./tracks.js";
 
 /**
  * Cartes de modulation (lot AD, FR-TWIN-6, docs/modulation.md) : zonage
@@ -191,4 +192,28 @@ export interface AgrirouterInboxItem {
   /** Confirmé à agrirouter (le message quitte sa file). */
   confirmedAt: string | null;
   confirmError: string | null;
+  /** Tâches réalisées lues dans le fichier (TaskData, lot AR4), chacune avec sa proposition d'intervention. */
+  tasks: AgrirouterInboxTask[];
+}
+
+/** Tâche réalisée lue dans un TaskData reçu, et l'intervention proposée. */
+export interface AgrirouterInboxTask {
+  index: number;
+  designator: string;
+  startedAt: string | null;
+  stoppedAt: string | null;
+  parcels: { id: string; name: string; share: number }[];
+  equipment: { id: string; name: string } | null;
+  /** Matériel tel que nommé par la console, s'il n'est pas reconnu. */
+  deviceName: string | null;
+  products: string[];
+  /** Doses moyennes relevées (valeurs réellement appliquées). */
+  rates: { value: number; unit: string }[];
+  /** Surface travaillée relevée par la console (m²). */
+  areaM2: number | null;
+  /** Carte de modulation envoyée par Fourmy et revenue réalisée. */
+  prescription: { id: string; name: string } | null;
+  interventionId: string | null;
+  /** Brouillon du formulaire d'intervention (même forme que celui des parcours GPS). */
+  draft: TrackDraft;
 }

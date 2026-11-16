@@ -6,3 +6,4 @@
 export * from "./zip.js";
 export * from "./shapefile.js";
 export * from "./taskdata.js";
+export * from "./read.js";

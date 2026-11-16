@@ -99,6 +99,8 @@ export interface TrackDraft {
     outputs: never[];
     purposes: never[];
     trackSessionIds: string[];
+    /** Brouillon tiré d'une tâche reçue d'agrirouter (lot AR4) plutôt que de parcours GPS. */
+    agrirouterInbox?: { id: string; task: number };
   };
   /** Procédures suggérées d'après l'outil (ou le matériel suivi), les plus fréquentes d'abord. */
   procedureSuggestions: string[];

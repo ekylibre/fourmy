@@ -402,6 +402,11 @@ const INDEX_LABELS: Record<VegetationIndex, string> = { ndvi: "NDVI", ndre: "NDR
 const fr = (v: number, digits = 2) => v.toLocaleString("fr-FR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
 /** Archive zip d'une carte : TaskData ISO-XML ou Shapefile. */
+/** Suffixe ` F<8 premiers caractères de l'id>` ajouté à la désignation de la tâche envoyée. */
+export const taskDesignator = (name: string, id: string) => `${[...name].slice(0, 21).join("").trim()} F${id.slice(0, 8)}`;
+/** Préfixe d'id de carte d'après une désignation de tâche revenue d'une console, ou null. */
+export const prescriptionRefOf = (designator: string) => /\bF([0-9a-f]{8})$/i.exec(designator.trim())?.[1]?.toLowerCase() ?? null;
+
 export async function prescriptionFile(db: Database, farmId: string, id: string, format: PrescriptionFormat): Promise<{ filename: string; bytes: Uint8Array }> {
   const p = await getPrescription(db, farmId, id);
   const base = slug(`${p.parcelName}-${p.name}`);
@@ -464,7 +469,8 @@ export async function prescriptionFile(db: Database, farmId: string, id: string,
     customer: farm?.name ?? "Ferme",
     farm: farm?.name ?? "Ferme",
     partfield: { name: p.parcelName, areaM2: area, boundary: boundary.coordinates },
-    task: p.name,
+    // Référence de la carte en fin de désignation (32 caractères au plus) : une tâche revenue réalisée y est rapprochée (lot AR4).
+    task: taskDesignator(p.name, p.id),
     product: p.product,
     unit: p.unit,
     zones: p.zones.map((z) => ({ code: z.code, name: `Zone ${z.code} ${INDEX_LABELS[p.index]} ${fr(z.meanIndex)}`, rate: z.rate })),
