@@ -167,3 +167,22 @@ export interface AgrirouterRecipient {
   /** Formats que la route permet d'envoyer à ce destinataire. */
   formats: PrescriptionFormat[];
 }
+
+/** Fichier reçu d'agrirouter (boîte de réception, lot AR2). */
+export interface AgrirouterInboxItem {
+  id: string;
+  /** Type de message agrirouter (`iso:11783:-10:taskdata:zip`, `…:time_log:protobuf`…). */
+  messageType: string;
+  filename: string | null;
+  size: number;
+  senderEndpointId: string | null;
+  senderName: string | null;
+  sentAt: string | null;
+  receivedAt: string;
+  /** `received` : rangé, pas encore lu (la lecture vient aux lots AR4 et AR5). */
+  state: "received" | "proposed" | "validated" | "dismissed" | "unreadable" | "ignored";
+  error: string | null;
+  /** Confirmé à agrirouter (le message quitte sa file). */
+  confirmedAt: string | null;
+  confirmError: string | null;
+}

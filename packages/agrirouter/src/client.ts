@@ -77,6 +77,85 @@ export interface Endpoint {
   capabilities: EndpointCapability[];
 }
 
+/** Événements du flux `GET /events` (spécification G4, schémas `*EventData`). */
+export type AgrirouterEvent =
+  | {
+      type: "MESSAGE_RECEIVED";
+      id: string;
+      message_type: string;
+      receiving_endpoint_id: string;
+      sending_endpoint_id?: string;
+      tenant_id?: string;
+      sent_at?: string;
+      received_at?: string;
+      filename?: string;
+      payload?: string;
+      payload_uri?: string;
+      teamset_context_id?: string;
+    }
+  | {
+      type: "FILE_RECEIVED";
+      message_ids: string[];
+      message_type: string;
+      receiving_endpoint_id: string;
+      sending_endpoint_id?: string;
+      tenant_id?: string;
+      sent_at?: string;
+      size: number;
+      filename?: string;
+      payload?: string;
+      payload_uri?: string;
+      teamset_context_id?: string;
+    }
+  | { type: "ENDPOINT_DELETED"; id: string; external_id: string }
+  | { type: "ENDPOINTS_LIST_CHANGED"; tenant_id: string; endpoints: TenantEndpoint[] }
+  | { type: "AUTHORIZATION_ADDED"; tenant: TenantInfo; scope: string; state?: string }
+  | { type: "AUTHORIZATION_REVOKED"; tenant_id: string; scope: string }
+  | { type: "UNKNOWN"; event: string; data: unknown };
+
+const KNOWN_EVENTS = new Set(["MESSAGE_RECEIVED", "FILE_RECEIVED", "ENDPOINT_DELETED", "ENDPOINTS_LIST_CHANGED", "AUTHORIZATION_ADDED", "AUTHORIZATION_REVOKED"]);
+
+/**
+ * Découpe un flux Server-Sent Events en trames (`event:`, `data:` sur
+ * plusieurs lignes, `id:`), selon la spécification WHATWG : une ligne vide
+ * termine la trame, les lignes `:` sont des commentaires (maintien en vie).
+ */
+export async function* readSse(body: ReadableStream<Uint8Array>): AsyncGenerator<{ event: string; data: string; id?: string }> {
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let event = "";
+  let data: string[] = [];
+  let id: string | undefined;
+  const reader = body.getReader();
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      buffer += done ? "\n" : decoder.decode(value, { stream: true });
+      let nl: number;
+      while ((nl = buffer.search(/\r\n|\r|\n/)) >= 0) {
+        const line = buffer.slice(0, nl);
+        buffer = buffer.slice(nl + (buffer.startsWith("\r\n", nl) ? 2 : 1));
+        if (line === "") {
+          if (data.length) yield { event: event || "message", data: data.join("\n"), ...(id !== undefined ? { id } : {}) };
+          event = "";
+          data = [];
+          continue;
+        }
+        if (line.startsWith(":")) continue;
+        const colon = line.indexOf(":");
+        const field = colon < 0 ? line : line.slice(0, colon);
+        const value = colon < 0 ? "" : line.slice(colon + 1).replace(/^ /, "");
+        if (field === "event") event = value;
+        else if (field === "data") data.push(value);
+        else if (field === "id") id = value;
+      }
+      if (done) return;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 export class AgrirouterClient {
   private readonly fetch: typeof fetch;
   private readonly sleep: (ms: number) => Promise<void>;
@@ -159,6 +238,56 @@ export class AgrirouterClient {
       }
       return res;
     }
+  }
+
+  /**
+   * Flux permanent des événements de l'application, toutes fermes
+   * confondues (`GET /events`, Server-Sent Events). Se termine quand agrirouter
+   * ferme la connexion ou que `signal` est levé : l'appelant reconnecte.
+   */
+  async *events(signal?: AbortSignal): AsyncGenerator<AgrirouterEvent> {
+    let res: Response | undefined;
+    for (let renewed = false; ; renewed = true) {
+      res = await this.fetch(`${this.api}/events`, {
+        headers: { authorization: `Bearer ${await this.token(renewed)}`, accept: "text/event-stream" },
+        ...(signal ? { signal } : {}),
+      });
+      if (res.status !== 401 || renewed) break;
+    }
+    if (!res.ok || !res.body) throw new AgrirouterError(res.status, `agrirouter GET /events : ${res.status}`);
+    for await (const frame of readSse(res.body)) {
+      let data: unknown;
+      try {
+        data = JSON.parse(frame.data);
+      } catch {
+        continue;
+      }
+      yield (KNOWN_EVENTS.has(frame.event) ? { ...(data as object), type: frame.event } : { type: "UNKNOWN", event: frame.event, data }) as AgrirouterEvent;
+    }
+  }
+
+  /** Contenu d'un message reçu : intégré à l'événement (base64) ou à télécharger (adresse signée, sans jeton). */
+  async payload(e: { payload?: string; payload_uri?: string }): Promise<Uint8Array> {
+    if (e.payload !== undefined) return new Uint8Array(Buffer.from(e.payload, "base64"));
+    if (!e.payload_uri) throw new AgrirouterError(502, "Événement agrirouter sans contenu.");
+    for (let attempt = 0; ; attempt++) {
+      const res = await this.fetch(e.payload_uri);
+      if ((res.status === 429 || res.status >= 500) && attempt < 3) {
+        await this.sleep(1000 * 2 ** attempt);
+        continue;
+      }
+      if (!res.ok) throw new AgrirouterError(res.status, `Téléchargement du contenu agrirouter : ${res.status}`);
+      return new Uint8Array(await res.arrayBuffer());
+    }
+  }
+
+  /** Confirme des messages reçus et traités : ils quittent la file du point de terminaison. */
+  async confirm(tenantId: string, confirmations: { messageId: string; endpointId: string }[]): Promise<void> {
+    if (!confirmations.length) return;
+    await this.call("POST", "/confirmations", {
+      tenantId,
+      json: { confirmations: confirmations.map((c) => ({ message_id: c.messageId, endpoint_id: c.endpointId })) },
+    });
   }
 
   /** Fermes (tenants) qui ont autorisé l'application, avec l'état passé au consentement. */

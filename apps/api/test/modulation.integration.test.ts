@@ -286,8 +286,10 @@ describe.skipIf(!url)("cartes de modulation et agrirouter (intégration)", () =>
       ],
       allow_delete_by_user: true,
     });
-    // Un état ne sert qu'une fois.
-    expect((await complete(state)).status).toBe(400);
+    // Un état déjà abouti : second retour sans effet (navigateur et événement AUTHORIZATION_ADDED), aucun nouveau PUT.
+    const puts = fake.calls.filter((c) => c.method === "PUT").length;
+    expect((await complete(state)).status).toBe(200);
+    expect(fake.calls.filter((c) => c.method === "PUT").length).toBe(puts);
 
     const items = (await (await app.request(`${base()}/integrations`, { headers })).json()) as { items: Integration[] };
     const integ = items.items.find((i) => i.provider === "agrirouter")!;

@@ -14,6 +14,8 @@ import { sendMaintenanceAlerts } from "./repos/alerts.js";
 import { appMailer } from "./mail.js";
 import { flushReads } from "./ign/store.js";
 import { purgeIgnCache, runIgnJob } from "./ign/preload.js";
+import { agrirouterClient, agrirouterConfig } from "./integrations/agrirouter.js";
+import { confirmAgrirouterInbox, runAgrirouterListener } from "./integrations/agrirouter-events.js";
 
 /**
  * Worker : synchronise les intégrations actives de toutes les fermes
@@ -142,6 +144,13 @@ async function ignPurgeTick(): Promise<void> {
   if (r.protectedDeleted) console.warn(`[worker] cache IGN : quota atteint, ${r.protectedDeleted} tuile(s) d'un plan de ferme supprimée(s)`);
 }
 
+/** agrirouter (lot AR2) : confirme les fichiers rangés dans la boîte de réception. */
+async function agrirouterTick(): Promise<void> {
+  if (!agrirouterConfig()) return;
+  const r = await confirmAgrirouterInbox(db(), agrirouterClient());
+  if (r.confirmed || r.failed) console.log(`[worker] agrirouter : ${r.confirmed} fichier(s) confirmé(s)${r.failed ? `, ${r.failed} en échec` : ""}`);
+}
+
 async function tick(): Promise<void> {
   for (const [name, job] of [
     ["lexicon", lexiconTick],
@@ -153,6 +162,7 @@ async function tick(): Promise<void> {
     ["alertes", alertsTick],
     ["cache IGN", ignCacheTick],
     ["quota IGN", ignPurgeTick],
+    ["agrirouter", agrirouterTick],
   ] as const) {
     if (stopping) return;
     await job().catch((e) => console.warn(`[worker] ${name} : ${e instanceof Error ? e.message : e}`));
@@ -173,9 +183,22 @@ async function tick(): Promise<void> {
   }
 }
 
+// Écoute permanente des événements agrirouter (lot AR2), à côté de la boucle.
+const listenerStop = new AbortController();
+const listener = agrirouterConfig()
+  ? runAgrirouterListener({
+      db: db(),
+      databaseUrl: process.env.DATABASE_URL!,
+      client: agrirouterClient,
+      signal: listenerStop.signal,
+      log: (m) => console.log(`[worker] agrirouter : ${m}`),
+    }).catch((e: unknown) => console.error("[worker] agrirouter, écoute arrêtée :", e))
+  : Promise.resolve();
+
 for (const signal of ["SIGTERM", "SIGINT"] as const) {
   process.on(signal, () => {
     stopping = true;
+    listenerStop.abort();
   });
 }
 
@@ -186,4 +209,5 @@ while (!stopping) {
     await new Promise((r) => setTimeout(r, 1000));
   }
 }
+await listener;
 process.exit(0);

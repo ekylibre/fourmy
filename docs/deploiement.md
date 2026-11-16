@@ -21,8 +21,8 @@ demandera d'abord de les retirer. Dokploy y accède par l'application GitHub
 | Service | Image | Rôle |
 |---|---|---|
 | `db` | `timescale/timescaledb-ha:pg17` | PostgreSQL + PostGIS + TimescaleDB, volume `fourmy_pgdata` |
-| `api` | `Dockerfile`, cible `api` | API Hono ; applique les migrations au démarrage ; relaie les tuiles IGN (fonds de carte, relief et bâtiments de la 3D) et les garde dans le volume `fourmy_ign_cache` |
-| `worker` | même image, `node apps/api/dist/worker.js` | synchronise les intégrations des fermes (Traccar : chaque minute ; stations Weenat et Sencrop : chaque heure), les parcours GPS (toutes les 5 minutes), le référentiel phyto Lexicon (chaque jour), l'eau autour des fermes (BD TOPO, tous les 30 jours), l'IFT et la météo des interventions réalisées, les heures estimées des matériels depuis Traccar (toutes les 15 minutes) les alertes d'entretien par e-mail (au plus une fois par heure), le préchargement des tuiles IGN autour des fermes (volume `fourmy_ign_cache`, partagé avec `api`) et le quota de ce cache (chaque jour) |
+| `api` | `Dockerfile`, cible `api` | API Hono ; applique les migrations au démarrage ; relaie les tuiles IGN (fonds de carte, relief et bâtiments de la 3D) et les garde dans le volume `fourmy_ign_cache` ; sert les fichiers reçus d'agrirouter (volume `fourmy_agrirouter_files`) |
+| `worker` | même image, `node apps/api/dist/worker.js` | synchronise les intégrations des fermes (Traccar : chaque minute ; stations Weenat et Sencrop : chaque heure), les parcours GPS (toutes les 5 minutes), le référentiel phyto Lexicon (chaque jour), l'eau autour des fermes (BD TOPO, tous les 30 jours), l'IFT et la météo des interventions réalisées, les heures estimées des matériels depuis Traccar (toutes les 15 minutes) les alertes d'entretien par e-mail (au plus une fois par heure), le préchargement des tuiles IGN autour des fermes (volume `fourmy_ign_cache`, partagé avec `api`) et le quota de ce cache (chaque jour) ; écoute en permanence les événements agrirouter (un seul worker à la fois, verrou en base), range les fichiers reçus dans le volume `fourmy_agrirouter_files` et les confirme à agrirouter |
 | `web` | `Dockerfile`, cible `web` (nginx) | application React + relais `/api` → `api` ; service worker `/sw.js` (copie hors ligne des fermes), servi sans cache ; relais `/version.json` → `site` (version affichée en pied de menu) |
 | `site` | `ghcr.io/ekylibre/fourmy-site:main`, construite par la CI depuis `docker/site.Dockerfile` (nginx) | site public fourmy.org ; relaie seulement `/api/public/` (formulaire de contact) ; `www` → apex |
 
@@ -114,6 +114,9 @@ Le volume `fourmy_ign_cache` n'a pas besoin de sauvegarde : il se reremplit
 depuis l'IGN (un préchargement relancé retélécharge les fichiers absents).
 Après sa perte, vider `ign_tiles` (`TRUNCATE ign_tiles`) pour que l'état
 « en cache » affiché aux fermes redevienne juste.
+
+Le volume `fourmy_agrirouter_files` **doit être sauvegardé** avec la base :
+un fichier reçu est confirmé à agrirouter, qui ne le renvoie plus.
 
 Base : sauvegarde Dokploy du volume `fourmy_pgdata` ou `pg_dump` planifié
 vers un stockage externe. Garder `FOURMY_SECRETS_KEY` et `BETTER_AUTH_SECRET`

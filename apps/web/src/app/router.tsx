@@ -31,6 +31,7 @@ import { PersonSheetPage } from "../features/team/PersonSheetPage";
 import { IntegrationsPage } from "../features/integrations/IntegrationsPage";
 import { AgrirouterCallbackPage } from "../features/integrations/AgrirouterCallbackPage";
 import { AgrirouterStartPage } from "../features/integrations/AgrirouterStartPage";
+import { AgrirouterInboxPage } from "../features/integrations/AgrirouterInboxPage";
 import { PrescriptionsPage } from "../features/modulation/PrescriptionsPage";
 import { FarmProvider, useMyFarms } from "./farm";
 import { UNAUTHORIZED_EVENT, useSession } from "./session";
@@ -193,6 +194,7 @@ export const routes = [
       { path: "team", element: <TeamRedirect /> },
       { path: "team/:personId", element: <PersonSheetPage /> },
       { path: "integrations", element: <IntegrationsPage /> },
+      { path: "agrirouter/inbox", element: <AgrirouterInboxPage /> },
       { path: "prescriptions", element: <PrescriptionsPage /> },
       { path: "prescriptions/new", element: <Suspense fallback={<Loading />}><PrescriptionNewPage /></Suspense> },
       { path: "prescriptions/:prescriptionId", element: <Suspense fallback={<Loading />}><PrescriptionPage /></Suspense> },
