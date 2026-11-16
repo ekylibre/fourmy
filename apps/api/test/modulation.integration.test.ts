@@ -27,14 +27,16 @@ const SPRAYER = "66666666-6666-4666-8666-666666666666";
 /** Faux agrirouter : enregistre les appels, suit l'état passé au consentement. */
 function fakeAgrirouter() {
   const calls: { method: string; path: string; headers: Headers; body: unknown }[] = [];
-  const state = { consentState: "", sendStatus: 200 };
+  const state = { consentState: "", sendStatus: 200, authorized: true, ownEndpoint: true, revokeStatus: 204 };
   const f = (async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const u = new URL(String(input));
     const headers = new Headers(init.headers);
     const body = init.body instanceof URLSearchParams ? Object.fromEntries(init.body) : typeof init.body === "string" ? JSON.parse(init.body) : init.body;
     calls.push({ method: init.method ?? "GET", path: u.pathname, headers, body });
     if (u.pathname === "/token") return Response.json({ access_token: "jeton-app", expires_in: 3600 });
-    if (u.pathname === "/tenants") return Response.json({ tenants: [{ tenant_id: TENANT, company_name: "EARL Essai", state: state.consentState, endpoints: [] }] });
+    if (u.pathname === "/tenants") {
+      return Response.json({ tenants: state.authorized ? [{ tenant_id: TENANT, company_name: "EARL Essai", state: state.consentState, endpoints: [] }] : [] });
+    }
     if (u.pathname.startsWith("/endpoints/") && init.method === "PUT") {
       return Response.json({ id: OWN_ENDPOINT, external_id: decodeURIComponent(u.pathname.slice(11)), endpoint_type: "cloud_software", tenant_id: TENANT, capabilities: [] }, { status: 201 });
     }
@@ -42,11 +44,11 @@ function fakeAgrirouter() {
       return Response.json({
         company_name: "EARL Essai",
         endpoints: [
-          {
+          ...(state.ownEndpoint ? [{
             id: OWN_ENDPOINT, name: "Fourmy", endpoint_type: "cloud_software", application_id: "a", tenant_id: TENANT, owned_by_your_application: true,
             capabilities: { can_send: [], can_receive: [] },
             routed_endpoints: { can_send_to: { [TRACTOR]: ["iso:11783:-10:taskdata:zip", "shp:shape:zip"], [SPRAYER]: ["shp:shape:zip"] } },
-          },
+          }] : []),
           { id: TRACTOR, name: "Fendt 724 terminal", endpoint_type: "virtual_communication_unit", application_id: "b", tenant_id: TENANT, owned_by_your_application: false, capabilities: { can_send: [], can_receive: [] } },
           { id: SPRAYER, name: "Pulvé Amazone", endpoint_type: "virtual_communication_unit", application_id: "b", tenant_id: TENANT, owned_by_your_application: false, capabilities: { can_send: [], can_receive: [] } },
           { id: "77777777-7777-4777-8777-777777777777", name: "Sans route", endpoint_type: "cloud_software", application_id: "c", tenant_id: TENANT, owned_by_your_application: false, capabilities: { can_send: [], can_receive: [] } },
@@ -55,7 +57,7 @@ function fakeAgrirouter() {
     }
     if (u.pathname === "/messages") return new Response(null, { status: state.sendStatus });
     if (u.pathname.startsWith("/endpoints/") && init.method === "DELETE") return new Response(null, { status: 204 });
-    if (u.pathname === "/authorizations") return new Response(null, { status: 204 });
+    if (u.pathname === "/authorizations") return new Response(state.revokeStatus === 204 ? null : "{}", { status: state.revokeStatus });
     return new Response("{}", { status: 404 });
   }) as typeof fetch;
   return { f, calls, state };
@@ -263,15 +265,26 @@ describe.skipIf(!url)("cartes de modulation et agrirouter (intégration)", () =>
     expect(ok.status).toBe(200);
     await Promise.all(pendingSyncs);
     const put = fake.calls.find((c) => c.method === "PUT")!;
-    expect(put.path).toBe(`/endpoints/${encodeURIComponent(`urn:fourmy:farm:${farmId}`)}`);
+    expect(put.path).toBe(`/endpoints/${encodeURIComponent(`urn:fourmy.org:fourmy:farm-${farmId}`)}`);
     expect(put.headers.get("x-agrirouter-tenant-id")).toBe(TENANT);
-    expect(put.body).toMatchObject({
-      name: "Fourmy Ferme test modulation",
+    // Configuration exigée par la revue : nom reconnaissable, capacités de la version, abonnements.
+    expect(put.body).toEqual({
+      name: "Fourmy - Ferme test modulation",
+      application_id: "11111111-1111-4111-8111-111111111111",
+      software_version_id: "22222222-2222-4222-8222-222222222222",
       endpoint_type: "cloud_software",
       capabilities: [
-        { message_type: "iso:11783:-10:taskdata:zip", direction: "SEND" },
+        { message_type: "iso:11783:-10:taskdata:zip", direction: "SEND_RECEIVE" },
         { message_type: "shp:shape:zip", direction: "SEND" },
+        { message_type: "iso:11783:-10:time_log:protobuf", direction: "RECEIVE" },
+        { message_type: "iso:11783:-10:device_description:protobuf", direction: "RECEIVE" },
       ],
+      subscriptions: [
+        { message_type: "iso:11783:-10:taskdata:zip" },
+        { message_type: "iso:11783:-10:time_log:protobuf" },
+        { message_type: "iso:11783:-10:device_description:protobuf" },
+      ],
+      allow_delete_by_user: true,
     });
     // Un état ne sert qu'une fois.
     expect((await complete(state)).status).toBe(400);
@@ -318,13 +331,47 @@ describe.skipIf(!url)("cartes de modulation et agrirouter (intégration)", () =>
     expect(p.sends[1]!.sentBy).toBeTruthy();
   });
 
-  it("retire la connexion : point de terminaison supprimé puis autorisation révoquée", async () => {
+  it("constate une connexion défaite dans agrirouter : déconnectée, sans secret, puis reconnectée", async () => {
+    const integration = async () => ((await (await app.request(`${base()}/integrations`, { headers })).json()) as { items: Integration[] }).items.find((i) => i.provider === "agrirouter")!;
+    const sync = async () => app.request(`${base()}/integrations/${(await integration()).id}/sync`, { method: "POST", headers });
+
+    // Point de terminaison absent juste après la connexion : propagation en cours, pas une suppression.
+    fake.state.ownEndpoint = false;
+    expect((await (await sync()).json()) as Integration).toMatchObject({ status: "ok", hasSecret: true });
+
+    // Autorisation retirée dans agrirouter.
+    fake.state.authorized = false;
+    const off = (await (await sync()).json()) as Integration;
+    expect(off).toMatchObject({ status: "disconnected", hasSecret: false });
+    expect(off.lastError).toContain("retirée dans agrirouter");
+    expect(off.settings).toMatchObject({ disconnectReason: "revoked" });
+    expect(off.settings.disconnectedAt).toBeTruthy();
+    expect((await sync()).status).toBe(400);
+    const send = await app.request(`${base()}/prescriptions/${prescription.id}/send`, { method: "POST", headers, body: JSON.stringify({ format: "isoxml", recipients: [TRACTOR] }) });
+    expect(send.status).toBe(400);
+
+    // Reconnexion : nouveau consentement, la date de déconnexion disparaît.
+    fake.state.authorized = true;
+    fake.state.ownEndpoint = true;
+    const start = (await (await app.request(`${base()}/integrations/agrirouter/connect`, { method: "POST", headers })).json()) as { url: string };
+    const state = new URL(start.url).searchParams.get("state")!;
+    fake.state.consentState = state;
+    const done = await app.request(`${base()}/integrations/agrirouter/complete`, { method: "POST", headers, body: JSON.stringify({ state, tenantId: TENANT }) });
+    expect(done.status).toBe(200);
+    await Promise.all(pendingSyncs);
+    const back = await integration();
+    expect(back).toMatchObject({ status: "ok", hasSecret: true });
+    expect(back.settings.disconnectedAt).toBeUndefined();
+  });
+
+  it("retire la connexion : point de terminaison supprimé, autorisation gardée si une autre ferme l'utilise (409)", async () => {
+    fake.state.revokeStatus = 409;
     const items = (await (await app.request(`${base()}/integrations`, { headers })).json()) as { items: Integration[] };
     const id = items.items.find((i) => i.provider === "agrirouter")!.id;
     const before = fake.calls.length;
     expect((await app.request(`${base()}/integrations/${id}`, { method: "DELETE", headers })).status).toBe(204);
     expect(fake.calls.slice(before).filter((c) => c.path !== "/token").map((c) => [c.method, c.path])).toEqual([
-      ["DELETE", `/endpoints/${encodeURIComponent(`urn:fourmy:farm:${farmId}`)}`],
+      ["DELETE", `/endpoints/${encodeURIComponent(`urn:fourmy.org:fourmy:farm-${farmId}`)}`],
       ["DELETE", "/authorizations"],
     ]);
     const send = await app.request(`${base()}/prescriptions/${prescription.id}/send`, { method: "POST", headers, body: JSON.stringify({ format: "isoxml", recipients: [TRACTOR] }) });

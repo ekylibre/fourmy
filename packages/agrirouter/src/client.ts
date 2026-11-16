@@ -8,7 +8,7 @@
 
 export const AGRIROUTER_URLS = {
   production: { api: "https://api.agrirouter.com", authorize: "https://app.agrirouter.com/api/authorize" },
-  // Adresse du consentement en QA non documentée publiquement : à confirmer (surcharge AgrirouterApp.authorizeUrl).
+  // QA : réservée à l'équipe agrirouter (on développe sur la production, avec l'IO-Tool).
   qa: { api: "https://api.qa.agrirouter.farm", authorize: "https://app.qa.agrirouter.farm/api/authorize" },
 } as const;
 export type AgrirouterEnvironment = keyof typeof AGRIROUTER_URLS;
@@ -17,6 +17,8 @@ export type AgrirouterEnvironment = keyof typeof AGRIROUTER_URLS;
 export const MESSAGE_TYPES = {
   taskdata: "iso:11783:-10:taskdata:zip",
   shape: "shp:shape:zip",
+  timeLog: "iso:11783:-10:time_log:protobuf",
+  deviceDescription: "iso:11783:-10:device_description:protobuf",
 } as const;
 
 export interface AgrirouterApp {
@@ -176,7 +178,14 @@ export class AgrirouterClient {
   async putEndpoint(
     tenantId: string,
     externalId: string,
-    e: { name: string; endpointType: "cloud_software" | "virtual_communication_unit"; capabilities: EndpointCapability[]; subscriptions: string[] },
+    e: {
+      name: string;
+      endpointType: "cloud_software" | "virtual_communication_unit";
+      capabilities: EndpointCapability[];
+      subscriptions: string[];
+      /** L'utilisateur peut supprimer le point de terminaison dans agrirouter (Fourmy doit alors le constater). */
+      allowDeleteByUser?: boolean;
+    },
   ): Promise<Endpoint> {
     const res = await this.call("PUT", `/endpoints/${encodeURIComponent(externalId)}`, {
       tenantId,
@@ -187,6 +196,7 @@ export class AgrirouterClient {
         endpoint_type: e.endpointType,
         capabilities: e.capabilities,
         subscriptions: e.subscriptions.map((message_type) => ({ message_type })),
+        ...(e.allowDeleteByUser !== undefined ? { allow_delete_by_user: e.allowDeleteByUser } : {}),
       },
     });
     return (await res.json()) as Endpoint;
@@ -200,9 +210,21 @@ export class AgrirouterClient {
     }
   }
 
-  /** Retire l'autorisation de la ferme (après suppression des points de terminaison de l'application, sinon 409). */
-  async revoke(tenantId: string): Promise<void> {
-    await this.call("DELETE", "/authorizations", { tenantId });
+  /**
+   * Retire l'autorisation de l'application pour ce compte agrirouter, à faire
+   * après la suppression de ses points de terminaison. Renvoie `false` sans
+   * erreur si l'autorisation est gardée : 409, l'application a encore un point
+   * de terminaison dans ce compte (une autre ferme Fourmy y est reliée), ou
+   * 404, il n'y a plus d'autorisation.
+   */
+  async revoke(tenantId: string): Promise<boolean> {
+    try {
+      await this.call("DELETE", "/authorizations", { tenantId });
+      return true;
+    } catch (e) {
+      if (e instanceof AgrirouterError && (e.status === 409 || e.status === 404)) return false;
+      throw e;
+    }
   }
 
   /**

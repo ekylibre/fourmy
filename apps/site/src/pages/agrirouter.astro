@@ -1,0 +1,32 @@
+---
+import Base from "../layouts/Base.astro";
+import { APP_URL } from "../lib/site";
+// Deep URL déclarée chez agrirouter (claudedocs/conception_agrirouter.md §4) :
+// l'exploitant qui lance la connexion depuis agrirouter arrive ici, puis
+// continue dans l'application (choix de la ferme, confirmation, consentement).
+// Un lien, pas une redirection : la page reste lisible pour la revue et le
+// catalogue d'agrirouter.
+const start = `${APP_URL.replace(/\/+$/, "")}/agrirouter/start`;
+---
+
+<Base title="Connecter Fourmy à agrirouter" description="Relier sa ferme Fourmy à agrirouter pour envoyer les cartes de modulation aux machines et recevoir les travaux réalisés.">
+  <div class="wrap">
+    <h1>Connecter Fourmy à agrirouter</h1>
+    <p class="lead muted">
+      agrirouter relie Fourmy aux consoles de vos machines et à vos autres logiciels agricoles, quelle qu'en soit la marque.
+    </p>
+    <p>Une fois votre ferme connectée, Fourmy peut :</p>
+    <ul>
+      <li>envoyer les cartes de modulation (ISO-XML, Shapefile) à vos consoles ;</li>
+      <li>envoyer vos parcelles et leurs contours ;</li>
+      <li>recevoir les travaux réalisés par vos machines, pour vous proposer les interventions à enregistrer.</li>
+    </ul>
+    <p>
+      Vous allez vous connecter à Fourmy, choisir la ferme à relier, puis autoriser Fourmy dans agrirouter. Seul le responsable d'une ferme peut la connecter.
+    </p>
+    <p><a class="btn btn-primary" href={start}>Continuer vers Fourmy</a></p>
+    <p class="muted" style="margin-top:2rem">
+      Pas encore de compte Fourmy ? <a href="/contact/">Écrivez-nous</a>.
+    </p>
+  </div>
+</Base>

@@ -80,7 +80,11 @@ La carte affiche ensuite :
 
 Les destinataires sont relus toutes les heures, ou sur demande avec « Actualiser les destinataires ».
 
-« Déconnecter » supprime le point de terminaison de Fourmy dans agrirouter, puis retire l'autorisation. Si agrirouter ne répond pas, l'intégration est quand même retirée de Fourmy. Un message invite alors à retirer l'accès dans agrirouter (Paramètres → Connexions).
+La connexion peut aussi partir d'agrirouter : son catalogue renvoie vers `fourmy.org/agrirouter` (Deep URL de l'application), qui mène à `/agrirouter/start` dans Fourmy. L'utilisateur se connecte si besoin, choisit la ferme dont il est responsable, confirme, puis suit le même consentement.
+
+Si l'autorisation est retirée ou le point de terminaison supprimé dans agrirouter, la synchro horaire le constate. L'intégration passe alors « Déconnectée le … », avec le motif, et propose « Reconnecter » ou « Retirer ».
+
+« Déconnecter » supprime le point de terminaison de Fourmy dans agrirouter, puis retire l'autorisation. Si une autre ferme Fourmy est reliée au même compte agrirouter, agrirouter garde l'autorisation (409) : c'est normal. Si agrirouter ne répond pas, l'intégration est quand même retirée de Fourmy. Un message invite alors à retirer l'accès dans agrirouter (Paramètres → Connexions).
 
 Pour qu'une console reçoive une carte, l'exploitant la relie à Fourmy dans agrirouter. Les routes entre une console (unité de communication virtuelle) et un logiciel aux capacités compatibles sont créées automatiquement. Entre deux logiciels, l'exploitant les crée lui-même dans l'interface d'agrirouter.
 
@@ -191,13 +195,18 @@ Pour les appels qui ne concernent pas une ferme, elle obtient un jeton `client_c
    - que `GET /tenants` contient ce tenant avec ce même état.
 
    L'état ne sert qu'une fois.
-4. L'API crée le point de terminaison de Fourmy dans la ferme agrirouter :
-   - `PUT /endpoints/urn:fourmy:farm:<ferme>`, de type `cloud_software`, nommé « Fourmy <ferme> » ;
-   - capacités en envoi : `iso:11783:-10:taskdata:zip` et `shp:shape:zip` ;
-   - aucun abonnement.
+4. L'API crée le point de terminaison de Fourmy dans la ferme agrirouter (lot AR1 du 16/11, `farmEndpointConfig`) :
+   - `PUT /endpoints/urn:fourmy.org:fourmy:farm-<ferme>`, de type `cloud_software`, nommé « Fourmy - <ferme> » ;
+   - capacités, sous-ensemble de la version 1 déclarée dans le portail : `iso:11783:-10:taskdata:zip` en envoi et réception, `shp:shape:zip` en envoi, `iso:11783:-10:time_log:protobuf` et `iso:11783:-10:device_description:protobuf` en réception ;
+   - abonnements : TaskData, TimeLog et Device Description (ce que publient les machines) ;
+   - `allow_delete_by_user: true`.
+
+   La réception n'est pas encore traitée (lot AR2) : les messages reçus restent non confirmés dans agrirouter.
 5. Le tenant est chiffré comme secret de l'intégration. Le point de terminaison et le nom du compte sont gardés dans les réglages.
 
 **Destinataires**
+
+La synchro horaire vérifie d'abord que la connexion tient : le tenant doit figurer dans `GET /tenants` (sinon autorisation retirée), et le point de terminaison de Fourmy dans la liste (sinon supprimé ; ce contrôle attend 10 min après la connexion, le temps qu'agrirouter le propage). Sinon, l'intégration passe `disconnected`, sans secret, avec `settings.disconnectedAt` et `settings.disconnectReason` (`revoked`, `endpoint_deleted`).
 
 `GET /tenants/{tenant}/endpoints` renvoie les routes du point de terminaison de Fourmy (`routed_endpoints.can_send_to`). Seuls les destinataires ayant une route pour l'un des deux formats sont gardés. La synchro (toutes les heures) range la liste dans le rapport de l'intégration.
 
@@ -282,13 +291,8 @@ Les réessais suivent la règle d'agrirouter : attente croissante sur 429 et 5xx
 
 ## Limites et suite
 
-- **Sans compte développeur agrirouter**, la connexion n'a été testée que contre une simulation qui suit l'API G4. Un essai réel passe par :
-  - l'inscription au portail développeur agrirouter ;
-  - une application et une version déclarant l'envoi de `iso:11783:-10:taskdata:zip` et `shp:shape:zip` ;
-  - un client OAuth avec l'adresse de retour.
-
-  Les tests sont gratuits. La production demande un accord et une revue d'implémentation, elle aussi gratuite depuis septembre 2026.
-- **Adresse du consentement en QA** (`app.qa.agrirouter.farm`) : supposée, non documentée publiquement. `AGRIROUTER_AUTHORIZE_URL` permet de la corriger.
+- **Application enregistrée le 2026-11-16** (portail agrirouter, production) : « Fourmy », marque Ekylibre, Deep URL `https://fourmy.org/agrirouter`, client OAuth de dev.fourmy.org. La version 1 attend la validation pour les tests (« Testing approved ») : aucune connexion réelle n'est possible avant. La suite (réception, file d'envoi, parcelles, revue) est conçue dans `claudedocs/conception_agrirouter.md`.
+- **On développe sur la production**, avec l'IO-Tool comme correspondant : l'environnement QA est réservé à l'équipe agrirouter.
 - **Fichiers non essayés sur une console réelle.** Les points à confirmer au premier essai :
   - l'ordre des mailles de la grille ;
   - l'ordre des enfants de `TSK` ;
