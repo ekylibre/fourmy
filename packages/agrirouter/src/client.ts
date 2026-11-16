@@ -42,10 +42,27 @@ export class AgrirouterError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** `token` : l'application n'a pas obtenu de jeton (identifiants refusés ou service indisponible). */
+    readonly phase: "token" | "call" = "call",
   ) {
     super(message);
     this.name = "AgrirouterError";
   }
+}
+
+/**
+ * Issue d'un envoi raté (règle de reprise d'agrirouter) :
+ * - `retry` : pas de réponse (réseau), jeton refusé ou indisponible, 401,
+ *   408, 429, 5xx : la connexion est coupée, on renvoie plus tard ;
+ * - `partial` : 400 sur un envoi à plusieurs destinataires, livraison
+ *   peut-être partielle : on ne renvoie pas ;
+ * - `failed` : refus définitif (autre 4xx).
+ */
+export function sendFailure(e: unknown, recipients: number): "retry" | "partial" | "failed" {
+  if (!(e instanceof AgrirouterError)) return "retry";
+  if (e.phase === "token" || e.status === 401 || e.status === 408 || e.status === 429 || e.status >= 500) return "retry";
+  if (e.status === 400 && recipients > 1) return "partial";
+  return "failed";
 }
 
 export type EndpointCapability = { message_type: string; direction: "SEND" | "RECEIVE" | "SEND_RECEIVE" };
@@ -192,7 +209,11 @@ export class AgrirouterClient {
       body: new URLSearchParams({ grant_type: "client_credentials", client_id: this.app.clientId, client_secret: this.app.clientSecret }),
     });
     if (!res.ok) {
-      throw new AgrirouterError(res.status, res.status === 400 || res.status === 401 ? "Identifiants de l'application agrirouter refusés." : `Jeton agrirouter indisponible (${res.status}).`);
+      throw new AgrirouterError(
+        res.status,
+        res.status === 400 || res.status === 401 ? "Identifiants de l'application agrirouter refusés." : `Jeton agrirouter indisponible (${res.status}).`,
+        "token",
+      );
     }
     const body = (await res.json()) as { access_token?: string; expires_in?: number };
     if (!body.access_token) throw new AgrirouterError(502, "Réponse de jeton agrirouter inattendue.");

@@ -446,7 +446,7 @@ proposition « Mettre à jour » sur la fiche ; aucune donnée saisie n'est
 |---|---|---|---|
 | **AR1** Conformité et Deep URL ✅ 16/11 | identifiant externe, nom, capacités et abonnements complets, `allow_delete_by_user`, 409 de la révocation, état `disconnected`, page `fourmy.org/agrirouter`, `/agrirouter/start`, `RequireAuth` avec `next` | 1 à 5 | **premier essai réel** : connexion des deux façons, envoi à l'IO-Tool |
 | **AR2** Écouteur et boîte de réception brute ✅ 16/11 | migration 0054, volume, `client.events()`, verrou consultatif, événements de connexion, réception rangée et confirmée sans lecture, page de la boîte de réception | 3, 15, 16, 19 | révocation et suppression vues ; fichiers de l'IO-Tool reçus, compteur à 0 |
-| **AR3** File d'envoi | `agrirouter_outbox`, tentative immédiate puis reprise, états, historique | 6, 7 | test de coupure de la revue |
+| **AR3** File d'envoi ✅ 16/11 | `agrirouter_outbox`, tentative immédiate puis reprise, états, historique | 6, 7 | test de coupure de la revue |
 | **AR4** TaskData reçue | `parseTaskData`, proposition, rapprochement de la carte envoyée (`TSK@B`) | 17 | retour des tâches réalisées |
 | **AR5** EFDI | protobuf, TimeLog → positions → parcours, Device Description → fiche | 17, 18 | télémétrie des machines |
 | **AR7** Parcelles | second flux, chargement initial, liens, tâche « parcelles » | 8 à 10 | parcelles sur les consoles |
@@ -472,6 +472,13 @@ Le site redirige désormais en relatif (`absolute_redirect off`) :
 Un fichier est confirmé dès qu'il est rangé sur le volume, sans attendre sa
 lecture (AR4, AR5), qui se fera depuis le volume. La question B (redélivraison
 après une coupure) reste à vérifier avec l'IO-Tool.
+
+**AR3, réalisé le 16/11.** Écarts et précisions :
+- un jeton refusé (identifiants révoqués, scénario de coupure de la revue)
+  et un 401 mettent aussi l'envoi en attente ;
+- si agrirouter ne répond pas au moment de l'envoi, les destinataires sont
+  contrôlés d'après la dernière synchro, pour pouvoir mettre en file ;
+- la purge des fichiers envoyés (90 jours) n'est pas faite.
 
 Ordre : AR1, puis AR2 et AR3 (indépendants), puis AR4 et AR5, puis AR7
 (le plus incertain), puis AR8. La revue ne peut avoir lieu qu'après AR7,

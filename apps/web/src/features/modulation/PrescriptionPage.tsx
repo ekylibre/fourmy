@@ -191,9 +191,15 @@ function SendPanel({ prescription: p, disabled }: { prescription: Prescription; 
   const [chosen, setChosen] = useState<string[]>([]);
   const send = useMutation({
     mutationFn: () => api.post<PrescriptionSend>(farmPath(farm.id, `/prescriptions/${p.id}/send`), { format, recipients: chosen }),
-    onSuccess: () => {
+    onSuccess: (s) => {
       setChosen([]);
-      notifications.show({ color: "lichen", message: "Carte transmise à agrirouter." });
+      notifications.show(
+        s.status === "queued"
+          ? { color: "paille", message: "agrirouter ne répond pas : la carte est en attente et partira dès le retour de la connexion." }
+          : s.status === "partial"
+            ? { color: "paille", message: `Livraison peut-être partielle : ${s.error ?? ""}` }
+            : { color: "lichen", message: "Carte transmise à agrirouter." },
+      );
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["prescriptions", farm.id] }),
   });
@@ -261,6 +267,9 @@ function SendPanel({ prescription: p, disabled }: { prescription: Prescription; 
   );
 }
 
+/** Heure seule (prochaine tentative d'un envoi en attente). */
+const formatTime = (iso: string) => new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+
 function SendHistory({ sends }: { sends: PrescriptionSend[] }) {
   return (
     <Table mt="md" aria-label="Envois" fz="sm">
@@ -284,6 +293,14 @@ function SendHistory({ sends }: { sends: PrescriptionSend[] }) {
               {s.status === "sent" ? (
                 <Badge color="lichen" variant="light">
                   Envoyé
+                </Badge>
+              ) : s.status === "queued" ? (
+                <Badge color="paille" variant="light" title={s.error ?? undefined}>
+                  En attente{s.nextAttemptAt ? `, nouvel essai à ${formatTime(s.nextAttemptAt)}` : ""}
+                </Badge>
+              ) : s.status === "partial" ? (
+                <Badge color="paille" variant="light" title={s.error ?? undefined}>
+                  Partiel
                 </Badge>
               ) : (
                 <Badge color="brique" variant="light" title={s.error ?? undefined}>

@@ -66,9 +66,11 @@ Un bandeau rappelle l'apport. La case « Garder la dose du plan en moyenne pond�
   - choix du format ;
   - choix des destinataires parmi ceux que les routes agrirouter permettent pour ce format ;
   - bouton « Envoyer ».
-- L'historique des envois : date, format, destinataires, auteur, état (« Envoyé » ou « Refusé » avec le motif au survol).
+- L'historique des envois : date, format, destinataires, auteur, état (« Envoyé », « En attente, nouvel essai à … », « Partiel » ou « Refusé », avec le motif au survol).
 
 « Envoyé » veut dire « accepté par agrirouter ». La console reçoit la carte à sa prochaine connexion. agrirouter ne renvoie pas d'accusé de livraison.
+
+Si agrirouter ne répond pas, la carte passe « En attente » et part toute seule au retour de la connexion (pendant 24 h au plus). « Partiel » : agrirouter a refusé un envoi à plusieurs destinataires, certains l'ont peut-être reçu ; Fourmy ne le renvoie pas, pour ne pas doubler la carte.
 
 ### Connecter la ferme à agrirouter
 
@@ -217,9 +219,18 @@ La synchro horaire vérifie d'abord que la connexion tient : le tenant doit figu
 - l'enveloppe est en en-têtes : `x-agrirouter-message-type`, `x-agrirouter-direct-recipients`, `x-agrirouter-endpoint-id`, `x-agrirouter-tenant-id`, `x-agrirouter-sent-timestamp`, `x-agrirouter-filename`, `x-agrirouter-is-publish: false` ;
 - agrirouter découpe lui-même les gros fichiers (256 Mo au plus).
 
-Avant l'envoi, l'API relit les destinataires en direct. Elle refuse un destinataire sans route ou qui n'accepte pas le format.
+Avant l'envoi, l'API relit les destinataires en direct (ceux de la dernière synchro si agrirouter ne répond pas). Elle refuse un destinataire sans route ou qui n'accepte pas le format.
 
-Les réessais suivent la règle d'agrirouter : attente croissante sur 429 et 5xx, sans `Retry-After`. Un envoi sans réponse n'est pas réessayé, car l'API n'a pas de clé d'idempotence.
+**File d'envoi (lot AR3)** : l'envoi est d'abord mis en file (`agrirouter_outbox`, migration 0056), fichier figé sur le volume `fourmy_agrirouter_files`, puis tenté aussitôt par l'API. Règle de reprise d'agrirouter (`sendFailure`) :
+
+| Réponse | Issue |
+|---|---|
+| 200 | « Envoyé » ; jamais renvoyé (agrirouter ne dédoublonne pas) |
+| pas de réponse, jeton refusé ou indisponible, 401, 408, 429, 5xx | « En attente » ; repris par le worker après 1, 2, 5, 15, 30, 60 min, puis toutes les heures, avec les mêmes octets ; abandonné au bout de 24 h |
+| 400 sur plusieurs destinataires | « Partiel », non renvoyé |
+| autre 4xx | « Refusé » |
+
+Dans chaque appel, le client réessaie déjà trois fois sur 429 et 5xx (1, 2, 4 s). Un envoi pris en charge par un processus mort est repris après 2 min. Une ferme déconnectée pendant l'attente fait échouer l'envoi.
 
 **Écoute des événements (lot AR2)**
 
