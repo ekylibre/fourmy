@@ -101,4 +101,22 @@ describe("AgrirouterClient", () => {
       new AgrirouterClient(app, { fetch: routing.f }).sendFile(TENANT, { senderEndpointId: "e", messageType: MESSAGE_TYPES.shape, recipients: ["r"], filename: "f.zip", payload: new Uint8Array(1) }),
     ).rejects.toThrow("400 No recipients for this sender and info type");
   });
+  it("garde l'autorisation sans erreur quand une autre ferme l'utilise (409) ou qu'elle n'existe plus (404)", async () => {
+    for (const [status, expected] of [[204, true], [409, false], [404, false]] as const) {
+      const { f, calls } = fake((c) => (c.url.endsWith("/token") ? token() : new Response(status === 204 ? null : "{}", { status })));
+      expect(await new AgrirouterClient(app, { fetch: f }).revoke(TENANT)).toBe(expected);
+      expect(calls.at(-1)).toMatchObject({ method: "DELETE", url: "https://api.agrirouter.com/authorizations" });
+    }
+    const { f } = fake((c) => (c.url.endsWith("/token") ? token() : new Response("{}", { status: 403 })));
+    await expect(new AgrirouterClient(app, { fetch: f }).revoke(TENANT)).rejects.toBeInstanceOf(AgrirouterError);
+  });
+
+  it("transmet allow_delete_by_user seulement s'il est donné", async () => {
+    const { f, calls } = fake((c) => (c.url.endsWith("/token") ? token() : Response.json({ id: "ep", external_id: "x", endpoint_type: "cloud_software", tenant_id: TENANT, capabilities: [] })));
+    const c = new AgrirouterClient(app, { fetch: f });
+    await c.putEndpoint(TENANT, "x", { name: "Fourmy", endpointType: "cloud_software", capabilities: [], subscriptions: [], allowDeleteByUser: true });
+    expect((calls.at(-1)!.body as Record<string, unknown>).allow_delete_by_user).toBe(true);
+    await c.putEndpoint(TENANT, "x", { name: "Fourmy", endpointType: "cloud_software", capabilities: [], subscriptions: [] });
+    expect(calls.at(-1)!.body).not.toHaveProperty("allow_delete_by_user");
+  });
 });

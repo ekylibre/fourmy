@@ -8,6 +8,7 @@ import {
 } from "@fourmy/contracts";
 import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
 import { decryptSecret, encryptSecret, secretHint } from "../secrets.js";
+import { ProviderDisconnected } from "./errors.js";
 import { PROVIDERS } from "./providers.js";
 
 /**
@@ -189,7 +190,12 @@ export async function syncIntegration(db: Database, farmId: string, id: string):
 
   const { row, equipmentList } = claimed;
   let secret: string | undefined;
-  let outcome: { status: "ok" | "error"; error: string | null; report: Record<string, unknown> | null };
+  let outcome: {
+    status: "ok" | "error" | "disconnected";
+    error: string | null;
+    report: Record<string, unknown> | null;
+    disconnect?: { disconnectedAt: string; disconnectReason: string };
+  };
   try {
     secret = decryptSecret(row.secret_ciphertext!);
     const report = await PROVIDERS[row.provider].sync(
@@ -198,7 +204,10 @@ export async function syncIntegration(db: Database, farmId: string, id: string):
     );
     outcome = { status: "ok", error: null, report };
   } catch (e) {
-    outcome = { status: "error", error: safeMessage(e, secret), report: null };
+    outcome =
+      e instanceof ProviderDisconnected
+        ? { status: "disconnected", error: e.message, report: null, disconnect: { disconnectedAt: new Date().toISOString(), disconnectReason: e.reason } }
+        : { status: "error", error: safeMessage(e, secret), report: null };
   }
 
   return withFarm(db, farmId, async (tx) => {
@@ -208,6 +217,9 @@ export async function syncIntegration(db: Database, farmId: string, id: string):
         UPDATE integrations SET running_since = NULL, last_sync_at = now(), status = ${outcome.status},
           last_error = ${outcome.error},
           last_report = coalesce(${outcome.report === null ? null : JSON.stringify(outcome.report)}::jsonb, last_report),
+          -- Déconnectée chez le fournisseur : le secret ne sert plus, la date et le motif sont gardés.
+          secret_ciphertext = CASE WHEN ${outcome.status} = 'disconnected' THEN NULL ELSE secret_ciphertext END,
+          settings = settings || coalesce(${outcome.disconnect ? JSON.stringify(outcome.disconnect) : null}::jsonb, '{}'::jsonb),
           updated_at = now()
         WHERE id = ${id} RETURNING *`,
     );

@@ -14,6 +14,7 @@ const STATUS: Record<Integration["status"], { label: string; color: string }> = 
   pending: { label: "À synchroniser", color: "paille" },
   ok: { label: "Synchronisée", color: "lichen" },
   error: { label: "En erreur", color: "brique" },
+  disconnected: { label: "Déconnectée", color: "brique" },
 };
 
 /**
@@ -139,6 +140,8 @@ function AgrirouterCard({ farmId, definition, integration }: { farmId: string; d
   const onError = (e: unknown) => setError(e instanceof ApiError ? (e.detail ?? e.message) : String(e));
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["integrations"] });
   const connected = !!integration?.hasSecret;
+  // Connexion défaite dans agrirouter (autorisation retirée, point de terminaison supprimé), constatée par Fourmy.
+  const disconnected = !connected && integration?.status === "disconnected";
   const connect = useMutation({
     mutationFn: () => api.post<{ url: string }>(farmPath(farmId, "/integrations/agrirouter/connect"), {}),
     onSuccess: ({ url }) => window.location.assign(url),
@@ -167,6 +170,7 @@ function AgrirouterCard({ farmId, definition, integration }: { farmId: string; d
       <Stack>
         <Group justify="space-between">
           <Title order={3}>{definition.label}</Title>
+          {disconnected && <Badge color="brique">Déconnectée</Badge>}
           {connected && integration && (
             <Group gap="xs">
               {integration.running ? (
@@ -229,6 +233,20 @@ function AgrirouterCard({ farmId, definition, integration }: { farmId: string; d
               </Button>
               <Button variant="subtle" color="brique" onClick={() => remove.mutate()} loading={remove.isPending}>
                 Déconnecter
+              </Button>
+            </Group>
+          </>
+        ) : disconnected ? (
+          <>
+            <Alert color="brique" title={`Déconnectée${integration!.settings.disconnectedAt ? ` le ${formatDate(String(integration!.settings.disconnectedAt))}` : ""}`}>
+              {integration!.lastError ?? "La connexion a été défaite dans agrirouter."} Les cartes ne peuvent plus être envoyées tant que la ferme n'est pas reconnectée.
+            </Alert>
+            <Group>
+              <Button onClick={() => connect.mutate()} loading={connect.isPending} disabled={definition.available === false}>
+                Reconnecter
+              </Button>
+              <Button variant="subtle" color="brique" onClick={() => remove.mutate()} loading={remove.isPending}>
+                Retirer
               </Button>
             </Group>
           </>
