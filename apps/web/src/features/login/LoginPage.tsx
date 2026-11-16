@@ -16,7 +16,7 @@ export function LoginPage() {
   const [pending, setPending] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  // Retour après connexion (page d'invitation) : un chemin interne seulement.
+  // Retour après connexion (invitation, page protégée, agrirouter) : un chemin interne seulement.
   const next = useSearchParams()[0].get("next");
   const target = next && /^\/(?!\/)/.test(next) ? next : "/farms";
 

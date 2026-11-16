@@ -188,13 +188,14 @@ const agrirouter: ProviderAdapter = {
   async sync({ settings, secret }) {
     const s = settings as unknown as AgrirouterSettings;
     if (!s.endpointId) throw new Error("Connexion agrirouter incomplète : reconnectez la ferme.");
-    const { companyName, recipients } = await agrirouterRecipients(secret, s.endpointId);
+    const { companyName, recipients } = await agrirouterRecipients(secret, s.endpointId, { connectedAt: s.connectedAt });
     return { companyName, recipients };
   },
   async disconnect({ settings, secret }) {
     const client = agrirouterClient();
     const s = settings as unknown as AgrirouterSettings;
     if (s.externalId) await client.deleteEndpoint(secret, s.externalId);
+    // Autorisation gardée (409) si une autre ferme Fourmy est reliée au même compte agrirouter.
     await client.revoke(secret);
   },
 };

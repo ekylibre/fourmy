@@ -165,7 +165,7 @@ export const INTEGRATION_PROVIDERS: IntegrationProviderDefinition[] = [
   },
 ];
 
-export const integrationStatus = z.enum(["pending", "ok", "error"]);
+export const integrationStatus = z.enum(["pending", "ok", "error", "disconnected"]);
 
 /** Intégration telle que lue (sans secret). */
 export const integration = z.object({

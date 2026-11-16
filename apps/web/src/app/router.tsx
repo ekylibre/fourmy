@@ -30,6 +30,7 @@ import { StockPage } from "../features/stock/StockPage";
 import { PersonSheetPage } from "../features/team/PersonSheetPage";
 import { IntegrationsPage } from "../features/integrations/IntegrationsPage";
 import { AgrirouterCallbackPage } from "../features/integrations/AgrirouterCallbackPage";
+import { AgrirouterStartPage } from "../features/integrations/AgrirouterStartPage";
 import { PrescriptionsPage } from "../features/modulation/PrescriptionsPage";
 import { FarmProvider, useMyFarms } from "./farm";
 import { UNAUTHORIZED_EVENT, useSession } from "./session";
@@ -49,6 +50,7 @@ const Plan3DPage = lazy(() => import("../3d/Plan3DPage").then((m) => ({ default:
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const session = useSession();
+  const location = useLocation();
   const { refetch } = session;
   // Session expirée ou révoquée pendant l'usage : on la relit (→ connexion).
   useEffect(() => {
@@ -57,7 +59,9 @@ function RequireAuth({ children }: { children: ReactNode }) {
     return () => globalThis.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
   }, [refetch]);
   if (session.isLoading) return <Loading />;
-  return session.data ? <>{children}</> : <Navigate to="/login" replace />;
+  // Retour à la page demandée après la connexion (lien venu d'agrirouter, favori…).
+  const next = location.pathname === "/" ? "" : `?next=${encodeURIComponent(location.pathname + location.search)}`;
+  return session.data ? <>{children}</> : <Navigate to={`/login${next}`} replace />;
 }
 
 /** Ferme inconnue ou non autorisée : on le dit, sans fuite d'information. */
@@ -130,6 +134,8 @@ export const routes = [
   { path: "/farms", element: <RequireAuth><FarmsPage /></RequireAuth> },
   // Retour du consentement agrirouter (adresse enregistrée chez agrirouter, sans ferme dans le chemin).
   { path: "/agrirouter/callback", element: <RequireAuth><AgrirouterCallbackPage /></RequireAuth> },
+  // Connexion lancée depuis agrirouter (Deep URL fourmy.org/agrirouter) : choix de la ferme et confirmation.
+  { path: "/agrirouter/start", element: <RequireAuth><AgrirouterStartPage /></RequireAuth> },
   legacy("/connexion"),
   legacy("/fermes"),
   // Éditions imprimables (sans menu) : cahier d'enregistrement, plans de fumure.

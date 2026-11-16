@@ -5,6 +5,7 @@ import type { AgrirouterRecipient, PrescriptionFormat } from "@fourmy/contracts"
 import { AgrirouterClient, MESSAGE_TYPES, type AgrirouterApp, type AgrirouterOptions } from "@fourmy/agrirouter";
 import { BadRequest } from "../routes/helpers.js";
 import { decryptSecret, encryptSecret } from "../secrets.js";
+import { ProviderDisconnected } from "./errors.js";
 
 /**
  * agrirouter (lot AD, docs/modulation.md) : l'application Fourmy est
@@ -53,12 +54,47 @@ export function agrirouterClient(): AgrirouterClient {
   return new AgrirouterClient(config, clientOptions);
 }
 
-/** Point de terminaison de Fourmy dans la ferme agrirouter : un par ferme Fourmy. */
-export const externalEndpointId = (farmId: string) => `urn:fourmy:farm:${farmId}`;
+/**
+ * Point de terminaison de Fourmy dans le compte agrirouter : un par ferme
+ * Fourmy, au format recommandé `urn:<domaine>:<application>:<instance>`.
+ */
+export const externalEndpointId = (farmId: string) => `urn:fourmy.org:fourmy:farm-${farmId}`;
 
-/** Nom accepté par agrirouter : lettres, chiffres, espaces et `_ . , : @ -`. */
-export const endpointName = (farmName: string) =>
-  `Fourmy ${farmName}`.replace(/[^\p{L}\p{N} _.,:@-]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 200);
+/**
+ * Nom reconnaissable par l'exploitant (exigé par la revue) : « Fourmy - <ferme> ».
+ * agrirouter n'accepte que lettres, chiffres, espaces et `_ . , : @ -`.
+ */
+export const endpointName = (farmName: string) => {
+  const farm = farmName.replace(/[^\p{L}\p{N} _.,:@-]/gu, " ").replace(/\s+/g, " ").trim();
+  return (farm ? `Fourmy - ${farm}` : "Fourmy").slice(0, 200);
+};
+
+/**
+ * Configuration complète du point de terminaison de la ferme (chaque PUT
+ * remplace tout) : elle doit rester un sous-ensemble des capacités déclarées
+ * dans la version de l'application (portail agrirouter, version 1) :
+ * TaskData en envoi et réception, Shapefile en envoi, TimeLog et Device
+ * Description EFDI en réception. Abonnements : ce que les machines publient.
+ */
+export const farmEndpointConfig = (farmName: string) => ({
+  name: endpointName(farmName),
+  endpointType: "cloud_software" as const,
+  capabilities: [
+    { message_type: MESSAGE_TYPES.taskdata, direction: "SEND_RECEIVE" as const },
+    { message_type: MESSAGE_TYPES.shape, direction: "SEND" as const },
+    { message_type: MESSAGE_TYPES.timeLog, direction: "RECEIVE" as const },
+    { message_type: MESSAGE_TYPES.deviceDescription, direction: "RECEIVE" as const },
+  ],
+  subscriptions: [MESSAGE_TYPES.taskdata, MESSAGE_TYPES.timeLog, MESSAGE_TYPES.deviceDescription],
+  allowDeleteByUser: true,
+});
+
+/**
+ * Délai après la connexion pendant lequel l'absence du point de terminaison
+ * dans la liste n'est pas une suppression (agrirouter propage les points de
+ * terminaison de façon asynchrone).
+ */
+const ENDPOINT_PROPAGATION_MS = 10 * 60_000;
 
 const FORMAT_OF: Record<string, PrescriptionFormat> = { [MESSAGE_TYPES.taskdata]: "isoxml", [MESSAGE_TYPES.shape]: "shape" };
 export const MESSAGE_TYPE_OF: Record<PrescriptionFormat, string> = { isoxml: MESSAGE_TYPES.taskdata, shape: MESSAGE_TYPES.shape };
@@ -123,15 +159,7 @@ export async function completeAgrirouterConnect(
   }
   const [farm] = await withFarm(db, farmId, (tx) => rows<{ name: string }>(tx, sql`SELECT name FROM farms WHERE id = ${farmId}`));
   const externalId = externalEndpointId(farmId);
-  const endpoint = await client.putEndpoint(input.tenantId, externalId, {
-    name: endpointName(farm?.name ?? "ferme"),
-    endpointType: "cloud_software",
-    capabilities: [
-      { message_type: MESSAGE_TYPES.taskdata, direction: "SEND" },
-      { message_type: MESSAGE_TYPES.shape, direction: "SEND" },
-    ],
-    subscriptions: [],
-  });
+  const endpoint = await client.putEndpoint(input.tenantId, externalId, farmEndpointConfig(farm?.name ?? ""));
   const settings: AgrirouterSettings = {
     endpointId: endpoint.id,
     externalId,
@@ -147,10 +175,28 @@ export async function completeAgrirouterConnect(
   );
 }
 
-/** Destinataires joignables par une route depuis le point de terminaison de Fourmy, avec les formats permis. */
-export async function agrirouterRecipients(tenantId: string, endpointId: string): Promise<{ companyName: string | null; recipients: AgrirouterRecipient[] }> {
-  const { companyName, endpoints } = await agrirouterClient().tenantEndpoints(tenantId);
+/**
+ * Destinataires joignables par une route depuis le point de terminaison de
+ * Fourmy, avec les formats permis. Avec `check`, vérifie d'abord que la
+ * connexion tient toujours : autorisation présente (`GET /tenants`) et point
+ * de terminaison encore là (sauf juste après la connexion). Sinon,
+ * `ProviderDisconnected`.
+ */
+export async function agrirouterRecipients(
+  tenantId: string,
+  endpointId: string,
+  check?: { connectedAt?: string },
+): Promise<{ companyName: string | null; recipients: AgrirouterRecipient[] }> {
+  const client = agrirouterClient();
+  if (check && !(await client.tenants()).some((t) => t.tenant_id === tenantId)) {
+    throw new ProviderDisconnected("revoked", "L'autorisation de Fourmy a été retirée dans agrirouter.");
+  }
+  const { companyName, endpoints } = await client.tenantEndpoints(tenantId);
   const own = endpoints.find((e) => e.id === endpointId);
+  const settled = !check?.connectedAt || Date.now() - Date.parse(check.connectedAt) > ENDPOINT_PROPAGATION_MS;
+  if (check && !own && settled) {
+    throw new ProviderDisconnected("endpoint_deleted", "Le point de terminaison de Fourmy a été supprimé dans agrirouter.");
+  }
   const routes = own?.routed_endpoints?.can_send_to ?? {};
   const recipients = endpoints
     .filter((e) => e.id !== endpointId && routes[e.id]?.length)
