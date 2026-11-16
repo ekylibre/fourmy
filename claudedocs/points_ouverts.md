@@ -48,6 +48,7 @@ Besoins : `claudedocs/besoins_agrirouter.md` ; conception et lots : `claudedocs/
   - nouvelles issues : #57 (point 95, P1), #58 (point 98, P2), #59 (point 105, P2) ;
   - passent « In Progress » : #14, #24, #31, #57 et #59 ;
   - le brouillon du point 17 est clos et archivé.
+  - agrirouter (soir) : #20 (point 55) passe « In Progress », avec un commentaire d'avancement ; nouvelles issues #66 (point 111), #67 (112), #68 (113), #69 (114).
 - **Avancés par agrirouter** :
   - 55 : application enregistrée, connexion conforme, essais en lecture seule sur la production ; l'essai sur console attend la validation de la version et l'IO-Tool ;
   - 46 : une carte revenue réalisée d'une console est reconnue et proposée avec l'intervention (AR4, PR #64).
