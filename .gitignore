@@ -19,3 +19,6 @@ apps/web/dist/
 apps/web/public/cesium/
 apps/site/.astro/
 .cache/
+
+# Sources de la fertilisation (documents COMIFER sous droits), gardées sur le poste
+claudedocs/PPF/

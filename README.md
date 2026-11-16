@@ -75,11 +75,12 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 
 ### À reprendre
 
-La liste complète des points ouverts (108 au 13/11/2026, par thème et par
+La liste complète des points ouverts (108 au 13/11/2026, revue le 16/11, par thème et par
 priorité) est dans `claudedocs/points_ouverts.md` ; elle alimente la
 roadmap du projet GitHub [Fourmy — Roadmap](https://github.com/orgs/ekylibre/projects/2)
 (issues pour P1 et P2, brouillons pour P3). Avant l'envoi à la ferme pilote : sauvegardes,
-déploiement des lots du 12 et 13/11 et worker vérifié sur dev.fourmy.org,
+vérification sur dev.fourmy.org des lots du 12 et 13/11 (déployés le 13/11,
+version 0.113.1 : worker, préchargement IGN, copie hors ligne),
 outils Traccar reliés, données de la ferme à compléter (SIRET, sols, 14-48
 liquide dans Ekylibre, Arion 430) et validation par la ferme pilote des
 phrases qui lui sont prêtées (l'accord écrit pour les captures est obtenu).

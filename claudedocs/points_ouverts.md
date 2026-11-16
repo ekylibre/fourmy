@@ -1,6 +1,6 @@
 # Points ouverts de Fourmy
 
-*Recensés le 2026-11-12 dans toute la documentation (`docs/`, `claudedocs/`, README, historique Git) et dans le journal de recette. Mis à jour le 2026-11-13 après les lots « Équipe et personnes » (P1 à P5), « Ma ferme » (F1 à F5) et « Itinéraires techniques » (T0 à T3). Cette liste alimente la roadmap du projet GitHub [Fourmy — Roadmap](https://github.com/orgs/ekylibre/projects/2) : les points P1 et P2 y sont les issues n° 1 à 37 du dépôt, dans l'ordre de cette liste (jalons « Envoi ferme pilote » et « Fin 2026 ») ; les points P3 y sont des brouillons. Le suivi se fait désormais dans le projet GitHub.*
+*Recensés le 2026-11-12 dans toute la documentation (`docs/`, `claudedocs/`, README, historique Git) et dans le journal de recette. Revus le 2026-11-16 (déploiement, TIKA, projet GitHub). Mis à jour le 2026-11-13 après les lots « Équipe et personnes » (P1 à P5), « Ma ferme » (F1 à F5) et « Itinéraires techniques » (T0 à T3). Cette liste alimente la roadmap du projet GitHub [Fourmy — Roadmap](https://github.com/orgs/ekylibre/projects/2) : les points P1 et P2 y sont les issues n° 1 à 37 du dépôt, dans l'ordre de cette liste (jalons « Envoi ferme pilote » et « Fin 2026 ») ; les points P3 y sont des brouillons. Le suivi se fait désormais dans le projet GitHub.*
 
 Chaque point se lit ainsi : **titre** : description. *nature · priorité · source*.
 
@@ -12,6 +12,19 @@ Chaque point se lit ainsi : **titre** : description. *nature · priorité · sou
 **Natures :** bug, évolution, donnée, décision, externe, juridique, doc, exploitation, dette.
 
 **Numérotation :** les points 1 à 94 gardent leur numéro du 12/11. Les points nouveaux commencent à 95 et sont rangés dans leur thème.
+
+## Mise à jour du 2026-11-16
+
+Aucun commit depuis le 13/11 (dernier : PR #56). État vérifié le 16/11 :
+
+- **Avancés** :
+  - 95 : le déploiement est fait. dev.fourmy.org et fourmy.org servent la version 0.113.1 (commit `eeeffbf` du 13/11, 19:15), qui contient tous les lots du 12 et 13/11. Il reste à vérifier sur dev.fourmy.org le préchargement IGN, la copie hors ligne et le worker (point 2) ;
+  - 105 : la première demande de fusion (`dom-natif`) est ouverte chez OSFarm le 13/11 ([osfarm/itineraire-technique#47](https://github.com/osfarm/itineraire-technique/pull/47)), sans relecture pour l'instant. Les huit autres attendent sa fusion.
+- **Projet GitHub** (mis à jour le 16/11) :
+  - nouvelles issues : #57 (point 95, P1), #58 (point 98, P2), #59 (point 105, P2) ;
+  - passent « In Progress » : #14, #24, #31, #57 et #59 ;
+  - le brouillon du point 17 est clos et archivé.
+- **Hors dépôt** : `claudedocs/PPF/` (sources COMIFER, PAR 7 et leurs extraits pour la fertilisation, environ 29 Mo de documents sous droits) est ignoré par `.gitignore` et reste sur le poste.
 
 ## Mise à jour du 2026-11-13
 
@@ -65,6 +78,8 @@ Plus deux points faits (17 et 104), hors du total.
     - les migrations 0044 à 0053, appliquées au démarrage de l'API ;
     - le volume `fourmy_ign_cache`, monté dans l'API et dans le worker ;
     - l'accès au dépôt GitHub du fork TIKA, à la construction de l'image.
+
+    **Avancé le 16/11** : version 0.113.1 en ligne sur dev.fourmy.org et fourmy.org. Il reste les vérifications.
 
     *exploitation · P1 · conception_ma_ferme §8, conception_itineraires_techniques §12 quater*
 96. **Surveiller la place prise par le cache IGN** sur le serveur (seuil de confirmation à 2 Go par ferme). *exploitation · P3 · conception_ma_ferme §13*
@@ -229,7 +244,7 @@ Plus deux points faits (17 et 104), hors du total.
 ## 15. Itinéraires techniques
 
 105. **Reverser les contributions TIKA à OSFarm** : neuf demandes de fusion en série (la 9e, `transcription-a-la-demande`, ajoutée le 13/11), depuis le fork `ekylibre/itineraire-technique`, relues par David et Bertrand.
-     - La première (`dom-natif`) est prête mais pas encore ouverte.
+     - La première (`dom-natif`) est ouverte depuis le 13/11 : [osfarm/itineraire-technique#47](https://github.com/osfarm/itineraire-technique/pull/47), en attente de relecture.
      - OSFarm doit choisir comment publier sur npm : une version à chaque fusion, ou une seule version 1.3.0 à la fin.
 
      *externe · P2 · conception_itineraires_techniques §7, §12 ter*
