@@ -157,8 +157,10 @@ async function agrirouterTick(): Promise<void> {
   }
   // Lecture des TaskData reçus : propositions d'intervention (lot AR4), sans appel à agrirouter.
   const read = await readAgrirouterInbox(db());
-  if (read.proposed || read.ignored || read.unreadable) {
-    console.log(`[worker] agrirouter : fichiers lus, ${read.proposed} avec proposition, ${read.ignored} sans suite, ${read.unreadable} illisible(s)`);
+  if (read.proposed || read.ignored || read.unreadable || read.merged) {
+    console.log(
+      `[worker] agrirouter : fichiers lus, ${read.proposed} avec proposition, ${read.merged} versé(s) aux parcours, ${read.ignored} sans suite, ${read.unreadable} illisible(s)`,
+    );
   }
   if (!agrirouterConfig()) return;
   const r = await confirmAgrirouterInbox(db(), agrirouterClient());

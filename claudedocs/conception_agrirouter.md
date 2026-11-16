@@ -448,7 +448,7 @@ proposition « Mettre à jour » sur la fiche ; aucune donnée saisie n'est
 | **AR2** Écouteur et boîte de réception brute ✅ 16/11 | migration 0054, volume, `client.events()`, verrou consultatif, événements de connexion, réception rangée et confirmée sans lecture, page de la boîte de réception | 3, 15, 16, 19 | révocation et suppression vues ; fichiers de l'IO-Tool reçus, compteur à 0 |
 | **AR3** File d'envoi ✅ 16/11 | `agrirouter_outbox`, tentative immédiate puis reprise, états, historique | 6, 7 | test de coupure de la revue |
 | **AR4** TaskData reçue ✅ 16/11 | `parseTaskData`, proposition, rapprochement de la carte envoyée (`TSK@B`) | 17 | retour des tâches réalisées |
-| **AR5** EFDI | protobuf, TimeLog → positions → parcours, Device Description → fiche | 17, 18 | télémétrie des machines |
+| **AR5** EFDI ✅ 16/11 | protobuf, TimeLog → positions → parcours, Device Description → fiche | 17, 18 | télémétrie des machines |
 | **AR7** Parcelles | second flux, chargement initial, liens, tâche « parcelles » | 8 à 10 | parcelles sur les consoles |
 | **AR8** Revue | deux fermes de démonstration, testeurs DKE invités, déroulé écrit, `docs/modulation.md` et nouveau `docs/agrirouter.md` | 20 | demande de revue |
 
@@ -493,6 +493,21 @@ après une coupure) reste à vérifier avec l'IO-Tool.
   dans le bandeau, à saisir ;
 - un fichier à plusieurs tâches passe « Validé » dès qu'une intervention en
   est tirée.
+
+**AR5, réalisé le 16/11.** Écarts et précisions :
+- définitions EFDI : `efdi.proto` de `DKE-Data/agrirouter-tmt-protobuf-definitions`
+  (Apache 2.0, question D tranchée). Décodeur écrit pour Fourmy, sans
+  `protobufjs` ; seuls les champs utiles sont lus ;
+- essayé sur des messages fabriqués par l'encodeur de Fourmy : cohérent
+  avec `efdi.proto`, à confirmer sur des messages réels (IO-Tool) ;
+- le matériel d'un journal vient de la description de machine du même
+  attelage (`teamset_context_id`), attendue une heure ; sinon « Sans suite » ;
+- un matériel déjà suivi par Traccar n'est pas doublé (un seul rattachement
+  de boîtier à la fois par matériel) ;
+- la largeur de travail se reporte sur l'avatar de la fiche ; le nombre de
+  sections est seulement affiché (pas de champ « sections » sur la fiche) ;
+- les journaux sans matériel reconnu ne donnent pas de proposition
+  d'intervention isolée : le flux de télémétrie passe par les parcours.
 
 Ordre : AR1, puis AR2 et AR3 (indépendants), puis AR4 et AR5, puis AR7
 (le plus incertain), puis AR8. La revue ne peut avoir lieu qu'après AR7,

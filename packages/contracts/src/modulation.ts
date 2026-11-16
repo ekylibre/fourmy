@@ -187,13 +187,32 @@ export interface AgrirouterInboxItem {
   sentAt: string | null;
   receivedAt: string;
   /** `received` : rangé, pas encore lu (la lecture vient aux lots AR4 et AR5). */
-  state: "received" | "proposed" | "validated" | "dismissed" | "unreadable" | "ignored";
+  state: "received" | "proposed" | "validated" | "dismissed" | "unreadable" | "ignored" | "merged";
   error: string | null;
   /** Confirmé à agrirouter (le message quitte sa file). */
   confirmedAt: string | null;
   confirmError: string | null;
   /** Tâches réalisées lues dans le fichier (TaskData, lot AR4), chacune avec sa proposition d'intervention. */
   tasks: AgrirouterInboxTask[];
+  /** Matériels d'une description de machine EFDI (lot AR5). */
+  devices: AgrirouterInboxDevice[];
+  /** Journal EFDI versé dans les parcours GPS d'un matériel (lot AR5, état `merged`). */
+  telemetry: { equipment: { id: string; name: string }; tool: string | null; positions: number; from: string; to: string } | null;
+}
+
+/** Matériel d'une description de machine reçue, et la mise à jour proposée de sa fiche. */
+export interface AgrirouterInboxDevice {
+  index: number;
+  designator: string;
+  serial: string | null;
+  equipment: { id: string; name: string } | null;
+  /** Largeur de travail déclarée par la machine (m), et celle de la fiche. */
+  workingWidthM: number | null;
+  currentWidthM: number | null;
+  sections: number;
+  /** Largeur différente de la fiche : proposée à la mise à jour. */
+  proposeWidth: boolean;
+  applied: boolean;
 }
 
 /** Tâche réalisée lue dans un TaskData reçu, et l'intervention proposée. */

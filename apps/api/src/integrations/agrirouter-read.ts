@@ -1,9 +1,10 @@
 import { sql } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
 import { MESSAGE_TYPES } from "@fourmy/agrirouter";
-import { readTaskData, IsoxmlReadError, type ReadTask } from "@fourmy/isoxml";
-import type { AgrirouterInboxTask, TrackDraft } from "@fourmy/contracts";
+import { decodeDeviceDescription, decodeTimeLog, EFDI_SECTION, EfdiReadError, readTaskData, IsoxmlReadError, type ReadTask } from "@fourmy/isoxml";
+import type { AgrirouterInboxDevice, AgrirouterInboxTask, TrackDraft } from "@fourmy/contracts";
 import { prescriptionRefOf } from "../repos/prescriptions.js";
+import { computeTrackSessions } from "../repos/track-sessions.js";
 import { readAgrirouterFile } from "./agrirouter-events.js";
 
 /**
@@ -124,17 +125,25 @@ async function parcelsOf(tx: Tx, task: ReadTask, at: string): Promise<{ id: stri
     .filter((f) => f.share >= 0.05);
 }
 
-/** Matériel de la ferme : par numéro de série, sinon par nom ou modèle. */
+type MatchedEquipment = { id: string; name: string; kind: string; width: number | null };
+
+/** Matériel de la ferme d'après la machine : par numéro de série, sinon par nom ou modèle. */
+async function matchEquipment(tx: Tx, d: { serial: string | null; designator: string }): Promise<MatchedEquipment | null> {
+  const [e] = await rows<MatchedEquipment>(
+    tx,
+    sql`SELECT id, name, kind, (avatar->>'workingWidthM')::float8 AS width FROM equipments
+        WHERE (${d.serial}::text IS NOT NULL AND lower(serial_number) = lower(${d.serial}::text))
+           OR (${d.designator} <> '' AND (lower(name) = lower(${d.designator}) OR lower(model) = lower(${d.designator})))
+        ORDER BY (lower(serial_number) = lower(${d.serial}::text)) DESC NULLS LAST, name LIMIT 1`,
+  );
+  return e ?? null;
+}
+
+/** Matériel d'une tâche : le premier de ses matériels reconnu. */
 async function equipmentOf(tx: Tx, task: ReadTask): Promise<{ id: string; name: string } | null> {
   for (const d of task.devices) {
-    const [e] = await rows<{ id: string; name: string }>(
-      tx,
-      sql`SELECT id, name FROM equipments
-          WHERE (${d.serial}::text IS NOT NULL AND lower(serial_number) = lower(${d.serial}::text))
-             OR (${d.designator} <> '' AND (lower(name) = lower(${d.designator}) OR lower(model) = lower(${d.designator})))
-          ORDER BY (lower(serial_number) = lower(${d.serial}::text)) DESC NULLS LAST, name LIMIT 1`,
-    );
-    if (e) return e;
+    const e = await matchEquipment(tx, d);
+    if (e) return { id: e.id, name: e.name };
   }
   return null;
 }
@@ -220,8 +229,149 @@ async function propose(tx: Tx, inboxId: string, index: number, task: ReadTask): 
   };
 }
 
-/** Lit un fichier reçu (déjà verrouillé) et enregistre son état : proposé, sans suite ou illisible. */
-async function readOne(tx: Tx, row: { id: string; file_sha256: string }): Promise<"proposed" | "ignored" | "unreadable"> {
+// --- Description de machine EFDI (lot AR5) -------------------------------------------
+
+/** DDI de largeur de travail (mm) : par défaut (68), réelle (67), de consigne (66). */
+const WIDTH_DDIS = [68, 67, 66];
+
+async function readDeviceDescription(tx: Tx, bytes: Uint8Array): Promise<{ state: "proposed" | "ignored"; parsed: unknown; error: string | null }> {
+  const dd = decodeDeviceDescription(bytes);
+  const devices: AgrirouterInboxDevice[] = [];
+  for (const [index, d] of dd.devices.entries()) {
+    const equipment = await matchEquipment(tx, d);
+    const widthMm = WIDTH_DDIS.map((ddi) => d.properties.find((p) => p.ddi === ddi && p.value > 0)?.value).find((v) => v !== undefined) ?? null;
+    const workingWidthM = widthMm === null ? null : round(widthMm / 1000, 2);
+    const currentWidthM = equipment?.width ?? null;
+    devices.push({
+      index,
+      designator: d.designator,
+      serial: d.serial,
+      equipment: equipment ? { id: equipment.id, name: equipment.name } : null,
+      workingWidthM,
+      currentWidthM,
+      sections: d.elements.filter((e) => e.type === EFDI_SECTION).length,
+      proposeWidth: !!equipment && workingWidthM !== null && workingWidthM <= 60 && (currentWidthM === null || Math.abs(currentWidthM - workingWidthM) >= 0.01),
+      applied: false,
+    });
+  }
+  const proposed = devices.some((d) => d.proposeWidth);
+  return {
+    state: proposed ? "proposed" : "ignored",
+    parsed: { taskController: dd.taskController, devices },
+    error: proposed ? null : devices.length ? "Description de machine gardée : rien à mettre à jour sur les fiches." : "Aucune machine dans cette description.",
+  };
+}
+
+// --- Journal EFDI (lot AR5) -------------------------------------------------------------
+
+/** Délai d'attente de la description de machine d'un journal (elles arrivent en général ensemble). */
+const WAIT_FOR_DEVICE_MS = 60 * 60_000;
+const WORK_STATE_DDI = 141; // 1 : au travail
+const SPEED_DDI = 397; // mm/s
+const ACTUAL_WIDTH_DDI = 67; // mm
+const SELF_PROPELLED = new Set(["tractor", "self_propelled_equipment"]);
+
+type InboxRow = { id: string; file_sha256: string; message_type: string; received_at: Date | string; teamset_context_id: string | null };
+
+/**
+ * Verse les positions d'un journal EFDI dans les parcours GPS du matériel
+ * (rattachement de source « agrirouter »), comme celles de Traccar. Le
+ * matériel vient de la description de machine du même attelage (teamset).
+ */
+async function readTimeLog(tx: Tx, row: InboxRow, bytes: Uint8Array, farmId: string): Promise<{ state: "merged" | "ignored" | "wait"; parsed: unknown; error: string | null }> {
+  const log = decodeTimeLog(bytes);
+  const [dd] = row.teamset_context_id
+    ? await rows<{ parsed: { devices?: AgrirouterInboxDevice[] } | null }>(
+        tx,
+        sql`SELECT parsed FROM agrirouter_inbox
+            WHERE message_type = ${MESSAGE_TYPES.deviceDescription} AND teamset_context_id = ${row.teamset_context_id} AND parsed IS NOT NULL
+            ORDER BY received_at DESC LIMIT 1`,
+      )
+    : [];
+  const devices = dd?.parsed?.devices ?? [];
+  if (!devices.length) {
+    if (Date.now() - new Date(row.received_at).getTime() < WAIT_FOR_DEVICE_MS) return { state: "wait", parsed: null, error: null };
+    return { state: "ignored", parsed: null, error: "Machine inconnue : aucune description de machine reçue pour ce journal." };
+  }
+  const matched = devices.filter((d) => d.equipment);
+  if (!matched.length) {
+    return { state: "ignored", parsed: null, error: `Matériel non reconnu : ${devices.map((d) => `« ${d.designator} »`).join(", ")}.` };
+  }
+  const kinds = await rows<{ id: string; kind: string }>(
+    tx,
+    sql`SELECT id, kind FROM equipments WHERE id IN (${sql.join(matched.map((d) => sql`${d.equipment!.id}::uuid`), sql`, `)})`,
+  );
+  const kindOf = new Map(kinds.map((k) => [k.id, k.kind]));
+  const carrier = matched.find((d) => SELF_PROPELLED.has(kindOf.get(d.equipment!.id) ?? "")) ?? matched[0]!;
+  const tool = matched.find((d) => d !== carrier) ?? null;
+  const equipment = carrier.equipment!;
+
+  // Rattachement : un matériel déjà suivi par Traccar n'est pas doublé.
+  const [binding] = await rows<{ id: string; source: string }>(
+    tx,
+    sql`SELECT id, source FROM tracker_bindings WHERE equipment_id = ${equipment.id} AND upper_inf(valid) ORDER BY lower(valid) DESC LIMIT 1`,
+  );
+  if (binding && binding.source !== "agrirouter") {
+    return { state: "ignored", parsed: null, error: `${equipment.name} est déjà suivi par Traccar : journal non versé, pour ne pas doubler ses parcours.` };
+  }
+  const bindingId = binding?.id ?? crypto.randomUUID();
+  if (!binding) {
+    await tx.execute(sql`
+      INSERT INTO tracker_bindings (id, farm_id, equipment_id, source, device_id, valid)
+      VALUES (${bindingId}, ${farmId}, ${equipment.id}, 'agrirouter', ${`efdi:${carrier.serial ?? carrier.designator}`}, tstzrange('-infinity', NULL))`);
+  }
+  const widthM = (v: number | undefined) => (v !== undefined && v > 0 ? v / 1000 : (tool?.workingWidthM ?? carrier.workingWidthM ?? null));
+  const points = log.times
+    .filter((t) => t.position && (t.start ?? t.position.gpsTime) && GOOD_FIX.has(t.position.status))
+    .map((t) => {
+      const value = (ddi: number) => t.values.find((v) => v.ddi === ddi)?.value;
+      const work = value(WORK_STATE_DDI);
+      const speed = value(SPEED_DDI);
+      const width = widthM(value(ACTUAL_WIDTH_DDI));
+      return {
+        time: (t.start ?? t.position!.gpsTime)!,
+        lat: t.position!.lat,
+        lon: t.position!.lon,
+        speed: speed === undefined ? null : round(speed * 0.0036, 2),
+        attrs: { ...(work !== undefined ? { working: work === 1 } : {}), ...(width !== null ? { widthM: width } : {}), ...(tool ? { tool: tool.equipment!.name } : {}), source: "agrirouter" },
+      };
+    });
+  if (!points.length) return { state: "ignored", parsed: null, error: "Journal sans position exploitable." };
+  await tx.execute(sql`
+    WITH u AS (
+      SELECT * FROM unnest(${`{${points.map((p) => p.time).join(",")}}`}::timestamptz[], ${`{${points.map((p) => p.lon).join(",")}}`}::float8[],
+                           ${`{${points.map((p) => p.lat).join(",")}}`}::float8[], ${`{${points.map((p) => p.speed ?? "NULL").join(",")}}`}::float8[])
+             WITH ORDINALITY AS u(t, x, y, s, n)
+    ), a AS (SELECT value AS a, ordinality AS n FROM jsonb_array_elements(${JSON.stringify(points.map((p) => p.attrs))}::jsonb) WITH ORDINALITY)
+    INSERT INTO positions (farm_id, binding_id, time, point, speed, attrs)
+    SELECT ${farmId}, ${bindingId}, u.t, ST_SetSRID(ST_MakePoint(u.x, u.y), 4326), u.s, a.a
+    FROM u JOIN a USING (n)
+    ON CONFLICT (binding_id, time) DO NOTHING`);
+  const times = points.map((p) => p.time).sort();
+  return {
+    state: "merged",
+    parsed: { telemetry: { equipment, tool: tool?.equipment?.name ?? null, positions: points.length, from: times[0]!, to: times.at(-1)! } },
+    error: null,
+  };
+}
+
+/** Lit un fichier reçu (déjà verrouillé) et enregistre son état. `wait` : à relire plus tard (description de machine attendue). */
+async function readOne(tx: Tx, row: InboxRow, farmId: string): Promise<"proposed" | "ignored" | "unreadable" | "merged" | "wait"> {
+  if (row.message_type !== MESSAGE_TYPES.taskdata) {
+    let outcome: { state: "proposed" | "ignored" | "merged" | "wait" | "unreadable"; parsed: unknown; error: string | null };
+    try {
+      const bytes = new Uint8Array(await readAgrirouterFile(row.file_sha256));
+      outcome = row.message_type === MESSAGE_TYPES.deviceDescription ? await readDeviceDescription(tx, bytes) : await readTimeLog(tx, row, bytes, farmId);
+    } catch (e) {
+      outcome = { state: "unreadable", parsed: null, error: e instanceof EfdiReadError ? e.message : `Fichier illisible : ${e instanceof Error ? e.message : String(e)}` };
+    }
+    if (outcome.state === "wait") return "wait";
+    await tx.execute(sql`
+      UPDATE agrirouter_inbox SET state = ${outcome.state}, parsed = ${outcome.parsed === null ? null : JSON.stringify(outcome.parsed)}::jsonb,
+        error = ${outcome.error?.slice(0, 500) ?? null}
+      WHERE id = ${row.id}`);
+    return outcome.state;
+  }
   let state: "proposed" | "ignored" | "unreadable";
   let parsed: unknown = null;
   let error: string | null = null;
@@ -246,12 +396,16 @@ async function readOne(tx: Tx, row: { id: string; file_sha256: string }): Promis
   return state;
 }
 
-/** Types lus à ce lot (les journaux EFDI viendront au lot AR5). */
-const READ_TYPES = [MESSAGE_TYPES.taskdata];
+/** Types lus : TaskData (lot AR4), descriptions de machine et journaux EFDI (lot AR5). Les descriptions d'abord. */
+const READ_TYPES = [MESSAGE_TYPES.taskdata, MESSAGE_TYPES.deviceDescription, MESSAGE_TYPES.timeLog];
 
 /** Worker : lit les fichiers reçus non encore lus, au plus `max` par tour ; `farmId` : une seule ferme (tests). */
-export async function readAgrirouterInbox(db: Database, max = 20, farmId: string | null = null): Promise<Record<"proposed" | "ignored" | "unreadable", number>> {
-  const counts = { proposed: 0, ignored: 0, unreadable: 0 };
+export async function readAgrirouterInbox(
+  db: Database,
+  max = 50,
+  farmId: string | null = null,
+): Promise<Record<"proposed" | "ignored" | "unreadable" | "merged", number>> {
+  const counts = { proposed: 0, ignored: 0, unreadable: 0, merged: 0 };
   const types = `{${READ_TYPES.join(",")}}`;
   const farms = farmId
     ? [farmId]
@@ -261,19 +415,30 @@ export async function readAgrirouterInbox(db: Database, max = 20, farmId: string
       });
   let done = 0;
   for (const farm of farms) {
+    // Fichiers en attente de leur description de machine : sautés pendant ce tour.
+    const waiting: string[] = [];
+    let merged = false;
     while (done < max) {
-      const state = await withFarm(db, farm, async (tx) => {
-        const [row] = await rows<{ id: string; file_sha256: string }>(
+      const outcome = await withFarm(db, farm, async (tx) => {
+        const [row] = await rows<InboxRow>(
           tx,
-          sql`SELECT id, file_sha256 FROM agrirouter_inbox WHERE state = 'received' AND message_type = ANY(${types}::text[])
-              ORDER BY received_at LIMIT 1 FOR UPDATE SKIP LOCKED`,
+          sql`SELECT id, file_sha256, message_type, received_at, teamset_context_id FROM agrirouter_inbox
+              WHERE state = 'received' AND message_type = ANY(${types}::text[])
+                AND NOT (id = ANY(${`{${waiting.join(",")}}`}::uuid[]))
+              ORDER BY (message_type = ${MESSAGE_TYPES.deviceDescription}) DESC, received_at LIMIT 1 FOR UPDATE SKIP LOCKED`,
         );
-        return row ? readOne(tx, row) : null;
+        return row ? { id: row.id, state: await readOne(tx, row, farm) } : null;
       });
-      if (!state) break;
-      counts[state]++;
+      if (!outcome) break;
+      if (outcome.state === "wait") waiting.push(outcome.id);
+      else {
+        counts[outcome.state]++;
+        merged ||= outcome.state === "merged";
+      }
       done++;
     }
+    // Journaux versés : parcours recalculés tout de suite (le worker ne le fait seul que pour Traccar).
+    if (merged) await computeTrackSessions(db, farm);
   }
   return counts;
 }
