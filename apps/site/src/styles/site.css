@@ -74,7 +74,13 @@ main { padding-block: 3rem 5rem; }
 .home-hero-head .lead { font-size: 1.25rem; color: var(--lv-ink-muted); max-width: 40rem; }
 .field { margin: 2.5rem 0 0; }
 .field-frame { position: relative; width: min(100% - 2.5rem, 80rem); margin-inline: auto; }
-.field-drone { width: 100%; border-radius: 16px; border: 1px solid var(--lv-line); box-shadow: var(--lv-shadow-float); background: var(--lv-surface-sunken); }
+.field-drone { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 16px; border: 1px solid var(--lv-line); box-shadow: var(--lv-shadow-float); background: var(--lv-surface-sunken); }
+.field-toggle {
+  position: absolute; left: 0.75rem; top: 0.75rem; padding: 0.35rem 0.7rem; border-radius: 8px; font: inherit; font-size: 0.85rem; font-weight: 600;
+  color: var(--lv-ink); background: var(--lv-surface); border: 1px solid var(--lv-line); cursor: pointer;
+}
+.field-toggle:hover { background: var(--lv-surface-sunken); }
+.field-toggle:focus-visible { outline: 3px solid var(--lv-lichen); outline-offset: 2px; }
 .field-inset {
   position: absolute; right: clamp(0.75rem, 3vw, 2.5rem); bottom: -3rem; width: clamp(10rem, 24vw, 19rem); margin: 0;
   background: var(--lv-surface); padding: 0.4rem; border-radius: 12px; border: 1px solid var(--lv-line); box-shadow: var(--lv-shadow-float);

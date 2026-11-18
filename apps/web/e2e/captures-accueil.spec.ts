@@ -5,8 +5,8 @@ import { expect, test, type Page } from "@playwright/test";
 /**
  * Captures de la page d'accueil de fourmy.org, sur la ferme de grandes
  * cultures de Pierre (accord écrit pour des captures publiques, voir
- * docs/site-public-exigences.md §6.1) : vue 3D d'un attelage au travail avec
- * le NDVI, interopérabilité, réglementaire, parcellaire. À la demande :
+ * docs/site-public-exigences.md §6.1) : interopérabilité, réglementaire,
+ * parcellaire, équipe. À la demande :
  *   CAPTURES=1 CAPTURES_FARM=<ferme> E2E_BASE_URL=http://localhost:5180 \
  *     pnpm --filter @fourmy/web exec playwright test e2e/captures-accueil.spec.ts
  * Connexion avec le compte de développement de seed:dev (responsable de la ferme).
@@ -37,36 +37,9 @@ test.beforeEach(async ({ page }) => {
   await signIn(page);
 });
 
-test("vue 3D : l'Arion 430 et sa herse dans le maïs, NDVI et couches du jumeau", async ({ page }) => {
-  test.setTimeout(240_000);
-  await page.setViewportSize({ width: 1600, height: 900 });
-  await page.goto(`/f/${FARM}/3d-plan?at=${DAY}&sat=ndvi`);
-  await expect(page.locator(".cesium-widget canvas")).toBeVisible({ timeout: 60_000 });
-  await page.waitForTimeout(8000);
-  await page.getByRole("combobox", { name: "Matériel" }).click();
-  await page.getByRole("combobox", { name: "Matériel" }).fill("Arion 430");
-  await page.getByRole("option", { name: "Claas Arion 430" }).click();
-  await page.getByRole("button", { name: "Charger" }).click();
-  const replay = page.getByLabel(/^Rejeu du/);
-  const slider = replay.getByRole("slider");
-  await expect(slider).toBeVisible({ timeout: 30_000 });
-  // 16 h 48 à Paris : la herse rotative travaille dans le maïs.
-  const [min, max] = [Number(await slider.getAttribute("aria-valuemin")), Number(await slider.getAttribute("aria-valuemax"))];
-  const target = Date.parse(`${DAY}T14:48:00Z`);
-  const box = (await replay.locator(".mantine-Slider-root").boundingBox())!; // la piste entière, pas le curseur
-  await page.mouse.click(box.x + ((target - min) / (max - min)) * box.width, box.y + box.height / 2);
-  // Plein écran : la vue occupe toute la fenêtre (repli sans l'API plein écran).
-  await page.getByRole("button", { name: "Plein écran" }).click();
-  // Grand angle : le NDVI sur les parcelles, le trajet recalé sur la route, l'attelage.
-  await page.getByText("Drone", { exact: true }).click();
-  await page.waitForTimeout(12_000); // relief, photo, NDVI et modèles chargés
-  await snap(page, "accueil-3d");
-  // Au plus près : l'Arion 430 et sa herse rotative dans les rangs de chaumes.
-  await page.getByText("Derrière", { exact: true }).click();
-  await page.waitForTimeout(10_000);
-  await page.mouse.move(0, 0);
-  await page.screenshot({ path: out("accueil-3d-attelage"), clip: { x: 500, y: 170, width: 600, height: 450 }, animations: "disabled" });
-});
+// Le haut de page est une boucle vidéo du rejeu 3D, avec son affiche (accueil-3d) et l'extrait
+// de fiche (accueil-fiche-pulverisation) : videos/accueil-pulverisation (capture/film.mjs,
+// capture/encode.sh, capture/fiche.mjs).
 
 test("interopérabilité : attelage et parcours tirés du GPS, trace sur la photo IGN", async ({ page }) => {
   test.setTimeout(120_000);
