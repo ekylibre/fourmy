@@ -24,10 +24,21 @@ export interface StateChange {
 
 /** Sans parcours calculé : un arrêt du travail plus long que ceci compte comme un transport. */
 const HEADLAND_MAX_MS = 120_000;
+/**
+ * Un arrêt du travail qui parcourt plus que ceci est un trajet (d'une parcelle
+ * à l'autre), même à l'intérieur d'un parcours de travail : rampe repliée.
+ * Un demi-tour en bout de champ fait moins de 200 m (05/10/2026 : 13 à 181 m ;
+ * trajets entre parcelles : 1,8 et 2 km).
+ */
+export const HEADLAND_MAX_M = 300;
+
+const M_PER_DEG = 111_320;
+const dist = (a: Sample, b: Sample) => Math.hypot((b[1] - a[1]) * M_PER_DEG * Math.cos((a[2] * Math.PI) / 180), (b[2] - a[2]) * M_PER_DEG);
 
 /**
  * Suite des états de l'outil : au travail ; pas au travail mais pendant un
- * parcours de travail (bout de champ, relevé) ; sinon en transport (replié).
+ * parcours de travail et sur moins de 300 m (bout de champ, relevé) ; sinon
+ * en transport (replié).
  */
 export function stateChanges(samples: readonly Sample[], sessions?: readonly ReplaySession[]): StateChange[] {
   const work = (sessions ?? []).filter((s) => s.kind === "work").map((s) => [Date.parse(s.from), Date.parse(s.to)] as const);
@@ -37,20 +48,22 @@ export function stateChanges(samples: readonly Sample[], sessions?: readonly Rep
     if (sessions) return { t, state: work.some(([a, b]) => t >= a && t <= b) ? "headland" : "transport" };
     return { t, state: "headland" };
   });
-  // Sans parcours : un arrêt long entre deux passes est un transport.
-  if (!sessions) {
-    let i = 0;
-    while (i < raw.length) {
-      if (raw[i]!.state === "work") {
-        i++;
-        continue;
-      }
-      let j = i;
-      while (j + 1 < raw.length && raw[j + 1]!.state !== "work") j++;
-      const end = raw[j + 1]?.t ?? raw[j]!.t;
-      if (end - raw[i]!.t > HEADLAND_MAX_MS || i === 0 || j === raw.length - 1) for (let k = i; k <= j; k++) raw[k]!.state = "transport";
-      i = j + 1;
+  // Chaque arrêt du travail : trajet s'il est long en distance (ou, sans parcours, en durée), ou en bord de trace.
+  let i = 0;
+  while (i < raw.length) {
+    if (raw[i]!.state !== "headland") {
+      i++;
+      continue;
     }
+    let j = i;
+    while (j + 1 < raw.length && raw[j + 1]!.state === "headland") j++;
+    let meters = i > 0 ? dist(samples[i - 1]!, samples[i]!) : 0;
+    for (let k = i; k < j; k++) meters += dist(samples[k]!, samples[k + 1]!);
+    if (j + 1 < samples.length) meters += dist(samples[j]!, samples[j + 1]!);
+    const end = raw[j + 1]?.t ?? raw[j]!.t;
+    const long = meters > HEADLAND_MAX_M || (!sessions && (end - raw[i]!.t > HEADLAND_MAX_MS || i === 0 || j === raw.length - 1));
+    if (long) for (let k = i; k <= j; k++) raw[k]!.state = "transport";
+    i = j + 1;
   }
   return raw.filter((c, i) => i === 0 || c.state !== raw[i - 1]!.state);
 }

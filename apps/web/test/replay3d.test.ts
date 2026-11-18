@@ -25,6 +25,15 @@ describe("état de l'outil au rejeu", () => {
     expect(stateChanges(samples, []).map((c) => c.state)).toEqual(["work", "transport", "work"]);
   });
 
+  it("un trajet entre deux parcelles pendant un parcours de travail est un transport (rampe repliée)", () => {
+    // Passe, puis 1,2 km sans travailler (route vers la parcelle suivante), puis passe.
+    const trip: Sample[] = [at(0, 0, true), at(5, 10, true), at(60, 400, false, null), at(120, 1200, false, null), at(125, 1210, true), at(130, 1220, true)];
+    const sessions = [{ kind: "work" as const, from: trip[0]![0], to: trip.at(-1)![0] }];
+    expect(stateChanges(trip, sessions).map((c) => c.state)).toEqual(["work", "transport", "work"]);
+    // Le bout de champ (25 m) reste un relevage.
+    expect(stateChanges(samples, sessions).map((c) => c.state)).toEqual(["work", "headland", "work"]);
+  });
+
   it("sans parcours : un arrêt court entre deux passes est un bout de champ", () => {
     expect(stateChanges(samples).map((c) => c.state)).toEqual(["work", "headland", "work"]);
   });
