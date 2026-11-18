@@ -1,9 +1,11 @@
-import { Alert, Badge, Button, Group, Paper, Table, Text, Title } from "@mantine/core";
+import { Alert, Button, Group, Paper, Table, Text, Title } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ComplianceResult, InterventionDetail } from "@fourmy/contracts";
 import { api, farmPath } from "../../app/api";
 import { formatDateTime, formatNumber } from "../../app/labels";
-import { ComplianceChecks, LEVELS } from "./CompliancePanel";
+import { ComplianceChecks } from "./CompliancePanel";
+import { TrafficLight } from "../../components/TrafficLight";
+import { iftLight, type Light } from "@fourmy/domain";
 import type { Names } from "./presenters";
 
 /**
@@ -24,7 +26,7 @@ export function ComplianceSection({ farmId, intervention: i }: { farmId: string;
     <Paper p="md" withBorder aria-label="Contrôle réglementaire">
       <Group justify="space-between" mb="xs">
         <Title order={4}>Contrôle réglementaire</Title>
-        {result && <Badge color={LEVELS[result.level].color}>{LEVELS[result.level].label}</Badge>}
+        {result && <TrafficLight level={result.level} variant="badge" />}
       </Group>
       {!result && <Text size="sm" c="dimmed">Contrôle en cours…</Text>}
       {result && <ComplianceChecks result={result} />}
@@ -65,15 +67,19 @@ export function IftSection({ farmId, intervention: i, names }: { farmId: string;
   const warnings = new Set((ift?.lines ?? []).map((l) => l.warning));
   const common = warnings.size === 1 ? [...warnings][0] : null;
   const articleName = (id: string) => names.article.get(id)?.name ?? "produit";
+  const level = iftLevel(ift);
   return (
     <Paper p="md" withBorder aria-label="IFT">
       <Group justify="space-between" mb="xs">
         <Title order={4}>IFT</Title>
-        {ift?.status === "ok" && ift.total !== null && (
-          <Text fw={700} className="lv-num" aria-label="IFT de l'intervention">
-            {formatNumber(ift.total, 3)}
-          </Text>
-        )}
+        <Group gap="xs">
+          {ift?.status === "ok" && ift.total !== null && (
+            <Text fw={700} className="lv-num" aria-label="IFT de l'intervention">
+              {formatNumber(ift.total, 3)}
+            </Text>
+          )}
+          <TrafficLight level={level} variant="led" label={IFT_LABELS[level]} detail="Chaque ligne face à la dose de référence : vert ≤ 1, orange jusqu'à 1,2, rouge au-delà." />
+        </Group>
       </Group>
       {!ift && <Text size="sm" c="dimmed">Pas encore calculé (calcul automatique en arrière-plan).</Text>}
       {ift?.status === "pending" && <Text size="sm" c="paille">En attente : {ift.error}</Text>}
@@ -84,9 +90,12 @@ export function IftSection({ farmId, intervention: i, names }: { farmId: string;
             {ift.lines.map((l, k) => (
               <Table.Tr key={k}>
                 <Table.Td>
-                  <Text size="sm">
-                    {articleName(l.articleId)} · {parcelName(l.parcelId)}
-                  </Text>
+                  <Group gap={6} wrap="nowrap">
+                    <TrafficLight level={iftLight(l.ift)} variant="led" compact size="xs" label={IFT_LABELS[iftLight(l.ift)]} />
+                    <Text size="sm">
+                      {articleName(l.articleId)} · {parcelName(l.parcelId)}
+                    </Text>
+                  </Group>
                   {l.warning && l.warning !== common && (
                     <Text size="xs" c="dimmed">
                       {l.warning}
@@ -121,4 +130,20 @@ export function IftSection({ farmId, intervention: i, names }: { farmId: string;
       </Group>
     </Paper>
   );
+}
+
+/** Mots des feux de l'IFT (dose face à la dose de référence). */
+const IFT_LABELS: Record<Light, string> = {
+  ok: "Dose de référence respectée",
+  info: "À noter",
+  warning: "Au-dessus de la dose de référence",
+  danger: "Bien au-dessus de la dose de référence",
+  unknown: "Non calculé",
+};
+
+/** Feu global de l'IFT : la ligne la plus défavorable ; gris si non calculé. */
+export function iftLevel(ift: { status: string; lines: { ift: number | null }[] } | null | undefined): Light {
+  if (!ift || ift.status !== "ok" || !ift.lines.length) return "unknown";
+  const order: Light[] = ["unknown", "ok", "warning", "danger"];
+  return ift.lines.map((l) => iftLight(l.ift)).reduce<Light>((w, x) => (order.indexOf(x) > order.indexOf(w) ? x : w), "ok");
 }

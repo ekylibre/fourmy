@@ -10,6 +10,7 @@ import { ErrorAlert, Loading } from "../../components/states";
 import { BrandPanel } from "../equipments/EquipmentSheetPage";
 import { TrackSettingsPanel } from "../equipments/TrackSettingsPanel";
 import { MaintenanceSettingsPanel } from "../maintenance/MaintenanceSettingsPanel";
+import { SprayingSettingsPanel } from "../interventions/SprayingSettingsPanel";
 
 /**
  * Réglages regroupés dans « Ma ferme » (E9, E21, E21 bis) : affichage,
@@ -78,7 +79,7 @@ export function DisplaySettings({ profile }: { profile: FarmProfile }) {
   );
 }
 
-export type PreferenceSection = "maintenance" | "tracks" | "brands";
+export type PreferenceSection = "maintenance" | "tracks" | "spraying" | "brands";
 
 /**
  * Onglet Préférences (besoins_navigation_compte.md §3.2) : entretien et
@@ -111,6 +112,12 @@ export function PreferencesTab({ canEdit, section }: { canEdit: boolean; section
           <TrackSettingsPanel farmId={farm.id} />
         </section>
       )}
+      <section id="preferences-spraying" aria-labelledby="preferences-spraying-title">
+        <Title order={3} id="preferences-spraying-title" mb="sm">
+          Pulvérisation
+        </Title>
+        <SprayingSettingsPanel farmId={farm.id} canEdit={canEdit} />
+      </section>
       <section id="preferences-brands" aria-labelledby="preferences-brands-title">
         <Title order={3} id="preferences-brands-title" mb="sm">
           Marques

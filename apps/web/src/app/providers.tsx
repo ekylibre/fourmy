@@ -2,6 +2,7 @@ import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
 import "@mantine/dates/styles.css";
 import "mantine-datatable/styles.css";
+import "@gfazioli/mantine-led/styles.css";
 import "@fourmy/ui-lyvre/lyvre.css";
 import type { ReactNode } from "react";
 import { MantineProvider } from "@mantine/core";

@@ -82,6 +82,8 @@ type ParamRow = {
   quantity: string | null;
   unit: string | null;
   working_zone: unknown;
+  /** Surface de la zone travaillée (m²), calculée par PostGIS. */
+  zone_area_m2: number | null;
   attrs: Record<string, unknown> | null;
 };
 
@@ -117,7 +119,12 @@ function toIntervention(r: Record<string, unknown>): Intervention {
       .map((p) => ({
         kind: p.ref_type as TargetKind,
         id: p.ref_id!,
-        ...(typeof a(p).workedAreaM2 === "number" ? { workedAreaM2: a(p).workedAreaM2 as number } : {}),
+        // Surface saisie, sinon celle de la zone travaillée (une modification sans la surface ne la perd pas).
+        ...(typeof a(p).workedAreaM2 === "number"
+          ? { workedAreaM2: a(p).workedAreaM2 as number }
+          : p.zone_area_m2
+            ? { workedAreaM2: Number(p.zone_area_m2) }
+            : {}),
         ...(p.working_zone ? { workingZone: p.working_zone as never } : {}),
         ...(p.ref_type === "equipment" && meters.has(p.ref_id!) ? { meter: meters.get(p.ref_id!)! } : {}),
       })),
@@ -217,7 +224,8 @@ async function readInterventions(tx: Tx, where: SQL, limit = 1000): Promise<Inte
              (SELECT coalesce(json_agg(json_build_object(
                  'role', p.role, 'ref_type', p.ref_type, 'ref_id', p.ref_id, 'quantity', p.quantity, 'unit', p.unit,
                  'attrs', p.attrs,
-                 'working_zone', CASE WHEN p.working_zone IS NULL THEN NULL ELSE ST_AsGeoJSON(p.working_zone)::json END
+                 'working_zone', CASE WHEN p.working_zone IS NULL THEN NULL ELSE ST_AsGeoJSON(p.working_zone)::json END,
+                 'zone_area_m2', CASE WHEN p.working_zone IS NULL THEN NULL ELSE round(ST_Area(p.working_zone::geography)) END
                ) ORDER BY p.role, p.id), '[]') FROM intervention_parameters p WHERE p.intervention_id = i.id) AS parameters,
              (SELECT coalesce(json_agg(json_build_object(
                  'id', c.id, 'rank', c.rank, 'label', c.label, 'template_id', c.template_id,
@@ -363,6 +371,12 @@ async function crewNames(tx: Tx, body: Body) {
 // ---------------------------------------------------------------------------
 
 async function writeBody(tx: Tx, interventionId: string, body: Body, articles: Map<string, Article>) {
+  // Zone travaillée sans surface (modification qui ne renvoie pas la surface) : surface de la zone.
+  for (const t of body.targets) {
+    if (t.workedAreaM2 || !t.workingZone) continue;
+    const [r] = await rows<{ m2: number | null }>(tx, sql`SELECT round(ST_Area(ST_SetSRID(ST_GeomFromGeoJSON(${JSON.stringify(t.workingZone)}), 4326)::geography))::float8 AS m2`);
+    if (r?.m2) t.workedAreaM2 = r.m2;
+  }
   // Parcours GPS rattachés à un attelage : `crew_id` est remis à NULL par la
   // suppression des attelages ; on le repose après réécriture (même id
   // d'attelage, sinon l'attelage qui contient le matériel suivi).

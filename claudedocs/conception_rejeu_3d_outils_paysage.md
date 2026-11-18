@@ -412,3 +412,13 @@ Tout est livré sur la branche `feat/rejeu-3d`, vérifié sur la séquence de te
   la zone du rejeu), et le résultat est gardé en mémoire selon les parcelles
   en place, pas selon la date. Charger un rejeu recalculait tout, ce qui
   figeait l'API et la vue plusieurs secondes.
+
+### Retour du 2026-11-18 : rampe dépliée sur la route entre deux parcelles
+
+- **Constat** : le parcours de travail de 16:24 à 17:46 enchaîne plusieurs
+  parcelles. Les trajets sur route entre elles (1,8 km à 16:38, 2 km à
+  16:50, 1 km à 17:22) étaient pris pour des bouts de champ : rampe relevée,
+  mais dépliée.
+- **Règle** (`stateChanges`, `replay.ts`) : un arrêt du travail qui parcourt
+  plus de 300 m est un transport (rampe repliée), même dans un parcours de
+  travail. Sur la séquence, les demi-tours font de 13 à 181 m.

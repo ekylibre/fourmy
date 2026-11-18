@@ -1,7 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
-import { geocodeQuality, type DomainCtx } from "@fourmy/domain";
-import { DEFAULT_FARM_DISPLAY, type FarmCertification, type FarmCertificationWrite, type FarmDisplay, type FarmProfile, type FarmProfileIdentity, type FarmSite, type FarmSiteWrite } from "@fourmy/contracts";
+import { DEFAULT_SPRAYING_THRESHOLDS, geocodeQuality, type DomainCtx } from "@fourmy/domain";
+import { DEFAULT_FARM_DISPLAY, type FarmSpraying, type FarmSprayingSettings, type FarmCertification, type FarmCertificationWrite, type FarmDisplay, type FarmProfile, type FarmProfileIdentity, type FarmSite, type FarmSiteWrite } from "@fourmy/contracts";
 import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
 import { geocodeSearch } from "../geocode.js";
 
@@ -214,6 +214,28 @@ export async function putDisplay(db: Database, farmId: string, ctx: DomainCtx, b
       ON CONFLICT (farm_id) DO UPDATE SET display = excluded.display, updated_at = now()`);
     await audit(tx, farmId, ctx, "farm_settings", farmId, "update_display", { before, after: body });
     return displayTx(tx);
+  });
+}
+
+/** Seuils des conditions de pulvérisation : ceux de la ferme, sinon les valeurs par défaut. */
+async function sprayingTx(tx: Tx): Promise<FarmSprayingSettings> {
+  const [s] = await rows<{ spraying: FarmSpraying | null }>(tx, sql`SELECT spraying FROM farm_settings`);
+  return s?.spraying ? { thresholds: s.spraying, isDefault: false } : { thresholds: DEFAULT_SPRAYING_THRESHOLDS, isDefault: true };
+}
+
+export async function getSpraying(db: Database, farmId: string): Promise<FarmSprayingSettings> {
+  return withFarm(db, farmId, sprayingTx);
+}
+
+/** Seuils de la ferme ; null : retour aux valeurs par défaut. */
+export async function putSpraying(db: Database, farmId: string, ctx: DomainCtx, body: FarmSpraying | null): Promise<FarmSprayingSettings> {
+  return withFarm(db, farmId, async (tx) => {
+    const before = await sprayingTx(tx);
+    await tx.execute(sql`
+      INSERT INTO farm_settings (farm_id, spraying) VALUES (${farmId}, ${body ? JSON.stringify(body) : null}::jsonb)
+      ON CONFLICT (farm_id) DO UPDATE SET spraying = excluded.spraying, updated_at = now()`);
+    await audit(tx, farmId, ctx, "farm_settings", farmId, "update_spraying", { before: before.isDefault ? null : before.thresholds, after: body });
+    return sprayingTx(tx);
   });
 }
 

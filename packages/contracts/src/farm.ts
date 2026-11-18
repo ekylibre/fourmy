@@ -120,6 +120,32 @@ export const farmDisplay = z.object({ basemap: z.enum(["plan", "ortho"]), areaUn
 export type FarmDisplay = z.infer<typeof farmDisplay>;
 export const DEFAULT_FARM_DISPLAY: FarmDisplay = { basemap: "ortho", areaUnit: "ha" };
 
+/**
+ * Seuils des conditions de pulvérisation (conception_vue_intervention.md §4.2),
+ * même forme que SprayingThresholds (domain). Le vent rouge ne dépasse pas
+ * le seuil réglementaire de 19 km/h (3 Beaufort).
+ */
+const range = (min: number, max: number) => z.number().min(min).max(max);
+const band = (min: number, max: number) =>
+  z
+    .object({ greenMin: range(min, max), greenMax: range(min, max), redMin: range(min, max), redMax: range(min, max) })
+    .refine((b) => b.redMin < b.greenMin && b.greenMin < b.greenMax && b.greenMax < b.redMax, { message: "Il faut défavorable bas < favorable bas < favorable haut < défavorable haut." });
+export const farmSpraying = z
+  .object({
+    windKmh: z.object({ green: range(0, 19), red: range(1, 19) }),
+    temperatureC: band(-20, 50),
+    humidityPct: band(0, 100),
+    rainMmPerHour: z.object({ green: range(0, 10), red: range(0, 20) }),
+  })
+  .refine((t) => t.windKmh.green < t.windKmh.red, { message: "Vent : le seuil favorable doit être sous le seuil défavorable." })
+  .refine((t) => t.rainMmPerHour.green <= t.rainMmPerHour.red, { message: "Pluie : le seuil favorable doit être au plus égal au seuil défavorable." });
+export type FarmSpraying = z.infer<typeof farmSpraying>;
+/** Seuils de la ferme et s'il s'agit des valeurs par défaut (GET /settings/spraying). */
+export interface FarmSprayingSettings {
+  thresholds: FarmSpraying;
+  isDefault: boolean;
+}
+
 /** Surface lisible dans l'unité choisie : hectares à 2 décimales, ares sans décimale. */
 export function formatArea(m2: number, unit: FarmDisplay["areaUnit"] = "ha"): string {
   return unit === "a"

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { ZodType } from "zod";
-import { farmCertificationWrite, farmDisplay, farmProfileIdentity, farmSiteWrite } from "@fourmy/contracts";
+import { farmCertificationWrite, farmDisplay, farmProfileIdentity, farmSiteWrite, farmSpraying } from "@fourmy/contracts";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import { GeocodeRateLimited, GeocodeUnavailable, geocodeReverse, geocodeSearch } from "../geocode.js";
@@ -10,7 +10,9 @@ import {
   deleteFarmCertification,
   deleteSite,
   getProfile,
+  getSpraying,
   putDisplay,
+  putSpraying,
   putIdentity,
   updateFarmCertification,
   updateSite,
@@ -80,6 +82,10 @@ export const farmProfileRoutes = new Hono<Env>()
   .put("/farm/logo", requireOwner, async (c) => c.json(await setLogo(db(), c.get("farmId"), domainCtx(c), { farm: true }, await logoUpload(c))))
   .delete("/farm/logo", requireOwner, async (c) => c.json(await setLogo(db(), c.get("farmId"), domainCtx(c), { farm: true }, null)))
   .put("/settings/display", requireOwner, async (c) => c.json(await putDisplay(db(), c.get("farmId"), domainCtx(c), await body(c, farmDisplay))))
+  // Seuils des conditions de pulvérisation (fiche d'une intervention) : lecture par tout membre.
+  .get("/settings/spraying", async (c) => c.json(await getSpraying(db(), c.get("farmId"))))
+  .put("/settings/spraying", requireOwner, async (c) => c.json(await putSpraying(db(), c.get("farmId"), domainCtx(c), await body(c, farmSpraying))))
+  .delete("/settings/spraying", requireOwner, async (c) => c.json(await putSpraying(db(), c.get("farmId"), domainCtx(c), null)))
   .get("/geocode", requireOwner, async (c) =>
     geocoding(c, async () => c.json(await geocodeSearch(c.req.query("q") ?? "", Number(c.req.query("limit") ?? 5) || 5, c.get("userId")))),
   )

@@ -27,6 +27,11 @@ describe("fiche d'une intervention", () => {
     expect(await within(quantities).findByText("Fongicide X")).toBeInTheDocument();
     expect(within(quantities).getByText(/2 L\/ha/)).toBeInTheDocument();
     expect(screen.getByText("Intervenants :").parentElement).toHaveTextContent("Intervenants : Camille");
+    // Historique replié par défaut : il s'ouvre au clic.
+    const history = screen.getByRole("button", { name: /Historique/ });
+    expect(history).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Réalisée", { selector: ".mantine-Timeline-itemTitle" })).toBeNull();
+    await user.click(history);
     expect(screen.getByText("Réalisée", { selector: ".mantine-Timeline-itemTitle" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Modifier" })).toHaveAttribute("href", expect.stringContaining(`/interventions/${DEMO.id}/edit`));
     // Sans WebGL (jsdom), la mini-carte est remplacée par un message ; la fiche reste lisible.
@@ -37,7 +42,9 @@ describe("fiche d'une intervention", () => {
     renderApp(`/f/${FARM}/interventions/${DEMO.id}?at=2026-06-30`);
     const period = (await screen.findAllByLabelText("Période de travail"))[0]!;
     expect(within(period).getByText(/\d+ h|\d+ min/)).toBeInTheDocument();
-    expect(await within(period).findByText("Camille")).toBeInTheDocument();
+    // Intervenants : dans le pavé Moyens, avec les matériels.
+    const means = screen.getAllByLabelText("Moyens")[0]!;
+    expect(await within(means).findByText(/Camille/)).toBeInTheDocument();
     const quantities = await screen.findByRole("table", { name: "Intrants et sorties" });
     const pictos = await within(quantities).findByLabelText("Pictogrammes réglementaires");
     expect(within(pictos).getByRole("img", { name: /SGH09 : Dangereux pour l'environnement aquatique/ })).toBeInTheDocument();
@@ -62,6 +69,7 @@ describe("fiche d'une intervention", () => {
       ]),
     );
     renderApp(`/f/${FARM}/interventions/${DEMO.id}?at=2026-06-30`);
+    await userEvent.setup().click(await screen.findByRole("button", { name: /Historique/ }));
     expect(await screen.findByText("Corrigée")).toBeInTheDocument();
     expect(screen.getByText("« dose mal recopiée »")).toBeInTheDocument();
     expect(await screen.findByText(/Fongicide X 2 L\/ha → Fongicide X 1,5 L\/ha/)).toBeInTheDocument();
@@ -70,8 +78,75 @@ describe("fiche d'une intervention", () => {
   it("une intervention reprise d'Ekylibre sans modification le dit", async () => {
     server.use(detail({ origin: "migration" }, []));
     renderApp(`/f/${FARM}/interventions/${DEMO.id}?at=2026-06-30`);
+    await userEvent.setup().click(await screen.findByRole("button", { name: /Historique/ }));
     expect(await screen.findByText(/Importée d'Ekylibre/)).toBeInTheDocument();
     expect(screen.getByText("Reprise d'Ekylibre")).toBeInTheDocument();
+  });
+
+  it("pulvérisation : conditions en tête, parcelles en %, feu de dose, IFT, rejeu 3D", async () => {
+    const EQUIPMENT = "00000000-0000-7000-8000-0000000000e1";
+    server.use(
+      detail({
+        weather: { kind: "observed", source: "open_meteo", icon: "03d", temperatureC: 24.9, humidityPct: 56.5, windKmh: 11.2, windMaxKmh: 11.4, precipitationMm: 0, fetchedAt: "2026-06-10T09:00:00.000Z", hours: [] },
+        targets: [{ kind: "land_parcel", id: PARCEL, workedAreaM2: 5000 }],
+        compliance: {
+          level: "info",
+          checkedAt: "2026-06-10T09:00:00.000Z",
+          referential: "2026.11.07.1",
+          reason: null,
+          checks: [
+            {
+              articleId: FONGICIDE,
+              articleName: "Fongicide X",
+              level: "ok",
+              usageId: null,
+              usages: [
+                { id: "u1", label: "Céréales*Oïdium", doseLabel: "2 L/ha" },
+                { id: "u2", label: "Céréales*Rouille", doseLabel: "3 L/ha" },
+              ],
+              indicators: [{ code: "dose", level: "ok", message: "Dose 2 L/ha, maximum 3 L/ha (cible non précisée)." }],
+              harvestAllowedFrom: null,
+              reentryAllowedFrom: null,
+            },
+          ],
+        },
+        ift: { status: "ok", total: 1.1, computedAt: "2026-06-10T10:00:00.000Z", error: null, lines: [{ articleId: FONGICIDE, parcelId: PARCEL, ift: 1.1, segment: null, warning: null }] },
+      }),
+      http.get("*/interventions/:id/track-sessions", () =>
+        HttpResponse.json({
+          items: [
+            { id: "00000000-0000-7000-8000-0000000000f1", equipmentId: EQUIPMENT, kind: "work", startedAt: "2026-06-10T08:00:00.000Z", stoppedAt: "2026-06-10T09:00:00.000Z", durationS: 3600, distanceM: 5000, coveredAreaM2: 5000, parcels: [], toolHint: null, widthM: 18, tool: null, tracker: null, intervention: null, drift: null },
+          ],
+        }),
+      ),
+    );
+    renderApp(`/f/${FARM}/interventions/${DEMO.id}?at=2026-06-30`);
+    // Météo en une ligne, sans doublon ; frise horaire du jour, heures de l'intervention soulignées.
+    const weather = await screen.findByLabelText("Météo de l'intervention");
+    expect(within(weather).getByLabelText("Hygrométrie : 57 %")).toBeInTheDocument();
+    expect(within(weather).getByLabelText("Vent : 11 km/h")).toBeInTheDocument(); // rafales égales : pas répétées
+    const strip = await within(weather).findByRole("group", { name: "Conditions de pulvérisation" });
+    // Créneaux du jour (démo) : 08:00 UTC vent 22 km/h, 09:00 favorable ; l'intervention couvre 08:00–09:00.
+    expect(within(strip).getByRole("img", { name: "défavorable" })).toBeInTheDocument();
+    expect(within(strip).getByText(/Pendant l'intervention \(.+\) : défavorable — vent 22 km\/h\./)).toBeInTheDocument();
+    expect(strip.querySelectorAll("[data-period]")).toHaveLength(1);
+    // Météo avant les parcelles, parcelles avant les moyens et les intrants.
+    const order = ["Météo de l'intervention", "Parcelles", "Moyens", "Intrants et sorties"].map((n) => screen.getAllByLabelText(n)[0]!);
+    for (let k = 1; k < order.length; k++) expect(order[k - 1]!.compareDocumentPosition(order[k]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Parcelle : 0,50 ha travaillés sur 1,25 ha, soit 40 %.
+    expect(await screen.findByLabelText("Part travaillée : 40 %")).toBeInTheDocument();
+    // Dose : cible non choisie, feu orange et lien pour la préciser.
+    const quantities = screen.getByRole("table", { name: "Intrants et sorties" });
+    expect(within(quantities).getByRole("img", { name: /Cible à préciser/ })).toBeInTheDocument();
+    expect(within(quantities).getByRole("link", { name: "Préciser la cible" })).toBeInTheDocument();
+    // IFT 1,1 : au-dessus de la dose de référence, orange.
+    // Feu global (en tête) et feu de la ligne.
+    expect(within(screen.getByLabelText("IFT")).getAllByRole("img", { name: /Au-dessus de la dose de référence/ })).toHaveLength(2);
+    // Rejeu 3D : premier matériel suivi, au début de l'intervention.
+    const replay = await screen.findByRole("link", { name: "Revoir l'intervention en 3D" });
+    const url = new URL(replay.getAttribute("href")!, "http://x");
+    expect(url.pathname).toBe(`/f/${FARM}/3d-plan`);
+    expect(Object.fromEntries(url.searchParams)).toEqual({ at: "2026-06-10", equipment: EQUIPMENT, t: "2026-06-10T08:00:00.000Z", replay: "1" });
   });
 
   it("une intervention annulée ne propose ni modification ni annulation", async () => {

@@ -109,12 +109,10 @@ describe("fiche et tableau de bord", () => {
     renderApp(`/f/${FARM}/interventions/${DEMO.id}?at=2026-06-10`);
     const meteo = await screen.findByLabelText("Météo de l'intervention");
     expect(within(meteo).getByText("18 °C")).toBeInTheDocument();
-    // Temps dominant (icône au format OpenWeather) et frise horaire.
+    // Une ligne : temps dominant (icône au format OpenWeather), puis les valeurs, rafales comprises.
     expect(within(meteo).getAllByRole("img", { name: "Pluie" }).length).toBeGreaterThan(0);
-    const hourly = within(meteo).getByLabelText("Météo heure par heure");
-    expect(within(hourly).getByRole("img", { name: "Peu nuageux" })).toBeInTheDocument();
-    expect(within(hourly).getByText("0,6 mm")).toBeInTheDocument();
-    expect(within(meteo).getByText("9 km/h (max 14)")).toBeInTheDocument();
+    expect(within(meteo).getByLabelText("Vent : 9 km/h, rafales 14")).toBeInTheDocument();
+    expect(within(meteo).getByLabelText("Pluie : 0,6 mm")).toBeInTheDocument();
     expect(within(meteo).getByText("OpenWeather, prévision")).toBeInTheDocument();
   });
 

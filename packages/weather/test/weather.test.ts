@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { dominantIcon, iconFromWmo, meteoblueForecast, openMeteoDays, openMeteoHours, openWeatherForecast, sprayCondition, summarize, type WeatherHour } from "../src/index.js";
+import { dominantIcon, iconFromWmo, meteoblueForecast, openMeteoDays, openMeteoHours, openWeatherForecast, summarize, type WeatherHour } from "../src/index.js";
 
 const hour = (at: string, patch: Partial<WeatherHour> = {}): WeatherHour => ({
   at,
@@ -85,22 +85,6 @@ describe("météo d'une intervention", () => {
   it("un pas de 3 h qui chevauche la période compte", () => {
     const three = [hour("2025-09-23T06:00:00Z", { stepHours: 3, temperatureC: 18 })];
     expect(summarize(three, [{ startedAt: "2025-09-23T07:00:00Z", stoppedAt: "2025-09-23T08:00:00Z" }], "openweather")!.temperatureC).toBe(18);
-  });
-});
-
-describe("conditions de pulvérisation (seuils d'Ekylibre)", () => {
-  it("favorable : vent faible, air humide, doux, sec", () => {
-    expect(sprayCondition(hour("t", { windKmh: 6, humidityPct: 85, temperatureC: 15, precipitationMm: 0 }))).toMatchObject({ level: "go", reasons: [] });
-  });
-  it("à surveiller : vent entre 2 et 5 m/s, hygrométrie 60 %", () => {
-    const c = sprayCondition(hour("t", { windKmh: 12, humidityPct: 60 }));
-    expect(c.level).toBe("caution");
-    expect(c.reasons).toEqual(["vent 12 km/h", "hygrométrie 60 %"]);
-  });
-  it("défavorable : vent ≥ 5 m/s (18 km/h), pluie, chaleur", () => {
-    expect(sprayCondition(hour("t", { windKmh: 19 })).level).toBe("stop");
-    expect(sprayCondition(hour("t", { precipitationMm: 1.2 })).reasons).toEqual(["pluie 1,2 mm"]);
-    expect(sprayCondition(hour("t", { temperatureC: 31 })).level).toBe("stop");
   });
 });
 
