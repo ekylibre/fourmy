@@ -40,6 +40,26 @@ const legend: Cell["s"][] = ["oui", "partiel", "non", "nt"];
       </section>
     </div>
 
+    <h2>Les prix publics</h2>
+    <p class="muted">Ce que chaque éditeur affiche, relevé le {comparison.date} : seule la page de l'éditeur fait foi, les prix changent.</p>
+    <div class="table-scroll" role="region" aria-label="Prix publics, défilable" tabindex="0">
+      <table class="compare-table price-table">
+        <caption class="sr-only">Prix publics de Fourmy, {products.map((p) => p.nom).join(", ")}</caption>
+        <thead>
+          <tr><th scope="col">Logiciel</th><th scope="col">Prix affiché</th><th scope="col">Ce que comprend le prix</th></tr>
+        </thead>
+        <tbody>
+          {comparison.tarifs.map((t) => (
+            <tr class={t.id === "fourmy" ? "row-fourmy" : undefined}>
+              <th scope="row">{t.id === "fourmy" ? "Fourmy" : products.find((p) => p.id === t.id)?.nom}</th>
+              <td class="price">{t.prix}</td>
+              <td>{t.u ? <a href={t.u}>{t.detail}</a> : t.detail}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
     <h2>Les logiciels de gestion parcellaire</h2>
     <p class="muted">Fonctionnalités vérifiées sur les pages de présentation des éditeurs le {comparison.date}.</p>
     <p class="legend" aria-label="Légende">
@@ -88,7 +108,14 @@ const legend: Cell["s"][] = ["oui", "partiel", "non", "nt"];
     <p class="muted compare-note">
       Pages lues : <a href="https://mesparcelles.fr/">MesParcelles</a> (accueil, formules d'abonnement, gestion parcellaire, échanges de
       données), <a href="https://smag.tech/nos-logiciels/logiciel-de-gestion-de-parcelles/">Smag Farmer</a> (logiciel de gestion de
-      parcelles), <a href="https://www.isagri.fr/geofolia/logiciel-de-gestion-parcellaire">Geofolia</a> (logiciel de gestion parcellaire).
+      parcelles), <a href="https://www.isagri.fr/geofolia/logiciel-de-gestion-parcellaire">Geofolia</a> (logiciel de gestion parcellaire),
+      et les <a href="https://cmds.chambres-agriculture.fr/sinformer/mon-exploitation/mesparcelles/mesparcelles-tarifs-et-formules">tarifs de
+      MesParcelles</a> de la Chambre d'agriculture de Charente-Maritime Deux-Sèvres.
+    </p>
+    <p class="muted compare-note">
+      Aussi à lire : le <a href="https://agriia.app/comparatif">comparatif d'Agriia</a> (OSKALE, logiciel pour les grandes cultures
+      en liste d'attente), qui relève les prix d'une dizaine d'outils, chacun avec sa source, dont les tarifs de MesParcelles d'autres
+      Chambres.
       Une erreur ou un oubli ? <a href="/contact/">Écrivez-nous</a>, nous corrigeons.
     </p>
   </div>

@@ -25,6 +25,25 @@ sources:
   mpD: &mpD https://mesparcelles.fr/nos-solutions-metiers/echanges-de-donnees
   smag: &smag https://smag.tech/nos-logiciels/logiciel-de-gestion-de-parcelles/
   geo: &geo https://www.isagri.fr/geofolia/logiciel-de-gestion-parcellaire
+  mpTarifs: &mpTarifs https://cmds.chambres-agriculture.fr/sinformer/mon-exploitation/mesparcelles/mesparcelles-tarifs-et-formules
+
+# Prix publics : ce que chaque éditeur affiche, et ce que le prix comprend.
+tarifs:
+  - id: fourmy
+    prix: Gratuit
+    detail: Logiciel libre ; hébergement par vos soins, ou accompagnement sur demande
+  - id: mp
+    prix: 400 € HT
+    detail: "Formule MesParcelles de la Chambre de Charente-Maritime Deux-Sèvres : parcellaire, interventions, plan de fumure, stocks et marges, application mobile ; 200 € HT par exploitation supplémentaire ; période non précisée. Chaque Chambre fixe son tarif."
+    u: *mpTarifs
+  - id: smag
+    prix: Non publié
+    detail: Tarif fixé par le distributeur (coopérative, négoce) ; essai gratuit
+    u: *smag
+  - id: geo
+    prix: À partir de 42,90 € par mois
+    detail: Environnement + ; 53,40 € par mois en Performance ; montant exact sur devis, selon les options
+    u: *geo
 
 groupes:
   - titre: Accès et prix
@@ -36,7 +55,7 @@ groupes:
         geo: { s: partiel, t: "accessible sur PC et smartphone, mode d'accès non précisé", u: *geo }
       - nom: Application mobile sur les stores
         fourmy: { s: partiel, t: "en test, pas encore publiée", f: mobile }
-        mp: { s: oui, t: "App Store et Google Play", u: *mpA }
+        mp: { s: oui, t: "App Store et Google Play, comprise dans la formule", u: *mpTarifs }
         smag: { s: oui, t: "application mobile synchronisée avec le web", u: *smag }
         geo: { s: oui, t: "application smartphone", u: *geo }
       - nom: Saisie au champ sans réseau
@@ -46,9 +65,9 @@ groupes:
         geo: { s: nt }
       - nom: Prix publié
         fourmy: { s: oui, t: "gratuit" }
-        mp: { s: non, t: "abonnement annuel, montant non affiché", u: *mpB }
+        mp: { s: oui, t: "400 € HT en Charente-Maritime Deux-Sèvres, fixé par chaque Chambre", u: *mpTarifs }
         smag: { s: non, t: "tarif fixé par le distributeur", u: *smag }
-        geo: { s: oui, t: "à partir de 42,9 € par mois (environnement +)", u: *geo }
+        geo: { s: oui, t: "à partir de 42,90 € par mois (environnement +)", u: *geo }
       - nom: Gratuit
         fourmy: { s: oui }
         mp: { s: partiel, t: "fonctions cartographiques gratuites avec un outil d'aide à la décision", u: *mpB }
@@ -117,7 +136,7 @@ groupes:
         geo: { s: oui, t: "stations météo connectées", u: *geo }
       - nom: Plan prévisionnel de fumure
         fourmy: { s: partiel, t: "en test, Nouvelle-Aquitaine", f: plan-fumure }
-        mp: { s: oui, t: "prévisionnel de fumure", u: *mpC }
+        mp: { s: oui, t: "plan de fumure compris dans la formule", u: *mpTarifs }
         smag: { s: oui, t: "plan prévisionnel de fumure", u: *smag }
         geo: { s: oui, t: "plan de fumure, option certifiée COMIFER", u: *geo }
       - nom: Cahier d'épandage, directive nitrates
@@ -135,7 +154,7 @@ groupes:
     criteres:
       - nom: Stocks d'intrants
         fourmy: { s: oui, t: "tenus par les interventions", f: stocks }
-        mp: { s: nt }
+        mp: { s: oui, t: "suivi économique : stocks, achats, marge", u: *mpTarifs }
         smag: { s: oui, t: "gestion des stocks", u: *smag }
         geo: { s: partiel, t: "en option (environnement +)", u: *geo }
       - nom: Matériels et entretien
@@ -160,9 +179,14 @@ groupes:
         geo: { s: partiel, t: "échange de données avec les partenaires", u: *geo }
       - nom: Équipe, conseiller
         fourmy: { s: oui, t: "rôles, lecture seule pour le conseiller, invitations", f: equipe }
-        mp: { s: oui, t: "conseillers des Chambres", u: *mpC }
+        mp: { s: oui, t: "conseillers des Chambres ; accompagnement et formations payants", u: *mpTarifs }
         smag: { s: oui, t: "données partagées avec le technicien", u: *smag }
         geo: { s: partiel, t: "logiciel collaboratif", u: *geo }
+      - nom: Plusieurs exploitations
+        fourmy: { s: oui, t: "une installation pour plusieurs fermes cloisonnées, sans surcoût" }
+        mp: { s: oui, t: "200 € HT par exploitation supplémentaire ; formule ETA", u: *mpTarifs }
+        smag: { s: nt }
+        geo: { s: nt }
       - nom: Cuverie
         fourmy: { s: oui, t: "contenu de chaque cuve à n'importe quelle date", f: cuverie }
         mp: { s: nt }
