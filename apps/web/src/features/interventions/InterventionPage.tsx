@@ -675,9 +675,9 @@ function LinkedTrackSessions({ farmId, items, names }: { farmId: string; items: 
   const hm = (iso: string) => new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   return (
     <Box aria-label="Parcours GPS rattachés" role="group">
-      <Text size="sm" fw={700} mb={4}>
+      <Title order={5} fz="sm" mb={4}>
         Parcours GPS rattachés ({items.length})
-      </Text>
+      </Title>
       <Stack gap={6} role="list">
         {items.map((s) => (
           <Box key={s.id} role="listitem">

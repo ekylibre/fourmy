@@ -68,8 +68,8 @@ test("choisir les parcelles sur la carte et dessiner une zone partielle", async 
   await form.getByRole("button", { name: "Enregistrer" }).click();
   await expect(page.getByText("Intervention enregistrée.")).toBeVisible();
 
-  // Après l'enregistrement, la fiche : surface travaillée de la parcelle 008.
+  // Après l'enregistrement, la fiche : surface travaillée, surface et part de la parcelle 008.
   await expect(page.getByRole("heading", { name: "Historique" })).toBeVisible();
-  await expect(page.getByRole("table", { name: "Cibles" }).getByRole("row").filter({ hasText: "Parcelle 008" })).toContainText("surface travaillée");
+  await expect(page.getByRole("table", { name: "Cibles" }).getByRole("row").filter({ hasText: "Parcelle 008" })).toContainText(/\d+,\d+ ha2,06 ha\d+ %/);
   expect(crashes).toEqual([]);
 });

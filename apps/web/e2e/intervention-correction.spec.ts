@@ -54,6 +54,8 @@ test("corriger la dose d'un traitement réalisé : fiche, historique, stock", as
 
   // Retour à la fiche : la correction est dans l'historique, avec le motif et l'avant → après.
   await expect(page.getByText("Intervention corrigée.")).toBeVisible();
+  // L'historique est replié par défaut : on l'ouvre.
+  await page.getByRole("button", { name: /Historique/ }).click();
   await expect(page.getByText("Corrigée", { exact: true })).toBeVisible();
   await expect(page.getByText("« dose mal recopiée »")).toBeVisible();
   await expect(page.getByText(new RegExp(`${phyto.name} 1 .*/ha → ${phyto.name} 1,5 .*/ha`))).toBeVisible();
