@@ -16,6 +16,8 @@ export function usePrescription(farmId: string, id: string) {
   return useQuery({
     queryKey: ["prescriptions", farmId, "one", id],
     queryFn: () => api.get<Prescription>(farmPath(farmId, `/prescriptions/${id}`)),
+    // Envoi en attente (agrirouter injoignable) : l'historique se met à jour quand il part.
+    refetchInterval: (q) => (q.state.data?.sends.some((s) => s.status === "queued") ? 30_000 : false),
   });
 }
 

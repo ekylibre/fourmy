@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AgrirouterClient, AgrirouterError, MESSAGE_TYPES } from "../src/index.js";
+import { AgrirouterClient, AgrirouterError, MESSAGE_TYPES, sendFailure } from "../src/index.js";
 
 /** Réponses synthétiques de l'API G4 (aucune donnée réelle). */
 type Call = { method: string; url: string; headers: Headers; body: unknown };
@@ -118,5 +118,17 @@ describe("AgrirouterClient", () => {
     expect((calls.at(-1)!.body as Record<string, unknown>).allow_delete_by_user).toBe(true);
     await c.putEndpoint(TENANT, "x", { name: "Fourmy", endpointType: "cloud_software", capabilities: [], subscriptions: [] });
     expect(calls.at(-1)!.body).not.toHaveProperty("allow_delete_by_user");
+  });
+  it("classe un envoi raté : reprise, livraison partielle ou refus définitif", async () => {
+    expect(sendFailure(new TypeError("fetch failed"), 1)).toBe("retry");
+    const refusedToken = fake(() => new Response("{}", { status: 401 }));
+    const tokenError = await new AgrirouterClient(app, { fetch: refusedToken.f }).tenants().catch((e: unknown) => e);
+    expect(tokenError).toMatchObject({ phase: "token" });
+    expect(sendFailure(tokenError, 1)).toBe("retry");
+    for (const status of [401, 408, 429, 500, 503]) expect(sendFailure(new AgrirouterError(status, "x"), 1)).toBe("retry");
+    expect(sendFailure(new AgrirouterError(400, "x"), 2)).toBe("partial");
+    expect(sendFailure(new AgrirouterError(400, "x"), 1)).toBe("failed");
+    expect(sendFailure(new AgrirouterError(403, "x"), 1)).toBe("failed");
+    expect(sendFailure(new AgrirouterError(413, "x"), 1)).toBe("failed");
   });
 });

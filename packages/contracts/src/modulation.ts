@@ -122,8 +122,14 @@ export interface PrescriptionSend {
   recipients: { id: string; name: string }[];
   sentAt: string;
   sentBy: string | null;
-  status: "sent" | "error";
+  /**
+   * `queued` : en attente (agrirouter injoignable), reprise automatique ;
+   * `partial` : livraison peut-être partielle (non renvoyée) ; `error` : refusé.
+   */
+  status: "queued" | "sent" | "partial" | "error";
   error: string | null;
+  /** Prochaine tentative d'un envoi en attente. */
+  nextAttemptAt: string | null;
 }
 
 export interface Prescription {

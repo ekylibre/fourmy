@@ -186,6 +186,34 @@ describe("cartes de modulation", () => {
     await waitFor(() => expect(sent).toEqual({ format: "isoxml", recipients: [TRACTOR] }));
   });
 
+  it("historique des envois : en attente (prochain essai), partiel, envoyé, refusé (AR3)", async () => {
+    const send = (id: string, status: string, extra: Record<string, unknown> = {}) => ({
+      id, format: "isoxml", channel: "agrirouter", recipients: [{ id: TRACTOR, name: "Fendt 724 terminal" }], sentAt: "2026-06-11T09:00:00Z", sentBy: "Camille",
+      status, error: null, nextAttemptAt: null, ...extra,
+    });
+    server.use(
+      http.get("*/prescriptions/recipients", () => HttpResponse.json(recipients)),
+      http.get("*/prescriptions/:id", () =>
+        HttpResponse.json({
+          ...prescription,
+          sends: [
+            send("s4", "queued", { error: "En attente : fetch failed", nextAttemptAt: "2026-06-11T09:16:00Z" }),
+            send("s3", "partial", { error: "Livraison peut-être partielle, non renvoyée : 400" }),
+            send("s2", "sent"),
+            send("s1", "error", { error: "403 refusé" }),
+          ],
+        }),
+      ),
+    );
+    renderApp(`/f/${FARM}/prescriptions/${prescription.id}`);
+    const table = await screen.findByRole("table", { name: "Envois" });
+    const expected = new Date("2026-06-11T09:16:00Z").toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    expect(within(table).getByText(`En attente, nouvel essai à ${expected}`).closest("[title]")).toHaveAttribute("title", "En attente : fetch failed");
+    expect(within(table).getByText("Partiel")).toBeInTheDocument();
+    expect(within(table).getByText("Envoyé")).toBeInTheDocument();
+    expect(within(table).getByText("Refusé").closest("[title]")).toHaveAttribute("title", "403 refusé");
+  });
+
   it("fiche d'une ferme non connectée à agrirouter : renvoi vers les intégrations", async () => {
     server.use(
       http.get("*/prescriptions/recipients", () => HttpResponse.json({ title: "Requête invalide", status: 400, detail: "Ferme non connectée à agrirouter (Intégrations)." }, { status: 400 })),
