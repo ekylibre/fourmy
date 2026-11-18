@@ -130,6 +130,25 @@ describe.skipIf(!url)("parcours → intervention (intégration)", () => {
     expect((await state([s1]))[0]!.intervention_id).toBe(iid); // transaction annulée
   });
 
+  it("modifier sans renvoyer la surface travaillée ne la perd pas : elle vient de la zone", async () => {
+    const before = await (await send("GET", `/interventions/${iid}`)).json();
+    const worked = before.targets[0].workedAreaM2 as number;
+    const res = await send("PUT", `/interventions/${iid}`, {
+      procedure: "plowing",
+      staffing: "crews",
+      crews: before.crews.map((c: Record<string, unknown>) => ({ id: c.id, tools: c.tools, doers: c.doers, periods: c.periods })),
+      // Comme une modification qui ne renvoie que la zone (correction du 18/11) : pas de workedAreaM2.
+      targets: before.targets.map((t: { kind: string; id: string; workingZone?: unknown }) => ({ kind: t.kind, id: t.id, workingZone: t.workingZone })),
+    });
+    expect(res.status).toBe(200);
+    const after = await (await send("GET", `/interventions/${iid}`)).json();
+    expect(Math.abs(after.targets[0].workedAreaM2 - worked)).toBeLessThan(2);
+    // Lecture d'une ligne ancienne sans surface enregistrée : la zone suffit.
+    await sql`UPDATE intervention_parameters SET attrs = NULL WHERE intervention_id = ${iid} AND role = 'target'`;
+    const legacy = await (await send("GET", `/interventions/${iid}`)).json();
+    expect(Math.abs(legacy.targets[0].workedAreaM2 - worked)).toBeLessThan(2);
+  });
+
   it("modifier l'intervention ne détache pas ses parcours (attelage conservé)", async () => {
     const before = await (await send("GET", `/interventions/${iid}`)).json();
     const res = await send("PUT", `/interventions/${iid}`, {

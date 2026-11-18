@@ -1,12 +1,12 @@
 import { sql, type SQL } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
 import type { DayWeather, InterventionTarget, InterventionWeather, SprayingForecast, WorkPeriod } from "@fourmy/contracts";
+import { DEFAULT_SPRAYING_THRESHOLDS, sprayingHour, type SprayingThresholds } from "@fourmy/domain";
 import {
   dominantIcon,
   meteoblueForecast,
   openMeteoHours,
   openWeatherForecast,
-  sprayCondition,
   summarize,
   type WeatherHour,
   type WeatherProviderName,
@@ -128,7 +128,16 @@ export async function interventionWeather(db: Database, farmId: string, req: Wea
   return s ? { ...s, fetchedAt: new Date().toISOString() } : null;
 }
 
-/** Créneaux de pulvérisation des prochains jours au centre de la ferme (widget). */
+/** Feu du domaine → niveau du créneau (contrat SprayingForecast). */
+const SLOT_LEVEL = { ok: "go", warning: "caution", danger: "stop" } as const;
+
+/** Seuils de pulvérisation de la ferme (Préférences), sinon ceux d'Ekylibre. */
+async function sprayingThresholdsTx(tx: Tx): Promise<SprayingThresholds> {
+  const [r] = (await tx.execute(sql`SELECT spraying FROM farm_settings`)) as unknown as { spraying: SprayingThresholds | null }[];
+  return r?.spraying ?? DEFAULT_SPRAYING_THRESHOLDS;
+}
+
+/** Créneaux de pulvérisation des prochains jours au centre de la ferme (widget), aux seuils de la ferme. */
 export async function sprayingForecast(
   db: Database,
   farmId: string,
@@ -137,7 +146,11 @@ export async function sprayingForecast(
   /** Début de la fenêtre (date d'un traitement) ; maintenant par défaut. Passée : conditions observées. */
   start?: Date,
 ): Promise<SprayingForecast | null> {
-  const { point, providers } = await withFarm(db, farmId, async (tx) => ({ point: await weatherPoint(tx), providers: await keyedProviders(tx) }));
+  const { point, providers, thresholds } = await withFarm(db, farmId, async (tx) => ({
+    point: await weatherPoint(tx),
+    providers: await keyedProviders(tx),
+    thresholds: await sprayingThresholdsTx(tx),
+  }));
   if (!point) return null;
   const now = new Date();
   const from = new Date(Math.floor((start ?? now).getTime() / HOUR) * HOUR);
@@ -149,11 +162,11 @@ export async function sprayingForecast(
       return t + h.stepHours * HOUR > from.getTime() && t < to.getTime();
     })
     .map((h) => {
-      const c = sprayCondition(h);
+      const c = sprayingHour(h, thresholds);
       return {
         at: h.at,
         stepHours: h.stepHours,
-        level: c.level,
+        level: SLOT_LEVEL[c.level],
         reasons: c.reasons,
         temperatureC: h.temperatureC,
         humidityPct: h.humidityPct,

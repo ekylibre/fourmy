@@ -1,17 +1,12 @@
-import { Alert, Badge, Group, Loader, Paper, Select, Stack, Text, ThemeIcon } from "@mantine/core";
+import { Alert, Group, Loader, Paper, Select, Stack, Text, ThemeIcon } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
-import { CircleAlert, CircleCheck, Info, OctagonX } from "lucide-react";
 import type { ComplianceLevelName, ComplianceResult, InterventionCrew, TreatmentCheckDto } from "@fourmy/contracts";
 import { api, farmPath } from "../../app/api";
+import { LIGHTS, TrafficLight } from "../../components/TrafficLight";
 
-/** Feux du contrôle réglementaire : couleurs et icônes communes (formulaire, fiche). */
-export const LEVELS: Record<ComplianceLevelName, { color: string; label: string; icon: typeof Info }> = {
-  ok: { color: "lichen", label: "Conforme", icon: CircleCheck },
-  info: { color: "ardoise", label: "À noter", icon: Info },
-  warning: { color: "paille", label: "À vérifier", icon: CircleAlert },
-  danger: { color: "brique", label: "Non conforme", icon: OctagonX },
-};
+/** Feux du contrôle réglementaire : ceux de toute l'application (TrafficLight). */
+export const LEVELS: Record<ComplianceLevelName, (typeof LIGHTS)[ComplianceLevelName]> = LIGHTS;
 
 /** Contrôle d'un produit : feu, choix de la cible (usage E-Phy), indicateurs. */
 export function TreatmentCheckView({
@@ -36,9 +31,7 @@ export function TreatmentCheckView({
             Contrôle réglementaire
           </Text>
         )}
-        <Badge color={LEVELS[check.level].color} variant="light">
-          {LEVELS[check.level].label}
-        </Badge>
+        <TrafficLight level={check.level} variant="badge" size="xs" />
       </Group>
       {check.usages.length === 1 && (
         <Text size="sm" aria-label={`Usage de ${check.articleName}`}>
@@ -148,7 +141,7 @@ export function ComplianceSummary({ check }: { check: ReturnType<typeof useCompl
         </Text>
         <Group gap={6}>
           {query.isFetching && <Loader size="xs" />}
-          {result && result.checks.length > 0 && <Badge color={LEVELS[result.level].color}>{LEVELS[result.level].label}</Badge>}
+          {result && result.checks.length > 0 && <TrafficLight level={result.level} variant="badge" />}
         </Group>
       </Group>
       {query.error && (

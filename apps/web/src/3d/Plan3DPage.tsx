@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useSearchParams } from "react-router";
 import { ActionIcon, Alert, Badge, Box, Button, Group, Indicator, Paper, Popover, ScrollArea, SegmentedControl, Select, Slider, Stack, Switch, Text, Title, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -40,7 +41,10 @@ export function Plan3DPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [placing, setPlacing] = useState(false);
   const [fallback, setFallback] = useState(false);
-  const [equipment, setEquipment] = useState<string | null>(null);
+  // Lien « Revoir en 3D » d'une intervention : ?equipment=…&t=…&replay=1 (lu une fois, puis retiré de l'adresse).
+  const [params, setParams] = useSearchParams();
+  const deepLink = useRef(params.get("replay") === "1" && params.get("equipment") ? { equipment: params.get("equipment")!, t: params.get("t") } : null);
+  const [equipment, setEquipment] = useState<string | null>(deepLink.current?.equipment ?? null);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState("60");
   const [clock, setClock] = useState<string | null>(null);
@@ -244,8 +248,33 @@ export function Plan3DPage() {
         })),
         sessions: t.sessions,
       });
+      // Lien depuis une intervention : rejeu placé au début de l'intervention.
+      const seekTo = pendingSeek.current;
+      pendingSeek.current = null;
+      if (seekTo && Date.parse(seekTo) >= Date.parse(t.samples[0]![0]) && Date.parse(seekTo) <= Date.parse(t.samples.at(-1)![0])) {
+        scene.current?.seek(new Date(seekTo).toISOString());
+        setClock(new Date(seekTo).toISOString());
+      }
     },
   });
+  const pendingSeek = useRef<string | null>(null);
+  // Lien « Revoir en 3D » : une fois la scène et le plan prêts, charge le rejeu du matériel demandé.
+  useEffect(() => {
+    const link = deepLink.current;
+    if (!link || !plan.data || !scene.current || !equipment) return;
+    deepLink.current = null;
+    pendingSeek.current = link.t;
+    loadTrack.mutate();
+    setParams(
+      (p) => {
+        const n = new URLSearchParams(p);
+        for (const k of ["equipment", "t", "replay"]) n.delete(k);
+        return n;
+      },
+      { replace: true },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan.data, equipment]);
 
   // Paysage (BD TOPO, LiDAR HD) : toujours les abords de la ferme, calculés une fois et gardés en cache.
   // Charger un rejeu ne le redemande pas (un recalcul figeait l'API et la vue plusieurs secondes).

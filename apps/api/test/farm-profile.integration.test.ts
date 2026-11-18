@@ -152,6 +152,24 @@ describe.skipIf(!url)("Ma ferme (intégration)", () => {
     expect((await get(worker.headers)).display).toEqual({ basemap: "plan", areaUnit: "a" });
   });
 
+  it("seuils des conditions de pulvérisation : défaut, réglage du responsable, retour au défaut", async () => {
+    const read = async (h = owner.headers) => (await app.request(`${base()}/settings/spraying`, { headers: h })).json();
+    const def = await read(worker.headers);
+    // Par défaut, les seuils d'Ekylibre.
+    expect(def).toMatchObject({ isDefault: true, thresholds: { windKmh: { green: 7.2, red: 18 }, humidityPct: { greenMin: 75, greenMax: 95, redMin: 50, redMax: 99 } } });
+    const mine = { ...def.thresholds, windKmh: { green: 12, red: 16 }, humidityPct: { greenMin: 60, greenMax: 95, redMin: 40, redMax: 99 } };
+    expect((await send("PUT", "/settings/spraying", mine, worker.headers)).status).toBe(403);
+    // Le vent rouge ne peut pas dépasser le seuil réglementaire (19 km/h) ; vert ≤ rouge.
+    expect((await send("PUT", "/settings/spraying", { ...mine, windKmh: { green: 15, red: 25 } })).status).toBe(400);
+    expect((await send("PUT", "/settings/spraying", { ...mine, windKmh: { green: 18, red: 16 } })).status).toBe(400);
+    expect((await send("PUT", "/settings/spraying", { ...mine, humidityPct: { greenMin: 80, greenMax: 70, redMin: 40, redMax: 99 } })).status).toBe(400);
+    const ok = await send("PUT", "/settings/spraying", mine);
+    expect(await ok.json()).toEqual({ isDefault: false, thresholds: mine });
+    expect(await read(worker.headers)).toEqual({ isDefault: false, thresholds: mine });
+    expect((await app.request(`${base()}/settings/spraying`, { method: "DELETE", headers: owner.headers })).status).toBe(200);
+    expect((await read()).isDefault).toBe(true);
+  });
+
   it("dépose, sert et retire le logo de la ferme (F3, E8 bis)", async () => {
     const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d, 0x49, 0x48, 0x44, 0x52]);
     const upload = (bytes: Uint8Array, name: string, headers = owner.headers) => {

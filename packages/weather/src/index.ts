@@ -311,49 +311,7 @@ export function summarize(
   };
 }
 
-// --- Conditions de pulvérisation ----------------------------------------------
+// Conditions de pulvérisation : règle et seuils dans @fourmy/domain (sprayingHour),
+// pour un seul calcul dans toute l'application, aux seuils de la ferme.
 
-export type SprayLevel = "go" | "caution" | "stop";
-
-export interface SprayCondition {
-  at: string;
-  level: SprayLevel;
-  /** Raisons d'un créneau défavorable ou à surveiller. */
-  reasons: string[];
-  hour: WeatherHour;
-}
-
-const worse = (a: SprayLevel, b: SprayLevel): SprayLevel => (a === "stop" || b === "stop" ? "stop" : a === "caution" || b === "caution" ? "caution" : "go");
-
-/**
- * Conditions de pulvérisation d'un pas de temps, seuils d'Ekylibre
- * (`weather_spraying_cells_controller.rb`) : vent ≤ 2 m/s favorable, < 5 m/s
- * à surveiller (19 km/h, limite réglementaire), hygrométrie 75–95 %,
- * température 5–25 °C, pluie ≤ 0,1 mm (≤ 0,3 mm à surveiller).
- */
-export function sprayCondition(h: WeatherHour): SprayCondition {
-  let level: SprayLevel = "go";
-  const reasons: string[] = [];
-  const flag = (l: SprayLevel, reason: string) => {
-    level = worse(level, l);
-    if (l !== "go") reasons.push(reason);
-  };
-  if (h.windKmh !== null) {
-    const ms = h.windKmh / 3.6;
-    flag(ms <= 2 ? "go" : ms < 5 ? "caution" : "stop", `vent ${Math.round(h.windKmh)} km/h`);
-  }
-  if (h.humidityPct !== null) {
-    const u = h.humidityPct;
-    flag(u >= 75 && u <= 95 ? "go" : (u > 50 && u < 75) || (u > 95 && u < 99) ? "caution" : "stop", `hygrométrie ${Math.round(u)} %`);
-  }
-  if (h.temperatureC !== null) {
-    const t = h.temperatureC;
-    flag(t >= 5 && t <= 25 ? "go" : (t > 25 && t < 30) || (t > 0 && t < 5) ? "caution" : "stop", `température ${Math.round(t)} °C`);
-  }
-  if (h.precipitationMm !== null) {
-    const p = h.precipitationMm / h.stepHours;
-    flag(p <= 0.1 ? "go" : p <= 0.3 ? "caution" : "stop", `pluie ${(Math.round(h.precipitationMm * 10) / 10).toLocaleString("fr-FR")} mm`);
-  }
-  return { at: h.at, level, reasons, hour: h };
-}
 export * from "./stations.js";

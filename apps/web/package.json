@@ -20,6 +20,7 @@
     "@fourmy/equipment-3d": "workspace:*",
     "@fourmy/fertilization-refs": "workspace:*",
     "@fourmy/ui-lyvre": "workspace:*",
+    "@gfazioli/mantine-led": "4.0.20",
     "@mantine/charts": "9.7.3",
     "@mantine/core": "9.7.3",
     "@mantine/dates": "9.7.3",

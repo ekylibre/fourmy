@@ -17,7 +17,7 @@ import { TeamPage } from "../team/TeamPage";
 const TABS = ["identity", "team", "sites", "ign", "preferences"] as const;
 type Tab = (typeof TABS)[number];
 /** Anciens onglets, devenus des sections de Préférences : les liens existants restent valables. */
-const LEGACY_SECTIONS: Record<string, PreferenceSection> = { maintenance: "maintenance", tracks: "tracks", brands: "brands" };
+const LEGACY_SECTIONS: Record<string, PreferenceSection> = { maintenance: "maintenance", tracks: "tracks", spraying: "spraying", brands: "brands" };
 
 export function FarmProfilePage() {
   const farm = useFarm();

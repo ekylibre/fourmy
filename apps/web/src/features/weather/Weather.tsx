@@ -1,5 +1,8 @@
 import { useEffect, useRef } from "react";
-import { Badge, Box, Button, Group, NumberInput, Paper, ScrollArea, SimpleGrid, Stack, Text, Tooltip } from "@mantine/core";
+import { Anchor, Badge, Box, Button, Group, NumberInput, Paper, ScrollArea, SimpleGrid, Stack, Text, Tooltip } from "@mantine/core";
+import { Link } from "react-router";
+import { sprayingPeriod } from "@fourmy/domain";
+import { TrafficLight } from "../../components/TrafficLight";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { CloudRain, CloudSun, Droplets, RefreshCw, Thermometer, Wind } from "lucide-react";
@@ -160,76 +163,45 @@ export function WeatherFields({
  * Météo enregistrée (fiche), façon meteoblue : temps dominant, température,
  * hygrométrie, vent et pluie, puis la frise horaire de la période.
  */
-export function WeatherSummary({ weather }: { weather: InterventionWeather }) {
-  if (weather.temperatureC === null && weather.humidityPct === null && weather.windKmh === null && weather.precipitationMm === null) {
-    return (
-      <Text size="sm" c="dimmed">
-        Pas de données météo pour cette intervention.
-      </Text>
-    );
-  }
-  const hours = weather.hours ?? [];
-  const values = [
-    { icon: Thermometer, label: "Température", v: `${fmt(weather.temperatureC)} °C` },
-    { icon: Droplets, label: "Hygrométrie", v: `${fmt(weather.humidityPct, 0)} %` },
-    { icon: Wind, label: "Vent", v: `${fmt(weather.windKmh)} km/h${weather.windMaxKmh ? ` (max ${fmt(weather.windMaxKmh)})` : ""}` },
-    { icon: CloudRain, label: "Pluie", v: `${fmt(weather.precipitationMm)} mm` },
-  ];
+/**
+ * Météo d'une intervention en une ligne (fiche) : temps dominant, puis
+ * température, hygrométrie, vent et pluie sur la période, et la source.
+ */
+export function WeatherLine({ weather }: { weather: InterventionWeather }) {
+  const parts = [
+    { icon: Thermometer, label: "Température", v: weather.temperatureC === null ? null : `${fmt(weather.temperatureC)} °C` },
+    { icon: Droplets, label: "Hygrométrie", v: weather.humidityPct === null ? null : `${fmt(weather.humidityPct, 0)} %` },
+    {
+      icon: Wind,
+      label: "Vent",
+      v: weather.windKmh === null ? null : `${fmt(weather.windKmh, 0)} km/h${weather.windMaxKmh && Math.round(weather.windMaxKmh) > Math.round(weather.windKmh) ? `, rafales ${fmt(weather.windMaxKmh, 0)}` : ""}`,
+    },
+    { icon: CloudRain, label: "Pluie", v: weather.precipitationMm === null ? null : `${fmt(weather.precipitationMm)} mm` },
+  ].filter((p) => p.v !== null);
   return (
-    <Stack gap="xs">
-      <SimpleGrid cols={{ base: 1, sm: hours.length > 1 ? 2 : 1 }} spacing="lg">
-        {/* Gauche : temps dominant, puis les valeurs, deux en haut et deux en bas. */}
-        <Stack gap="xs">
-          {weather.icon && (
-            <Group gap={8} wrap="nowrap">
-              <WeatherIcon code={weather.icon} size={36} />
-              <Text size="sm" fw={600}>
-                {weatherLabel(weather.icon)}
-              </Text>
-            </Group>
-          )}
-          <SimpleGrid cols={2} spacing="sm" verticalSpacing="sm">
-            {values.map(({ icon: Icon, label, v }) => (
-              <Group key={label} gap={6} wrap="nowrap" align="flex-start">
-                <Icon size={16} aria-hidden style={{ marginTop: 2, flex: "none" }} color="var(--mantine-color-dimmed)" />
-                <Stack gap={0}>
-                  <Text size="xs" c="dimmed">
-                    {label}
-                  </Text>
-                  <Text size="sm" fw={600} className="lv-num">
-                    {v}
-                  </Text>
-                </Stack>
-              </Group>
-            ))}
-          </SimpleGrid>
-        </Stack>
-        {/* Droite : l'évolution heure par heure. */}
-        {hours.length > 1 && (
-          <ScrollArea type="auto">
-            <Group gap={0} wrap="nowrap" aria-label="Météo heure par heure">
-              {hours.map((h) => (
-                <Stack key={h.at} gap={2} align="center" miw={46} py={4} style={{ borderLeft: "1px solid var(--mantine-color-default-border)" }}>
-                  <Text size="xs" c="dimmed" className="lv-num">
-                    {new Date(h.at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                  </Text>
-                  <WeatherIcon code={h.icon} size={20} />
-                  <Text size="xs" fw={600} className="lv-num">
-                    {fmt(h.temperatureC, 0)}°
-                  </Text>
-                  <Text size="xs" c={h.precipitationMm ? "blue" : "dimmed"} className="lv-num">
-                    {h.precipitationMm ? `${fmt(h.precipitationMm)} mm` : "—"}
-                  </Text>
-                </Stack>
-              ))}
-            </Group>
-          </ScrollArea>
+    <Group justify="space-between" align="center" gap="sm" wrap="wrap">
+      <Group gap="lg" wrap="wrap">
+        {weather.icon && (
+          <Group gap={6} wrap="nowrap">
+            <WeatherIcon code={weather.icon} size={28} />
+            <Text size="sm" fw={600}>
+              {weatherLabel(weather.icon)}
+            </Text>
+          </Group>
         )}
-      </SimpleGrid>
+        {parts.map(({ icon: Icon, label, v }) => (
+          <Group key={label} gap={4} wrap="nowrap" aria-label={`${label} : ${v}`}>
+            <Icon size={15} aria-hidden color="var(--mantine-color-dimmed)" />
+            <Text size="sm" className="lv-num">
+              {v}
+            </Text>
+          </Group>
+        ))}
+      </Group>
       <Text size="xs" c="dimmed">
         {weatherSourceLabel(weather)}
       </Text>
-    </Stack>
+    </Group>
   );
 }
 
@@ -248,7 +220,22 @@ const SLOT_LABELS = { go: "favorable", caution: "à surveiller", stop: "défavor
  * Conditions de pulvérisation des prochains jours (MET-3), seuils
  * d'Ekylibre : un créneau par heure (ou par 3 h), sa couleur et sa raison.
  */
-export function SprayingConditions({ farmId, days = 3, from }: { farmId: string; days?: number; /** Début de la fenêtre (ISO) ; maintenant par défaut. */ from?: string }) {
+export function SprayingConditions({
+  farmId,
+  days = 3,
+  from,
+  highlight,
+  bare = false,
+}: {
+  farmId: string;
+  days?: number;
+  /** Début de la fenêtre (ISO) ; maintenant par défaut. */
+  from?: string;
+  /** Période d'une intervention : ses heures sont mises en avant et le bilan porte sur elles. */
+  highlight?: { from: string; to: string };
+  /** Sans cadre ni titre (dans un pavé qui a déjà le sien). */
+  bare?: boolean;
+}) {
   const q = useQuery({
     queryKey: ["weather-spraying", farmId, days, from ?? null],
     queryFn: () => api.get<SprayingForecast | null>(farmPath(farmId, `/weather/spraying?days=${days}${from ? `&from=${encodeURIComponent(from)}` : ""}`)),
@@ -273,16 +260,31 @@ export function SprayingConditions({ farmId, days = 3, from }: { farmId: string;
   const observed = q.data.kind === "observed";
   const next = q.data.slots.find((s) => s.level === "go");
   const goHours = q.data.slots.filter((s) => s.level === "go").reduce((n, s) => n + s.stepHours, 0);
+  // Bilan de l'intervention : le pire créneau de sa période (même règle et mêmes seuils que la frise).
+  const period = highlight ? sprayingPeriod(q.data.slots.map((x) => ({ ...x, level: DOMAIN_LEVEL[x.level] })), highlight.from, highlight.to) : null;
+  const inPeriod = (x: { at: string; stepHours: number }) => !highlight || (Date.parse(x.at) < Date.parse(highlight.to) && Date.parse(x.at) + x.stepHours * 3_600_000 > Date.parse(highlight.from));
+  const hm = (iso: string) => new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  const Frame = bare ? Box : Paper;
   return (
-    <Paper p="md" withBorder aria-label="Conditions de pulvérisation">
-      <Group justify="space-between" mb="xs">
-        <Text fw={700}>Conditions de pulvérisation</Text>
-        <Text size="xs" c="dimmed">
-          {SOURCES[q.data.source]}, {observed ? "observées" : "prévision"}
+    <Frame {...(bare ? {} : { p: "md", withBorder: true })} aria-label="Conditions de pulvérisation" role="group">
+      <Group justify="space-between" mb="xs" gap="xs">
+        <Text fw={700} size={bare ? "sm" : undefined}>
+          Conditions de pulvérisation
         </Text>
+        {period ? (
+          <TrafficLight level={period.level} variant="badge" label={period.level === "unknown" ? "Inconnues" : SLOT_LABELS[SLOT_OF[period.level]]} />
+        ) : (
+          <Text size="xs" c="dimmed">
+            {SOURCES[q.data.source]}, {observed ? "observées" : "prévision"}
+          </Text>
+        )}
       </Group>
       <Text size="sm" mb="xs">
-        {observed
+        {period && highlight
+          ? `Pendant l'intervention (${hm(highlight.from)}–${hm(highlight.to)}) : ${
+              period.level === "unknown" ? "pas de météo horaire." : period.level === "ok" ? "conditions favorables." : `${SLOT_LABELS[SLOT_OF[period.level]]} — ${period.reasons.join(", ")}.`
+            }`
+          : observed
           ? goHours
             ? `Ce jour-là : ${goHours} h favorable(s) à la pulvérisation.`
             : "Ce jour-là : aucune heure favorable à la pulvérisation."
@@ -324,7 +326,13 @@ export function SprayingConditions({ farmId, days = 3, from }: { farmId: string;
                         w={s.stepHours * 8}
                         h={18}
                         bg={`var(--mantine-color-${SLOT_COLORS[s.level]}-${s.level === "go" ? 5 : 4})`}
-                        style={{ borderRadius: 2 }}
+                        data-period={highlight && inPeriod(s) ? "" : undefined}
+                        style={{
+                          borderRadius: 2,
+                          // Heures de l'intervention : pleines et soulignées ; les autres, estompées.
+                          opacity: highlight && !inPeriod(s) ? 0.35 : 1,
+                          boxShadow: highlight && inPeriod(s) ? "inset 0 -3px 0 var(--mantine-color-text)" : undefined,
+                        }}
                       />
                     </Tooltip>
                   ))}
@@ -341,9 +349,17 @@ export function SprayingConditions({ farmId, days = 3, from }: { farmId: string;
           </Badge>
         ))}
         <Text size="xs" c="dimmed">
-          Seuils : vent, hygrométrie, température, pluie (repris d'Ekylibre).
+          {highlight ? "Heures de l'intervention soulignées. " : ""}Seuils de la ferme : vent, hygrométrie, température, pluie (
+          <Anchor component={Link} to={`/f/${farmId}/farm?tab=spraying`} size="xs">
+            régler
+          </Anchor>
+          ).
         </Text>
       </Group>
-    </Paper>
+    </Frame>
   );
 }
+
+/** Niveau d'un créneau ↔ feu du domaine (sprayingPeriod). */
+const DOMAIN_LEVEL = { go: "ok", caution: "warning", stop: "danger" } as const;
+const SLOT_OF = { ok: "go", warning: "caution", danger: "stop" } as const;
