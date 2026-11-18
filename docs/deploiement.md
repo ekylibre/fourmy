@@ -11,10 +11,10 @@ Docker. Environnements prévus :
 La configuration ne dépend pas du serveur : tout passe par des variables
 d'environnement. Rejouer le même compose ailleurs suffit.
 
-Le dépôt `ekylibre/fourmy` est **privé** (noms des pilotes et contours
-réels de leurs parcelles dans la documentation et les fixtures) ; l'ouvrir
-demandera d'abord de les retirer. Dokploy y accède par l'application GitHub
-« Dokploy-ekylibre-org » et redéploie à chaque push sur `main`.
+Le dépôt `ekylibre/fourmy` est **public** depuis novembre 2026 (la page
+Installer de fourmy.org donne son `git clone`). Dokploy y accède par
+l'application GitHub « Dokploy-ekylibre-org » et redéploie à chaque push sur
+`main`.
 
 ## Services
 

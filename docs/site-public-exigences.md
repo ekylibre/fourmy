@@ -160,8 +160,7 @@
    Le bouton « Se connecter » pointe vers dev.fourmy.org en attendant.
 5. **Roadmap** : page publique retirée en novembre 2026 ; la roadmap reste sur
    GitHub ([Fourmy — Roadmap](https://github.com/orgs/ekylibre/projects/2)).
-   La page Installer donne le `git clone` du dépôt, encore privé : à ouvrir avant
-   ou avec la mise en ligne de cette page.
+   La page Installer donne le `git clone` du dépôt, public depuis novembre 2026.
 6. **Historique Git dans Dokploy** : réglé. Dokploy clone sans historique,
    l'image du site est donc construite par la CI (`docs/deploiement.md`) ;
    premier déploiement le 2026-11-07.
