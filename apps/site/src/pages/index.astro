@@ -1,5 +1,5 @@
 ---
-import { Image } from "astro:assets";
+import { Image, getImage } from "astro:assets";
 import Base from "../layouts/Base.astro";
 import FeatureFigure from "../components/FeatureFigure.astro";
 import { APP_URL } from "../lib/site";
@@ -8,8 +8,9 @@ import { catalogue } from "../lib/catalogue";
 import { release, formatDate } from "../lib/release";
 
 const latest = release.entries.slice(0, 3);
-const drone = captures.get("accueil-3d")!;
-const attelage = captures.get("accueil-3d-attelage")!;
+// Boucle du rejeu 3D (videos/accueil-pulverisation) ; sa première image sert d'affiche et de repli.
+const poster = await getImage({ src: captures.get("accueil-3d")!, width: 1600, format: "webp" });
+const fiche = captures.get("accueil-fiche-pulverisation")!;
 
 /** Les trois domaines de la page d'accueil : une capture, et ce que chacun couvre. */
 const pillars = [
@@ -71,23 +72,31 @@ const pillars = [
 
     <figure class="field">
       <div class="field-frame">
-        <Image
+        <video
           class="field-drone"
-          src={drone}
-          alt="Plan 3D vu du ciel : les parcelles de maïs teintées par l'indice de végétation, le trajet du tracteur sur la route et son étiquette au champ"
-          widths={[800, 1200, 1600]}
-          sizes="(max-width: 80rem) 100vw, 80rem"
-          format="webp"
-          loading="eager"
-        />
+          autoplay
+          muted
+          loop
+          playsinline
+          preload="auto"
+          width="1600"
+          height="900"
+          poster={poster.src}
+          aria-label="Rejeu 3D : le tracteur et son pulvérisateur traitent une parcelle de maïs ; la bande traitée se colore derrière la rampe, qui se relève au bout du champ avant la passe suivante"
+          data-hero-video
+        >
+          <source src="/videos/accueil-pulverisation.webm" type="video/webm" />
+          <source src="/videos/accueil-pulverisation.mp4" type="video/mp4" />
+        </video>
+        <button class="field-toggle" type="button" data-hero-toggle aria-pressed="false">Mettre en pause</button>
         <figure class="field-inset">
-          <Image src={attelage} alt="Le même instant, caméra derrière le tracteur : la herse rotative attelée travaille dans les rangs de chaumes" widths={[300, 600]} sizes="18rem" format="webp" loading="eager" />
-          <figcaption>Même instant, caméra derrière l'attelage</figcaption>
+          <Image src={fiche} alt="Fiche de la même intervention : IFT total et IFT de chaque parcelle de maïs, chacun avec son voyant vert, dose de référence respectée" widths={[300, 600]} sizes="18rem" format="webp" loading="eager" />
+          <figcaption>La fiche de l'intervention : IFT calculé par parcelle</figcaption>
         </figure>
       </div>
       <figcaption class="field-caption">
-        Rejeu du 5 octobre 2026 à 16 h 48, ferme de grandes cultures du Béarn. Un tracteur et sa herse rotative dans le maïs ;
-        parcelles teintées par le NDVI Sentinel-2 du 24 septembre ; trajet sur route recalé sur la carte.
+        Rejeu du 5 octobre 2026 de 16 h 46 à 16 h 50, accéléré dix fois, ferme de grandes cultures du Béarn. Un tracteur et son
+        pulvérisateur de 18 m dans le maïs, d'après la trace GPS ; relief et photo aérienne IGN.
       </figcaption>
     </figure>
 
@@ -97,6 +106,27 @@ const pillars = [
       <div><dt>{release.version}</dt><dd>version actuelle</dd></div>
     </dl>
   </section>
+  <script>
+    // Boucle du haut de page : arrêtée si l'on demande moins d'animations, et toujours suspendable (WCAG 2.2.2).
+    const video = document.querySelector<HTMLVideoElement>("[data-hero-video]");
+    const toggle = document.querySelector<HTMLButtonElement>("[data-hero-toggle]");
+    if (video && toggle) {
+      const show = (paused: boolean) => {
+        toggle.textContent = paused ? "Lire la vidéo" : "Mettre en pause";
+        toggle.setAttribute("aria-pressed", String(paused));
+      };
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        video.removeAttribute("autoplay");
+        video.pause();
+        show(true);
+      }
+      toggle.addEventListener("click", () => {
+        if (video.paused) void video.play();
+        else video.pause();
+        show(video.paused);
+      });
+    }
+  </script>
 
   <section class="section wrap" aria-labelledby="deja">
     <h2 id="deja">Ce que Fourmy fait déjà</h2>
