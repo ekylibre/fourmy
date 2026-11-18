@@ -211,3 +211,8 @@ main { padding-block: 3rem 5rem; }
 .compare-table tr.group th { background: var(--lv-surface-sunken); font: 700 1rem/1.2 var(--font-title); padding-top: 0.9rem; }
 .compare-note { font-size: 0.9rem; }
 .install pre:focus-visible { outline: 3px solid var(--lv-lichen); outline-offset: 2px; }
+
+.price-table { min-width: 40rem; }
+.price-table td.price { font-weight: 600; white-space: nowrap; width: 18%; }
+.price-table td:last-child { width: auto; }
+.price-table .row-fourmy th, .price-table .row-fourmy td { background: var(--lv-sauge); }

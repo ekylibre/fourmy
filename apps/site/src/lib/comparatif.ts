@@ -23,8 +23,15 @@ export interface Criterion {
   fourmy: Cell;
   [product: string]: Cell | string;
 }
+export interface Price {
+  id: string;
+  prix: string;
+  detail: string;
+  u?: string;
+}
 export interface Comparison {
   date: string;
+  tarifs: Price[];
   logiciels: Product[];
   groupes: { titre: string; criteres: Criterion[] }[];
 }
@@ -39,6 +46,9 @@ for (const g of comparison.groupes)
       if (id !== "fourmy" && cell.s !== "nt" && !cell.u) throw new Error(`comparatif.yaml : source manquante (${c.nom}, ${id})`);
       if (cell.f && !features.some((f) => f.id === cell.f)) throw new Error(`comparatif.yaml : fonctionnalité inconnue (${cell.f})`);
     }
+
+for (const t of comparison.tarifs)
+  if (t.id !== "fourmy" && !t.u) throw new Error(`comparatif.yaml : source du prix manquante (${t.id})`);
 
 export const STATUS_TEXT: Record<Status, string> = { oui: "oui", partiel: "en partie", non: "non", nt: "non trouvé chez l'éditeur" };
 export const STATUS_MARK: Record<Status, string> = { oui: "✓", partiel: "", non: "✕", nt: "·" };

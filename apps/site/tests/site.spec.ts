@@ -64,7 +64,11 @@ test("fonctionnalités rangées par module", async ({ page }) => {
 
 test("comparatif : chaque case d'un autre logiciel renvoie à sa source", async ({ page }) => {
   await page.goto("/comparatif/");
-  const table = page.getByRole("table");
+  const table = page.getByRole("table", { name: /^Fourmy comparé à/ });
   await expect(table.locator("thead").getByRole("columnheader")).toHaveText([/Critère/, /Fourmy/, /MesParcelles/, /Smag Farmer/, /Geofolia/]);
   await expect(table.getByRole("row").filter({ hasText: "Registre phytosanitaire" }).getByRole("link")).toHaveCount(4);
+  // Prix publics : chaque prix d'un autre logiciel renvoie à la page qui l'affiche.
+  const prices = page.getByRole("table", { name: /^Prix publics/ });
+  await expect(prices.getByRole("row").filter({ hasText: "MesParcelles" })).toContainText("400 € HT");
+  await expect(prices.getByRole("row").filter({ hasText: /MesParcelles|Smag Farmer|Geofolia/ }).getByRole("link")).toHaveCount(3);
 });
