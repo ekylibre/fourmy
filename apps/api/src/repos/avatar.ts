@@ -2,6 +2,7 @@ import { sql, type SQL } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
 import { buildAvatarGlb, inspectGlb, resolveAvatar, type AvatarInput, type ResolvedAvatar } from "@fourmy/equipment-3d";
 import type { AvatarInfo, AvatarWrite, Hitch, LatestPosition } from "@fourmy/contracts";
+import { getProcedure } from "@fourmy/contracts";
 import type { DomainCtx } from "@fourmy/domain";
 import { createHash } from "node:crypto";
 import { BadRequest, NotFound } from "../routes/helpers.js";
@@ -157,13 +158,13 @@ export async function latestPositions(db: Database, farmId: string, at: string):
  */
 export async function hitches(db: Database, farmId: string, equipmentId: string, from: string, to: string): Promise<Hitch[]> {
   return withFarm(db, farmId, async (tx) => {
-    const list = await rows<Record<string, unknown> & Row & { tool_id: string; name: string; started_at: string; stopped_at: string }>(
+    const list = await rows<Record<string, unknown> & Row & { tool_id: string; name: string; started_at: string; stopped_at: string; procedure?: string | null }>(
       tx,
       // Attelages (lot N3) : outils du même attelage que le matériel, sur les
       // périodes de cet attelage. Mode libre : tous les outils de
       // l'intervention, sur toutes ses périodes (déduction d'avant).
       sql`SELECT e.id AS tool_id, e.name, e.kind, e.equipment_type, e.technical, e.avatar, e.model_asset_id, b.color AS brand_color, ${LOGO_PNG} AS logo_id,
-                 w.started_at, w.stopped_at
+                 w.started_at, w.stopped_at, i.procedure
           FROM interventions i
           JOIN intervention_parameters me ON me.intervention_id = i.id AND me.role = 'tool' AND me.ref_id = ${equipmentId}
           JOIN intervention_parameters o ON o.intervention_id = i.id AND o.role = 'tool' AND o.ref_type = 'equipment' AND o.ref_id <> ${equipmentId}
@@ -176,7 +177,7 @@ export async function hitches(db: Database, farmId: string, equipmentId: string,
           ORDER BY w.started_at`,
     );
     // Parcours du boîtier : outil résolu au calcul, sinon lien `traccarTool` posé depuis.
-    const announced = await rows<Record<string, unknown> & Row & { tool_id: string; name: string; started_at: string; stopped_at: string }>(
+    const announced = await rows<Record<string, unknown> & Row & { tool_id: string; name: string; started_at: string; stopped_at: string; procedure?: string | null }>(
       tx,
       sql`SELECT e.id AS tool_id, e.name, e.kind, e.equipment_type, e.technical, e.avatar, e.model_asset_id, b.color AS brand_color, ${LOGO_PNG} AS logo_id,
                  s.started_at, s.stopped_at
@@ -207,6 +208,10 @@ export async function hitches(db: Database, farmId: string, equipmentId: string,
           to: iso(r.stopped_at)!,
           hitchOffsetM: a.params.hitchOffsetM,
           avatarHash: r.model_asset_id ? `m${r.model_asset_id.slice(0, 8)}` : a.hash,
+          // Rejeu 3D : articulation (gabarit), bande travaillée (largeur, couleur du procédé).
+          template: r.model_asset_id ? null : a.params.template,
+          workingWidthM: a.params.workingWidthM > 0 ? a.params.workingWidthM : null,
+          shape: r.procedure ? getProcedure(r.procedure).shape : null,
         };
       })
       .sort((x, y) => x.from.localeCompare(y.from));

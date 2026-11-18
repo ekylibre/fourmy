@@ -37,6 +37,32 @@ visible) ([`requirements.md`](requirements.md) §4.9 bis). Étude d'origine :
   - orientation et inter-rang, avec leur origine (automatique ou saisie) ;
   - le responsable de la ferme peut les modifier ou revenir à l'automatique.
 
+## Rejeu des matériels et paysage (lots R0 à R5, 2026-11-18)
+
+Conception : `claudedocs/conception_rejeu_3d_outils_paysage.md`.
+
+- **Outil articulé** : l'avatar généré d'un outil a des nœuds `lift` et, pour
+  un pulvérisateur, `boom_left` et `boom_right` (`packages/equipment-3d`,
+  version 2 du générateur). Au rejeu, l'outil est posé au travail, relevé en
+  bout de champ (pas au travail, pendant un parcours de travail) et replié en
+  transport. Les rampes de pulvérisateur ont trois tronçons par côté,
+  repliés en accordéon le long de la cuve. Le relevage est animé et dure au
+  moins 0,4 s à l'écran (`replay.ts`, `tool-nodes.ts`). La fiche du matériel
+  (onglet 3D) montre les deux positions : « Travail » et « Route ».
+- **Bande travaillée** : derrière l'outil, de la largeur du boîtier (sinon de
+  la fiche de l'outil, sinon 3 m), colorée par forme de procédé
+  (pulvérisation violette, semis blé, fertilisation vert d'eau, travail du
+  sol orange…). Elle apparaît au fil du rejeu (CustomShader) ; un double
+  passage ressort plus foncé. Interrupteur dans « Matériels suivis ».
+- **Paysage** (`GET /landscape3d?at=…&bbox=…`) :
+  - **arbres** : haies, bois, forêts, vergers et peupleraies de la BD TOPO,
+    avec une hauteur par nature puis la hauteur réelle du LiDAR HD, plus les
+    arbres isolés repérés dans le LiDAR ; aucun dans les parcelles cultivées
+    ni dans les bâtiments ; feuillus dégarnis de novembre à mars ;
+  - **pylônes et câbles** : pylônes en treillis à leur hauteur IGN, orientés
+    selon la ligne ; câbles avec leur flèche ;
+  - **interrupteurs** dans « Végétation et météo ».
+
 ## Règles
 
 **Phases du couvert** (`canopyAt`, domaine), d'après la courbe NDVI lissée des

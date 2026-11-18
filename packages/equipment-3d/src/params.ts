@@ -183,6 +183,13 @@ const techText = (technical: unknown, group: string, key: string): string | null
   return typeof v === "string" ? v : null;
 };
 
+/**
+ * Version du générateur de GLB, comprise dans l'empreinte : un changement de
+ * dessin (v2 : nœuds articulés du rejeu 3D ; v3 : rampes en trois tronçons) change l'URL des modèles, donc
+ * aucun cache ne sert l'ancien dessin.
+ */
+export const GLB_GENERATOR_VERSION = 3;
+
 export interface ResolvedAvatar {
   params: AvatarParams;
   provenance: Record<string, Provenance>;
@@ -265,7 +272,7 @@ export function resolveAvatar(input: {
     logo: saved.logo ?? "sides",
   };
   provenance.logo = saved.logo ? "input" : "default";
-  return { params, provenance, hash: fnv(JSON.stringify(params) + (input.logoId ?? "")) };
+  return { params, provenance, hash: fnv(`${GLB_GENERATOR_VERSION}:${JSON.stringify(params)}${input.logoId ?? ""}`) };
 }
 
 /** Empreinte FNV-1a 32 bits (hexadécimal), sans dépendance. */

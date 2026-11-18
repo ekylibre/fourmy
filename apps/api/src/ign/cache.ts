@@ -193,7 +193,7 @@ export interface IgnManifestEntry {
  * Manifeste de la copie hors ligne (F5, §6.4) : les tuiles du plan de la
  * ferme **déjà sur le serveur**, pour que le navigateur ne déclenche jamais
  * d'appel à l'IGN. Fonds de carte par le relais, relief par la route de la
- * 3D ; les bâtiments arrivent avec la réponse du plan 3D.
+ * 3D ; les bâtiments et le paysage arrivent avec les réponses du plan 3D.
  */
 export async function cacheManifest(db: Database, farmId: string): Promise<{ entries: IgnManifestEntry[]; bytes: number }> {
   return withFarm(db, farmId, async (tx) => {
@@ -201,7 +201,7 @@ export async function cacheManifest(db: Database, farmId: string): Promise<{ ent
     const entries: IgnManifestEntry[] = [];
     const base = `/api/v1/farms/${farmId}`;
     for (const [layer, keys] of plan ?? []) {
-      if (layer === "buildings") continue;
+      if (layer === "buildings" || layer === "landscape" || layer === "canopy") continue;
       const path = layer === "elevation" ? "/terrain/heightmap" : `/ign/tiles/${layer}`;
       for (let i = 0; i < keys.length; i += 5000) {
         const batch = keys.slice(i, i + 5000);

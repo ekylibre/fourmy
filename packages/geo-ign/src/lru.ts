@@ -15,6 +15,9 @@ export class Lru<K, V> {
     this.map.set(key, value);
     if (this.map.size > this.max) this.map.delete(this.map.keys().next().value as K);
   }
+  clear(): void {
+    this.map.clear();
+  }
   get size(): number {
     return this.map.size;
   }

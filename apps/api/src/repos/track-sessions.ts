@@ -425,7 +425,8 @@ export async function getTrackSession(db: Database, farmId: string, id: string, 
   });
   const s = detail.session;
   const track = await trackReplay(db, farmId, { equipmentId: s.equipmentId, from: s.startedAt, to: new Date(ms(s.stoppedAt) + 1000).toISOString(), toleranceM: 2 });
-  return { ...s, samples: track.samples, coverage: detail.coverage };
+  // Fiche du parcours : trace sans la largeur (contrat à quatre valeurs par point).
+  return { ...s, samples: track.samples.map(([t, lon, lat, w]) => [t, lon, lat, w] as [string, number, number, boolean | null]), coverage: detail.coverage };
 }
 
 export async function getTrackSettings(db: Database, farmId: string): Promise<TrackSettings> {

@@ -68,6 +68,30 @@ describe.skipIf(!url)("traces (intégration)", () => {
     expect(p.tools).toEqual(["Rampe 10 m"]);
   });
 
+  it("garde les bascules travail / relevé et la largeur d'une ligne droite (rejeu 3D)", async () => {
+    const [binding] = await sql<{ id: string }[]>`SELECT id FROM tracker_bindings WHERE equipment_id = ${equipmentId}`;
+    // 6 octobre : même ligne droite, relevée du 6e au 8e point, largeur 12 m ensuite.
+    for (let i = 0; i <= 12; i++) {
+      const [lon, lat] = at(50, -10 + i * 10);
+      const attrs = i >= 6 && i <= 8 ? { working: false } : { working: true, widthM: i > 8 ? 12 : 10 };
+      await sql`INSERT INTO positions (farm_id, binding_id, time, point, speed, attrs)
+        VALUES (${farmId}, ${binding!.id}, ${new Date(Date.UTC(2026, 9, 6, 12, 0, i * 5)).toISOString()},
+                ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326), 7.2, ${sql.json(attrs)})`;
+    }
+    const q = `equipment=${equipmentId}&from=2026-10-06T00:00:00Z&to=2026-10-07T00:00:00Z&tolerance=1`;
+    const json = await (await app.request(`${base}/tracks?${q}`, { headers })).json();
+    const states = (json.samples as [string, number, number, boolean | null, number | null][]).map(([t, , , w, width]) => [t.slice(11, 19), w, width]);
+    expect(states).toEqual([
+      ["12:00:00", true, 10],
+      ["12:00:25", true, 10],
+      ["12:00:30", false, null],
+      ["12:00:40", false, null],
+      ["12:00:45", true, 12],
+      ["12:01:00", true, 12],
+    ]);
+    expect(json.sessions).toEqual([]);
+  });
+
   it("simplifie une trace rectiligne en conservant le temps, et produit du CZML", async () => {
     const json = await (await app.request(`${base}/tracks?${win()}&tolerance=1`, { headers })).json();
     expect(json.rawCount).toBe(13);

@@ -82,6 +82,8 @@ describe.skipIf(!url)("avatar 3D (intégration)", () => {
     const h = await (await app.request(`${base()}/tracks/hitches?equipment=${tractor}&from=2026-11-03T00:00:00.000Z&to=2026-11-04T00:00:00.000Z`, { headers })).json();
     // « Charrue » : gabarit de charrue portée proposé d'après le nom, accrochée au relevage (pas de timon).
     expect(h.items).toEqual([expect.objectContaining({ toolId: plough, toolName: "Charrue", from: periods[0]!.startedAt, hitchOffsetM: 0 })]);
+    // Rejeu 3D : gabarit (articulation), largeur de travail et forme du procédé (couleur de la bande).
+    expect(h.items[0]).toMatchObject({ template: "plough", workingWidthM: expect.any(Number), shape: "work" });
   });
 
   it("type de matériel : il fixe la nature et l'avatar de base ; une fiche sans type le garde", async () => {

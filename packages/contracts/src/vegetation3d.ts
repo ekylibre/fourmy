@@ -64,3 +64,19 @@ export interface ParcelRowsWrite {
   bearingDeg: number;
   spacingM: number;
 }
+
+/**
+ * Paysage du plan 3D (GET /landscape3d) : arbres de la BD TOPO en tableau
+ * compact [lon, lat, hauteur, couronne, index dans `kinds`], pylônes et lignes
+ * électriques (claudedocs/conception_rejeu_3d_outils_paysage.md §4.3).
+ */
+export interface Landscape3dAt {
+  trees: { kinds: ("deciduous" | "conifer" | "hedge" | "orchard")[]; items: [number, number, number, number, number][] };
+  pylons: { id: string; lon: number; lat: number; heightM: number; voltageKv: number | null }[];
+  lines: { id: string; voltageKv: number | null; coords: [number, number][] }[];
+  attribution: string[];
+  truncated: boolean;
+  missingTiles: number;
+  /** Hauteurs du LiDAR HD (MNH) : tuiles lues, arbres retirés (plus bas que 1,5 m) et cimes isolées ajoutées ; null sans LiDAR. */
+  canopy?: { tiles: number; removed: number; added: number } | null;
+}

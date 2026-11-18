@@ -7,6 +7,11 @@ import {
   Cartesian3,
   Cartographic,
   ClassificationType,
+  CustomShader,
+  PropertyBag,
+  CustomShaderTranslucencyMode,
+  LightingModel,
+  UniformType,
   ClockRange,
   HeadingPitchRange,
   Matrix4,
@@ -51,11 +56,17 @@ import {
 import { outerRing, type Pt } from "@fourmy/domain";
 import type { GeoJsonGeometry } from "@fourmy/contracts";
 import { behind, cesiumHeading, densify, headings, initialView, runIndexes, splitRuns, type Sample } from "./geometry";
-import { localFrame, rowPieces } from "@fourmy/domain";
-import type { ParcelVegetation } from "@fourmy/contracts";
+import { localFrame, pylonHeightM, rowPieces } from "@fourmy/domain";
+import type { Landscape3dAt, ParcelVegetation, ProcedureShape } from "@fourmy/contracts";
 import { instancedBoxGlb, type BoxInstance } from "./vegetation-glb";
 import { vegetationStyle } from "./vegetation";
 import type { WeatherLook } from "./weather-look";
+import { hitchSpan, stateChanges, swathStrips, toolPose, transitionMs, type ReplaySession } from "./replay";
+import { nodeTransforms, type NodeTransform } from "./tool-nodes";
+import { toTrs } from "./tool-nodes-trs";
+import { articulationOf } from "@fourmy/equipment-3d";
+import { swathGlb, swathMesh } from "./swath-glb";
+import { catenary, instancedGlb, isLeafless, pylonGeometry, treeGeometry, type Instance } from "./landscape-glb";
 
 /** Pluie ou neige en post-traitement : traits (ou flocons) qui tombent devant la scène. */
 const PRECIPITATION_GLSL = `
@@ -86,8 +97,27 @@ void main() {
 export interface TrackAvatar {
   modelUrl?: string;
   logoUrl?: string;
-  hitches?: { name: string; url: string; offsetM: number; from: string; to: string }[];
+  hitches?: {
+    name: string;
+    url: string;
+    offsetM: number;
+    from: string;
+    to: string;
+    /** Gabarit de l'avatar généré : nœuds articulés (outil relevé, rampe repliée). */
+    template?: string | null;
+    workingWidthM?: number | null;
+    shape?: ProcedureShape | null;
+  }[];
+  /** Parcours de la fenêtre : bout de champ (relevé) ou transport (replié). */
+  sessions?: ReplaySession[];
 }
+
+/** Bande travaillée : hauteur au-dessus du relief (m) et opacité d'un passage (deux passages foncent). */
+const SWATH_LIFT_M = 0.3;
+/** Paysage : côté des carrés d'arbres (un modèle chacun) et distance d'affichage (m). */
+const LANDSCAPE_CELL_M = 400;
+const LANDSCAPE_MAX_DISTANCE_M = 3_000;
+const SWATH_ALPHA = 0.35;
 
 /** Échantillons par côté d'une tuile de relief (API /terrain/heightmap). */
 const TERRAIN_SIZE = 65;
@@ -199,6 +229,18 @@ export class FarmScene {
   private trackEntities: Entity[] = [];
   private fleetEntities: Entity[] = [];
   private trackLines: PolylineCollection | null = null;
+  /** Bande travaillée du rejeu (glTF généré) et son effacement de l'écoute d'horloge. */
+  private swathModel: Model | null = null;
+  private swathUrl: string | null = null;
+  private swathListener: (() => void) | null = null;
+  private swathGeneration = 0;
+  private swathVisible = true;
+  /** Paysage (arbres, pylônes, câbles) : modèles, URL de blob et clé de ce qui est affiché. */
+  private landModels: Model[] = [];
+  private landUrls: string[] = [];
+  private landLines: PolylineCollection | null = null;
+  private landGeneration = 0;
+  private landKey = "";
   /** Cap boussole (degrés) du matériel le long de la trace, pour la caméra qui le suit. */
   private trackHeading: SampledProperty | null = null;
   private cameraMode: TrackCamera = "overview";
@@ -228,6 +270,8 @@ export class FarmScene {
   private readonly handler: ScreenSpaceEventHandler;
 
   constructor(container: HTMLElement, private readonly opts: FarmSceneOptions) {
+    // Développement : la scène est accessible depuis la console (vérifications visuelles, captures).
+    if (import.meta.env.DEV) (globalThis as { fourmyScene?: FarmScene }).fourmyScene = this;
     this.viewer = new Viewer(container, {
       baseLayer: false,
       terrainProvider: new FarmTerrainProvider((x, y, level) =>
@@ -626,7 +670,7 @@ export class FarmScene {
       }, false);
       add({
         id: `track:done:${run.from}`,
-        polyline: { positions: done, width: run.working ? 4 : 2, material: run.working ? COLORS.work : COLORS.transport.withAlpha(0.8) },
+        polyline: { positions: done, width: 2, material: run.working ? COLORS.work : COLORS.transport.withAlpha(0.8) },
       });
     }
     // Avatar posé sur le relief (sinon point surélevé), orienté selon le cap.
@@ -645,10 +689,16 @@ export class FarmScene {
     });
     const start = JulianDate.fromIso8601(samples[0]![0]);
     const stop = JulianDate.fromIso8601(samples.at(-1)![0]);
+    // État de l'outil au fil de la trace : posé, relevé (bout de champ), replié (transport).
+    const changes = stateChanges(samples, avatar.sessions);
+    // Bande travaillée derrière l'outil (chargée à part : la trace s'affiche sans l'attendre).
+    void this.setSwath(samples, avatar.hitches ?? []);
     // Outils attelés (interventions) : même trace, reculée de la distance d'attelage le long du cap.
     for (const h of avatar.hitches ?? []) {
-      const from = JulianDate.fromIso8601(h.from);
-      const to = JulianDate.fromIso8601(h.to);
+      // Affiché aussi sur les trajets qui encadrent l'intervention (rampe repliée sur la route).
+      const span = hitchSpan(h.from, h.to, avatar.sessions);
+      const from = JulianDate.fromIso8601(span.from);
+      const to = JulianDate.fromIso8601(span.to);
       const toolPos = new SampledPositionProperty();
       samples.forEach(([t, lon, lat], i) => {
         const [blon, blat] = behind(lon, lat, caps[i]!, h.offsetM);
@@ -660,7 +710,13 @@ export class FarmScene {
         availability: new TimeIntervalCollection([new TimeInterval({ start: JulianDate.greaterThan(from, start) ? from : start, stop: JulianDate.lessThan(to, stop) ? to : stop })]),
         position: toolPos,
         orientation,
-        model: { uri: h.url, minimumPixelSize: this.cameraMode === "drone" ? 0 : 32, maximumScale: 20, heightReference: HeightReference.CLAMP_TO_GROUND },
+        model: {
+          uri: h.url,
+          minimumPixelSize: this.cameraMode === "drone" ? 0 : 32,
+          maximumScale: 20,
+          heightReference: HeightReference.CLAMP_TO_GROUND,
+          nodeTransformations: this.toolNodes(h.template, changes),
+        },
       });
     }
     add({
@@ -801,7 +857,254 @@ export class FarmScene {
     this.viewer.camera.lookAt(at, new HeadingPitchRange(CesiumMath.toRadians(cap ?? 0), CesiumMath.toRadians(-22), this.followRange));
   }
 
+  /**
+   * Nœuds articulés d'un outil généré (conception §5.2) : `lift` monte et
+   * bascule hors travail, les demi-rampes se replient en transport. Calculés
+   * à chaque image depuis l'horloge, sans recréer de géométrie.
+   */
+  private toolNodes(template: string | null | undefined, changes: ReturnType<typeof stateChanges>) {
+    if (!toolPose(template, changes, 0, 0)) return undefined;
+    const booms = articulationOf(template)?.booms ?? false;
+    // Pose recalculée une fois par image (et non par nœud) : le dernier instant est gardé.
+    let last: { at: number; nodes: Record<string, NodeTransform> } | null = null;
+    const nodesAt = (time: JulianDate | undefined) => {
+      const at = time ? JulianDate.toDate(time).getTime() : 0;
+      if (last?.at !== at) last = { at, nodes: nodeTransforms(toolPose(template, changes, at, transitionMs(this.viewer.clock.multiplier))!, booms) };
+      return last.nodes;
+    };
+    const bag: Record<string, CallbackProperty> = {};
+    for (const name of Object.keys(nodeTransforms({ liftM: 0, pitchRad: 0, fold: 0 }, booms))) {
+      bag[name] = new CallbackProperty((time) => toTrs(nodesAt(time)[name]!), false);
+    }
+    return new PropertyBag(bag);
+  }
+
+  /**
+   * Bande travaillée (conception §6) : un glTF généré, posé sur le relief aux
+   * deux bords, dont un CustomShader ne montre que la partie déjà parcourue à
+   * l'heure de l'horloge. Translucide : un double passage ressort plus foncé.
+   */
+  private async setSwath(samples: Sample[], hitches: NonNullable<TrackAvatar["hitches"]>) {
+    const generation = ++this.swathGeneration;
+    const strips = swathStrips(
+      samples,
+      hitches.map((h) => ({ from: h.from, to: h.to, offsetM: h.offsetM, workingWidthM: h.workingWidthM, shape: h.shape, template: h.template })),
+      { maxPairs: 100_000 },
+    );
+    if (!strips.length) return;
+    const [lon0, lat0] = strips[0]!.left[0]!;
+    const edges = strips.flatMap((st) => st.times.flatMap((_, i) => [st.left[i]!, st.right[i]!]));
+    const cartos = [Cartographic.fromDegrees(lon0, lat0), ...edges.map(([lon, lat]) => Cartographic.fromDegrees(lon, lat))];
+    const grounded = await sampleTerrain(this.viewer.terrainProvider, 15, cartos).catch(() => cartos);
+    if (generation !== this.swathGeneration || this.viewer.isDestroyed()) return;
+    const h0 = grounded[0]!.height || 0;
+    let k = 1;
+    const t0 = Date.parse(samples[0]![0]);
+    // Repère est/nord/haut exact de Cesium : une approximation sphérique décale
+    // la bande de plusieurs mètres à 2 km de l'origine (champs éloignés le même jour).
+    const enu = Transforms.eastNorthUpToFixedFrame(Cartesian3.fromDegrees(lon0, lat0, h0));
+    const toEnu = Matrix4.inverseTransformation(enu, new Matrix4());
+    const scratch = new Cartesian3();
+    const mesh = swathMesh(
+      strips,
+      ([lon, lat]) => {
+        const world = Cartesian3.fromDegrees(lon, lat, (grounded[k++]!.height || h0) + SWATH_LIFT_M, undefined, scratch);
+        const local = Matrix4.multiplyByPoint(toEnu, world, scratch);
+        return [local.x, local.y, local.z];
+      },
+      t0,
+    );
+    const shader = new CustomShader({
+      uniforms: { u_now: { type: UniformType.FLOAT, value: -1 } },
+      translucencyMode: CustomShaderTranslucencyMode.TRANSLUCENT,
+      lightingModel: LightingModel.UNLIT,
+      fragmentShaderText: `
+        void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material) {
+          if (fsInput.attributes.time > u_now) discard;
+          material.diffuse = fsInput.attributes.color_0.rgb;
+          material.alpha = ${SWATH_ALPHA.toFixed(2)};
+        }`,
+    });
+    const url = URL.createObjectURL(new Blob([swathGlb(mesh) as BlobPart], { type: "model/gltf-binary" }));
+    const model = await Model.fromGltfAsync({
+      url,
+      modelMatrix: enu,
+      upAxis: Axis.Z,
+      forwardAxis: Axis.X,
+      customShader: shader,
+      shadows: ShadowMode.DISABLED,
+      id: "track:swath",
+    });
+    if (generation !== this.swathGeneration || this.viewer.isDestroyed()) {
+      model.destroy();
+      URL.revokeObjectURL(url);
+      return;
+    }
+    model.show = this.swathVisible;
+    this.viewer.scene.primitives.add(model);
+    this.swathModel = model;
+    this.swathUrl = url;
+    this.swathListener = this.viewer.scene.preRender.addEventListener(() => {
+      shader.setUniform("u_now", (JulianDate.toDate(this.viewer.clock.currentTime).getTime() - t0) / 1000);
+    });
+  }
+
+  /**
+   * Paysage de la BD TOPO (conception §7.3, §7.4) : un glTF instancié par
+   * type d'arbre, posé sur le relief ; pylônes en treillis à leur hauteur ;
+   * câbles tendus d'un sommet à l'autre avec leur flèche. `null` retire tout.
+   */
+  async setLandscape(data: Landscape3dAt | null, opts: { date: string; trees: boolean; power: boolean }) {
+    const key = data ? JSON.stringify([opts, data.trees.items.length, data.pylons.length, data.lines.length, data.trees.items[0]]) : "";
+    if (key === this.landKey) return;
+    this.landKey = key;
+    const generation = ++this.landGeneration;
+    this.clearLandscape();
+    if (!data) return;
+    const all: [number, number][] = [
+      ...(opts.trees ? data.trees.items.map((t) => [t[0], t[1]] as [number, number]) : []),
+      ...(opts.power ? data.pylons.map((p) => [p.lon, p.lat] as [number, number]) : []),
+      ...(opts.power ? data.lines.flatMap((l) => l.coords) : []),
+    ];
+    if (!all.length) return;
+    const [lon0, lat0] = all[0]!;
+    const grounded = await sampleTerrain(this.viewer.terrainProvider, 15, [Cartographic.fromDegrees(lon0, lat0), ...all.map(([lon, lat]) => Cartographic.fromDegrees(lon, lat))]).catch(() => null);
+    if (generation !== this.landGeneration || this.viewer.isDestroyed() || !grounded) return;
+    const h0 = grounded[0]!.height || 0;
+    const enu = Transforms.eastNorthUpToFixedFrame(Cartesian3.fromDegrees(lon0, lat0, h0));
+    const toEnu = Matrix4.inverseTransformation(enu, new Matrix4());
+    const scratch = new Cartesian3();
+    // Indices des altitudes : arbres, puis pylônes, puis sommets des lignes (ordre de `all`).
+    const nTrees = opts.trees ? data.trees.items.length : 0;
+    const pylonBase = 1 + nTrees;
+    const lineBase = pylonBase + (opts.power ? data.pylons.length : 0);
+    // Position exacte dans le repère local (voir la bande travaillée : pas d'approximation sphérique).
+    const local = (lon: number, lat: number, index: number, lift = 0): [number, number, number] => {
+      const p = Matrix4.multiplyByPoint(toEnu, Cartesian3.fromDegrees(lon, lat, (grounded[index]!.height || h0) + lift, undefined, scratch), scratch);
+      return [p.x, p.y, p.z];
+    };
+    // Lacet reproductible d'après la position (pas de scintillement d'un chargement à l'autre).
+    const yawOf = (lon: number, lat: number) => ((Math.sin(lon * 12.9898e4 + lat * 78.233e4) * 43758.5453) % 1) * Math.PI * 2;
+    // Un modèle par type et par carré de 400 m : Cesium écarte les carrés hors champ ou trop loin.
+    const groups = new Map<string, { kind: number; list: Instance[] }>();
+    if (opts.trees) {
+      data.trees.items.forEach(([lon, lat, h, crown, kind], i) => {
+        const [x, y, z] = local(lon, lat, 1 + i, -0.2);
+        const key = `${kind}:${Math.floor(x / LANDSCAPE_CELL_M)}:${Math.floor(y / LANDSCAPE_CELL_M)}`;
+        const g = groups.get(key) ?? { kind, list: [] };
+        g.list.push({ x, y, z, yaw: yawOf(lon, lat), sx: crown, sy: crown, sz: h });
+        groups.set(key, g);
+      });
+    }
+    const leafless = isLeafless(opts.date);
+    const add = async (glb: Uint8Array, id: string) => {
+      const url = URL.createObjectURL(new Blob([glb as BlobPart], { type: "model/gltf-binary" }));
+      this.landUrls.push(url);
+      const model = await Model.fromGltfAsync({
+        url,
+        modelMatrix: enu,
+        upAxis: Axis.Z,
+        forwardAxis: Axis.X,
+        shadows: ShadowMode.DISABLED,
+        id,
+        distanceDisplayCondition: new DistanceDisplayCondition(0, LANDSCAPE_MAX_DISTANCE_M),
+      });
+      if (generation !== this.landGeneration || this.viewer.isDestroyed()) {
+        model.destroy();
+        return;
+      }
+      this.viewer.scene.primitives.add(model);
+      this.landModels.push(model);
+    };
+    const geometries = new Map(data.trees.kinds.map((k, i) => [i, treeGeometry(k, leafless)]));
+    for (const [key, g] of groups) await add(instancedGlb(geometries.get(g.kind)!, g.list), `landscape:trees:${key}`);
+    if (!opts.power) return;
+    // Sommets des lignes dans le repère local (calculés avant les pylônes : leur orientation suit la ligne).
+    let v = lineBase;
+    const lineTops = data.lines.map((line) => line.coords.map(([lon, lat]) => local(lon, lat, v++)));
+    const pylons = data.pylons.map((p, i) => {
+      const at = local(p.lon, p.lat, pylonBase + i);
+      // Consoles perpendiculaires à la ligne : le modèle a ses consoles sur y, la ligne passe donc sur x.
+      let yaw = 0;
+      let best = 40;
+      for (const tops of lineTops) {
+        tops.forEach((v, i) => {
+          const d = Math.hypot(v[0] - at[0], v[1] - at[1]);
+          if (d >= best) return;
+          const [a, b] = [tops[Math.max(0, i - 1)]!, tops[Math.min(tops.length - 1, i + 1)]!];
+          best = d;
+          yaw = Math.atan2(b[1] - a[1], b[0] - a[0]);
+        });
+      }
+      return { ...p, at, yaw };
+    });
+    if (pylons.length) {
+      await add(
+        instancedGlb(
+          pylonGeometry(),
+          pylons.map((p) => ({ x: p.at[0], y: p.at[1], z: p.at[2], yaw: p.yaw, sx: p.heightM, sy: p.heightM, sz: p.heightM })),
+          "Fourmy pylônes",
+        ),
+        "landscape:pylons",
+      );
+    }
+    // Câbles : accrochés aux consoles du pylône le plus proche (à moins de 30 m), sinon à une hauteur d'après la tension.
+    // Deux conducteurs au bout de la console basse (0,7 h, ±0,3 h), un au bout de la console haute (0,85 h, +0,22 h).
+    const lines = new PolylineCollection();
+    const steel = Material.fromType("Color", { color: Color.fromCssColorString("#3A3F42").withAlpha(0.85) });
+    const conductors = [
+      { up: 0.7, side: 0.3 },
+      { up: 0.7, side: -0.3 },
+      { up: 0.85, side: 0.22 },
+    ];
+    data.lines.forEach((line, li) => {
+      const tops = lineTops[li]!.map(([x, y, z]) => {
+        const near = pylons.find((p) => Math.hypot(p.at[0] - x, p.at[1] - y) < 30);
+        return { x, y, z, h: near?.heightM ?? pylonHeightM(line.voltageKv) };
+      });
+      for (const c of conductors) {
+        const positions: Cartesian3[] = [];
+        for (let i = 0; i + 1 < tops.length; i++) {
+          const [a, b] = [tops[i]!, tops[i + 1]!];
+          const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+          const [nx, ny] = [-(b.y - a.y) / len, (b.x - a.x) / len];
+          const end = (p: typeof a): [number, number, number] => [p.x + nx * p.h * c.side, p.y + ny * p.h * c.side, p.z + p.h * c.up];
+          const pts = catenary(end(a), end(b));
+          for (const [x, y, z] of i ? pts.slice(1) : pts) positions.push(Matrix4.multiplyByPoint(enu, new Cartesian3(x, y, z), new Cartesian3()));
+        }
+        if (positions.length >= 2) lines.add({ positions, width: 1.5, material: steel });
+      }
+    });
+    this.landLines = this.viewer.scene.primitives.add(lines);
+  }
+
+  private clearLandscape() {
+    for (const m of this.landModels) this.viewer.scene.primitives.remove(m);
+    this.landModels = [];
+    for (const u of this.landUrls) URL.revokeObjectURL(u);
+    this.landUrls = [];
+    if (this.landLines) this.viewer.scene.primitives.remove(this.landLines);
+    this.landLines = null;
+  }
+
+  /** Affiche ou masque la bande travaillée du rejeu. */
+  setSwathVisible(on: boolean) {
+    this.swathVisible = on;
+    if (this.swathModel) this.swathModel.show = on;
+  }
+
+  private clearSwath() {
+    this.swathGeneration++;
+    this.swathListener?.();
+    this.swathListener = null;
+    if (this.swathModel) this.viewer.scene.primitives.remove(this.swathModel);
+    this.swathModel = null;
+    if (this.swathUrl) URL.revokeObjectURL(this.swathUrl);
+    this.swathUrl = null;
+  }
+
   clearTrack() {
+    this.clearSwath();
     if (this.cameraMode !== "overview") this.viewer.camera.lookAtTransform(Matrix4.IDENTITY);
     this.trackHeading = null;
     this.droneFrame = null;
@@ -825,6 +1128,9 @@ export class FarmScene {
 
   destroy() {
     this.vegGeneration++;
+    this.landGeneration++;
+    this.clearSwath();
+    for (const u of this.landUrls) URL.revokeObjectURL(u);
     for (const u of this.vegUrls) URL.revokeObjectURL(u);
     this.handler.destroy();
     this.viewer.destroy();

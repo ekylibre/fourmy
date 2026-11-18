@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { sql } from "drizzle-orm";
 import type { IgnLayer } from "@fourmy/contracts";
 import type { Database } from "@fourmy/db";
-import { fetchBuildings, fetchHeightmap, IgnHttpError, mercatorTileBounds, tileBounds } from "@fourmy/geo-ign";
+import { fetchBuildings, fetchCanopy, fetchHeightmap, fetchLandscape, IgnHttpError, mercatorTileBounds, tileBounds } from "@fourmy/geo-ign";
 
 /**
  * Cache des tuiles IGN sur le disque du serveur (« Ma ferme », lots F4 et
@@ -82,6 +82,23 @@ export const IGN_LAYERS: Record<IgnLayer, { ext: string; contentType: string; ra
     raster: false,
     fetch: (z, x, y, _etag, fetchImpl) =>
       viaGeoIgn(async () => Buffer.from(JSON.stringify(await fetchBuildings(mercatorTileBounds(z, x, y), fetchImpl as typeof fetch)))),
+  },
+  landscape: {
+    ext: "json",
+    contentType: "application/json",
+    raster: false,
+    fetch: (z, x, y, _etag, fetchImpl) =>
+      viaGeoIgn(async () => Buffer.from(JSON.stringify(await fetchLandscape(mercatorTileBounds(z, x, y), fetchImpl as typeof fetch)))),
+  },
+  canopy: {
+    ext: "f32",
+    contentType: "application/octet-stream",
+    raster: false,
+    fetch: (z, x, y, _etag, fetchImpl) =>
+      viaGeoIgn(async () => {
+        const grid = await fetchCanopy(mercatorTileBounds(z, x, y), undefined, fetchImpl as typeof fetch);
+        return Buffer.from(grid.buffer, grid.byteOffset, grid.byteLength);
+      }),
   },
 };
 

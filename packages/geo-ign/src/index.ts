@@ -7,3 +7,5 @@ export * from "./resample.js";
 export * from "./apicarto.js";
 export * from "./communes.js";
 export * from "./coverage.js";
+export * from "./landscape.js";
+export * from "./canopy.js";
