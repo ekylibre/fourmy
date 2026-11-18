@@ -203,7 +203,7 @@ Pour les appels qui ne concernent pas une ferme, elle obtient un jeton `client_c
    - abonnements : TaskData, TimeLog et Device Description (ce que publient les machines) ;
    - `allow_delete_by_user: true`.
 
-   Les fichiers reçus sont rangés et confirmés (lot AR2, ci-dessous) ; les TaskData sont lus (lot AR4), les journaux EFDI le seront au lot AR5.
+   Les fichiers reçus sont rangés et confirmés (lot AR2, ci-dessous) ; les TaskData (lot AR4) et les messages EFDI (lot AR5) sont lus.
 5. Le tenant est chiffré comme secret de l'intégration. Le point de terminaison et le nom du compte sont gardés dans les réglages.
 
 **Destinataires**
@@ -262,6 +262,11 @@ La ferme d'un événement est retrouvée sans lever l'isolation : fonctions `fou
 
 La proposition a la forme du brouillon des parcours GPS : « Créer l'intervention » ouvre le formulaire pré-rempli. Les produits et doses relevés s'affichent dans le bandeau, à saisir dans les intrants (pas de correspondance automatique avec les articles). À l'enregistrement, le fichier passe « Validé » et la tâche garde l'intervention. Un fichier sans tâche réalisée passe « Sans suite », un fichier abîmé « Illisible » avec le motif.
 
+**Messages EFDI (lot AR5)** : décodés sans dépendance (`decodeTimeLog`, `decodeDeviceDescription` de `@fourmy/isoxml`, numéros de champs de `efdi.proto` de DKE-Data, Apache 2.0) ; une enveloppe `google.protobuf.Any` de l'ancienne API est déballée.
+
+- **Description de machine** (`device_description`) : chaque machine est rapprochée d'un matériel de la ferme (numéro de série, sinon nom ou modèle). Sa largeur de travail (DDI 68, 67 ou 66, en mm) est comparée à celle de la fiche (avatar) ; si elle diffère, « Reporter … m sur la fiche » la met à jour. Le nombre de sections est affiché, pas enregistré. Sans rien à mettre à jour : « Sans suite », la description reste gardée pour les journaux.
+- **Journal** (`time_log`) : rattaché à la description de machine du même attelage (`teamset_context_id`), attendue une heure au plus. Ses positions (GNSS à RTK flottant) sont versées dans les **parcours GPS** du matériel automoteur reconnu, comme celles de Traccar : rattachement de source `agrirouter` (migration 0058), état de travail (DDI 141), vitesse (DDI 397), largeur, outil attelé (autre matériel reconnu). Les parcours sont recalculés aussitôt ; l'intervention se tire ensuite de l'onglet Parcours du matériel. Un matériel déjà suivi par Traccar n'est pas doublé ; une position déjà reçue n'est pas réinsérée. État « Versé aux parcours ».
+
 **Boîte de réception** : `Intégrations → Fichiers reçus d'agrirouter` (`/f/:ferme/agrirouter/inbox`, responsable) : date, type, fichier, état, confirmation, téléchargement.
 
 ## API
@@ -278,6 +283,7 @@ La proposition a la forme du brouillon des parcours GPS : « Créer l'interventi
 | `POST /integrations/agrirouter/connect` · `…/complete` | Consentement agrirouter (responsable) |
 | `GET /agrirouter/inbox` · `GET /agrirouter/inbox/:id/file` | Fichiers reçus d'agrirouter, tâches proposées et contenu (responsable) |
 | `POST /agrirouter/inbox/:id/dismiss` | Écarter un fichier reçu (responsable) |
+| `POST /agrirouter/inbox/:id/devices/:index/apply` | Reporter la largeur de travail d'une machine sur la fiche du matériel (responsable) |
 
 ## Code
 
@@ -342,7 +348,7 @@ La proposition a la forme du brouillon des parcours GPS : « Créer l'interventi
   - l'ordre des mailles de la grille ;
   - l'ordre des enfants de `TSK` ;
   - le type de point du contour.
-- **Journaux EFDI** (TimeLog, Device Description, protobuf), non lus : lot AR5 de `claudedocs/conception_agrirouter.md`. Ils sont déjà rangés et confirmés (lot AR2).
+- **EFDI essayé seulement sur des messages fabriqués par Fourmy** : décodeur et encodeur suivent les numéros de champs de `efdi.proto`, mais aucun message réel de machine n'a encore été lu. Les DDI d'état de travail (141), de vitesse (397) et de largeur (66 à 68) sont à confirmer avec l'IO-Tool.
 - **Lecture des TaskData essayée** sur un seul fichier réel (console Topcon, sans dose). Doses, surface et rapprochement d'une carte revenue sont à confirmer sur des fichiers de consoles réelles (IO-Tool).
 - **Zonage sur une seule image.** Un zonage pluriannuel (médiane de plusieurs dates ou de plusieurs saisons) serait plus stable pour les cartes de sol ou de semis.
 - **Pas de lien** entre une carte et l'intervention qui l'applique. Les doses moyennes et la quantité ne pré-remplissent pas encore la saisie.

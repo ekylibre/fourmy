@@ -108,6 +108,8 @@ describe("agrirouter : fichiers reçus (AR2)", () => {
               confirmedAt: null,
               confirmError: null,
               tasks: [],
+              devices: [],
+              telemetry: null,
             },
           ],
         }),
@@ -168,6 +170,8 @@ describe("agrirouter : travail reçu d'une console (AR4)", () => {
     confirmedAt: "2026-03-20T10:00:05Z",
     confirmError: null,
     tasks: [task],
+    devices: [],
+    telemetry: null,
     ...over,
   });
 
@@ -210,5 +214,63 @@ describe("agrirouter : travail reçu d'une console (AR4)", () => {
     const banner = await screen.findByLabelText("Travail reçu d'agrirouter");
     expect(within(banner).getByText("Travail reçu de la console par agrirouter")).toBeInTheDocument();
     expect(within(banner).getByText(/reçue de la console par agrirouter/)).toBeInTheDocument();
+  });
+});
+
+describe("agrirouter : descriptions de machine et journaux EFDI (AR5)", () => {
+  const EQ = "00000000-0000-7000-8000-0000000000e1";
+  const base = {
+    messageType: "iso:11783:-10:device_description:protobuf",
+    filename: null,
+    size: 512,
+    senderEndpointId: null,
+    senderName: null,
+    sentAt: null,
+    receivedAt: "2026-04-16T07:29:00Z",
+    error: null,
+    confirmedAt: "2026-04-16T07:29:05Z",
+    confirmError: null,
+    tasks: [],
+  };
+
+  it("description de machine : matériel reconnu, largeur proposée et reportée ; journal versé aux parcours", async () => {
+    let applied = false;
+    const device = {
+      index: 0, designator: "ZA-TS", serial: "AMZ-1", equipment: { id: EQ, name: "Épandeur" },
+      workingWidthM: 24, currentWidthM: 18, sections: 2, proposeWidth: true, applied: false,
+    };
+    server.use(
+      http.get("*/agrirouter/inbox", () =>
+        HttpResponse.json({
+          items: [
+            { ...base, id: "00000000-0000-7000-8000-0000000002a1", state: applied ? "validated" : "proposed", devices: [{ ...device, applied, currentWidthM: applied ? 24 : 18 }], telemetry: null },
+            {
+              ...base,
+              id: "00000000-0000-7000-8000-0000000002a2",
+              messageType: "iso:11783:-10:time_log:protobuf",
+              state: "merged",
+              devices: [],
+              telemetry: { equipment: { id: EQ, name: "Fendt" }, tool: "Épandeur", positions: 300, from: "2026-04-16T07:30:00Z", to: "2026-04-16T07:34:59Z" },
+            },
+          ],
+        }),
+      ),
+      http.post("*/agrirouter/inbox/:id/devices/0/apply", () => {
+        applied = true;
+        return HttpResponse.json({});
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(`/f/${FARM}/agrirouter/inbox`);
+    const machine = await screen.findByLabelText("Machine ZA-TS");
+    expect(within(machine).getByText(/largeur 24 m · 2 sections \(fiche : 18 m\)/)).toBeInTheDocument();
+    expect(within(machine).getByRole("link", { name: "Épandeur" })).toHaveAttribute("href", `/f/${FARM}/equipments/${EQ}`);
+    await user.click(within(machine).getByRole("button", { name: "Reporter 24 m sur la fiche" }));
+    expect(await within(await screen.findByLabelText("Machine ZA-TS")).findByText("reportée sur la fiche")).toBeInTheDocument();
+
+    expect(screen.getByText("Enregistrement de travail (TimeLog)")).toBeInTheDocument();
+    expect(screen.getByText("Versé aux parcours")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "parcours de Fendt" })).toHaveAttribute("href", `/f/${FARM}/equipments/${EQ}?tab=tracks`);
+    expect(screen.getByText(/300 positions du/)).toHaveTextContent("(attelé : Épandeur)");
   });
 });

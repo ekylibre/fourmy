@@ -107,7 +107,7 @@ describe.skipIf(!url)("agrirouter : lecture des TaskData reçus (AR4)", () => {
 
   it("fichier réel Topcon : parcelle par les positions, tracteur par son modèle, période en UTC", async () => {
     const id = await receive(TOPCON, "topcon.zip");
-    expect(await readAgrirouterInbox(db(), 20, farmId)).toEqual({ proposed: 1, ignored: 0, unreadable: 0 });
+    expect(await readAgrirouterInbox(db(), 20, farmId)).toEqual({ proposed: 1, ignored: 0, unreadable: 0, merged: 0 });
     const it = await item(id);
     expect(it.state).toBe("proposed");
     expect(it.tasks).toHaveLength(1);
@@ -155,12 +155,12 @@ describe.skipIf(!url)("agrirouter : lecture des TaskData reçus (AR4)", () => {
   it("tâche seulement prévue : sans suite ; fichier abîmé : illisible avec le motif", async () => {
     const planned = await receive(returned("Prévue", 1), "prevue.zip");
     const broken = await receive(new Uint8Array([80, 75, 1, 2, 3]), "abime.zip");
-    expect(await readAgrirouterInbox(db(), 20, farmId)).toEqual({ proposed: 0, ignored: 1, unreadable: 1 });
+    expect(await readAgrirouterInbox(db(), 20, farmId)).toEqual({ proposed: 0, ignored: 1, unreadable: 1, merged: 0 });
     expect(await item(planned)).toMatchObject({ state: "ignored", error: "Aucune tâche réalisée dans ce fichier.", tasks: [] });
     expect((await item(broken)).state).toBe("unreadable");
     expect((await item(broken)).error).toContain("Archive zip illisible");
     // Déjà lus : rien de plus au tour suivant.
-    expect(await readAgrirouterInbox(db(), 20, farmId)).toEqual({ proposed: 0, ignored: 0, unreadable: 0 });
+    expect(await readAgrirouterInbox(db(), 20, farmId)).toEqual({ proposed: 0, ignored: 0, unreadable: 0, merged: 0 });
   });
 
   it("intervention enregistrée depuis la proposition (API) : le fichier passe validé, la tâche garde l'intervention", async () => {
