@@ -17,6 +17,7 @@ import { purgeIgnCache, runIgnJob } from "./ign/preload.js";
 import { agrirouterClient, agrirouterConfig } from "./integrations/agrirouter.js";
 import { confirmAgrirouterInbox, runAgrirouterListener } from "./integrations/agrirouter-events.js";
 import { drainAgrirouterOutbox } from "./integrations/agrirouter-outbox.js";
+import { readAgrirouterInbox } from "./integrations/agrirouter-read.js";
 
 /**
  * Worker : synchronise les intégrations actives de toutes les fermes
@@ -153,6 +154,11 @@ async function agrirouterTick(): Promise<void> {
   const out = await drainAgrirouterOutbox(db());
   if (out.sent || out.partial || out.failed || out.queued) {
     console.log(`[worker] agrirouter : envois ${out.sent} parti(s), ${out.queued} toujours en attente, ${out.partial} partiel(s), ${out.failed} abandonné(s)`);
+  }
+  // Lecture des TaskData reçus : propositions d'intervention (lot AR4), sans appel à agrirouter.
+  const read = await readAgrirouterInbox(db());
+  if (read.proposed || read.ignored || read.unreadable) {
+    console.log(`[worker] agrirouter : fichiers lus, ${read.proposed} avec proposition, ${read.ignored} sans suite, ${read.unreadable} illisible(s)`);
   }
   if (!agrirouterConfig()) return;
   const r = await confirmAgrirouterInbox(db(), agrirouterClient());

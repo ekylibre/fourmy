@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { sql } from "drizzle-orm";
 import { withFarm } from "@fourmy/db";
-import type { AgrirouterInboxItem } from "@fourmy/contracts";
+import type { AgrirouterInboxItem, AgrirouterInboxTask } from "@fourmy/contracts";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import { readAgrirouterFile } from "../integrations/agrirouter-events.js";
-import { NotFound, uuidParam } from "./helpers.js";
+import { BadRequest, NotFound, uuidParam } from "./helpers.js";
 
 type Row = {
   id: string;
@@ -20,6 +20,7 @@ type Row = {
   error: string | null;
   confirmed_at: Date | string | null;
   confirm_error: string | null;
+  parsed: { tasks?: AgrirouterInboxTask[] } | null;
 };
 const iso = (v: Date | string | null) => (v === null ? null : new Date(v).toISOString());
 
@@ -36,6 +37,7 @@ const view = (r: Row): AgrirouterInboxItem => ({
   error: r.error,
   confirmedAt: iso(r.confirmed_at),
   confirmError: r.confirm_error,
+  tasks: r.parsed?.tasks ?? [],
 });
 
 /** Nom de fichier sûr pour l'en-tête de téléchargement. */
@@ -50,10 +52,21 @@ export const agrirouterRoutes = new Hono<Env>()
   .get("/agrirouter/inbox", async (c) => {
     const items = await withFarm(db(), c.get("farmId"), (tx) =>
       tx.execute(sql`
-        SELECT id, message_type, filename, size, sender_endpoint_id, sender_name, sent_at, received_at, state, error, confirmed_at, confirm_error
+        SELECT id, message_type, filename, size, sender_endpoint_id, sender_name, sent_at, received_at, state, error, confirmed_at, confirm_error, parsed
         FROM agrirouter_inbox ORDER BY received_at DESC LIMIT 500`),
     );
     return c.json({ items: (items as unknown as Row[]).map(view) });
+  })
+  // Écarter un fichier reçu : il reste dans la liste, sans proposition.
+  .post("/agrirouter/inbox/:id/dismiss", async (c) => {
+    const [row] = (await withFarm(db(), c.get("farmId"), (tx) =>
+      tx.execute(sql`
+        UPDATE agrirouter_inbox SET state = 'dismissed'
+        WHERE id = ${uuidParam(c, "id")} AND state IN ('received', 'proposed', 'ignored', 'unreadable')
+        RETURNING id, message_type, filename, size, sender_endpoint_id, sender_name, sent_at, received_at, state, error, confirmed_at, confirm_error, parsed`),
+    )) as unknown as Row[];
+    if (!row) throw new BadRequest("Fichier introuvable, ou déjà validé ou écarté.");
+    return c.json(view(row));
   })
   .get("/agrirouter/inbox/:id/file", async (c) => {
     const [row] = (await withFarm(db(), c.get("farmId"), (tx) =>

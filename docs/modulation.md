@@ -203,7 +203,7 @@ Pour les appels qui ne concernent pas une ferme, elle obtient un jeton `client_c
    - abonnements : TaskData, TimeLog et Device Description (ce que publient les machines) ;
    - `allow_delete_by_user: true`.
 
-   Les fichiers reçus sont rangés et confirmés (lot AR2, ci-dessous) ; leur lecture vient aux lots AR4 et AR5.
+   Les fichiers reçus sont rangés et confirmés (lot AR2, ci-dessous) ; les TaskData sont lus (lot AR4), les journaux EFDI le seront au lot AR5.
 5. Le tenant est chiffré comme secret de l'intégration. Le point de terminaison et le nom du compte sont gardés dans les réglages.
 
 **Destinataires**
@@ -248,6 +248,20 @@ La ferme d'un événement est retrouvée sans lever l'isolation : fonctions `fou
 
 **Confirmation** : à chaque tour, le worker confirme (`POST /confirmations`) les fichiers rangés, par compte agrirouter et par lots de 100 ; un échec est retenté au tour suivant (20 fois au plus, motif gardé). Un fichier est considéré traité dès qu'il est rangé : sa lecture se fera depuis le volume.
 
+**Lecture des TaskData (lot AR4)** : le worker lit chaque TaskData reçu (`readTaskData` de `@fourmy/isoxml`, sans dépendance : zip, fichiers externes XFR, journaux binaires TLG). Chaque tâche réalisée (pas prévue, modèle ni annulée) devient une proposition d'intervention :
+
+| Élément | D'où il vient |
+|---|---|
+| Périodes | TIM de travail effectif (type 4), sinon tous les TIM, sinon début et fin du journal. Heures de console sans fuseau lues à l'heure de Paris. |
+| Parcelles | positions du journal (état GNSS à RTK flottant) dans les parcelles valides à la date, part des points ≥ 5 % ; sinon contour de la tâche (PFD) ; sinon parcelle de la carte d'origine |
+| Matériel | DVC par numéro de série, sinon par nom ou modèle |
+| Produits | allocations de produit (PAN) et produit de la carte d'origine |
+| Dose moyenne | DDI réels 7 (kg/ha), 2 (L/ha), 12 (grains/ha), sinon consignes 6, 1, 11, d'après le journal ou les totaux |
+| Surface travaillée | DDI 116 (surface totale, m²), répartie selon la part de chaque parcelle ; sinon surface du contour |
+| Carte d'origine | désignation de la tâche envoyée par Fourmy, terminée par ` F<8 premiers caractères de l'id>` |
+
+La proposition a la forme du brouillon des parcours GPS : « Créer l'intervention » ouvre le formulaire pré-rempli. Les produits et doses relevés s'affichent dans le bandeau, à saisir dans les intrants (pas de correspondance automatique avec les articles). À l'enregistrement, le fichier passe « Validé » et la tâche garde l'intervention. Un fichier sans tâche réalisée passe « Sans suite », un fichier abîmé « Illisible » avec le motif.
+
 **Boîte de réception** : `Intégrations → Fichiers reçus d'agrirouter` (`/f/:ferme/agrirouter/inbox`, responsable) : date, type, fichier, état, confirmation, téléchargement.
 
 ## API
@@ -262,7 +276,8 @@ La ferme d'un événement est retrouvée sans lever l'isolation : fonctions `fou
 | `GET /prescriptions/recipients` | Destinataires agrirouter, lus en direct |
 | `POST /prescriptions/:id/send` | Envoi par agrirouter (responsable), tracé |
 | `POST /integrations/agrirouter/connect` · `…/complete` | Consentement agrirouter (responsable) |
-| `GET /agrirouter/inbox` · `GET /agrirouter/inbox/:id/file` | Fichiers reçus d'agrirouter et leur contenu (responsable) |
+| `GET /agrirouter/inbox` · `GET /agrirouter/inbox/:id/file` | Fichiers reçus d'agrirouter, tâches proposées et contenu (responsable) |
+| `POST /agrirouter/inbox/:id/dismiss` | Écarter un fichier reçu (responsable) |
 
 ## Code
 
@@ -327,7 +342,8 @@ La ferme d'un événement est retrouvée sans lever l'isolation : fonctions `fou
   - l'ordre des mailles de la grille ;
   - l'ordre des enfants de `TSK` ;
   - le type de point du contour.
-- **Lecture des fichiers reçus**, non faite : tâches ISO-XML réalisées, TimeLogs, Device Descriptions (lots AR4 et AR5 de `claudedocs/conception_agrirouter.md`). Ils sont déjà rangés et confirmés (lot AR2).
+- **Journaux EFDI** (TimeLog, Device Description, protobuf), non lus : lot AR5 de `claudedocs/conception_agrirouter.md`. Ils sont déjà rangés et confirmés (lot AR2).
+- **Lecture des TaskData essayée** sur un seul fichier réel (console Topcon, sans dose). Doses, surface et rapprochement d'une carte revenue sont à confirmer sur des fichiers de consoles réelles (IO-Tool).
 - **Zonage sur une seule image.** Un zonage pluriannuel (médiane de plusieurs dates ou de plusieurs saisons) serait plus stable pour les cartes de sol ou de semis.
 - **Pas de lien** entre une carte et l'intervention qui l'applique. Les doses moyennes et la quantité ne pré-remplissent pas encore la saisie.
 - Le lien avec le plan de fumure existe dans l'autre sens : voir ci-dessous.
