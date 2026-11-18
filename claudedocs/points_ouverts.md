@@ -1,6 +1,6 @@
 # Points ouverts de Fourmy
 
-*Recensés le 2026-11-12 dans toute la documentation (`docs/`, `claudedocs/`, README, historique Git) et dans le journal de recette. Mis à jour le 2026-11-13 après les lots « Équipe et personnes » (P1 à P5), « Ma ferme » (F1 à F5) et « Itinéraires techniques » (T0 à T3). Cette liste alimente la roadmap du projet GitHub [Fourmy — Roadmap](https://github.com/orgs/ekylibre/projects/2) : les points P1 et P2 y sont les issues n° 1 à 37 du dépôt, dans l'ordre de cette liste (jalons « Envoi ferme pilote » et « Fin 2026 ») ; les points P3 y sont des brouillons. Le suivi se fait désormais dans le projet GitHub.*
+*Recensés le 2026-11-12 dans toute la documentation (`docs/`, `claudedocs/`, README, historique Git) et dans le journal de recette. Revus le 2026-11-16 (déploiement, TIKA, projet GitHub, agrirouter). Mis à jour le 2026-11-13 après les lots « Équipe et personnes » (P1 à P5), « Ma ferme » (F1 à F5) et « Itinéraires techniques » (T0 à T3). Cette liste alimente la roadmap du projet GitHub [Fourmy — Roadmap](https://github.com/orgs/ekylibre/projects/2) : les points P1 et P2 y sont les issues n° 1 à 37 du dépôt, dans l'ordre de cette liste (jalons « Envoi ferme pilote » et « Fin 2026 ») ; les points P3 y sont des brouillons. Le suivi se fait désormais dans le projet GitHub.*
 
 Chaque point se lit ainsi : **titre** : description. *nature · priorité · source*.
 
@@ -12,6 +12,49 @@ Chaque point se lit ainsi : **titre** : description. *nature · priorité · sou
 **Natures :** bug, évolution, donnée, décision, externe, juridique, doc, exploitation, dette.
 
 **Numérotation :** les points 1 à 94 gardent leur numéro du 12/11. Les points nouveaux commencent à 95 et sont rangés dans leur thème.
+
+## Mise à jour du 2026-11-16
+
+Le matin, aucun commit depuis le 13/11 (dernier : PR #56). L'après-midi et le soir : reprise de l'intégration agrirouter (ci-dessous).
+
+### agrirouter, point d'avancement du 16/11 au soir
+
+Besoins : `claudedocs/besoins_agrirouter.md` ; conception et lots : `claudedocs/conception_agrirouter.md` ; fonctionnement : `docs/modulation.md`.
+
+- **Portail agrirouter (production)** : application « Fourmy », marque Ekylibre, Deep URL `https://fourmy.org/agrirouter`, version 1 soumise pour revue avec 4 capacités (TaskData en envoi et réception, Shapefile en envoi, TimeLog et Device Description EFDI en réception), client OAuth de dev.fourmy.org. Jeton obtenu et flux d'événements ouvert en production (essais en lecture seule). Identifiants dans le `.env.prod` des ressources, sauf l'ID de version (après « Testing approved »).
+- **Décisions** : machines virtuelles (VCU) retirées du périmètre ; parcelles poussées de Fourmy vers agrirouter seulement ; travaux reçus proposés en intervention, à valider.
+- **Lots** :
+
+  | Lot | Contenu | État |
+  |---|---|---|
+  | AR1 | connexion conforme à la revue, Deep URL, déconnexion constatée | ✅ fusionné (#61) |
+  | AR2 | écoute des événements, fichiers reçus rangés et confirmés | PR #62 à relire |
+  | AR3 | file d'envoi, reprise après coupure | PR #63 (sur #62) |
+  | AR4 | TaskData reçus lus, proposés en intervention | PR #64 (sur #63) |
+  | AR5 | descriptions de machine et journaux EFDI versés aux parcours | PR #65 (sur #64) |
+  | AR6 | machines virtuelles | retiré |
+  | AR7 | synchro des parcelles (AgmaSync) | à faire, après la réponse du support |
+  | AR8 | préparation de la revue d'implémentation | à faire |
+
+- **Bloquant** : aucun essai réel tant que la version 1 n'est pas « Testing approved » et sans compte IO-Tool. Le message au support (accès IO-Tool, validation de la version, déclaration des parcelles, échantillons, contrat) est rédigé et reste à envoyer (point 111).
+- **Essayé sur** : un TaskData réel public (console Topcon, isoxml-js, Apache 2.0) et des messages synthétiques. Doses, surfaces, DDI et EFDI sont à confirmer sur de vrais fichiers (point 114).
+
+État vérifié le 16/11 :
+
+- **Avancés** :
+  - 95 : le déploiement est fait. dev.fourmy.org et fourmy.org servent la version 0.113.1 (commit `eeeffbf` du 13/11, 19:15), qui contient tous les lots du 12 et 13/11. Il reste à vérifier sur dev.fourmy.org le préchargement IGN, la copie hors ligne et le worker (point 2) ;
+  - 105 : la première demande de fusion (`dom-natif`) est ouverte chez OSFarm le 13/11 ([osfarm/itineraire-technique#47](https://github.com/osfarm/itineraire-technique/pull/47)), sans relecture pour l'instant. Les huit autres attendent sa fusion.
+- **Projet GitHub** (mis à jour le 16/11) :
+  - nouvelles issues : #57 (point 95, P1), #58 (point 98, P2), #59 (point 105, P2) ;
+  - passent « In Progress » : #14, #24, #31, #57 et #59 ;
+  - le brouillon du point 17 est clos et archivé.
+  - agrirouter (soir) : #20 (point 55) passe « In Progress », avec un commentaire d'avancement ; nouvelles issues #66 (point 111), #67 (112), #68 (113), #69 (114).
+- **Avancés par agrirouter** :
+  - 55 : application enregistrée, connexion conforme, essais en lecture seule sur la production ; l'essai sur console attend la validation de la version et l'IO-Tool ;
+  - 46 : une carte revenue réalisée d'une console est reconnue et proposée avec l'intervention (AR4, PR #64).
+- **Fait (code, PR à fusionner)** : 57, réception agrirouter (AR2 à AR5, PR #62 à #65).
+- **Nouveaux** : 111 à 117 (thème 9).
+- **Hors dépôt** : `claudedocs/PPF/` (sources COMIFER, PAR 7 et leurs extraits pour la fertilisation, environ 29 Mo de documents sous droits) est ignoré par `.gitignore` et reste sur le poste.
 
 ## Mise à jour du 2026-11-13
 
@@ -43,20 +86,20 @@ Chaque point se lit ainsi : **titre** : description. *nature · priorité · sou
 | 6. Matériels et entretien | 0 | 0 | 7 | 7 |
 | 7. GPS et attelages | 1 | 2 | 4 | 7 |
 | 8. Télédétection, croissance, modulation, 3D | 0 | 1 | 10 | 11 |
-| 9. Intégrations externes | 0 | 4 | 5 | 9 |
+| 9. Intégrations externes | 0 | 8 | 7 | 15 |
 | 10. Données de la ferme pilote | 5 | 4 | 0 | 9 |
 | 11. Site public et vidéos | 1 | 2 | 1 | 4 |
 | 12. Juridique et partenariats | 0 | 1 | 3 | 4 |
 | 13. Dette technique et qualité | 0 | 3 | 6 | 9 |
 | 14. Nouveaux domaines | 0 | 0 | 7 | 7 |
 | 15. Itinéraires techniques | 0 | 1 | 5 | 6 |
-| **Total** | **10** | **30** | **68** | **108** |
+| **Total** | **10** | **34** | **70** | **114** |
 
-Plus deux points faits (17 et 104), hors du total.
+Plus trois points faits (17, 104 et 57, ce dernier en PR à fusionner), hors du total.
 
 ## 1. Mise en production et exploitation
 
-1. **Sauvegardes de la base et coffre des clés** : planifier les sauvegardes et garder `FOURMY_SECRETS_KEY` et `BETTER_AUTH_SECRET` à part. *exploitation · P1 · deploiement.md « Sauvegardes »*
+1. **Sauvegardes de la base et coffre des clés** : planifier les sauvegardes et garder `FOURMY_SECRETS_KEY` et `BETTER_AUTH_SECRET` à part. Depuis AR2, sauvegarder aussi le volume `fourmy_agrirouter_files` (fichiers reçus, non renvoyés par agrirouter). *exploitation · P1 · deploiement.md « Sauvegardes »*
 2. **Vérifier le worker sur dev.fourmy.org** : Traccar, Copernicus, IFT, Lexicon, eau, parcours, et depuis le 13/11 le préchargement IGN. *exploitation · P1 · plan_de_test §8 T-PHY-6*
 3. **Production Eyona** : domaine, adresse de l'application (`app.fourmy.org` ?), cible de « Se connecter », API IFT de production. *décision · P2 · deploiement.md, site-public-exigences §6*
 4. **Boîte contact@fourmy.org et SMTP** : sans eux, pas de formulaire de contact, pas d'alertes d'entretien, et les invitations se font par lien copié (équipe, décision 7). *externe · P2 · site-public-exigences §6*
@@ -65,6 +108,8 @@ Plus deux points faits (17 et 104), hors du total.
     - les migrations 0044 à 0053, appliquées au démarrage de l'API ;
     - le volume `fourmy_ign_cache`, monté dans l'API et dans le worker ;
     - l'accès au dépôt GitHub du fork TIKA, à la construction de l'image.
+
+    **Avancé le 16/11** : version 0.113.1 en ligne sur dev.fourmy.org et fourmy.org. Il reste les vérifications.
 
     *exploitation · P1 · conception_ma_ferme §8, conception_itineraires_techniques §12 quater*
 96. **Surveiller la place prise par le cache IGN** sur le serveur (seuil de confirmation à 2 Go par ferme). *exploitation · P3 · conception_ma_ferme §13*
@@ -151,7 +196,7 @@ Plus deux points faits (17 et 104), hors du total.
     - zonage sur plusieurs années.
 
     *évolution · P3 · plan_de_test §8*
-46. **Lier une carte de modulation à l'intervention qui l'applique**. *évolution · P3 · modulation.md*
+46. **Lier une carte de modulation à l'intervention qui l'applique**. Avancé le 16/11 : une carte revenue réalisée d'une console est reconnue et citée dans la proposition d'intervention (AR4) ; le lien n'est pas encore gardé sur l'intervention. *évolution · P3 · modulation.md*
 47. **Signalements** : semis non saisi, confirmation NDMI ou Sentinel-1. *évolution · P3 · teledetection.md*
 48. **Sentinel-1, LAI, fournisseur de secours**. *évolution · P3 · specs §16*
 49. **Modèle de croissance** : précocité, vernalisation, autres cultures, stations locales. *évolution · P3 · modele-croissance.md*
@@ -163,13 +208,20 @@ Plus deux points faits (17 et 104), hors du total.
 
 53. **API Carto de l'IGN** : en 404 le 12/11 (PAC et cadastre) ; à revérifier. *externe · P2 · plan_de_test §8*
 54. **Weenat et Sencrop avec de vrais comptes**. *externe · P2 · meteo.md*
-55. **agrirouter en conditions réelles** : compte développeur, essai sur console. *externe · P2 · modulation.md*
+55. **agrirouter en conditions réelles** : compte développeur, essai sur console. **Avancé le 16/11** : compte développeur validé, application et version 1 enregistrées en production, client OAuth de dev.fourmy.org, connexion conforme à la revue (AR1, #61). Reste l'essai sur console. *externe · P2 · modulation.md*
 56. **CGU de CDSE pour un SaaS**. *juridique · P2 · specs §23.12*
-57. **Réception agrirouter** (TimeLogs, doses appliquées) et consoles ISOBUS. *évolution · P3 · FR-GPS-3*
+57. ~~**Réception agrirouter** (TimeLogs, doses appliquées) et consoles ISOBUS~~ : **fait le 16/11**, PR #62 à #65 à fusionner. Fichiers reçus rangés et confirmés, TaskData proposés en intervention, journaux EFDI versés aux parcours GPS. *évolution · P3 · FR-GPS-3*
 58. **Telepac et déclaration PAC**. *évolution · P3 · FR-PARC-3, FR-REG-2*
 59. **Synchronisation Lyvre** : stocks, consommations, pièces. *évolution · P3 · FR-STK-3, US-8*
 60. **Serveur MCP pour Aiffel**. *évolution · P3 · FR-API-2, US-7*
 61. **Capteurs génériques** : OGC SensorThings, API DSA de Weenat. *évolution · P3 · FR-CAP-2, FR-TWIN-9*
+111. **Écrire au support agrirouter** (support@agrirouter.com) : compte IO-Tool, passage de la version 1 en « Testing approved », déclaration des parcelles (AgmaSync), échantillons TaskData et EFDI, contrat de participation. Message rédigé le 16/11. *externe · P2 · besoins_agrirouter §3*
+112. **Synchro des parcelles (AgmaSync, lot AR7)** : exploitation, parcelles et contours poussés vers agrirouter, chargement initial, révisions. À coder après la réponse du support sur la déclaration. *évolution · P2 · conception_agrirouter §8*
+113. **Préparer la revue d'implémentation (lot AR8)** : deux fermes de démonstration, testeurs DKE invités, déroulé écrit, `docs/agrirouter.md`. *doc · P2 · conception_agrirouter §11*
+114. **Confirmer sur de vrais fichiers avec l'IO-Tool** : envoi d'une carte, redélivraison après coupure (question B), DDI de dose et de surface (2, 7, 12, 116), messages EFDI (DDI 141, 397, 66 à 68, forme G4). *externe · P2 · conception_agrirouter §12*
+115. **Purger les fichiers envoyés** à agrirouter après 90 jours (volume `fourmy_agrirouter_files`). Les fichiers reçus sont gardés et doivent être sauvegardés (point 1). *exploitation · P3 · conception_agrirouter §3*
+116. **Fuseau horaire par ferme** : les heures des consoles sans fuseau sont lues à l'heure de Paris. *évolution · P3 · conception_agrirouter AR4*
+117. **Produits reçus d'une console vers les intrants** : correspondance entre le nom du produit de la console et l'article de la ferme ; aujourd'hui, produit et dose s'affichent seulement dans le bandeau. Sections d'un matériel à garder sur sa fiche. *évolution · P3 · conception_agrirouter AR4, AR5*
 
 ## 10. Données de la ferme pilote
 
@@ -229,7 +281,7 @@ Plus deux points faits (17 et 104), hors du total.
 ## 15. Itinéraires techniques
 
 105. **Reverser les contributions TIKA à OSFarm** : neuf demandes de fusion en série (la 9e, `transcription-a-la-demande`, ajoutée le 13/11), depuis le fork `ekylibre/itineraire-technique`, relues par David et Bertrand.
-     - La première (`dom-natif`) est prête mais pas encore ouverte.
+     - La première (`dom-natif`) est ouverte depuis le 13/11 : [osfarm/itineraire-technique#47](https://github.com/osfarm/itineraire-technique/pull/47), en attente de relecture.
      - OSFarm doit choisir comment publier sur npm : une version à chaque fusion, ou une seule version 1.3.0 à la fin.
 
      *externe · P2 · conception_itineraires_techniques §7, §12 ter*
