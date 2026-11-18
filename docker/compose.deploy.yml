@@ -61,12 +61,15 @@ services:
       AGRIROUTER_REDIRECT_URI: ${AGRIROUTER_REDIRECT_URI:-${PUBLIC_URL}/agrirouter/callback}
       AGRIROUTER_ENVIRONMENT: ${AGRIROUTER_ENVIRONMENT:-production}
     # Cache des tuiles IGN (« Ma ferme », F4) : relu par l'API, rempli aussi par le worker.
+    # Fichiers reçus d'agrirouter : rangés par le worker, téléchargés par l'API.
     volumes:
       - fourmy_ign_cache:/var/cache/fourmy/ign
+      - fourmy_agrirouter_files:/var/cache/fourmy/agrirouter
 
   # Tâches de fond : intégrations des fermes (Traccar : chaque minute), Lexicon,
   # eau, IFT, météo, heures estimées des matériels, alertes d'entretien,
-  # préchargement et quota du cache IGN.
+  # préchargement et quota du cache IGN, écoute des événements agrirouter
+  # (une seule instance écoute, verrou en base).
   worker:
     build:
       context: ..
@@ -105,6 +108,7 @@ services:
       FOURMY_IGN_PRELOAD_CONCURRENCY: ${FOURMY_IGN_PRELOAD_CONCURRENCY:-8}
     volumes:
       - fourmy_ign_cache:/var/cache/fourmy/ign
+      - fourmy_agrirouter_files:/var/cache/fourmy/agrirouter
 
   web:
     build:
@@ -133,3 +137,4 @@ services:
 volumes:
   fourmy_pgdata:
   fourmy_ign_cache:
+  fourmy_agrirouter_files:

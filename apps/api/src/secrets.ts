@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from "node:crypto";
 
 /**
  * Chiffrement des secrets d'intégration (jetons, mots de passe) avant leur
@@ -48,3 +48,12 @@ export function decryptSecret(stored: string): string {
 
 /** Quatre derniers caractères, pour reconnaître un secret sans le révéler. */
 export const secretHint = (plain: string) => (plain.length > 8 ? plain.slice(-4) : "");
+
+/**
+ * Empreinte stable d'une valeur secrète (HMAC-SHA256 avec la clé des
+ * secrets) : retrouver une ligne par cette valeur sans la stocker en clair
+ * (agrirouter : compte « tenant » d'un événement).
+ */
+export function secretHmac(value: string): string {
+  return createHmac("sha256", key()).update(value).digest("hex");
+}

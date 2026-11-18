@@ -445,7 +445,7 @@ proposition « Mettre à jour » sur la fiche ; aucune donnée saisie n'est
 | Lot | Contenu | Exigences | Permet |
 |---|---|---|---|
 | **AR1** Conformité et Deep URL ✅ 16/11 | identifiant externe, nom, capacités et abonnements complets, `allow_delete_by_user`, 409 de la révocation, état `disconnected`, page `fourmy.org/agrirouter`, `/agrirouter/start`, `RequireAuth` avec `next` | 1 à 5 | **premier essai réel** : connexion des deux façons, envoi à l'IO-Tool |
-| **AR2** Écouteur et boîte de réception brute | migration 0054, volume, `client.events()`, verrou consultatif, événements de connexion, réception rangée et confirmée sans lecture, page de la boîte de réception | 3, 15, 16, 19 | révocation et suppression vues ; fichiers de l'IO-Tool reçus, compteur à 0 |
+| **AR2** Écouteur et boîte de réception brute ✅ 16/11 | migration 0054, volume, `client.events()`, verrou consultatif, événements de connexion, réception rangée et confirmée sans lecture, page de la boîte de réception | 3, 15, 16, 19 | révocation et suppression vues ; fichiers de l'IO-Tool reçus, compteur à 0 |
 | **AR3** File d'envoi | `agrirouter_outbox`, tentative immédiate puis reprise, états, historique | 6, 7 | test de coupure de la revue |
 | **AR4** TaskData reçue | `parseTaskData`, proposition, rapprochement de la carte envoyée (`TSK@B`) | 17 | retour des tâches réalisées |
 | **AR5** EFDI | protobuf, TimeLog → positions → parcours, Device Description → fiche | 17, 18 | télémétrie des machines |
@@ -460,6 +460,18 @@ terminaison supprimé, sans attendre l'écouteur d'AR2. Ce contrôle attend 10 m
 après la connexion, le temps qu'agrirouter propage le point de terminaison.
 Le site redirige désormais en relatif (`absolute_redirect off`) :
 `fourmy.org/agrirouter` menait à `http://…/agrirouter/`.
+
+**AR2, réalisé le 16/11**, avec deux écarts à la conception :
+- pas de table `agrirouter_endpoints` : sans machines virtuelles, la ferme
+  n'a qu'un point de terminaison, déjà dans `integrations.settings`
+  (`endpointId`, `externalId`, et la nouvelle empreinte `tenantHash`). Les
+  fonctions de résolution lisent ces réglages ;
+- pas de table `agrirouter_streams` : `/events` n'a pas de `Last-Event-ID`.
+  Elle viendra avec le flux des parcelles (AR7).
+
+Un fichier est confirmé dès qu'il est rangé sur le volume, sans attendre sa
+lecture (AR4, AR5), qui se fera depuis le volume. La question B (redélivraison
+après une coupure) reste à vérifier avec l'IO-Tool.
 
 Ordre : AR1, puis AR2 et AR3 (indépendants), puis AR4 et AR5, puis AR7
 (le plus incertain), puis AR8. La revue ne peut avoir lieu qu'après AR7,

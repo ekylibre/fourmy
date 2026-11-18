@@ -201,7 +201,7 @@ Pour les appels qui ne concernent pas une ferme, elle obtient un jeton `client_c
    - abonnements : TaskData, TimeLog et Device Description (ce que publient les machines) ;
    - `allow_delete_by_user: true`.
 
-   La réception n'est pas encore traitée (lot AR2) : les messages reçus restent non confirmés dans agrirouter.
+   Les fichiers reçus sont rangés et confirmés (lot AR2, ci-dessous) ; leur lecture vient aux lots AR4 et AR5.
 5. Le tenant est chiffré comme secret de l'intégration. Le point de terminaison et le nom du compte sont gardés dans les réglages.
 
 **Destinataires**
@@ -221,6 +221,24 @@ Avant l'envoi, l'API relit les destinataires en direct. Elle refuse un destinata
 
 Les réessais suivent la règle d'agrirouter : attente croissante sur 429 et 5xx, sans `Retry-After`. Un envoi sans réponse n'est pas réessayé, car l'API n'a pas de clé d'idempotence.
 
+**Écoute des événements (lot AR2)**
+
+Le worker écoute en permanence `GET /events` (Server-Sent Events), pour toutes les fermes à la fois. Un seul worker écoute : il tient un verrou consultatif PostgreSQL sur une connexion dédiée, libéré s'il s'arrête. Le flux coupé est rouvert avec une attente croissante (1 s à 60 s).
+
+| Événement | Effet |
+|---|---|
+| `MESSAGE_RECEIVED`, `FILE_RECEIVED` | ferme retrouvée par le point de terminaison destinataire ; contenu (intégré en base64 ou téléchargé depuis `payload_uri`) rangé par empreinte sur le volume `fourmy_agrirouter_files` ; ligne dans `agrirouter_inbox`, une seule fois même en cas de redélivraison. Destinataire inconnu de Fourmy : confirmé sans être gardé. |
+| `ENDPOINT_DELETED` | la ferme dont c'est encore le point de terminaison passe « Déconnectée » |
+| `AUTHORIZATION_REVOKED` | toutes les fermes reliées à ce compte agrirouter passent « Déconnectée » |
+| `AUTHORIZATION_ADDED` | si le navigateur n'est pas revenu, la connexion se termine d'après l'état du consentement. Le retour tardif du navigateur reste sans erreur. |
+| `ENDPOINTS_LIST_CHANGED` | destinataires recalculés à partir de la liste reçue, sans attendre la synchro horaire |
+
+La ferme d'un événement est retrouvée sans lever l'isolation : fonctions `fourmy_agrirouter_*` (migration 0055), qui ne renvoient que des identifiants. Le compte agrirouter (tenant) reste chiffré ; les réglages en gardent une empreinte HMAC (`tenantHash`).
+
+**Confirmation** : à chaque tour, le worker confirme (`POST /confirmations`) les fichiers rangés, par compte agrirouter et par lots de 100 ; un échec est retenté au tour suivant (20 fois au plus, motif gardé). Un fichier est considéré traité dès qu'il est rangé : sa lecture se fera depuis le volume.
+
+**Boîte de réception** : `Intégrations → Fichiers reçus d'agrirouter` (`/f/:ferme/agrirouter/inbox`, responsable) : date, type, fichier, état, confirmation, téléchargement.
+
 ## API
 
 | Route | Rôle |
@@ -233,6 +251,7 @@ Les réessais suivent la règle d'agrirouter : attente croissante sur 429 et 5xx
 | `GET /prescriptions/recipients` | Destinataires agrirouter, lus en direct |
 | `POST /prescriptions/:id/send` | Envoi par agrirouter (responsable), tracé |
 | `POST /integrations/agrirouter/connect` · `…/complete` | Consentement agrirouter (responsable) |
+| `GET /agrirouter/inbox` · `GET /agrirouter/inbox/:id/file` | Fichiers reçus d'agrirouter et leur contenu (responsable) |
 
 ## Code
 
@@ -297,7 +316,7 @@ Les réessais suivent la règle d'agrirouter : attente croissante sur 429 et 5xx
   - l'ordre des mailles de la grille ;
   - l'ordre des enfants de `TSK` ;
   - le type de point du contour.
-- **Réception**, non faite : TimeLogs, doses réellement appliquées, retours de tâches. agrirouter les fournit par un flux SSE (`GET /events`) et une confirmation des messages (`POST /confirmations`). Il faudra un abonnement et un processus d'écoute permanent dans le worker.
+- **Lecture des fichiers reçus**, non faite : tâches ISO-XML réalisées, TimeLogs, Device Descriptions (lots AR4 et AR5 de `claudedocs/conception_agrirouter.md`). Ils sont déjà rangés et confirmés (lot AR2).
 - **Zonage sur une seule image.** Un zonage pluriannuel (médiane de plusieurs dates ou de plusieurs saisons) serait plus stable pour les cartes de sol ou de semis.
 - **Pas de lien** entre une carte et l'intervention qui l'applique. Les doses moyennes et la quantité ne pré-remplissent pas encore la saisie.
 - Le lien avec le plan de fumure existe dans l'autre sens : voir ci-dessous.

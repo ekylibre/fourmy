@@ -87,3 +87,38 @@ describe("agrirouter : connexion défaite dans agrirouter", () => {
     expect(within(card).queryByRole("button", { name: "Connecter à agrirouter" })).toBeNull();
   });
 });
+
+describe("agrirouter : fichiers reçus (AR2)", () => {
+  it("liste les fichiers reçus avec leur type, leur état et le lien de téléchargement", async () => {
+    server.use(
+      http.get("*/agrirouter/inbox", () =>
+        HttpResponse.json({
+          items: [
+            {
+              id: "00000000-0000-7000-8000-0000000001b0",
+              messageType: "iso:11783:-10:taskdata:zip",
+              filename: "tache.zip",
+              size: 2048,
+              senderEndpointId: null,
+              senderName: null,
+              sentAt: null,
+              receivedAt: "2026-11-16T09:30:00Z",
+              state: "received",
+              error: null,
+              confirmedAt: null,
+              confirmError: null,
+            },
+          ],
+        }),
+      ),
+    );
+    renderApp(`/f/${FARM}/agrirouter/inbox`);
+    const table = await screen.findByRole("table", { name: "Fichiers reçus d'agrirouter" });
+    expect(within(table).getByText("Tâches ISO-XML")).toBeInTheDocument();
+    expect(within(table).getByText("tache.zip")).toBeInTheDocument();
+    expect(within(table).getByText("(2 Ko)")).toBeInTheDocument();
+    expect(within(table).getByText("Reçu")).toBeInTheDocument();
+    expect(within(table).getByText("Non confirmé")).toBeInTheDocument();
+    expect(within(table).getByRole("link", { name: "Télécharger" })).toHaveAttribute("href", `/api/v1/farms/${FARM}/agrirouter/inbox/00000000-0000-7000-8000-0000000001b0/file`);
+  });
+});

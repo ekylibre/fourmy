@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Alert, Badge, Button, Group, List, Paper, PasswordInput, Stack, Switch, Table, Text, TextInput, Title } from "@mantine/core";
+import { Link } from "react-router";
+import { Alert, Anchor, Badge, Button, Group, List, Paper, PasswordInput, Stack, Switch, Table, Text, TextInput, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { INTEGRATION_CATEGORIES, type Integration, type IntegrationProviderDefinition } from "@fourmy/contracts";
@@ -219,6 +220,9 @@ function AgrirouterCard({ farmId, definition, integration }: { farmId: string; d
                 )}
               </div>
             )}
+            <Anchor component={Link} to={`/f/${farmId}/agrirouter/inbox`} size="sm">
+              Fichiers reçus d'agrirouter
+            </Anchor>
             {integration!.lastError && (
               <Alert color="brique" title="Dernière synchronisation en échec">
                 {integration!.lastError}

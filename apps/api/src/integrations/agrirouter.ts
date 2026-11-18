@@ -2,9 +2,9 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
 import type { AgrirouterRecipient, PrescriptionFormat } from "@fourmy/contracts";
-import { AgrirouterClient, MESSAGE_TYPES, type AgrirouterApp, type AgrirouterOptions } from "@fourmy/agrirouter";
+import { AgrirouterClient, MESSAGE_TYPES, type AgrirouterApp, type AgrirouterOptions, type TenantEndpoint } from "@fourmy/agrirouter";
 import { BadRequest } from "../routes/helpers.js";
-import { decryptSecret, encryptSecret } from "../secrets.js";
+import { decryptSecret, encryptSecret, secretHmac } from "../secrets.js";
 import { ProviderDisconnected } from "./errors.js";
 
 /**
@@ -128,7 +128,16 @@ export interface AgrirouterSettings {
   externalId: string;
   companyName?: string;
   connectedAt: string;
+  /** Empreinte HMAC du tenant : retrouver la ferme d'un événement agrirouter sans le tenant en clair. */
+  tenantHash?: string;
+  /** Empreinte de l'état du consentement abouti : un second retour (navigateur et événement) est sans effet. */
+  completedState?: string;
 }
+
+/** Empreinte du tenant, telle que gardée dans les réglages. */
+export const tenantHash = (tenantId: string) => secretHmac(`agrirouter-tenant:${tenantId}`);
+/** Empreinte d'un état de consentement, telle que gardée dans les réglages. */
+export const stateHash = (state: string) => hash(state);
 
 /**
  * Termine la connexion au retour du consentement : l'état doit être celui
@@ -142,8 +151,13 @@ export async function completeAgrirouterConnect(
   input: { state: string; tenantId: string },
 ): Promise<void> {
   const [row] = await withFarm(db, farmId, (tx) =>
-    rows<{ id: string; settings: Record<string, string> }>(tx, sql`SELECT id, settings FROM integrations WHERE provider = 'agrirouter'`),
+    rows<{ id: string; settings: Record<string, string>; secret_ciphertext: string | null }>(
+      tx,
+      sql`SELECT id, settings, secret_ciphertext FROM integrations WHERE provider = 'agrirouter'`,
+    ),
   );
+  // Déjà terminée avec ce même état (par l'événement AUTHORIZATION_ADDED, ou un double retour) : rien à refaire.
+  if (row?.secret_ciphertext && row.settings.completedState === hash(input.state) && input.state.startsWith(`${farmId}.`)) return;
   const expected = row?.settings.pendingState;
   const until = Date.parse(row?.settings.pendingUntil ?? "");
   const given = Buffer.from(hash(input.state));
@@ -164,6 +178,8 @@ export async function completeAgrirouterConnect(
     endpointId: endpoint.id,
     externalId,
     connectedAt: new Date().toISOString(),
+    tenantHash: tenantHash(input.tenantId),
+    completedState: hash(input.state),
     ...(tenant.company_name ? { companyName: tenant.company_name } : {}),
   };
   await withFarm(db, farmId, (tx) =>
@@ -197,6 +213,12 @@ export async function agrirouterRecipients(
   if (check && !own && settled) {
     throw new ProviderDisconnected("endpoint_deleted", "Le point de terminaison de Fourmy a été supprimé dans agrirouter.");
   }
+  return { companyName, recipients: recipientsFrom(endpoints, endpointId) };
+}
+
+/** Destinataires joignables d'après une liste de points de terminaison (API ou événement ENDPOINTS_LIST_CHANGED). */
+export function recipientsFrom(endpoints: TenantEndpoint[], endpointId: string): AgrirouterRecipient[] {
+  const own = endpoints.find((e) => e.id === endpointId);
   const routes = own?.routed_endpoints?.can_send_to ?? {};
   const recipients = endpoints
     .filter((e) => e.id !== endpointId && routes[e.id]?.length)
@@ -208,7 +230,7 @@ export async function agrirouterRecipients(
     }))
     .filter((r) => r.formats.length > 0)
     .sort((a, b) => a.name.localeCompare(b.name, "fr"));
-  return { companyName, recipients };
+  return recipients;
 }
 
 /** Intégration agrirouter connectée d'une ferme (tenant déchiffré), ou erreur lisible. */

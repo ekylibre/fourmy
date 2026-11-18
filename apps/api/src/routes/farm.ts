@@ -12,6 +12,7 @@ import { plan3dRoutes } from "./plan3d.js";
 import { peopleRoutes } from "./people.js";
 import { memberRoutes } from "./members.js";
 import { integrationRoutes } from "./integrations.js";
+import { agrirouterRoutes } from "./agrirouter.js";
 import { procedureRoutes } from "./procedures.js";
 import { phytoRoutes } from "./phyto.js";
 import { activityRoutes } from "./activities.js";
@@ -56,5 +57,6 @@ export const farmRoutes = new Hono<Env>()
   .route("/", peopleRoutes)
   .route("/", memberRoutes)
   .route("/", integrationRoutes)
+  .route("/", agrirouterRoutes)
   .route("/", procedureRoutes)
   .route("/", phytoRoutes);
