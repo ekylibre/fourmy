@@ -1,0 +1,95 @@
+---
+import Base from "../layouts/Base.astro";
+import { comparison, STATUS_MARK, STATUS_TEXT, type Cell } from "../lib/comparatif";
+
+const products = comparison.logiciels;
+const cell = (c: Cell, key: string) => ({ ...c, key });
+const legend: Cell["s"][] = ["oui", "partiel", "non", "nt"];
+---
+
+<Base title="Comparatif" description="Fourmy comparé à MesParcelles, Smag Farmer et Geofolia : accès et prix, parcellaire, interventions et réglementaire, matériels et échanges, chaque case avec sa source.">
+  <div class="wrap compare">
+    <h1>Fourmy et les autres logiciels</h1>
+    <p class="lead muted">
+      Chaque case renvoie à la page de l'éditeur qui la justifie. Un point « · » signifie que rien n'a été trouvé chez l'éditeur, pas que
+      la fonctionnalité manque ; les offres évoluent.
+    </p>
+
+    <div class="compare-cols">
+      <section aria-labelledby="distingue">
+        <h2 id="distingue">Ce qui distingue Fourmy</h2>
+        <ul>
+          <li>Libre et auto-hébergeable : code sous licence GNU AGPL v3, gratuit, vos données restent chez vous.</li>
+          <li>La ferme à n'importe quelle date : parcellaire, stocks, cuves et interventions datés, sur une frise.</li>
+          <li>Le plan 3D de la ferme, où les chantiers se rejouent d'après la trace GPS des tracteurs.</li>
+          <li>Les parcours GPS deviennent des interventions : attelage, horaires et parcelles pré-remplis.</li>
+          <li>Les contrôles réglementaires à la saisie, chacun avec son voyant, et le registre au format 2027.</li>
+          <li>Les machines reliées en ISO-XML et par agrirouter, dans les deux sens (en test).</li>
+          <li>La reprise complète des fermes Ekylibre, registre phytosanitaire identique.</li>
+        </ul>
+      </section>
+      <section aria-labelledby="pas-encore">
+        <h2 id="pas-encore">Ce que Fourmy ne fait pas encore</h2>
+        <ul>
+          <li>Pas d'application mobile sur les stores : elle est en test ; l'application web s'utilise sur téléphone.</li>
+          <li>Pas d'export vers TéléPAC pour la déclaration.</li>
+          <li>Plan de fumure en test, pour la Nouvelle-Aquitaine seulement.</li>
+          <li>Pas d'échange de bons d'apport ou de livraison avec les coopératives et les négoces.</li>
+          <li>Pas de dossier de certification HVE.</li>
+        </ul>
+      </section>
+    </div>
+
+    <h2>Les logiciels de gestion parcellaire</h2>
+    <p class="muted">Fonctionnalités vérifiées sur les pages de présentation des éditeurs le {comparison.date}.</p>
+    <p class="legend" aria-label="Légende">
+      {legend.map((s) => (
+        <span><span class={`mark mark-${s}`} aria-hidden="true">{STATUS_MARK[s]}</span> {s === "partiel" ? "en partie, option payante ou module tiers" : STATUS_TEXT[s]}</span>
+      ))}
+    </p>
+    <div class="table-scroll" role="region" aria-label="Tableau comparatif, défilable" tabindex="0">
+      <table class="compare-table">
+        <caption class="sr-only">Fourmy comparé à {products.map((p) => p.nom).join(", ")}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Critère</th>
+            <th scope="col" class="col-fourmy">Fourmy</th>
+            {products.map((p) => (
+              <th scope="col">
+                <a href={p.url} title={p.base}>{p.nom}</a>
+                <span class="base">{p.base}</span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        {
+          comparison.groupes.map((g) => (
+            <tbody>
+              <tr class="group">
+                <th scope="colgroup" colspan={products.length + 2}>{g.titre}</th>
+              </tr>
+              {g.criteres.map((c) => (
+                <tr>
+                  <th scope="row">{c.nom}</th>
+                  {[cell(c.fourmy, "fourmy"), ...products.map((p) => cell(c[p.id] as Cell, p.id))].map((v) => (
+                    <td class={v.key === "fourmy" ? "col-fourmy" : undefined}>
+                      <span class={`mark mark-${v.s}`} aria-hidden="true">{STATUS_MARK[v.s]}</span>
+                      <span class="sr-only">{STATUS_TEXT[v.s]}{v.t ? " : " : ""}</span>
+                      {v.t && (v.u ? <a href={v.u}>{v.t}</a> : v.f ? <a href={`/fonctionnalites/#${v.f}`}>{v.t}</a> : <span>{v.t}</span>)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          ))
+        }
+      </table>
+    </div>
+    <p class="muted compare-note">
+      Pages lues : <a href="https://mesparcelles.fr/">MesParcelles</a> (accueil, formules d'abonnement, gestion parcellaire, échanges de
+      données), <a href="https://smag.tech/nos-logiciels/logiciel-de-gestion-de-parcelles/">Smag Farmer</a> (logiciel de gestion de
+      parcelles), <a href="https://www.isagri.fr/geofolia/logiciel-de-gestion-parcellaire">Geofolia</a> (logiciel de gestion parcellaire).
+      Une erreur ou un oubli ? <a href="/contact/">Écrivez-nous</a>, nous corrigeons.
+    </p>
+  </div>
+</Base>

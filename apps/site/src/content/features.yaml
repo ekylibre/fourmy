@@ -1,8 +1,38 @@
-# Fonctionnalités présentées sur fourmy.org (page Fonctionnalités et accueil).
-# status : disponible | en-test | a-venir ; capture : src/assets/captures/<capture>.png
-# (régénérées par `pnpm --filter @fourmy/site captures`) ; since : version d'arrivée.
+# Fonctionnalités présentées sur fourmy.org (page Fonctionnalités), classées par module dans
+# l'ordre du menu de l'application.
+# module : un id de `modules` ; status : disponible | en-test | a-venir ;
+# capture : src/assets/captures/<capture>.png (apps/web/e2e/captures*.spec.ts) ; since : version d'arrivée.
+modules:
+  - id: tableau
+    title: Tableau de bord et frise
+    text: La ferme du jour, ou de n'importe quelle date.
+  - id: cartes
+    title: Cartes 2D, 3D et satellite
+    text: Le parcellaire sur la photo IGN, le plan 3D de la ferme et le suivi des cultures depuis l'espace.
+  - id: activites
+    title: Activités et cultures
+    text: Ce qui pousse sur chaque parcelle, et comment ça avance.
+  - id: interventions
+    title: Interventions
+    text: Tous les travaux de la ferme, saisis au bureau ou au champ.
+  - id: materiels
+    title: Matériels et traces GPS
+    text: Chaque tracteur et chaque outil, leurs heures, leur entretien et leurs parcours.
+  - id: stocks
+    title: Stocks et cuverie
+    text: Ce qui entre, ce qui sort, et ce que contient chaque cuve.
+  - id: reglementaire
+    title: Réglementaire
+    text: Les contrôles à la saisie et les registres tenus tout seuls.
+  - id: ferme
+    title: Ma ferme et équipe
+    text: L'exploitation, ses sites, ses personnes et leurs heures.
+  - id: interoperabilite
+    title: Interopérabilité
+    text: Les machines, les stations et les logiciels qui parlent à Fourmy.
 features:
   - id: frise
+    module: tableau
     title: La ferme à n'importe quelle date
     text: >-
       Une frise en haut de l'écran : faites-la glisser et toute la ferme revient à cette
@@ -11,6 +41,7 @@ features:
     capture: tableau-de-bord
     since: 0.17.0
   - id: carte
+    module: cartes
     title: Carte et parcellaire dans le temps
     text: >-
       Parcelles sur la photo aérienne et la carte IGN, versionnées : une parcelle découpée
@@ -19,17 +50,19 @@ features:
     capture: carte
     since: 0.8.0
   - id: plan-3d
+    module: cartes
     title: Plan 3D de l'exploitation
     text: >-
-      Relief et photo IGN, bâtiments à leur hauteur, cuves qui se remplissent au fil des
-      vendanges, NDVI des parcelles, et rejeu des passages de tracteurs : la caméra suit
-      l'avatar 3D du tracteur et de son outil attelé, ou survole la ferme comme un drone,
-      pendant que le tracé de la journée se dessine. Les trajets sur route suivent la
-      route, et une barre de temps place le rejeu à l'instant voulu, en plein écran.
+      Relief et photo IGN, bâtiments à leur hauteur, arbres et lignes électriques, cuves
+      qui se remplissent au fil des vendanges, cultures en rangs à la hauteur vue par
+      satellite. Le rejeu des tracteurs suit l'avatar 3D et son outil attelé : la bande
+      travaillée se colore derrière l'outil, la rampe se replie sur la route. Une barre de
+      temps place le rejeu à l'instant voulu, en plein écran.
     status: disponible
     capture: accueil-3d
     since: 0.18.0
   - id: satellite
+    module: cartes
     title: Suivi des cultures par satellite
     text: >-
       NDVI, NDRE et NDMI de chaque parcelle d'après les images Sentinel-2, avec votre compte
@@ -38,6 +71,7 @@ features:
     status: en-test
     since: 0.68.0
   - id: croissance
+    module: activites
     title: Stades et besoins en eau des cultures
     text: >-
       Les stades du maïs et des céréales prévus d'après les degrés-jours depuis le semis, et
@@ -46,6 +80,7 @@ features:
     status: en-test
     since: 0.72.0
   - id: modulation
+    module: cartes
     title: Cartes de modulation pour la console du tracteur
     text: >-
       Des zones tirées de l'image satellite, une dose par zone, puis l'export ISO-XML ou
@@ -53,7 +88,16 @@ features:
       prévue en moyenne sur la parcelle.
     status: en-test
     since: 0.74.0
+  - id: itineraires
+    module: activites
+    title: Itinéraires techniques
+    text: >-
+      La frise des travaux d'une parcelle sur la campagne ou la rotation, et celle d'une
+      activité, toutes parcelles réunies, avec descente sur chaque parcelle.
+    status: disponible
+    since: 0.111.0
   - id: interventions
+    module: interventions
     title: Toutes les interventions, un seul formulaire
     text: >-
       Labour, semis, traitements, fertilisation, récolte, vendange, entretien du matériel :
@@ -65,6 +109,7 @@ features:
     capture: intervention
     since: 0.19.0
   - id: interventions-carte
+    module: interventions
     title: Les parcelles choisies sur la carte
     text: >-
       Cliquez les parcelles sur la photo aérienne, ou prenez-les toutes d'un geste ; dessinez
@@ -74,6 +119,7 @@ features:
     capture: intervention-carte
     since: 0.33.0
   - id: interventions-semaine
+    module: interventions
     title: La semaine des travaux
     text: >-
       Les interventions de la semaine en liste, en kanban (planifiées, en cours, réalisées)
@@ -84,15 +130,19 @@ features:
     capture: interventions-semaine
     since: 0.31.0
   - id: interventions-fiche
+    module: interventions
     title: Fiche d'intervention et corrections tracées
     text: >-
-      Chaque intervention a sa fiche : parcelles, doses à l'hectare et au total, matériels,
-      trace GPS. Une erreur de saisie se corrige ; le stock et le registre suivent, et
-      l'historique garde la version d'avant.
+      Chaque intervention a sa fiche : météo et conditions de pulvérisation, surface
+      travaillée de chaque parcelle, attelages et parcours GPS, intrants avec le voyant de
+      leur dose, contrôle réglementaire et IFT, et un bouton pour revoir le chantier en 3D.
+      Une erreur de saisie se corrige ; le stock et le registre suivent, et l'historique
+      garde la version d'avant.
     status: disponible
     capture: intervention-fiche
     since: 0.30.0
   - id: controle-phyto
+    module: reglementaire
     title: Contrôle réglementaire des traitements
     text: >-
       En saisissant un traitement, Fourmy vérifie l'autorisation du produit sur la culture,
@@ -103,6 +153,7 @@ features:
     capture: controle-phyto
     since: 0.34.0
   - id: meteo-interventions
+    module: interventions
     title: Météo des interventions
     text: >-
       La météo de chaque intervention est remplie toute seule (température, hygrométrie,
@@ -112,6 +163,7 @@ features:
     capture: meteo
     since: 0.35.0
   - id: stocks
+    module: stocks
     title: Stocks tenus tout seuls
     text: >-
       Chaque intervention réalisée sort les produits du stock ; une récolte y entre, rangée
@@ -120,6 +172,7 @@ features:
     capture: stocks
     since: 0.14.0
   - id: cuverie
+    module: stocks
     title: Cuverie
     text: >-
       Chaque cuve, ce qu'elle contient, son millésime et son cépage, à n'importe quelle date.
@@ -127,6 +180,7 @@ features:
     capture: cuverie
     since: 0.17.0
   - id: registre
+    module: reglementaire
     title: Registre phytosanitaire et IFT calculés
     text: >-
       Le registre se déduit des traitements saisis : rien à ressaisir. Export pour les
@@ -135,6 +189,7 @@ features:
     capture: registre
     since: 0.7.0
   - id: registre-reglementaire
+    module: reglementaire
     title: Registre phyto au format réglementaire 2027
     text: >-
       Le registre électronique tel que l'attend l'arrêté du 24 décembre 2025 : une ligne
@@ -145,6 +200,7 @@ features:
     capture: registre-reglementaire
     since: 0.66.0
   - id: plan-fumure
+    module: reglementaire
     title: Plan prévisionnel de fumure calculé
     text: >-
       La dose d'azote de chaque parcelle selon le référentiel régional, terme par terme et
@@ -155,6 +211,7 @@ features:
     status: en-test
     since: 0.77.0
   - id: cahier-fertilisation
+    module: reglementaire
     title: Cahier de fertilisation et directive nitrates
     text: >-
       Le cahier d'enregistrement se déduit des interventions, prêt à imprimer ou en CSV,
@@ -166,6 +223,7 @@ features:
     status: en-test
     since: 0.78.0
   - id: traces
+    module: materiels
     title: Traces GPS des tracteurs
     text: >-
       Reliez vos boîtiers Traccar : les trajets arrivent chaque minute, et la surface
@@ -174,6 +232,7 @@ features:
     capture: integrations
     since: 0.22.0
   - id: parcours
+    module: materiels
     title: Parcours GPS transformés en interventions
     text: >-
       Chaque matériel suivi a son onglet Parcours : les chantiers et les déplacements de
@@ -185,6 +244,7 @@ features:
     capture: parcours
     since: 0.57.0
   - id: attelages
+    module: interventions
     title: Attelages tracteur, outils et conducteur
     text: >-
       Déclarez une intervention par attelages : chaque tracteur avec ses outils, son
@@ -194,6 +254,7 @@ features:
     status: disponible
     since: 0.54.0
   - id: materiels
+    module: materiels
     title: Matériels et relevés d'heures
     text: >-
       La fiche de chaque matériel : identité, moteur et boîte, options, fiche technique,
@@ -204,6 +265,7 @@ features:
     capture: materiels
     since: 0.42.0
   - id: entretien
+    module: materiels
     title: Plan d'entretien et échéances
     text: >-
       Le plan d'entretien du constructeur repris pour chaque tracteur : vidanges, filtres,
@@ -213,6 +275,7 @@ features:
     status: en-test
     since: 0.43.0
   - id: avatar-3d
+    module: materiels
     title: Un avatar 3D pour chaque matériel
     text: >-
       Chaque tracteur a son avatar à ses dimensions, à ses couleurs et avec son logo, et
@@ -222,13 +285,15 @@ features:
     capture: avatar-3d
     since: 0.46.0
   - id: mobile
+    module: interventions
     title: Application mobile hors ligne
     text: >-
       Saisie au champ sans réseau, envoi au retour de la connexion, intervention par
-      intervention.
+      intervention, attelages compris. Chacun y retrouve sa fiche et ses heures.
     status: en-test
     since: 0.21.0
   - id: equipe
+    module: ferme
     title: Équipe, fiches et temps de travaux
     text: >-
       Une fiche par personne, avec ou sans compte : photo, coordonnées réservées au
@@ -239,7 +304,27 @@ features:
     status: disponible
     capture: equipe-temps
     since: 0.20.0
+  - id: agrirouter
+    module: interoperabilite
+    title: Les machines reliées par agrirouter
+    text: >-
+      Reliez Fourmy à agrirouter : les cartes de modulation partent vers les consoles, et
+      reviennent les travaux réalisés, proposés comme interventions à valider, et la
+      télémétrie des machines, versée dans les parcours GPS. Un envoi attend le retour de
+      la connexion si agrirouter ne répond pas.
+    status: en-test
+    since: 0.114.0
+  - id: ma-ferme
+    module: ferme
+    title: Ma ferme, sites et cartes hors ligne
+    text: >-
+      La fiche de l'exploitation (identité, certifications, logo sur les documents), ses
+      sites, et les fonds de carte IGN gardés sur le serveur : la ferme se consulte même
+      sans réseau, dans le navigateur.
+    status: disponible
+    since: 0.99.0
   - id: reprise
+    module: interoperabilite
     title: Reprise de vos données Ekylibre
     text: >-
       Parcelles, interventions, stocks, cuves et personnes repris d'Ekylibre ; le registre
@@ -248,6 +333,7 @@ features:
     status: disponible
     since: 0.9.0
   - id: stations-meteo
+    module: interoperabilite
     title: Vos stations météo Weenat et Sencrop
     text: >-
       Reliez votre compte Weenat ou Sencrop : les mesures de vos stations arrivent toutes
@@ -256,6 +342,7 @@ features:
     status: en-test
     since: 0.67.0
   - id: capteurs
+    module: interoperabilite
     title: Sondes et pièges connectés
     text: >-
       Sondes et pièges reliés comme les traceurs GPS et les stations météo, relevés

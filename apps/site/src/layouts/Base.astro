@@ -9,8 +9,8 @@ import "@fourmy/ui-lyvre/lyvre.css";
 import "../styles/site.css";
 import logo from "@fourmy/ui-lyvre/brand/fourmy-logo.svg";
 import logoDark from "@fourmy/ui-lyvre/brand/fourmy-logo-dark.svg";
-import { APP_URL } from "../lib/site";
-import { release } from "../lib/release";
+import { APP_URL, REPO_URL } from "../lib/site";
+import { deliveries, release } from "../lib/release";
 
 interface Props {
   title: string;
@@ -22,8 +22,9 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
 const path = Astro.url.pathname;
 const nav = [
   { href: "/fonctionnalites/", label: "Fonctionnalités" },
-  { href: "/roadmap/", label: "Roadmap" },
+  { href: "/comparatif/", label: "Comparatif" },
   { href: "/changelog/", label: "Nouveautés" },
+  { href: "/installer/", label: "Installer" },
   { href: "/contact/", label: "Contact" },
 ];
 const ogImage = new URL("/og.png", Astro.site);
@@ -46,6 +47,7 @@ const ogImage = new URL("/og.png", Astro.site);
     <meta property="og:image" content={ogImage} />
     <meta property="og:locale" content="fr_FR" />
     <meta name="theme-color" content="#2F6B4F" />
+    <link rel="alternate" type="application/rss+xml" title="Nouveautés de Fourmy" href="/changelog/rss.xml" />
   </head>
   <body>
     <a class="skip" href="#contenu">Aller au contenu</a>
@@ -66,13 +68,15 @@ const ogImage = new URL("/og.png", Astro.site);
         <div>
           <img src={logoDark.src} alt="Fourmy" width={logoDark.width} height={logoDark.height} loading="lazy" />
           <p>Le jumeau numérique de la ferme. Logiciel libre (GNU AGPL v3), édité par <a href="https://ekylibre.com/">Ekylibre SAS</a>.</p>
-          <p class="version" data-testid="version">Version {release.version}</p>
+          <p class="version" data-testid="version"><a href={`/changelog/${deliveries()[0]?.version ?? ""}/`}>Version {release.version}</a></p>
         </div>
         <ul aria-label="Le projet">
           {nav.map((n) => <li><a href={n.href}>{n.label}</a></li>)}
           <li><a href={APP_URL}>Se connecter</a></li>
+          <li><a href="/changelog/rss.xml">Flux RSS des nouveautés</a></li>
         </ul>
         <ul aria-label="Informations">
+          <li><a href={REPO_URL}>Code source (GitHub)</a></li>
           <li><a href="/mentions-legales/">Mentions légales</a></li>
           <li><a href="/donnees-personnelles/">Données personnelles</a></li>
           <li><a href="mailto:contact@fourmy.org">contact@fourmy.org</a></li>

@@ -17,7 +17,11 @@ test.describe.configure({ mode: "serial" });
 const out = (name: string) => fileURLToPath(new URL(`../../site/src/assets/captures/${name}.png`, import.meta.url));
 const snap = async (page: Page, name: string) => {
   // Pas de champ en cours de saisie sur les captures (date de la frise surlignée).
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.evaluate(() => {
+    (document.activeElement as HTMLElement | null)?.blur();
+    // Pas de photo ni de nom du compte de capture sur le site public.
+    for (const b of document.querySelectorAll<HTMLElement>('button[aria-label^="Compte de"]')) b.style.visibility = "hidden";
+  });
   await page.screenshot({ path: out(name), animations: "disabled" });
 };
 
@@ -118,8 +122,11 @@ test("parcelles choisies sur la carte, zone partielle", async ({ page }) => {
   await page.keyboard.up("Shift");
   await form.getByRole("button", { name: "Voir Parcelle 008 sur la carte" }).click();
   await form.getByRole("button", { name: "Zone partielle" }).click();
-  const cx = box.x + box.width / 2;
-  const cy = box.y + box.height / 2;
+  // La carte a pu bouger (panneau de dessin ouvert) : on la mesure à nouveau.
+  await map.scrollIntoViewIfNeeded();
+  const drawBox = (await map.boundingBox())!;
+  const cx = drawBox.x + drawBox.width / 2;
+  const cy = drawBox.y + drawBox.height / 2;
   for (const [dx, dy] of [[-60, -40], [50, -55], [70, 35], [-45, 50], [-60, -40]] as const) await page.mouse.click(cx + dx, cy + dy);
   await expect(form.getByText(/^zone .* sur .* ha$/)).toBeVisible();
   await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);

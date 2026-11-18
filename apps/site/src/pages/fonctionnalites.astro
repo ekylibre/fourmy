@@ -1,30 +1,61 @@
 ---
 import Base from "../layouts/Base.astro";
 import FeatureFigure from "../components/FeatureFigure.astro";
-import { features, STATUS_LABELS } from "../lib/site";
+import { features, modules, STATUS_LABELS } from "../lib/site";
 import { catalogue } from "../lib/catalogue";
 
 const order = { disponible: 0, "en-test": 1, "a-venir": 2 } as const;
-const sorted = [...features].sort((a, b) => order[a.status] - order[b.status]);
+const groups = modules
+  .map((m) => {
+    const list = features.filter((f) => f.module === m.id).sort((a, b) => order[a.status] - order[b.status]);
+    return { ...m, illustrated: list.filter((f) => f.capture), others: list.filter((f) => !f.capture), count: list.length };
+  })
+  .filter((g) => g.count > 0);
 ---
 
-<Base title="Fonctionnalités" description="Ce que fait Fourmy : frise dans le temps, carte, plan 3D, interventions, stocks, cuverie, registre phytosanitaire, traces GPS, application mobile.">
+<Base title="Fonctionnalités" description="Ce que fait Fourmy, module par module : frise dans le temps, cartes 2D et 3D, satellite, interventions, matériels et traces GPS, stocks, registre phytosanitaire, fertilisation, agrirouter.">
   <div class="wrap">
     <h1>Fonctionnalités</h1>
     <p class="lead muted">
-      {catalogue.procedures} procédures ({catalogue.crops} pour les cultures, {catalogue.vine} pour la vigne) regroupées en
-      {catalogue.shapes.length} formes : {catalogue.shapes.join(", ").toLowerCase()}. Les captures viennent de fermes de test ; photographies aériennes et relief : © IGN, licence ouverte Etalab 2.0.
+      Rangées comme dans le menu de l'application. {catalogue.procedures} procédures ({catalogue.crops} pour les cultures,
+      {catalogue.vine} pour la vigne) regroupées en {catalogue.shapes.length} formes : {catalogue.shapes.join(", ").toLowerCase()}.
+      Les captures viennent de fermes de test ; photographies aériennes et relief : © IGN, licence ouverte Etalab 2.0.
     </p>
+    <nav class="modules-nav" aria-label="Modules">
+      <ul>
+        {groups.map((g) => <li><a href={`#${g.id}`}>{g.title} <span>{g.count}</span></a></li>)}
+      </ul>
+    </nav>
     {
-      sorted.map((f) => (
-        <section class="feature" id={f.id}>
-          <FeatureFigure capture={f.capture} alt={`${f.title} — capture de Fourmy`} />
-          <div>
-            <span class={`badge badge-${f.status}`}>{STATUS_LABELS[f.status]}</span>
-            <h2>{f.title}</h2>
-            <p>{f.text}</p>
-            {f.since && <p class="muted">Depuis la version {f.since}.</p>}
-          </div>
+      groups.map((g) => (
+        <section class="module" id={g.id} aria-labelledby={`${g.id}-titre`}>
+          <header class="module-head">
+            <h2 id={`${g.id}-titre`}>{g.title}</h2>
+            <p class="muted">{g.text}</p>
+          </header>
+          {g.illustrated.map((f) => (
+            <article class="feature" id={f.id} aria-labelledby={`${f.id}-titre`}>
+              <FeatureFigure capture={f.capture} alt={`${f.title} : capture de Fourmy`} />
+              <div>
+                <span class={`badge badge-${f.status}`}>{STATUS_LABELS[f.status]}</span>
+                <h3 id={`${f.id}-titre`}>{f.title}</h3>
+                <p>{f.text}</p>
+                {f.since && <p class="muted">Depuis la version {f.since}.</p>}
+              </div>
+            </article>
+          ))}
+          {g.others.length > 0 && (
+            <div class="feature-cards">
+              {g.others.map((f) => (
+                <article class="card" id={f.id} aria-labelledby={`${f.id}-titre`}>
+                  <span class={`badge badge-${f.status}`}>{STATUS_LABELS[f.status]}</span>
+                  <h3 id={`${f.id}-titre`}>{f.title}</h3>
+                  <p>{f.text}</p>
+                  {f.since && <p class="muted">Depuis la version {f.since}.</p>}
+                </article>
+              ))}
+            </div>
+          )}
         </section>
       ))
     }

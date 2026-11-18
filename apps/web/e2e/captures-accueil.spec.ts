@@ -28,7 +28,11 @@ async function signIn(page: Page) {
   await page.waitForURL(/\/farms|\/f\//);
 }
 const snap = async (page: Page, name: string) => {
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.evaluate(() => {
+    (document.activeElement as HTMLElement | null)?.blur();
+    // Pas de photo ni de nom du compte de capture sur le site public.
+    for (const b of document.querySelectorAll<HTMLElement>('button[aria-label^="Compte de"]')) b.style.visibility = "hidden";
+  });
   await page.mouse.move(0, 0);
   await page.screenshot({ path: out(name), animations: "disabled" });
 };

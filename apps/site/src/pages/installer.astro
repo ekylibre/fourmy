@@ -1,0 +1,111 @@
+---
+import Base from "../layouts/Base.astro";
+import { APP_URL, REPO_URL } from "../lib/site";
+
+const env = `PUBLIC_URL=http://localhost:8080
+POSTGRES_PASSWORD=$(openssl rand -hex 24)
+BETTER_AUTH_SECRET=$(openssl rand -base64 48)
+FOURMY_SECRETS_KEY=$(openssl rand -base64 32)`;
+---
+
+<Base title="Installer" description="Installer Fourmy sur votre serveur avec Docker Compose : démarrage rapide, mise en production, mise à jour, intégrations.">
+  <div class="wrap prose install">
+    <h1>Installer Fourmy</h1>
+    <p class="lead muted">
+      Fourmy tient dans un fichier Docker Compose : la base PostgreSQL (avec PostGIS et TimescaleDB), l'API, le worker des tâches de
+      fond et l'application web. Une seule installation sert plusieurs fermes, chacune cloisonnée. Pour regarder d'abord,{" "}
+      <a href={APP_URL}>l'application en ligne</a> ne demande rien à installer.
+    </p>
+
+    <h2>Démarrage rapide</h2>
+    <ol class="steps">
+      <li>
+        Récupérez le code :
+        <pre tabindex="0"><code>git clone {REPO_URL}.git
+cd fourmy</code></pre>
+      </li>
+      <li>
+        Créez le fichier de configuration avec ses trois secrets. Gardez <code>FOURMY_SECRETS_KEY</code> hors du serveur : sans elle,
+        les accès des intégrations sont à ressaisir.
+        <pre tabindex="0"><code>cat &gt; .env &lt;&lt;EOF
+{env}
+EOF</code></pre>
+      </li>
+      <li>
+        Ouvrez le port de l'application : dans <code>docker/compose.deploy.yml</code>, décommentez les lignes
+        <code>ports</code> du service <code>web</code> (<code>"8080:80"</code>).
+      </li>
+      <li>
+        Lancez Fourmy :
+        <pre tabindex="0"><code>docker compose --env-file .env -f docker/compose.deploy.yml up -d --build</code></pre>
+        Les migrations de la base s'appliquent au démarrage de l'API.
+      </li>
+      <li>
+        Créez le premier compte (le mot de passe passe par l'entrée standard, jamais en argument) :
+        <pre tabindex="0"><code>printf '%s' "$MOT_DE_PASSE" | docker compose --env-file .env -f docker/compose.deploy.yml \
+  exec -T api node apps/api/dist/cli/create-user.js --email vous@exemple.fr --name "Votre nom"</code></pre>
+      </li>
+      <li>Ouvrez <strong>http://localhost:8080</strong> et connectez-vous avec ce compte.</li>
+    </ol>
+
+    <h2>Reprendre une ferme Ekylibre</h2>
+    <p>
+      Une ferme entre dans Fourmy depuis une sauvegarde d'Ekylibre (versions 4.37 et 5.0) : parcelles, interventions, stocks, cuves,
+      matériels et personnes. La sauvegarde est restaurée dans une base jetable, lue en lecture seule, et la reprise peut être rejouée
+      sans doublon. Le rapport compare le registre phytosanitaire d'Ekylibre à celui de Fourmy, année par année.
+    </p>
+    <pre tabindex="0"><code>packages/migrator-ekylibre/scripts/restore-source.sh &lt;sauvegarde&gt;.zip
+node packages/migrator-ekylibre/dist/cli.js --source postgres://…/ekylibre_src_&lt;ferme&gt;</code></pre>
+    <p>La reprise se lance aussi depuis l'application (menu Interopérabilité, Imports) quand le serveur connaît les bases restaurées.</p>
+
+    <h2>Sur un serveur</h2>
+    <ul>
+      <li>
+        Derrière un proxy HTTPS (Traefik, Caddy, nginx) ou avec Dokploy, le service <code>web</code> écoute sur le port 80 du conteneur :
+        il sert l'application et relaie l'API sur la même adresse. <code>PUBLIC_URL</code> prend l'adresse publique en HTTPS.
+      </li>
+      <li>
+        Les données tiennent dans des volumes Docker : la base (<code>fourmy_pgdata</code>) et les fichiers reçus d'agrirouter
+        (<code>fourmy_agrirouter_files</code>) sont à sauvegarder ensemble, avec <code>FOURMY_SECRETS_KEY</code> et
+        <code>BETTER_AUTH_SECRET</code>. Le cache des cartes IGN se reconstruit seul.
+      </li>
+      <li>L'inscription libre est fermée : les comptes se créent en ligne de commande, puis chaque responsable invite son équipe.</li>
+      <li>
+        En production, réglez <code>FOURMY_IFT_API_URL</code> sur l'API IFT de production du ministère
+        (<code>https://ecoagri.api.agriculture.gouv.fr/ift/v5/api</code>) ; la préproduction est utilisée par défaut.
+      </li>
+      <li>Toutes les variables sont décrites dans <a href={`${REPO_URL}/blob/main/docs/deploiement.md`}>le guide de déploiement</a>.</li>
+    </ul>
+
+    <h2>Mettre à jour</h2>
+    <p>
+      Récupérez la nouvelle version (<code>git pull</code>) et relancez la même commande <code>docker compose … up -d --build</code>.
+      La base est migrée au démarrage. Lisez d'abord les <a href="/changelog/">nouveautés</a> : les actions à faire sont en tête de
+      chaque livraison.
+    </p>
+
+    <h2>Intégrations</h2>
+    <p>
+      Les accès aux services d'une ferme se saisissent dans l'application, par la ferme elle-même (menu Interopérabilité,
+      Intégrations) : boîtiers GPS Traccar, stations Weenat et Sencrop, météo OpenWeather et meteoblue, images Sentinel-2 avec un compte
+      Copernicus. Ils sont chiffrés, testés avant d'être enregistrés et jamais réaffichés. Sans clé, la météo vient d'Open-Meteo.
+    </p>
+    <p>
+      Côté serveur, seules deux connexions se règlent par variables : agrirouter (<code>AGRIROUTER_CLIENT_ID</code> et suivantes,
+      application enregistrée chez agrirouter) et le routage des tracteurs sur la route pour le rejeu 3D (<code>FOURMY_OSRM_URL</code>,
+      service OSRM auto-hébergé).
+    </p>
+
+    <h2>Application mobile</h2>
+    <p>
+      L'application mobile de saisie hors ligne est en test et n'est pas encore publiée sur les stores. L'application web s'utilise
+      sur téléphone et garde une copie de la ferme pour la consulter sans réseau.
+    </p>
+
+    <h2>Besoin d'aide ?</h2>
+    <p>
+      Pour être accompagné dans l'installation, l'hébergement ou la reprise de vos données Ekylibre, <a href="/contact/">écrivez-nous</a>.
+      Les questions techniques vont dans les <a href={`${REPO_URL}/issues`}>tickets du dépôt</a>.
+    </p>
+  </div>
+</Base>

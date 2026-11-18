@@ -1,0 +1,19 @@
+---
+import Base from "../../layouts/Base.astro";
+import Delivery from "../../components/Delivery.astro";
+import { deliveries, release } from "../../lib/release";
+
+const list = deliveries();
+---
+
+<Base title="Nouveautés" description="Les nouveautés et corrections de Fourmy, livraison par livraison, calculées à chaque évolution du logiciel.">
+  <div class="wrap changelog">
+    <h1>Nouveautés</h1>
+    <p class="lead muted">
+      Version actuelle : <strong>{release.version}</strong>. Les livraisons d'une même journée sont regroupées ; les actions à faire
+      en mettant à jour sont en tête de la livraison. Cette page se calcule à chaque évolution du logiciel.
+    </p>
+    <p><a class="rss" href="/changelog/rss.xml">S'abonner au flux RSS</a></p>
+    {list.map((d) => <Delivery d={d} />)}
+  </div>
+</Base>

@@ -1,0 +1,23 @@
+---
+// Page d'une livraison, à l'adresse de sa version la plus récente (/changelog/0.122.0/).
+import Base from "../../layouts/Base.astro";
+import Delivery from "../../components/Delivery.astro";
+import { deliveries, formatDate } from "../../lib/release";
+
+export function getStaticPaths() {
+  const list = deliveries();
+  return list.map((d, i) => ({ params: { version: d.version }, props: { d, newer: list[i - 1], older: list[i + 1] } }));
+}
+const { d, newer, older } = Astro.props;
+---
+
+<Base title={`Version ${d.version}`} description={`Fourmy ${d.version}, ${formatDate(d.day)}${d.title ? ` : ${d.title}` : ""}.`}>
+  <div class="wrap changelog">
+    <p><a href="/changelog/">Toutes les nouveautés</a></p>
+    <Delivery d={d} level={1} link={false} />
+    <nav class="release-nav" aria-label="Autres versions">
+      {older && <a href={`/changelog/${older.version}/`}>Version précédente : {older.version}</a>}
+      {newer && <a href={`/changelog/${newer.version}/`}>Version suivante : {newer.version}</a>}
+    </nav>
+  </div>
+</Base>

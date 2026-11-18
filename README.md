@@ -18,7 +18,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 |---|---|
 | [`docs/requirements.md`](docs/requirements.md) | Exigences v1, user stories, fermes pilotes, première tranche de 7 jours |
 | [`docs/architecture.md`](docs/architecture.md) | Choix d'architecture (ADR), modèle de données, API, 3D, plugins, organisation multi-agent |
-| [`docs/site-public-exigences.md`](docs/site-public-exigences.md) | Site public fourmy.org : exigences validées (présentation, roadmap, changelog automatique, contact, page ekylibre.com, logo) |
+| [`docs/site-public-exigences.md`](docs/site-public-exigences.md) | Site public fourmy.org : exigences validées (présentation, fonctionnalités par module, comparatif, nouveautés automatiques, installation, contact, page ekylibre.com, logo) |
 | [`docs/deploiement.md`](docs/deploiement.md) | Déploiement Docker / Dokploy : services, variables, premier démarrage (dev puis production Eyona) |
 | [`docs/interventions.md`](docs/interventions.md) | Interventions et procédures simplifiées (validé ; étapes 1 à 3 réalisées) : 6 formes, catalogue, modèle, correspondance Ekylibre, impacts Fourmy et zero-mobile |
 | [`docs/workflow.md`](docs/workflow.md) | Plan d'implémentation de la première tranche : jour 1 des fondations, tâches des 7 agents, recette |
@@ -58,7 +58,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | Comptes better-auth (étape 2) | ✅ comptes locaux, sessions cookie + bearer (mobile), équipe (membres, personnes ↔ comptes) |
 | Intégrations par ferme | ✅ module Intégrations (Traccar) : accès chiffrés par ferme, testés avant enregistrement, worker de synchro chaque minute |
 | Déploiement | ✅ Dokploy : dev.fourmy.org et fourmy.org en ligne depuis le 07/11 (image construite par la CI) ; sauvegardes de la base à mettre en place |
-| Site public fourmy.org | ✅ présentation, fonctionnalités illustrées, roadmap, nouveautés automatiques, contact ; page Fourmy d'ekylibre.com sur une branche |
+| Site public fourmy.org | ✅ présentation, fonctionnalités par module, comparatif, nouveautés automatiques (RSS), installation, contact ; page Fourmy d'ekylibre.com sur une branche |
 | zero-mobile (étape 3) | ✅ branche `fourmy-backend` : compte Fourmy, catalogue, formulaire générique par forme, push par intervention ; vérifié contre l'API — reste le passage sur appareil |
 | Retours de test des pilotes (interventions, phyto, activités, parcelles) | ✅ lots A à H : saisie pleine page, contrôle réglementaire, précautions et mélanges, activités, certifications, parcelles depuis la carte (PAC, cadastre) |
 | Matériels et entretien (lots I à M) | ✅ fiche et relevés d'heures, plan d'entretien et échéances, import de la base matériel, interventions d'entretien, heures estimées par Traccar, pièces à commander, alertes, avatar 3D et rejeu dans le plan 3D (`docs/materiels.md`) |

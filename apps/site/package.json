@@ -2,7 +2,7 @@
   "name": "@fourmy/site",
   "version": "0.0.0",
   "private": true,
-  "description": "Site public fourmy.org : projet, fonctionnalités, roadmap, changelog, contact",
+  "description": "Site public fourmy.org : projet, fonctionnalités, comparatif, nouveautés, installation, contact",
   "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
