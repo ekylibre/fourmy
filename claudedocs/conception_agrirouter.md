@@ -446,9 +446,9 @@ proposition « Mettre à jour » sur la fiche ; aucune donnée saisie n'est
 |---|---|---|---|
 | **AR1** Conformité et Deep URL ✅ 16/11 | identifiant externe, nom, capacités et abonnements complets, `allow_delete_by_user`, 409 de la révocation, état `disconnected`, page `fourmy.org/agrirouter`, `/agrirouter/start`, `RequireAuth` avec `next` | 1 à 5 | **premier essai réel** : connexion des deux façons, envoi à l'IO-Tool |
 | **AR2** Écouteur et boîte de réception brute ✅ 16/11 | migration 0054, volume, `client.events()`, verrou consultatif, événements de connexion, réception rangée et confirmée sans lecture, page de la boîte de réception | 3, 15, 16, 19 | révocation et suppression vues ; fichiers de l'IO-Tool reçus, compteur à 0 |
-| **AR3** File d'envoi | `agrirouter_outbox`, tentative immédiate puis reprise, états, historique | 6, 7 | test de coupure de la revue |
-| **AR4** TaskData reçue | `parseTaskData`, proposition, rapprochement de la carte envoyée (`TSK@B`) | 17 | retour des tâches réalisées |
-| **AR5** EFDI | protobuf, TimeLog → positions → parcours, Device Description → fiche | 17, 18 | télémétrie des machines |
+| **AR3** File d'envoi ✅ 16/11 | `agrirouter_outbox`, tentative immédiate puis reprise, états, historique | 6, 7 | test de coupure de la revue |
+| **AR4** TaskData reçue ✅ 16/11 | `parseTaskData`, proposition, rapprochement de la carte envoyée (`TSK@B`) | 17 | retour des tâches réalisées |
+| **AR5** EFDI ✅ 16/11 | protobuf, TimeLog → positions → parcours, Device Description → fiche | 17, 18 | télémétrie des machines |
 | **AR7** Parcelles | second flux, chargement initial, liens, tâche « parcelles » | 8 à 10 | parcelles sur les consoles |
 | **AR8** Revue | deux fermes de démonstration, testeurs DKE invités, déroulé écrit, `docs/modulation.md` et nouveau `docs/agrirouter.md` | 20 | demande de revue |
 
@@ -472,6 +472,42 @@ Le site redirige désormais en relatif (`absolute_redirect off`) :
 Un fichier est confirmé dès qu'il est rangé sur le volume, sans attendre sa
 lecture (AR4, AR5), qui se fera depuis le volume. La question B (redélivraison
 après une coupure) reste à vérifier avec l'IO-Tool.
+
+**AR3, réalisé le 16/11.** Écarts et précisions :
+- un jeton refusé (identifiants révoqués, scénario de coupure de la revue)
+  et un 401 mettent aussi l'envoi en attente ;
+- si agrirouter ne répond pas au moment de l'envoi, les destinataires sont
+  contrôlés d'après la dernière synchro, pour pouvoir mettre en file ;
+- la purge des fichiers envoyés (90 jours) n'est pas faite.
+
+**AR4, réalisé le 16/11.** Écarts et précisions :
+- pas d'accès à l'IO-Tool (compte à demander au support) : le lecteur est
+  essayé sur un TaskData réel public (console Topcon, `isoxml-js`, Apache
+  2.0) et sur des tâches synthétiques. Les doses et la surface (DDI 2, 7, 12,
+  116) restent à confirmer sur de vrais fichiers ;
+- lecteur écrit pour Fourmy (zip, XML réduit, TLG binaire), sans dépendance ;
+- la carte d'origine est reconnue par la fin de la désignation de la tâche
+  (` F<8 caractères>`), sans colonne `task_ref` ;
+- heures sans fuseau lues à l'heure de Paris (pas de fuseau par ferme) ;
+- les produits et doses ne sont pas mis dans les intrants : ils s'affichent
+  dans le bandeau, à saisir ;
+- un fichier à plusieurs tâches passe « Validé » dès qu'une intervention en
+  est tirée.
+
+**AR5, réalisé le 16/11.** Écarts et précisions :
+- définitions EFDI : `efdi.proto` de `DKE-Data/agrirouter-tmt-protobuf-definitions`
+  (Apache 2.0, question D tranchée). Décodeur écrit pour Fourmy, sans
+  `protobufjs` ; seuls les champs utiles sont lus ;
+- essayé sur des messages fabriqués par l'encodeur de Fourmy : cohérent
+  avec `efdi.proto`, à confirmer sur des messages réels (IO-Tool) ;
+- le matériel d'un journal vient de la description de machine du même
+  attelage (`teamset_context_id`), attendue une heure ; sinon « Sans suite » ;
+- un matériel déjà suivi par Traccar n'est pas doublé (un seul rattachement
+  de boîtier à la fois par matériel) ;
+- la largeur de travail se reporte sur l'avatar de la fiche ; le nombre de
+  sections est seulement affiché (pas de champ « sections » sur la fiche) ;
+- les journaux sans matériel reconnu ne donnent pas de proposition
+  d'intervention isolée : le flux de télémétrie passe par les parcours.
 
 Ordre : AR1, puis AR2 et AR3 (indépendants), puis AR4 et AR5, puis AR7
 (le plus incertain), puis AR8. La revue ne peut avoir lieu qu'après AR7,

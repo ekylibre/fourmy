@@ -390,6 +390,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       compliance: { usages: usageChoices, ...(overrideReason.trim() ? { reason: overrideReason.trim() } : {}) },
       ...(weather ? { weather } : {}),
       ...(fromTracks ? { trackSessionIds: fromTracks.body.trackSessionIds } : {}),
+      ...(fromTracks?.body.agrirouterInbox ? { agrirouterInbox: fromTracks.body.agrirouterInbox } : {}),
     } satisfies InterventionCompleteWrite;
   };
 
@@ -1100,13 +1101,23 @@ function TrackDraftBanner({
   onChoose: (code: string) => void;
 }) {
   const n = draft.body.trackSessionIds.length;
+  // Tâche reçue d'une console par agrirouter (lot AR4) plutôt que des parcours GPS.
+  const received = Boolean(draft.body.agrirouterInbox);
   const suggestions = draft.procedureSuggestions
     .map((code) => catalogue.items.find((p) => p.code === code))
     .filter((p): p is ProcedureCatalogueItem => !!p);
   return (
-    <Alert color="lichen" variant="light" title={`${n} parcours GPS ${n > 1 ? "seront rattachés" : "sera rattaché"}`} aria-label="Parcours GPS">
+    <Alert
+      color="lichen"
+      variant="light"
+      title={received ? "Travail reçu de la console par agrirouter" : `${n} parcours GPS ${n > 1 ? "seront rattachés" : "sera rattaché"}`}
+      aria-label={received ? "Travail reçu d'agrirouter" : "Parcours GPS"}
+    >
       <Stack gap={6}>
-        <Text size="sm">Attelage, périodes et parcelles viennent des traces. Tout reste modifiable avant l'enregistrement.</Text>
+        <Text size="sm">
+          {received ? "Attelage, périodes et parcelles viennent du fichier de la console." : "Attelage, périodes et parcelles viennent des traces."} Tout reste
+          modifiable avant l'enregistrement.
+        </Text>
         {suggestions.length > 0 && (
           <Group gap={6}>
             <Text size="sm">Procédure suggérée :</Text>

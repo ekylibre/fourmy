@@ -16,6 +16,8 @@ import { flushReads } from "./ign/store.js";
 import { purgeIgnCache, runIgnJob } from "./ign/preload.js";
 import { agrirouterClient, agrirouterConfig } from "./integrations/agrirouter.js";
 import { confirmAgrirouterInbox, runAgrirouterListener } from "./integrations/agrirouter-events.js";
+import { drainAgrirouterOutbox } from "./integrations/agrirouter-outbox.js";
+import { readAgrirouterInbox } from "./integrations/agrirouter-read.js";
 
 /**
  * Worker : synchronise les intégrations actives de toutes les fermes
@@ -144,8 +146,22 @@ async function ignPurgeTick(): Promise<void> {
   if (r.protectedDeleted) console.warn(`[worker] cache IGN : quota atteint, ${r.protectedDeleted} tuile(s) d'un plan de ferme supprimée(s)`);
 }
 
-/** agrirouter (lot AR2) : confirme les fichiers rangés dans la boîte de réception. */
+/**
+ * agrirouter : reprend les envois en attente (lot AR3), puis confirme les
+ * fichiers rangés dans la boîte de réception (lot AR2).
+ */
 async function agrirouterTick(): Promise<void> {
+  const out = await drainAgrirouterOutbox(db());
+  if (out.sent || out.partial || out.failed || out.queued) {
+    console.log(`[worker] agrirouter : envois ${out.sent} parti(s), ${out.queued} toujours en attente, ${out.partial} partiel(s), ${out.failed} abandonné(s)`);
+  }
+  // Lecture des TaskData reçus : propositions d'intervention (lot AR4), sans appel à agrirouter.
+  const read = await readAgrirouterInbox(db());
+  if (read.proposed || read.ignored || read.unreadable || read.merged) {
+    console.log(
+      `[worker] agrirouter : fichiers lus, ${read.proposed} avec proposition, ${read.merged} versé(s) aux parcours, ${read.ignored} sans suite, ${read.unreadable} illisible(s)`,
+    );
+  }
   if (!agrirouterConfig()) return;
   const r = await confirmAgrirouterInbox(db(), agrirouterClient());
   if (r.confirmed || r.failed) console.log(`[worker] agrirouter : ${r.confirmed} fichier(s) confirmé(s)${r.failed ? `, ${r.failed} en échec` : ""}`);

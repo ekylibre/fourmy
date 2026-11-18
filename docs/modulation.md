@@ -66,9 +66,11 @@ Un bandeau rappelle l'apport. La case « Garder la dose du plan en moyenne pond�
   - choix du format ;
   - choix des destinataires parmi ceux que les routes agrirouter permettent pour ce format ;
   - bouton « Envoyer ».
-- L'historique des envois : date, format, destinataires, auteur, état (« Envoyé » ou « Refusé » avec le motif au survol).
+- L'historique des envois : date, format, destinataires, auteur, état (« Envoyé », « En attente, nouvel essai à … », « Partiel » ou « Refusé », avec le motif au survol).
 
 « Envoyé » veut dire « accepté par agrirouter ». La console reçoit la carte à sa prochaine connexion. agrirouter ne renvoie pas d'accusé de livraison.
+
+Si agrirouter ne répond pas, la carte passe « En attente » et part toute seule au retour de la connexion (pendant 24 h au plus). « Partiel » : agrirouter a refusé un envoi à plusieurs destinataires, certains l'ont peut-être reçu ; Fourmy ne le renvoie pas, pour ne pas doubler la carte.
 
 ### Connecter la ferme à agrirouter
 
@@ -201,7 +203,7 @@ Pour les appels qui ne concernent pas une ferme, elle obtient un jeton `client_c
    - abonnements : TaskData, TimeLog et Device Description (ce que publient les machines) ;
    - `allow_delete_by_user: true`.
 
-   Les fichiers reçus sont rangés et confirmés (lot AR2, ci-dessous) ; leur lecture vient aux lots AR4 et AR5.
+   Les fichiers reçus sont rangés et confirmés (lot AR2, ci-dessous) ; les TaskData (lot AR4) et les messages EFDI (lot AR5) sont lus.
 5. Le tenant est chiffré comme secret de l'intégration. Le point de terminaison et le nom du compte sont gardés dans les réglages.
 
 **Destinataires**
@@ -217,9 +219,18 @@ La synchro horaire vérifie d'abord que la connexion tient : le tenant doit figu
 - l'enveloppe est en en-têtes : `x-agrirouter-message-type`, `x-agrirouter-direct-recipients`, `x-agrirouter-endpoint-id`, `x-agrirouter-tenant-id`, `x-agrirouter-sent-timestamp`, `x-agrirouter-filename`, `x-agrirouter-is-publish: false` ;
 - agrirouter découpe lui-même les gros fichiers (256 Mo au plus).
 
-Avant l'envoi, l'API relit les destinataires en direct. Elle refuse un destinataire sans route ou qui n'accepte pas le format.
+Avant l'envoi, l'API relit les destinataires en direct (ceux de la dernière synchro si agrirouter ne répond pas). Elle refuse un destinataire sans route ou qui n'accepte pas le format.
 
-Les réessais suivent la règle d'agrirouter : attente croissante sur 429 et 5xx, sans `Retry-After`. Un envoi sans réponse n'est pas réessayé, car l'API n'a pas de clé d'idempotence.
+**File d'envoi (lot AR3)** : l'envoi est d'abord mis en file (`agrirouter_outbox`, migration 0056), fichier figé sur le volume `fourmy_agrirouter_files`, puis tenté aussitôt par l'API. Règle de reprise d'agrirouter (`sendFailure`) :
+
+| Réponse | Issue |
+|---|---|
+| 200 | « Envoyé » ; jamais renvoyé (agrirouter ne dédoublonne pas) |
+| pas de réponse, jeton refusé ou indisponible, 401, 408, 429, 5xx | « En attente » ; repris par le worker après 1, 2, 5, 15, 30, 60 min, puis toutes les heures, avec les mêmes octets ; abandonné au bout de 24 h |
+| 400 sur plusieurs destinataires | « Partiel », non renvoyé |
+| autre 4xx | « Refusé » |
+
+Dans chaque appel, le client réessaie déjà trois fois sur 429 et 5xx (1, 2, 4 s). Un envoi pris en charge par un processus mort est repris après 2 min. Une ferme déconnectée pendant l'attente fait échouer l'envoi.
 
 **Écoute des événements (lot AR2)**
 
@@ -237,6 +248,25 @@ La ferme d'un événement est retrouvée sans lever l'isolation : fonctions `fou
 
 **Confirmation** : à chaque tour, le worker confirme (`POST /confirmations`) les fichiers rangés, par compte agrirouter et par lots de 100 ; un échec est retenté au tour suivant (20 fois au plus, motif gardé). Un fichier est considéré traité dès qu'il est rangé : sa lecture se fera depuis le volume.
 
+**Lecture des TaskData (lot AR4)** : le worker lit chaque TaskData reçu (`readTaskData` de `@fourmy/isoxml`, sans dépendance : zip, fichiers externes XFR, journaux binaires TLG). Chaque tâche réalisée (pas prévue, modèle ni annulée) devient une proposition d'intervention :
+
+| Élément | D'où il vient |
+|---|---|
+| Périodes | TIM de travail effectif (type 4), sinon tous les TIM, sinon début et fin du journal. Heures de console sans fuseau lues à l'heure de Paris. |
+| Parcelles | positions du journal (état GNSS à RTK flottant) dans les parcelles valides à la date, part des points ≥ 5 % ; sinon contour de la tâche (PFD) ; sinon parcelle de la carte d'origine |
+| Matériel | DVC par numéro de série, sinon par nom ou modèle |
+| Produits | allocations de produit (PAN) et produit de la carte d'origine |
+| Dose moyenne | DDI réels 7 (kg/ha), 2 (L/ha), 12 (grains/ha), sinon consignes 6, 1, 11, d'après le journal ou les totaux |
+| Surface travaillée | DDI 116 (surface totale, m²), répartie selon la part de chaque parcelle ; sinon surface du contour |
+| Carte d'origine | désignation de la tâche envoyée par Fourmy, terminée par ` F<8 premiers caractères de l'id>` |
+
+La proposition a la forme du brouillon des parcours GPS : « Créer l'intervention » ouvre le formulaire pré-rempli. Les produits et doses relevés s'affichent dans le bandeau, à saisir dans les intrants (pas de correspondance automatique avec les articles). À l'enregistrement, le fichier passe « Validé » et la tâche garde l'intervention. Un fichier sans tâche réalisée passe « Sans suite », un fichier abîmé « Illisible » avec le motif.
+
+**Messages EFDI (lot AR5)** : décodés sans dépendance (`decodeTimeLog`, `decodeDeviceDescription` de `@fourmy/isoxml`, numéros de champs de `efdi.proto` de DKE-Data, Apache 2.0) ; une enveloppe `google.protobuf.Any` de l'ancienne API est déballée.
+
+- **Description de machine** (`device_description`) : chaque machine est rapprochée d'un matériel de la ferme (numéro de série, sinon nom ou modèle). Sa largeur de travail (DDI 68, 67 ou 66, en mm) est comparée à celle de la fiche (avatar) ; si elle diffère, « Reporter … m sur la fiche » la met à jour. Le nombre de sections est affiché, pas enregistré. Sans rien à mettre à jour : « Sans suite », la description reste gardée pour les journaux.
+- **Journal** (`time_log`) : rattaché à la description de machine du même attelage (`teamset_context_id`), attendue une heure au plus. Ses positions (GNSS à RTK flottant) sont versées dans les **parcours GPS** du matériel automoteur reconnu, comme celles de Traccar : rattachement de source `agrirouter` (migration 0058), état de travail (DDI 141), vitesse (DDI 397), largeur, outil attelé (autre matériel reconnu). Les parcours sont recalculés aussitôt ; l'intervention se tire ensuite de l'onglet Parcours du matériel. Un matériel déjà suivi par Traccar n'est pas doublé ; une position déjà reçue n'est pas réinsérée. État « Versé aux parcours ».
+
 **Boîte de réception** : `Intégrations → Fichiers reçus d'agrirouter` (`/f/:ferme/agrirouter/inbox`, responsable) : date, type, fichier, état, confirmation, téléchargement.
 
 ## API
@@ -251,7 +281,9 @@ La ferme d'un événement est retrouvée sans lever l'isolation : fonctions `fou
 | `GET /prescriptions/recipients` | Destinataires agrirouter, lus en direct |
 | `POST /prescriptions/:id/send` | Envoi par agrirouter (responsable), tracé |
 | `POST /integrations/agrirouter/connect` · `…/complete` | Consentement agrirouter (responsable) |
-| `GET /agrirouter/inbox` · `GET /agrirouter/inbox/:id/file` | Fichiers reçus d'agrirouter et leur contenu (responsable) |
+| `GET /agrirouter/inbox` · `GET /agrirouter/inbox/:id/file` | Fichiers reçus d'agrirouter, tâches proposées et contenu (responsable) |
+| `POST /agrirouter/inbox/:id/dismiss` | Écarter un fichier reçu (responsable) |
+| `POST /agrirouter/inbox/:id/devices/:index/apply` | Reporter la largeur de travail d'une machine sur la fiche du matériel (responsable) |
 
 ## Code
 
@@ -316,7 +348,8 @@ La ferme d'un événement est retrouvée sans lever l'isolation : fonctions `fou
   - l'ordre des mailles de la grille ;
   - l'ordre des enfants de `TSK` ;
   - le type de point du contour.
-- **Lecture des fichiers reçus**, non faite : tâches ISO-XML réalisées, TimeLogs, Device Descriptions (lots AR4 et AR5 de `claudedocs/conception_agrirouter.md`). Ils sont déjà rangés et confirmés (lot AR2).
+- **EFDI essayé seulement sur des messages fabriqués par Fourmy** : décodeur et encodeur suivent les numéros de champs de `efdi.proto`, mais aucun message réel de machine n'a encore été lu. Les DDI d'état de travail (141), de vitesse (397) et de largeur (66 à 68) sont à confirmer avec l'IO-Tool.
+- **Lecture des TaskData essayée** sur un seul fichier réel (console Topcon, sans dose). Doses, surface et rapprochement d'une carte revenue sont à confirmer sur des fichiers de consoles réelles (IO-Tool).
 - **Zonage sur une seule image.** Un zonage pluriannuel (médiane de plusieurs dates ou de plusieurs saisons) serait plus stable pour les cartes de sol ou de semis.
 - **Pas de lien** entre une carte et l'intervention qui l'applique. Les doses moyennes et la quantité ne pré-remplissent pas encore la saisie.
 - Le lien avec le plan de fumure existe dans l'autre sens : voir ci-dessous.

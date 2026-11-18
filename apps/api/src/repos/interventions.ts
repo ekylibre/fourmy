@@ -1,3 +1,4 @@
+import { linkInboxIntervention } from "../integrations/agrirouter-read.js";
 import { sql, type SQL } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
 import {
@@ -412,6 +413,7 @@ async function writeBody(tx: Tx, interventionId: string, body: Body, articles: M
     for (const d of body.doers) await insert("doer", "person", d.personId, null, null, null);
     for (const p of body.periods) await period(p);
     await linkTrackSessions(tx, interventionId, body.trackSessionIds ?? []);
+    await linkInboxIntervention(tx, body.agrirouterInbox, interventionId);
     return;
   }
   // Attelages : id client conservé (stable entre deux modifications).
@@ -446,6 +448,7 @@ async function writeBody(tx: Tx, interventionId: string, body: Body, articles: M
       WHERE s.id = ${l.id}`);
   }
   await linkTrackSessions(tx, interventionId, body.trackSessionIds ?? []);
+  await linkInboxIntervention(tx, body.agrirouterInbox, interventionId);
 }
 
 /** Irrigation : dose d'eau et matériel, sur les seules procédures d'irrigation (la règle du domaine l'a vérifié). */

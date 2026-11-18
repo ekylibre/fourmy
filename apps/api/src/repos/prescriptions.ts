@@ -3,6 +3,7 @@ import { withFarm, type Database, type Tx } from "@fourmy/db";
 import {
   MODULATION_MIN_VALID_RATIO,
   PRESCRIPTION_UNIT_LABELS,
+  type AgrirouterRecipient,
   type ModulationDate,
   type ModulationZone,
   type Prescription,
@@ -18,7 +19,10 @@ import {
 import { classifyZones, conserveMean, isUsable, modulationRates, prescriptionTotal, utmEpsg } from "@fourmy/domain";
 import { INDEX_RASTER_METHOD, type Bbox, type PolygonGeometry } from "@fourmy/sentinel";
 import { shapefile, taskData, zip } from "@fourmy/isoxml";
-import { agrirouterClient, agrirouterRecipients, connectedAgrirouter, MESSAGE_TYPE_OF } from "../integrations/agrirouter.js";
+import { sendFailure } from "@fourmy/agrirouter";
+import { agrirouterRecipients, connectedAgrirouter, MESSAGE_TYPE_OF } from "../integrations/agrirouter.js";
+import { storeAgrirouterFile } from "../integrations/agrirouter-events.js";
+import { deliverAgrirouterSend, enqueueAgrirouterSend } from "../integrations/agrirouter-outbox.js";
 import { copernicusClient } from "../integrations/providers.js";
 import { BadRequest, NotFound } from "../routes/helpers.js";
 import { decryptSecret } from "../secrets.js";
@@ -301,9 +305,9 @@ export async function getPrescription(db: Database, farmId: string, id: string):
       sql`SELECT code, mean_index, min_index, max_index, area_m2, rate, ST_AsGeoJSON(shape, 7)::json AS geom
           FROM prescription_zones WHERE prescription_id = ${id} ORDER BY code`,
     );
-    const sends = await rows<{ id: string; format: PrescriptionFormat; channel: "agrirouter"; recipients: { id: string; name: string }[]; sent_at: string | Date; sent_by: string | null; status: "sent" | "error"; error: string | null }>(
+    const sends = await rows<{ id: string; format: PrescriptionFormat; channel: "agrirouter"; recipients: { id: string; name: string }[]; sent_at: string | Date; sent_by: string | null; status: PrescriptionSend["status"]; error: string | null; next_attempt_at: string | Date | null }>(
       tx,
-      sql`SELECT s.id, s.format, s.channel, s.recipients, s.sent_at, coalesce(u.name, u.email) AS sent_by, s.status, s.error
+      sql`SELECT s.id, s.format, s.channel, s.recipients, s.sent_at, coalesce(u.name, u.email) AS sent_by, s.status, s.error, s.next_attempt_at
           FROM prescription_sends s LEFT JOIN users u ON u.id = s.sent_by
           WHERE s.prescription_id = ${id} ORDER BY s.sent_at DESC`,
     );
@@ -311,7 +315,7 @@ export async function getPrescription(db: Database, farmId: string, id: string):
     return {
       ...base,
       zones: zones.map((z) => ({ code: z.code, meanIndex: z.mean_index, minIndex: z.min_index, maxIndex: z.max_index, areaM2: Math.round(z.area_m2), rate: z.rate, geometry: z.geom })),
-      sends: sends.map((s): PrescriptionSend => ({ id: s.id, format: s.format, channel: s.channel, recipients: s.recipients, sentAt: iso(s.sent_at), sentBy: s.sent_by, status: s.status, error: s.error })),
+      sends: sends.map((s): PrescriptionSend => ({ id: s.id, format: s.format, channel: s.channel, recipients: s.recipients, sentAt: iso(s.sent_at), sentBy: s.sent_by, status: s.status, error: s.error, nextAttemptAt: s.next_attempt_at === null ? null : iso(s.next_attempt_at) })),
     };
   });
 }
@@ -398,6 +402,11 @@ const INDEX_LABELS: Record<VegetationIndex, string> = { ndvi: "NDVI", ndre: "NDR
 const fr = (v: number, digits = 2) => v.toLocaleString("fr-FR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
 /** Archive zip d'une carte : TaskData ISO-XML ou Shapefile. */
+/** Suffixe ` F<8 premiers caractères de l'id>` ajouté à la désignation de la tâche envoyée. */
+export const taskDesignator = (name: string, id: string) => `${[...name].slice(0, 21).join("").trim()} F${id.slice(0, 8)}`;
+/** Préfixe d'id de carte d'après une désignation de tâche revenue d'une console, ou null. */
+export const prescriptionRefOf = (designator: string) => /\bF([0-9a-f]{8})$/i.exec(designator.trim())?.[1]?.toLowerCase() ?? null;
+
 export async function prescriptionFile(db: Database, farmId: string, id: string, format: PrescriptionFormat): Promise<{ filename: string; bytes: Uint8Array }> {
   const p = await getPrescription(db, farmId, id);
   const base = slug(`${p.parcelName}-${p.name}`);
@@ -460,7 +469,8 @@ export async function prescriptionFile(db: Database, farmId: string, id: string,
     customer: farm?.name ?? "Ferme",
     farm: farm?.name ?? "Ferme",
     partfield: { name: p.parcelName, areaM2: area, boundary: boundary.coordinates },
-    task: p.name,
+    // Référence de la carte en fin de désignation (32 caractères au plus) : une tâche revenue réalisée y est rapprochée (lot AR4).
+    task: taskDesignator(p.name, p.id),
     product: p.product,
     unit: p.unit,
     zones: p.zones.map((z) => ({ code: z.code, name: `Zone ${z.code} ${INDEX_LABELS[p.index]} ${fr(z.meanIndex)}`, rate: z.rate })),
@@ -474,8 +484,10 @@ export async function prescriptionFile(db: Database, farmId: string, id: string,
 
 /**
  * Envoie la carte par agrirouter aux destinataires choisis (parmi ceux que
- * la route permet). L'envoi est tracé, réussi ou non ; « envoyé » veut dire
- * accepté par agrirouter, pas reçu par la console.
+ * la route permet). Lot AR3 : l'envoi passe par la file (fichier figé) et
+ * part aussitôt si agrirouter répond ; sinon il reste « en attente » et le
+ * worker le reprend. « Envoyé » veut dire accepté par agrirouter, pas reçu
+ * par la console. Un refus définitif est tracé puis renvoyé en erreur.
  */
 export async function sendPrescription(
   db: Database,
@@ -485,42 +497,51 @@ export async function sendPrescription(
   req: { format: PrescriptionFormat; recipients: string[] },
 ): Promise<PrescriptionSend> {
   const { tenantId, settings } = await withFarm(db, farmId, connectedAgrirouter);
-  const { recipients } = await agrirouterRecipients(tenantId, settings.endpointId);
+  const recipients = await sendableRecipients(db, farmId, tenantId, settings.endpointId);
   const chosen = req.recipients.map((r) => recipients.find((x) => x.id === r));
   if (chosen.some((r) => !r)) throw new BadRequest("Destinataire inconnu ou sans route depuis Fourmy dans agrirouter.");
   const refused = chosen.filter((r) => !r!.formats.includes(req.format));
   if (refused.length) throw new BadRequest(`${refused.map((r) => r!.name).join(", ")} : ce format ne peut pas lui être envoyé (route agrirouter).`);
   const file = await prescriptionFile(db, farmId, id, req.format);
+  const fileSha256 = await storeAgrirouterFile(file.bytes);
 
-  let error: string | null = null;
-  try {
-    await agrirouterClient().sendFile(tenantId, {
-      senderEndpointId: settings.endpointId,
-      messageType: MESSAGE_TYPE_OF[req.format],
-      recipients: req.recipients,
-      filename: file.filename,
-      payload: file.bytes,
-    });
-  } catch (e) {
-    error = (e instanceof Error ? e.message : String(e)).slice(0, 500);
-  }
-  const send: PrescriptionSend = {
-    id: crypto.randomUUID(),
-    format: req.format,
-    channel: "agrirouter",
-    recipients: chosen.map((r) => ({ id: r!.id, name: r!.name })),
-    sentAt: new Date().toISOString(),
-    sentBy: null,
-    status: error ? "error" : "sent",
-    error,
-  };
-  await withFarm(db, farmId, (tx) =>
-    tx.execute(sql`
+  const sendId = crypto.randomUUID();
+  const outboxId = await withFarm(db, farmId, async (tx) => {
+    await tx.execute(sql`
       INSERT INTO prescription_sends (id, prescription_id, farm_id, channel, format, recipients, status, error, sent_by, sent_at)
-      VALUES (${send.id}, ${id}, ${farmId}, 'agrirouter', ${send.format}, ${JSON.stringify(send.recipients)}::jsonb, ${send.status}, ${error}, ${userId}, ${send.sentAt})`),
-  );
-  if (error) throw new BadRequest(`Envoi refusé : ${error}`);
-  return send;
+      VALUES (${sendId}, ${id}, ${farmId}, 'agrirouter', ${req.format}, ${JSON.stringify(chosen.map((r) => ({ id: r!.id, name: r!.name })))}::jsonb,
+        'queued', NULL, ${userId}, now())`);
+    return enqueueAgrirouterSend(tx, {
+      farmId,
+      prescriptionSendId: sendId,
+      messageType: MESSAGE_TYPE_OF[req.format],
+      filename: file.filename,
+      recipients: req.recipients,
+      fileSha256,
+      claimed: true,
+    });
+  });
+  const outcome = await deliverAgrirouterSend(db, farmId, outboxId);
+  if (outcome.state === "failed") throw new BadRequest(`Envoi refusé : ${outcome.error}`);
+  const sent = (await getPrescription(db, farmId, id)).sends.find((s) => s.id === sendId);
+  return sent!;
+}
+
+/**
+ * Destinataires lus en direct ; si agrirouter ne répond pas (coupure), ceux
+ * de la dernière synchro, pour pouvoir mettre l'envoi en file.
+ */
+async function sendableRecipients(db: Database, farmId: string, tenantId: string, endpointId: string): Promise<AgrirouterRecipient[]> {
+  try {
+    return (await agrirouterRecipients(tenantId, endpointId)).recipients;
+  } catch (e) {
+    if (sendFailure(e, 1) !== "retry") throw e;
+    const [row] = await withFarm(db, farmId, (tx) =>
+      rows<{ last_report: { recipients?: AgrirouterRecipient[] } | null }>(tx, sql`SELECT last_report FROM integrations WHERE provider = 'agrirouter'`),
+    );
+    if (!row?.last_report?.recipients) throw new BadRequest("agrirouter ne répond pas et aucun destinataire n'est connu : réessayez plus tard.");
+    return row.last_report.recipients;
+  }
 }
 
 export const prescriptionUnits = PRESCRIPTION_UNIT_LABELS;

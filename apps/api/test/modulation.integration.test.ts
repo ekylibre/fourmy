@@ -1,4 +1,7 @@
 import { inflateRawSync } from "node:zlib";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import postgres from "postgres";
 import type { Integration, IntegrationProviderDefinition, ModulationDate, Prescription, PrescriptionSend, PrescriptionSummary, Zoning } from "@fourmy/contracts";
@@ -6,6 +9,9 @@ import { INDEX_RASTER_METHOD } from "@fourmy/sentinel";
 import { createApp } from "../src/app.js";
 import { setAgrirouterClientOptions } from "../src/integrations/agrirouter.js";
 import { pendingSyncs } from "../src/routes/integrations.js";
+import { db } from "../src/db.js";
+import { agrirouterFilesConfig } from "../src/integrations/agrirouter-events.js";
+import { drainAgrirouterOutbox } from "../src/integrations/agrirouter-outbox.js";
 import { addMember, setupFarm, teardown } from "./helpers.js";
 
 /**
@@ -55,7 +61,10 @@ function fakeAgrirouter() {
         ],
       });
     }
-    if (u.pathname === "/messages") return new Response(null, { status: state.sendStatus });
+    if (u.pathname === "/messages") {
+      if (state.sendStatus === 0) throw new TypeError("fetch failed");
+      return new Response(null, { status: state.sendStatus });
+    }
     if (u.pathname.startsWith("/endpoints/") && init.method === "DELETE") return new Response(null, { status: 204 });
     if (u.pathname === "/authorizations") return new Response(state.revokeStatus === 204 ? null : "{}", { status: state.revokeStatus });
     return new Response("{}", { status: 404 });
@@ -125,10 +134,13 @@ describe.skipIf(!url)("cartes de modulation et agrirouter (intégration)", () =>
       AGRIROUTER_REDIRECT_URI: "https://fourmy.test/agrirouter/callback",
     });
     setAgrirouterClientOptions({ fetch: fake.f, sleep: async () => {} });
+    // Fichiers envoyés (file d'envoi, AR3) : dossier temporaire.
+    agrirouterFilesConfig.dir = await mkdtemp(join(tmpdir(), "fourmy-modulation-"));
   });
   afterAll(async () => {
     process.env = env;
     setAgrirouterClientOptions({});
+    await rm(agrirouterFilesConfig.dir, { recursive: true, force: true });
     await teardown(sql, farmId, [userId, worker.userId]);
     await sql.end();
   });
@@ -331,6 +343,22 @@ describe.skipIf(!url)("cartes de modulation et agrirouter (intégration)", () =>
       ["isoxml", "sent"],
     ]);
     expect(p.sends[1]!.sentBy).toBeTruthy();
+  });
+
+  it("agrirouter injoignable : l'envoi est mis en attente, puis part au retour de la connexion (AR3)", async () => {
+    fake.state.sendStatus = 0;
+    const res = await app.request(`${base()}/prescriptions/${prescription.id}/send`, { method: "POST", headers, body: JSON.stringify({ format: "isoxml", recipients: [TRACTOR] }) });
+    expect(res.status).toBe(200);
+    const queued = (await res.json()) as PrescriptionSend;
+    expect(queued).toMatchObject({ status: "queued", recipients: [{ id: TRACTOR, name: "Fendt 724 terminal" }] });
+    expect(queued.error).toMatch(/^En attente : /);
+    expect(queued.nextAttemptAt).toBeTruthy();
+
+    fake.state.sendStatus = 200;
+    await sql`UPDATE agrirouter_outbox SET next_attempt_at = now() - interval '1 second' WHERE prescription_send_id = ${queued.id}`;
+    await drainAgrirouterOutbox(db(), 20, farmId);
+    const p = (await (await app.request(`${base()}/prescriptions/${prescription.id}`, { headers })).json()) as Prescription;
+    expect(p.sends.find((s) => s.id === queued.id)).toMatchObject({ status: "sent", error: null, nextAttemptAt: null });
   });
 
   it("constate une connexion défaite dans agrirouter : déconnectée, sans secret, puis reconnectée", async () => {
