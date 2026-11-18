@@ -1,7 +1,7 @@
 import { Document, WebIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS, KHRMaterialsUnlit } from "@gltf-transform/extensions";
 import type { AvatarParams } from "./params.js";
-import { beam, discHarrow, fertilizerSpreader, mountedSprayer, plough, rollerTool, rotaryHarrow, sower, SPRAYER_BODY_MAX_M, tineCultivator } from "./tools.js";
+import { beam, discHarrow, sprayerBooms, fertilizerSpreader, mountedSprayer, plough, rollerTool, rotaryHarrow, sower, SPRAYER_BODY_MAX_M, tineCultivator } from "./tools.js";
 
 /**
  * Avatar 3D (glTF binaire) d'un matériel, à l'échelle réelle. Repère local :
@@ -46,9 +46,42 @@ const norm = (a: V3): V3 => {
   return [a[0] / l, a[1] / l, a[2] / l];
 };
 
-/** Maillage par matériau ; toutes les faces sont visibles des deux côtés (matériaux double face). */
+/**
+ * Groupe articulé de l'avatar (rejeu 3D) : un nœud glTF à part, placé sur son
+ * pivot, que la vue anime (outil relevé, rampe repliée). Le groupe `frame` est
+ * le nœud racine, fixe.
+ */
+export interface MeshGroup {
+  /** Pivot dans le repère local de l'avatar (x avant, y gauche, z haut). */
+  pivot: V3;
+  parent: string | null;
+  parts: Map<string, Part>;
+}
+
+/** Maillage par groupe articulé puis par matériau ; toutes les faces sont visibles des deux côtés (matériaux double face). */
 export class Mesh {
-  parts = new Map<string, Part>();
+  groups = new Map<string, MeshGroup>([["frame", { pivot: [0, 0, 0], parent: null, parts: new Map() }]]);
+  private current = "frame";
+
+  /** Parties par matériau du groupe courant. */
+  get parts(): Map<string, Part> {
+    return this.groups.get(this.current)!.parts;
+  }
+
+  /** Nom du groupe où vont les faces suivantes. */
+  get groupName(): string {
+    return this.current;
+  }
+
+  /**
+   * Faces suivantes dans le groupe `name` (créé au premier appel, avec son
+   * pivot et son parent ; à défaut de parent, le groupe courant).
+   */
+  group(name: string, pivot: V3 = [0, 0, 0], parent?: string) {
+    if (!this.groups.has(name)) this.groups.set(name, { pivot, parent: parent ?? this.current, parts: new Map() });
+    this.current = name;
+    return this;
+  }
 
   private part(m: string): Part {
     let p = this.parts.get(m);
@@ -66,8 +99,9 @@ export class Mesh {
     const normal = n ?? norm(cross(sub(verts[1]!, verts[0]!), sub(verts[2]!, verts[0]!)));
     const base = p.positions.length / 3;
     const tone = faceTone(normal);
+    const pivot = this.groups.get(this.current)!.pivot;
     verts.forEach((v, i) => {
-      p.positions.push(...toGltf(v));
+      p.positions.push(...toGltf(sub(v, pivot)));
       p.normals.push(...toGltf(normal));
       p.tones.push(tone);
       if (uv) p.uvs.push(...uv[i]!);
@@ -192,7 +226,7 @@ export const TRACTOR_SVG_PALETTE = {
 // Gabarits
 // ---------------------------------------------------------------------------
 
-type Zone = { x: number; side: number; z: number; h: number };
+type Zone = { x: number; side: number; z: number; h: number; group?: string };
 
 /**
  * Tracteur d'après le dessin du kit : proportions de l'illustration, mises à
@@ -361,6 +395,9 @@ function simpleWheel(m: Mesh, cx: number, cy: number, d: number, w: number) {
 }
 
 /** Formes du gabarit (repère local). Renvoie la zone du logo. */
+/** Hauteur des points bas d'attelage d'un outil porté : pivot du relevage. */
+const MOUNTED_PIVOT_Z = 0.4;
+
 function shape(p: AvatarParams, m: Mesh): Zone | undefined {
   const { lengthM: L, widthM: W, heightM: H } = p;
   switch (p.template) {
@@ -384,11 +421,13 @@ function shape(p: AvatarParams, m: Mesh): Zone | undefined {
       const hitch = p.hitchOffsetM;
       m.box("chassis", -hitch / 2, 0, 0.45, hitch, 0.12, 0.12);
       const depth = Math.max(0.6, L - hitch);
-      m.box("body", -hitch - depth / 2, 0, 0.35, depth, ww, Math.max(0.2, H * 0.25));
-      m.box("dark", -hitch - depth / 2, 0, 0.05, depth * 0.9, ww, 0.3);
       simpleWheel(m, -hitch - depth * 0.6, ww / 2 + 0.15, p.rearWheelDiameterM, 0.25);
       simpleWheel(m, -hitch - depth * 0.6, -(ww / 2 + 0.15), p.rearWheelDiameterM, 0.25);
-      return { x: -hitch - depth / 2, side: ww / 2 + 0.005, z: 0.35 + Math.max(0.2, H * 0.25) / 2, h: 0.15 };
+      // Organes de travail relevés hors travail (rejeu 3D), les roues restent au sol.
+      m.group("lift", [-hitch - depth / 2, 0, 0.35]);
+      m.box("body", -hitch - depth / 2, 0, 0.35, depth, ww, Math.max(0.2, H * 0.25));
+      m.box("dark", -hitch - depth / 2, 0, 0.05, depth * 0.9, ww, 0.3);
+      return { x: -hitch - depth / 2, side: ww / 2 + 0.005, z: 0.35 + Math.max(0.2, H * 0.25) / 2, h: 0.15, group: "lift" };
     }
     case "trailed_sprayer": {
       const W = Math.min(p.widthM, SPRAYER_BODY_MAX_M + 0.5); // cuve et voie au gabarit, la rampe seule s'élargit
@@ -399,25 +438,32 @@ function shape(p: AvatarParams, m: Mesh): Zone | undefined {
       simpleWheel(m, -hitch - body * 0.55, -(W / 2 - 0.2), p.rearWheelDiameterM, 0.35);
       const tankZ = p.rearWheelDiameterM * 0.55;
       m.box("body", -hitch - body / 2, 0, tankZ, body * 0.85, W - 0.8, H - tankZ - 0.3);
-      m.box("dark", -hitch - body - 0.15, 0, 0.9, 0.1, p.workingWidthM || 12, 0.12); // rampe dépliée
+      // Rampe dépliée : tronçon central, puis demi-rampes articulées (relevée en bout de champ, repliée le long de la cuve en transport).
+      const ww = p.workingWidthM || 12;
+      const xb = -hitch - body - 0.15;
+      const inner = (W - 0.8) / 2 + 0.2;
+      m.group("lift", [xb, 0, 0.9]);
+      m.box("dark", xb, 0, 0.9, 0.1, inner * 2, 0.12);
+      sprayerBooms(m, xb, inner, ww, { top: [1.05, 1.0], bottom: [0.85, 0.95], bar: 0.8, pivotZ: 0.9 });
+      m.group("frame");
       return { x: -hitch - body / 2, side: (W - 0.8) / 2 + 0.005, z: (tankZ + H - 0.3) / 2, h: 0.35 };
     }
     case "mounted_tool":
-      return tineCultivator(p, m);
     case "sower":
-      return sower(p, m);
     case "rotary_harrow":
-      return rotaryHarrow(p, m);
     case "plough":
-      return plough(p, m);
     case "mounted_sprayer":
-      return mountedSprayer(p, m);
     case "fertilizer_spreader":
-      return fertilizerSpreader(p, m);
+    case "roller": {
+      // Outil porté : tout l'outil suit le relevage trois points (pivot aux points bas d'attelage).
+      m.group("lift", [0, 0, MOUNTED_PIVOT_Z]);
+      const draw = { mounted_tool: tineCultivator, sower, rotary_harrow: rotaryHarrow, plough, mounted_sprayer: mountedSprayer, fertilizer_spreader: fertilizerSpreader, roller: rollerTool }[p.template];
+      const zone = draw(p, m);
+      m.group("frame");
+      return { ...zone, group: "lift" };
+    }
     case "disc_harrow":
       return discHarrow(p, m);
-    case "roller":
-      return rollerTool(p, m);
     case "trailer": {
       const hitch = p.hitchOffsetM;
       const body = Math.max(1.5, L - hitch);
@@ -468,6 +514,8 @@ export function pngRatio(png: Uint8Array | null | undefined): number {
 }
 
 export interface AvatarModel {
+  /** Nœuds articulés (hors racine), animables par la vue 3D. */
+  nodes: string[];
   glb: Uint8Array;
   triangles: number;
   /** Boîte englobante dans le repère local (x avant, y gauche, z haut), en mètres. */
@@ -481,19 +529,20 @@ export async function buildAvatarGlb(p: AvatarParams, logoPng?: Uint8Array | nul
   const withLogo = p.logo === "sides" && !!logoPng && !!zone;
   if (withLogo && zone) {
     const ratio = pngRatio(logoPng);
+    m.group(zone.group ?? "frame");
     for (const s of [1, -1]) m.logo(zone.x, s * zone.side, zone.z, zone.h, ratio);
   }
   const defs = materials(p);
   const doc = new Document();
   const buffer = doc.createBuffer();
-  const mesh = doc.createMesh("avatar");
   const unlit = doc.createExtension(KHRMaterialsUnlit);
-  let triangles = 0;
-  for (const [key, part] of m.parts) {
-    if (!part.indices.length || (key === "logo" && !withLogo)) continue;
+  const mats = new Map<string, ReturnType<Document["createMaterial"]>>();
+  const material = (key: string) => {
+    let mat = mats.get(key);
+    if (mat) return mat;
     const def = defs[key] ?? { color: "#888888" };
     // Aplats sans éclairage (KHR_materials_unlit) : la teinte de chaque face est précalculée (COLOR_0).
-    const mat = doc
+    mat = doc
       .createMaterial(key)
       .setBaseColorFactor([1, 1, 1, def.alpha ?? 1])
       .setMetallicFactor(0)
@@ -502,37 +551,60 @@ export async function buildAvatarGlb(p: AvatarParams, logoPng?: Uint8Array | nul
       .setExtension("KHR_materials_unlit", unlit.createUnlit());
     if ((def.alpha ?? 1) < 1) mat.setAlphaMode("BLEND");
     if (key === "logo") mat.setBaseColorTexture(doc.createTexture("logo").setImage(logoPng!).setMimeType("image/png")).setAlphaMode("BLEND");
-    const prim = doc
-      .createPrimitive()
-      .setMaterial(mat)
-      .setAttribute("POSITION", doc.createAccessor().setType("VEC3").setArray(new Float32Array(part.positions)).setBuffer(buffer))
-      .setAttribute("NORMAL", doc.createAccessor().setType("VEC3").setArray(new Float32Array(part.normals)).setBuffer(buffer))
-      .setIndices(doc.createAccessor().setType("SCALAR").setArray(new Uint32Array(part.indices)).setBuffer(buffer));
-    if (key === "logo") prim.setAttribute("TEXCOORD_0", doc.createAccessor().setType("VEC2").setArray(new Float32Array(part.uvs)).setBuffer(buffer));
-    else {
-      const colors = new Float32Array(part.tones.length * 3);
-      part.tones.forEach((t, i) => colors.set(linear(shade(def.color, t)).slice(0, 3), i * 3));
-      prim.setAttribute("COLOR_0", doc.createAccessor().setType("VEC3").setArray(colors).setBuffer(buffer));
+    mats.set(key, mat);
+    return mat;
+  };
+  let triangles = 0;
+  // Un nœud par groupe articulé, placé sur son pivot (relatif au parent) ; le groupe `frame` est la racine `avatar`.
+  const nodes = new Map<string, ReturnType<Document["createNode"]>>();
+  for (const [name, g] of m.groups) {
+    const node = doc.createNode(name === "frame" ? "avatar" : name);
+    if (g.parent) {
+      const parentPivot = m.groups.get(g.parent)!.pivot;
+      node.setTranslation(toGltf(sub(g.pivot, parentPivot)));
     }
-    mesh.addPrimitive(prim);
-    triangles += part.indices.length / 3;
+    const mesh = doc.createMesh(name === "frame" ? "avatar" : name);
+    for (const [key, part] of g.parts) {
+      if (!part.indices.length || (key === "logo" && !withLogo)) continue;
+      const def = defs[key] ?? { color: "#888888" };
+      const prim = doc
+        .createPrimitive()
+        .setMaterial(material(key))
+        .setAttribute("POSITION", doc.createAccessor().setType("VEC3").setArray(new Float32Array(part.positions)).setBuffer(buffer))
+        .setAttribute("NORMAL", doc.createAccessor().setType("VEC3").setArray(new Float32Array(part.normals)).setBuffer(buffer))
+        .setIndices(doc.createAccessor().setType("SCALAR").setArray(new Uint32Array(part.indices)).setBuffer(buffer));
+      if (key === "logo") prim.setAttribute("TEXCOORD_0", doc.createAccessor().setType("VEC2").setArray(new Float32Array(part.uvs)).setBuffer(buffer));
+      else {
+        const colors = new Float32Array(part.tones.length * 3);
+        part.tones.forEach((t, i) => colors.set(linear(shade(def.color, t)).slice(0, 3), i * 3));
+        prim.setAttribute("COLOR_0", doc.createAccessor().setType("VEC3").setArray(colors).setBuffer(buffer));
+      }
+      mesh.addPrimitive(prim);
+      triangles += part.indices.length / 3;
+    }
+    if (mesh.listPrimitives().length) node.setMesh(mesh);
+    else mesh.dispose();
+    nodes.set(name, node);
   }
-  doc.createScene("scene").addChild(doc.createNode("avatar").setMesh(mesh));
+  for (const [name, g] of m.groups) if (g.parent) nodes.get(g.parent)!.addChild(nodes.get(name)!);
+  doc.createScene("scene").addChild(nodes.get("frame")!);
   doc.getRoot().getAsset().generator = "Fourmy equipment-3d";
   const glb = await new WebIO().registerExtensions([KHRMaterialsUnlit]).writeBinary(doc);
-  // Boîte englobante (repère local) : contrôle d'échelle.
+  // Boîte englobante (repère local, au repos) : contrôle d'échelle.
   const min: V3 = [Infinity, Infinity, Infinity];
   const max: V3 = [-Infinity, -Infinity, -Infinity];
-  for (const part of m.parts.values()) {
-    for (let i = 0; i < part.positions.length; i += 3) {
-      const local: V3 = [part.positions[i + 2]!, part.positions[i]!, part.positions[i + 1]!]; // glTF → local
-      for (let k = 0; k < 3; k++) {
-        min[k] = Math.min(min[k]!, local[k]!);
-        max[k] = Math.max(max[k]!, local[k]!);
+  for (const g of m.groups.values()) {
+    for (const part of g.parts.values()) {
+      for (let i = 0; i < part.positions.length; i += 3) {
+        const local: V3 = [part.positions[i + 2]! + g.pivot[0], part.positions[i]! + g.pivot[1], part.positions[i + 1]! + g.pivot[2]]; // glTF → local
+        for (let k = 0; k < 3; k++) {
+          min[k] = Math.min(min[k]!, local[k]!);
+          max[k] = Math.max(max[k]!, local[k]!);
+        }
       }
     }
   }
-  return { glb, triangles, bounds: { min, max } };
+  return { glb, triangles, bounds: { min, max }, nodes: [...m.groups.keys()].filter((n) => n !== "frame") };
 }
 
 /** Contrôle d'un GLB importé (FR-MAT-83) : en-tête, taille, nombre de triangles. */

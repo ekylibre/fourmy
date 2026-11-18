@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isoDateTime, uuid } from "./primitives.js";
+import { procedureShape } from "./procedures.js";
 
 /**
  * Matériels, lot I (docs/materiels-entretien-design.md) : fiche d'identité,
@@ -280,5 +281,18 @@ export const latestPosition = z.object({
 export type LatestPosition = z.infer<typeof latestPosition>;
 
 /** Outil attelé à un matériel pendant une période (interventions réalisées, FR-MAT-85). */
-export const hitch = z.object({ toolId: uuid, toolName: z.string(), from: isoDateTime, to: isoDateTime, hitchOffsetM: z.number(), avatarHash: z.string() });
+export const hitch = z.object({
+  toolId: uuid,
+  toolName: z.string(),
+  from: isoDateTime,
+  to: isoDateTime,
+  hitchOffsetM: z.number(),
+  avatarHash: z.string(),
+  /** Gabarit de l'avatar généré (`mounted_sprayer`…) ; null pour un modèle importé. */
+  template: z.string().nullable().optional(),
+  /** Largeur de travail de l'outil (fiche, nom ou gabarit), en mètres. */
+  workingWidthM: z.number().nullable().optional(),
+  /** Forme du procédé de l'intervention (`treatment`…) ; null pour un outil annoncé par le boîtier. */
+  shape: procedureShape.nullable().optional(),
+});
 export type Hitch = z.infer<typeof hitch>;

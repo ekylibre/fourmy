@@ -131,16 +131,16 @@ export function formatArea(m2: number, unit: FarmDisplay["areaUnit"] = "ha"): st
  * Couches IGN mises en cache sur le serveur (F4, F4 bis). L'hydrographie n'en
  * fait pas partie : elle est déjà gardée en base et rafraîchie tous les 30 jours.
  */
-export const ignLayer = z.enum(["ortho", "plan", "elevation", "buildings"]);
+export const ignLayer = z.enum(["ortho", "plan", "elevation", "buildings", "landscape", "canopy"]);
 export type IgnLayer = z.infer<typeof ignLayer>;
-export const IGN_LAYER_LABELS: Record<IgnLayer, string> = { ortho: "Photos aériennes", plan: "Plan IGN", elevation: "Relief (3D)", buildings: "Bâtiments (3D)" };
+export const IGN_LAYER_LABELS: Record<IgnLayer, string> = { ortho: "Photos aériennes", plan: "Plan IGN", elevation: "Relief (3D)", buildings: "Bâtiments (3D)", landscape: "Arbres, haies et lignes électriques (3D)", canopy: "Hauteur de la végétation, LiDAR HD (3D, volumineux)" };
 export const farmIgnSettings = z.object({
   layers: z.array(ignLayer).min(1, "Choisissez au moins une couche.").transform((l) => [...new Set(l)]),
   detailMarginM: z.number().int().min(0).max(1000),
   autoRefresh: z.boolean(),
 });
 export type FarmIgnSettings = z.infer<typeof farmIgnSettings>;
-export const DEFAULT_FARM_IGN: FarmIgnSettings = { layers: ["ortho", "plan", "elevation", "buildings"], detailMarginM: 200, autoRefresh: false };
+export const DEFAULT_FARM_IGN: FarmIgnSettings = { layers: ["ortho", "plan", "elevation", "buildings", "landscape"], detailMarginM: 200, autoRefresh: false };
 /** Au-delà, le préchargement serveur demande une confirmation (N3). */
 export const IGN_SERVER_CONFIRM_BYTES = 2e9;
 

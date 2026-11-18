@@ -54,8 +54,14 @@ export const trackReplay = z.object({
   /** Points bruts dans la fenêtre, avant simplification. */
   rawCount: z.number().int(),
   toleranceM: z.number(),
-  /** [instant ISO, longitude, latitude, au travail ?] après simplification. */
-  samples: z.array(z.tuple([isoDateTime, z.number(), z.number(), z.boolean().nullable()])),
+  /**
+   * [instant ISO, longitude, latitude, au travail ?, largeur de travail (m) ?]
+   * après simplification. La largeur (attribut `widthM` des positions) est
+   * absente des points recalés sur la route.
+   */
+  samples: z.array(z.tuple([isoDateTime, z.number(), z.number(), z.boolean().nullable(), z.number().nullable().optional()])),
+  /** Parcours calculés sur la fenêtre (travail ou déplacement) : bout de champ ou transport au rejeu 3D. */
+  sessions: z.array(z.object({ kind: z.enum(["work", "transit"]), from: isoDateTime, to: isoDateTime })).optional(),
   /** Recalage des déplacements sur la route (OSRM, `road=1`) : null si non demandé ou service absent. */
   road: z.object({ runs: z.number().int(), snapped: z.number().int() }).nullable().optional(),
 });

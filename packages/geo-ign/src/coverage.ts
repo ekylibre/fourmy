@@ -21,7 +21,7 @@ export interface LonLat {
 /** Anneaux [lon, lat] ; seul l'anneau extérieur compte (les trous sont couverts). */
 export type PolygonRings = number[][][];
 
-export type IgnCoverageLayer = "ortho" | "plan" | "elevation" | "buildings";
+export type IgnCoverageLayer = "ortho" | "plan" | "elevation" | "buildings" | "landscape" | "canopy";
 export type TileScheme = "mercator" | "geographic";
 
 /**
@@ -35,9 +35,13 @@ export const IGN_LAYER_ZOOMS: Record<IgnCoverageLayer, { scheme: TileScheme; zon
   plan: { scheme: "mercator", zone: [8, 16], detail: [17] },
   elevation: { scheme: "geographic", zone: [10, 14], detail: [15, 16] },
   buildings: { scheme: "mercator", zone: [14, 14], detail: [] },
+  // Arbres, haies, lignes et pylônes (BD TOPO) : comme les bâtiments, une requête WFS par tuile de zoom 14.
+  landscape: { scheme: "mercator", zone: [14, 14], detail: [] },
+  // Hauteur de la végétation (MNH du LiDAR HD) : grille de 768 × 768 par tuile de zoom 14 (~2,2 m).
+  canopy: { scheme: "mercator", zone: [14, 14], detail: [] },
 };
 /** Taille moyenne retenue pour l'estimation, en octets (relief : grille 65 × 65 en float32). */
-export const IGN_TILE_BYTES: Record<IgnCoverageLayer, number> = { ortho: 25_000, plan: 15_000, elevation: 16_900, buildings: 10_000 };
+export const IGN_TILE_BYTES: Record<IgnCoverageLayer, number> = { ortho: 25_000, plan: 15_000, elevation: 16_900, buildings: 10_000, landscape: 30_000, canopy: 2_359_296 };
 
 const MAX_LAT = 85.05112878;
 const M_PER_DEG = 111_320;

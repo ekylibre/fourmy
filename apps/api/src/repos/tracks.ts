@@ -16,42 +16,66 @@ export async function trackReplay(
   q: { equipmentId: string; from: string; to: string; toleranceM: number },
 ): Promise<TrackReplay> {
   return withFarm(db, farmId, async (tx) => {
+    // Simplification par tronçon d'état constant (au travail, largeur) : un
+    // tronçon garde ses deux bouts, donc la bascule travail / relevé reste à
+    // sa place (rejeu 3D : outil relevé, bande travaillée).
     const rows = (await tx.execute(sql`
       WITH pts AS (
-        SELECT p.time, p.point, (p.attrs->>'working')::boolean AS working
+        SELECT p.time, p.point, (p.attrs->>'working')::boolean AS working,
+               CASE WHEN jsonb_typeof(p.attrs->'widthM') = 'number' AND (p.attrs->>'widthM')::float8 > 0
+                    THEN (p.attrs->>'widthM')::float8 END AS width
         FROM positions p
         JOIN tracker_bindings b ON b.id = p.binding_id AND b.equipment_id = ${q.equipmentId}
         WHERE p.time >= ${q.from}::timestamptz AND p.time < ${q.to}::timestamptz
       ),
-      line AS (
-        SELECT count(*) AS n,
-               ST_Simplify(
-                 ST_MakeLine(ST_MakePointM(ST_X(point), ST_Y(point), extract(epoch FROM time)) ORDER BY time),
-                 ${q.toleranceM * DEG_PER_M}) AS g
-        FROM pts
+      marked AS (
+        SELECT *, CASE WHEN (working, width) IS NOT DISTINCT FROM (lag(working) OVER w, lag(width) OVER w) THEN 0 ELSE 1 END AS change
+        FROM pts WINDOW w AS (ORDER BY time)
+      ),
+      runs AS (
+        SELECT *, sum(change) OVER (ORDER BY time) AS run FROM marked
+      ),
+      lines AS (
+        SELECT run, min(working::int)::boolean AS working, min(width) AS width, count(*) AS n,
+               ST_MakeLine(ST_MakePointM(ST_X(point), ST_Y(point), extract(epoch FROM time)) ORDER BY time) AS g
+        FROM runs GROUP BY run
       ),
       samples AS (
-        SELECT d.geom, to_timestamp(ST_M(d.geom)) AS t
-        FROM line, LATERAL ST_DumpPoints(line.g) d
-        WHERE line.n >= 2
+        SELECT l.run, l.working, l.width, d.geom, to_timestamp(ST_M(d.geom)) AS t
+        FROM lines l,
+             LATERAL ST_DumpPoints(CASE WHEN l.n >= 2 THEN ST_Simplify(l.g, ${q.toleranceM * DEG_PER_M}, true) ELSE ST_StartPoint(l.g) END) d
       )
-      SELECT (SELECT n FROM line)::int AS n,
-             s.t, ST_X(s.geom) AS lon, ST_Y(s.geom) AS lat,
-             (SELECT working FROM pts WHERE pts.time <= s.t ORDER BY pts.time DESC LIMIT 1) AS working
-      FROM samples s ORDER BY s.t`)) as unknown as {
+      SELECT (SELECT count(*) FROM pts)::int AS n, s.t, ST_X(s.geom) AS lon, ST_Y(s.geom) AS lat, s.working, s.width
+      FROM samples s
+      WHERE (SELECT count(*) FROM pts) >= 2
+      ORDER BY s.t, s.run`)) as unknown as {
       n: number;
       t: Date | string;
       lon: number;
       lat: number;
       working: boolean | null;
+      width: number | null;
     }[];
+    // Deux tronçons voisins ne partagent pas de sommet ; un même instant n'est gardé qu'une fois.
+    const samples: TrackReplay["samples"] = [];
+    for (const r of rows) {
+      const t = new Date(r.t).toISOString();
+      if (samples.length && samples.at(-1)![0] >= t) continue;
+      samples.push([t, r.lon, r.lat, r.working, r.width === null ? null : Number(r.width)]);
+    }
+    const sessions = (await tx.execute(sql`
+      SELECT kind, greatest(started_at, ${q.from}::timestamptz) AS f, least(stopped_at, ${q.to}::timestamptz) AS t
+      FROM track_sessions
+      WHERE equipment_id = ${q.equipmentId} AND stopped_at > ${q.from}::timestamptz AND started_at < ${q.to}::timestamptz
+      ORDER BY started_at`)) as unknown as { kind: "work" | "transit"; f: Date | string; t: Date | string }[];
     return {
       equipmentId: q.equipmentId,
       from: q.from,
       to: q.to,
       rawCount: rows[0]?.n ?? 0,
       toleranceM: q.toleranceM,
-      samples: rows.map((r) => [new Date(r.t).toISOString(), r.lon, r.lat, r.working]),
+      samples,
+      sessions: sessions.map((x) => ({ kind: x.kind, from: new Date(x.f).toISOString(), to: new Date(x.t).toISOString() })),
     };
   });
 }

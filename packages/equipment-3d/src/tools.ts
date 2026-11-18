@@ -11,7 +11,8 @@ import type { AvatarParams } from "./params.js";
  */
 
 type V3 = [number, number, number];
-export type Zone = { x: number; side: number; z: number; h: number };
+/** Zone du logo ; `group` : groupe articulé qui la porte (à défaut, `frame`). */
+export type Zone = { x: number; side: number; z: number; h: number; group?: string };
 
 const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const add = (a: V3, b: V3): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -186,12 +187,51 @@ export function mountedSprayer(p: AvatarParams, m: Mesh): Zone {
   const ww = p.workingWidthM || 12;
   const xb = x1 - 0.25;
   m.box("dark", xb, 0, 0.55, 0.2, 1.4, 0.8); // cadre de levage
-  for (const s of [1, -1]) {
-    beam(m, "dark", [xb, s * 0.6, 1.1], [xb, s * (ww / 2), 0.95], 0.08, 0.08);
-    beam(m, "dark", [xb, s * 0.6, 0.65], [xb, s * (ww / 2), 0.9], 0.06, 0.06);
-  }
-  beam(m, "light", [xb - 0.05, -ww / 2, 0.62], [xb - 0.05, ww / 2, 0.62], 0.03, 0.03); // porte-buses
+  // Rampe : tronçon central à la largeur de la cuve, puis demi-rampes articulées (repliées le long de la cuve en transport).
+  const inner = (W - 0.4) / 2 + 0.2;
+  beam(m, "dark", [xb, -inner, 1.1], [xb, inner, 1.1], 0.08, 0.08);
+  beam(m, "light", [xb - 0.05, -inner, 0.62], [xb - 0.05, inner, 0.62], 0.03, 0.03);
+  sprayerBooms(m, xb, inner, ww, { top: [1.1, 0.95], bottom: [0.65, 0.9], bar: 0.62, pivotZ: 0.9 });
   return { x: (x0 + x1) / 2, side: (W - 0.4) / 2 + 0.006, z: (zb + zt) / 2, h: Math.min(0.35, (zt - zb) * 0.3) };
+}
+
+/** Tronçons de chaque demi-rampe de pulvérisateur (repliage en accordéon). */
+export const BOOM_SECTIONS = 3;
+
+/** Nom du nœud d'un tronçon de demi-rampe : `boom_left`, `boom_left_2`, `boom_left_3`… */
+export const boomNode = (side: "left" | "right", k: number) => `boom_${side}${k ? `_${k + 1}` : ""}`;
+
+/**
+ * Demi-rampes d'un pulvérisateur, de part et d'autre du tronçon central :
+ * BOOM_SECTIONS tronçons en treillis par côté, chacun un nœud enfant du
+ * précédent, pivot à sa jonction. La vue 3D les replie en accordéon le long
+ * de la cuve (premier tronçon vers l'avant, le suivant vers l'arrière…).
+ */
+export function sprayerBooms(
+  m: Mesh,
+  xb: number,
+  inner: number,
+  ww: number,
+  z: { top: [number, number]; bottom: [number, number]; bar: number; pivotZ: number },
+) {
+  const parent = m.groupName;
+  const half = Math.max(ww / 2, inner + 0.3 * BOOM_SECTIONS);
+  const len = (half - inner) / BOOM_SECTIONS;
+  const at = (pair: [number, number], y: number) => pair[0] + ((pair[1] - pair[0]) * (y - inner)) / (half - inner);
+  for (const side of ["left", "right"] as const) {
+    const s = side === "left" ? 1 : -1;
+    let prev = parent;
+    for (let k = 0; k < BOOM_SECTIONS; k++) {
+      const [y0, y1] = [inner + k * len, inner + (k + 1) * len];
+      m.group(boomNode(side, k), [xb, s * y0, z.pivotZ], prev);
+      beam(m, "dark", [xb, s * y0, at(z.top, y0)], [xb, s * y1, at(z.top, y1)], 0.08, 0.08);
+      beam(m, "dark", [xb, s * y0, at(z.bottom, y0)], [xb, s * y1, at(z.bottom, y1)], 0.06, 0.06);
+      beam(m, "dark", [xb, s * y1, at(z.bottom, y1)], [xb, s * y1, at(z.top, y1)], 0.05, 0.05); // montant de jonction
+      beam(m, "light", [xb - 0.05, s * y0, z.bar], [xb - 0.05, s * y1, z.bar], 0.03, 0.03); // porte-buses
+      prev = boomNode(side, k);
+    }
+  }
+  m.group(parent);
 }
 
 /** Largeur maximale d'une cuve de pulvérisateur (gabarit routier), même si la largeur saisie est celle de la rampe. */
@@ -228,6 +268,7 @@ export function discHarrow(p: AvatarParams, m: Mesh): Zone {
   beam(m, "body", [0, 0, 0.45], [-hitch, 0, 0.7], 0.14, 0.14); // timon
   m.box("dark", 0, 0, 0.38, 0.18, 0.1, 0.12); // anneau
   const fx = -hitch;
+  m.group("lift", [fx - 0.65, 0, 0.7]); // châssis et trains de disques, relevés sur les roues de transport
   m.box("body", fx - 0.1, 0, 0.7, 0.2, ww, 0.16); // poutre avant du châssis
   m.box("body", fx - 1.2, 0, 0.7, 0.2, ww, 0.16); // poutre arrière
   for (const s of [1, -1]) m.box("body", fx - 0.65, s * (ww / 2 - 0.1), 0.7, 1.3, 0.14, 0.14);
@@ -240,10 +281,11 @@ export function discHarrow(p: AvatarParams, m: Mesh): Zone {
       beam(m, "chassis", [x, y, 0.7], [x, y, 0.32], 0.05, 0.04);
     }
   }
+  roller(m, -L + 0.3, ww - 0.15, 0.27, { x: fx - 1.25, z: 0.7 });
+  m.group("frame");
   wheel(m, fx - 0.65, 0.55, 0.8, 0.28); // roues de transport (repliées entre les trains)
   wheel(m, fx - 0.65, -0.55, 0.8, 0.28);
-  roller(m, -L + 0.3, ww - 0.15, 0.27, { x: fx - 1.25, z: 0.7 });
-  return { x: fx - 0.1, side: ww / 2 + 0.005, z: 0.78, h: 0.12 };
+  return { x: fx - 0.1, side: ww / 2 + 0.005, z: 0.78, h: 0.12, group: "lift" };
 }
 
 /** Rouleau porté ou traîné : cadre et rouleau à anneaux. */

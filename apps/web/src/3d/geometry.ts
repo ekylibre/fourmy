@@ -1,8 +1,8 @@
 import { circleInside, outerRing, ringCentroid, toLocal, type Pt } from "@fourmy/domain";
 import type { GeoJsonGeometry } from "@fourmy/contracts";
 
-/** Échantillon de trace : [instant ISO, longitude, latitude, au travail ?]. */
-export type Sample = [string, number, number, boolean | null];
+/** Échantillon de trace : [instant ISO, longitude, latitude, au travail ?, largeur de travail (m) ?]. */
+export type Sample = [string, number, number, boolean | null, (number | null)?];
 
 /**
  * Découpe une trace en tronçons de même état (travail / transport). Chaque
@@ -41,7 +41,8 @@ export function densify(samples: Sample[], stepM = 8): Sample[] {
       for (let j = 1; j <= n && d > 0; j++) {
         const f = (j * stepM) / d;
         if (f >= 1) break;
-        out.push([new Date(t0 + (t1 - t0) * f).toISOString(), prev[1] + (s[1] - prev[1]) * f, prev[2] + (s[2] - prev[2]) * f, s[3]]);
+        // État et largeur du point d'arrivée (une passe démarre au premier point au travail).
+        out.push([new Date(t0 + (t1 - t0) * f).toISOString(), prev[1] + (s[1] - prev[1]) * f, prev[2] + (s[2] - prev[2]) * f, s[3], s[4] ?? null]);
       }
     }
     out.push(s);

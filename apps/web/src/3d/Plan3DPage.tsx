@@ -21,7 +21,7 @@ import { placementFromClick } from "./geometry";
 import { indexColor } from "@fourmy/contracts";
 import { imageFor, useParcelIndicesAt, useRemoteSensingStatus, useSatelliteLayer, useVegetationIndex } from "../features/remote-sensing/remote-sensing";
 import { SatelliteControl } from "../features/remote-sensing/SatelliteControl";
-import type { Vegetation3dAt } from "@fourmy/contracts";
+import type { Landscape3dAt, Vegetation3dAt } from "@fourmy/contracts";
 import { weatherLook } from "./weather-look";
 import { PHASE_LABELS } from "./vegetation";
 
@@ -73,6 +73,9 @@ export function Plan3DPage() {
   const modelUrl = (id: string, hash: string) => `${location.origin}/api/v1${farmPath(farm.id, `/equipments/${id}/avatar.glb?v=${hash}`)}`;
   // Tous les matériels suivis, à leur dernière position connue à la date (FR-MAT-86).
   const [fleetOn, setFleetOn] = useState(false);
+  // Bande travaillée du rejeu (largeur d'outil, recouvrements, couleur par travail).
+  const [swathOn, setSwathOn] = useState(true);
+  useEffect(() => scene.current?.setSwathVisible(swathOn), [swathOn]);
   const fleet = useQuery({
     queryKey: ["tracks-latest", farm.id, at],
     queryFn: () => api.get<{ items: LatestPosition[] }>(farmPath(farm.id, `/tracks/latest?at=${encodeURIComponent(at)}`)),
@@ -229,10 +232,38 @@ export function Plan3DPage() {
       await scene.current?.setTrack(t.samples, name, {
         modelUrl: avatar ? modelUrl(equipment!, avatar.hash) : undefined,
         logoUrl: logo ? assetUrl(farm.id, logo) : undefined,
-        hitches: (hitched?.items ?? []).map((h) => ({ name: h.toolName, url: modelUrl(h.toolId, h.avatarHash), offsetM: offset, from: h.from, to: h.to })),
+        hitches: (hitched?.items ?? []).map((h) => ({
+          name: h.toolName,
+          url: modelUrl(h.toolId, h.avatarHash),
+          offsetM: offset,
+          from: h.from,
+          to: h.to,
+          template: h.template,
+          workingWidthM: h.workingWidthM,
+          shape: h.shape,
+        })),
+        sessions: t.sessions,
       });
     },
   });
+
+  // Paysage (BD TOPO, LiDAR HD) : toujours les abords de la ferme, calculés une fois et gardés en cache.
+  // Charger un rejeu ne le redemande pas (un recalcul figeait l'API et la vue plusieurs secondes).
+  const [treesOn, setTreesOn] = useState(true);
+  const [powerOn, setPowerOn] = useState(true);
+  const landscape = useQuery({
+    queryKey: ["landscape3d", farm.id, day],
+    queryFn: () => api.get<Landscape3dAt>(farmPath(farm.id, `/landscape3d?at=${day}`)),
+    enabled: treesOn || powerOn,
+    staleTime: 60 * 60_000,
+    retry: false,
+  });
+  useEffect(() => {
+    if (!plan.data) return;
+    scene.current
+      ?.setLandscape(treesOn || powerOn ? (landscape.data ?? null) : null, { date: day, trees: treesOn, power: powerOn })
+      .catch((e) => console.warn("Paysage 3D non construit", e));
+  }, [plan.data, landscape.data, treesOn, powerOn, day]);
 
   if (plan.error) return <ErrorAlert error={plan.error} />;
   const p = plan.data;
@@ -252,7 +283,7 @@ export function Plan3DPage() {
       key: "twin",
       label: "Végétation et météo",
       icon: Sprout,
-      active: vegOn || weatherOn,
+      active: vegOn || weatherOn || treesOn || powerOn,
       content: (
         <>
           <Switch label="Rangs de végétation (état observé ou simulé)" checked={vegOn} onChange={(e) => setVegOn(e.currentTarget.checked)} />
@@ -262,6 +293,19 @@ export function Plan3DPage() {
                 .map(([phase, n]) => `${n} ${PHASE_LABELS[phase as keyof typeof PHASE_LABELS]}`)
                 .join(" · ") || "Aucune parcelle"}
               {fromModel > 0 && ` · dont ${fromModel} d'après le modèle de croissance (pas de NDVI récent)`}
+            </Text>
+          )}
+          <Switch mt="xs" label="Arbres et haies (IGN, BD TOPO)" checked={treesOn} onChange={(e) => setTreesOn(e.currentTarget.checked)} />
+          <Switch mt="xs" label="Pylônes et lignes électriques (IGN, BD TOPO)" checked={powerOn} onChange={(e) => setPowerOn(e.currentTarget.checked)} />
+          {(treesOn || powerOn) && (
+            <Text size="xs" c="dimmed" mt={4} aria-label="Paysage">
+              {landscape.isLoading
+                ? "Paysage en cours de chargement…"
+                : landscape.error
+                  ? "Paysage indisponible (IGN)."
+                  : landscape.data
+                    ? `${landscape.data.trees.items.length.toLocaleString("fr-FR")} arbres · ${landscape.data.pylons.length} pylônes · ${landscape.data.lines.length} lignes${landscape.data.canopy ? ` · hauteurs du LiDAR HD (${landscape.data.canopy.added.toLocaleString("fr-FR")} arbres isolés)` : ""}${landscape.data.truncated ? " · arbres limités autour du centre" : ""}${landscape.data.missingTiles ? " · incomplet, l'IGN n'a pas tout servi" : ""}`
+                    : null}
             </Text>
           )}
           <Switch mt="xs" label="Météo du jour" checked={weatherOn} onChange={(e) => setWeatherOn(e.currentTarget.checked)} />
@@ -291,6 +335,7 @@ export function Plan3DPage() {
       content: (
         <>
           <Switch label="Tous les matériels suivis (dernière position connue)" checked={fleetOn} onChange={(e) => setFleetOn(e.currentTarget.checked)} />
+          <Switch mt="xs" label="Bande travaillée au rejeu (largeur de l'outil, couleur du travail)" checked={swathOn} onChange={(e) => setSwathOn(e.currentTarget.checked)} />
           {fleetOn && fleet.data && (
             <Text size="xs" c="dimmed" mt={4}>
               {fleet.data.items.length ? fleet.data.items.map((f) => `${f.name} (${new Date(f.time).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })})`).join(" · ") : "Aucune position dans les 30 jours précédents."}

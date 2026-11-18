@@ -27,13 +27,22 @@ export const preloadConfig = {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Tuiles en parallèle par couche, au plus : une tuile de paysage fait quatre
+ * requêtes WFS et l'IGN limite le débit (429 constatés à 8 en parallèle) ;
+ * une tuile LiDAR pèse 2,4 Mo.
+ */
+const LAYER_CONCURRENCY: Partial<Record<IgnLayer, number>> = { landscape: 1, canopy: 2 };
+
 async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   for (let n = 1; ; n++) {
     try {
       return await fn();
     } catch (e) {
       if (!(e instanceof IgnUnavailable) || n >= preloadConfig.attempts) throw e;
-      await sleep(preloadConfig.retryDelayMs * n);
+      // Limite de débit : le délai demandé par l'IGN, sinon une attente plus longue qu'après une panne.
+      const wait = e.status === 429 ? Math.max((e.retryAfterS ?? 0) * 1000, preloadConfig.retryDelayMs * 3 * n) : preloadConfig.retryDelayMs * n;
+      await sleep(wait);
     }
   }
 }
@@ -84,13 +93,14 @@ export async function runIgnJob(db: Database, stopping: () => boolean = () => fa
   let lastError: string | null = null;
   for (const [layer, tiles] of plan) {
     const p = progress[layer]!;
-    for (let i = 0; i < tiles.length; i += preloadConfig.concurrency) {
+    const concurrency = Math.min(preloadConfig.concurrency, LAYER_CONCURRENCY[layer] ?? preloadConfig.concurrency);
+    for (let i = 0; i < tiles.length; i += concurrency) {
       if (stopping() || Date.now() - started > preloadConfig.budgetMs) {
         await release(db, job.farm_id, job.id, progress);
         return { jobId: job.id, status: "running", ...totals(progress) };
       }
       await Promise.all(
-        tiles.slice(i, i + preloadConfig.concurrency).map(async (t) => {
+        tiles.slice(i, i + concurrency).map(async (t) => {
           try {
             if ((await withRetry(() => ensureTile(db, layer, t.z, t.x, t.y))) === "fetched") p.fetched++;
           } catch (e) {
@@ -100,7 +110,7 @@ export async function runIgnJob(db: Database, stopping: () => boolean = () => fa
           p.done++;
         }),
       );
-      sinceCheckpoint += preloadConfig.concurrency;
+      sinceCheckpoint += concurrency;
       if (sinceCheckpoint >= preloadConfig.progressEvery || Date.now() - checkpointAt >= preloadConfig.progressEveryMs) {
         sinceCheckpoint = 0;
         checkpointAt = Date.now();

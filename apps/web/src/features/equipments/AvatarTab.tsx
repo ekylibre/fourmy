@@ -1,9 +1,10 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { Alert, Badge, Button, ColorInput, FileButton, Grid, Group, Loader, NumberInput, Paper, Select, Stack, Switch, Text, Title } from "@mantine/core";
+import { Alert, Badge, Button, ColorInput, FileButton, Grid, Group, Loader, NumberInput, Paper, SegmentedControl, Select, Stack, Switch, Text, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Box, Upload } from "lucide-react";
-import { AVATAR_TEMPLATE_LABELS, buildAvatarGlb, resolveAvatar, type AvatarInput, type Provenance } from "@fourmy/equipment-3d";
+import { articulationOf, AVATAR_TEMPLATE_LABELS, buildAvatarGlb, resolveAvatar, type AvatarInput, type Provenance } from "@fourmy/equipment-3d";
+import { modePose } from "../../3d/tool-nodes";
 import type { AvatarInfo, AvatarWrite, EquipmentSheet } from "@fourmy/contracts";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
@@ -61,6 +62,8 @@ export function AvatarTab({ sheet: s }: { sheet: EquipmentSheet }) {
   const info = useQuery({ queryKey: ["avatar", farm.id, s.id], queryFn: () => api.get<AvatarInfo>(farmPath(farm.id, `/equipments/${s.id}/avatar`)) });
   const [draft, setDraft] = useState<AvatarWrite | null>(null);
   const [glb, setGlb] = useState<Uint8Array | null>(null);
+  // Outil articulé : aperçu au travail (posé, rampe dépliée) ou sur la route (relevé, rampe repliée).
+  const [mode, setMode] = useState<"work" | "road">("work");
   const saved = useMemo<AvatarWrite>(() => draft ?? info.data?.saved ?? {}, [draft, info.data?.saved]);
   const logo = useQuery({
     queryKey: ["avatar-logo", farm.id, info.data?.logoAssetId],
@@ -129,15 +132,32 @@ export function AvatarTab({ sheet: s }: { sheet: EquipmentSheet }) {
     );
   };
   const imported = info.data!.imported;
+  // Modèle importé : pas de nœuds articulés connus, donc pas de mode.
+  const articulated = !imported && !!articulationOf(resolved.params.template);
 
   return (
     <Grid>
       <Grid.Col span={{ base: 12, md: 7 }}>
         <Paper withBorder p="xs">
           <MapBoundary what="l'aperçu 3D">
-            <Suspense fallback={<Loader size="sm" />}>{glb ? <AvatarPreview glb={glb} height={380} sizeM={Math.max(p.lengthM ?? 5, p.widthM ?? 2.5, p.workingWidthM ?? 0)}
+            <Suspense fallback={<Loader size="sm" />}>{glb ? <AvatarPreview glb={glb} height={380} sizeM={Math.max(p.lengthM ?? 5, p.widthM ?? 2.5, articulated && mode === "road" ? 0 : (p.workingWidthM ?? 0))}
                   centerM={["tractor", "self_propelled"].includes(resolved.params.template) ? (p.wheelbaseM ?? 0) / 2 : -(p.lengthM ?? 0) / 2}
+                  pose={articulated ? modePose(resolved.params.template, mode) : null}
+                  booms={articulationOf(resolved.params.template)?.booms ?? false}
                 /> : <Loader size="sm" />}</Suspense>
+            {articulated && (
+              <SegmentedControl
+                mt="xs"
+                size="xs"
+                value={mode}
+                onChange={(v) => setMode(v as "work" | "road")}
+                data={[
+                  { value: "work", label: "Travail" },
+                  { value: "road", label: articulationOf(resolved.params.template)?.booms ? "Route (rampe repliée)" : "Route (relevé)" },
+                ]}
+                aria-label="Position de l'outil"
+              />
+            )}
           </MapBoundary>
         </Paper>
         <Text size="xs" c="dimmed" mt={4}>

@@ -105,7 +105,7 @@ describe.skipIf(!url)("Cache IGN (intégration)", () => {
 
   it("sans siège placé : pas de plan, préchargement refusé", async () => {
     const s = await state();
-    expect(s).toMatchObject({ plan: null, cached: { tiles: 0 }, lastJob: null, canEdit: true, settings: { layers: ["ortho", "plan", "elevation", "buildings"], detailMarginM: 200, autoRefresh: false } });
+    expect(s).toMatchObject({ plan: null, cached: { tiles: 0 }, lastJob: null, canEdit: true, settings: { layers: ["ortho", "plan", "elevation", "buildings", "landscape"], detailMarginM: 200, autoRefresh: false } });
     const r = await send("POST", "/ign/cache/jobs", {});
     expect(r.status).toBe(409);
     expect((await r.json()).detail).toMatch(/siège/);

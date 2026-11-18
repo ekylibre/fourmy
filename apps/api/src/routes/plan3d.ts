@@ -3,13 +3,15 @@ import { intersects, expand, tileBounds } from "@fourmy/geo-ign";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import { farmExtent, plan3dAt, enrichHeightsFromIgn } from "../repos/plan3d.js";
-import { atOrNow, BadRequest, domainCtx } from "./helpers.js";
+import { atOrNow, BadRequest, domainCtx, problem } from "./helpers.js";
 import { HEIGHTMAP_SIZE, terrainTile } from "../terrain.js";
 import { setParcelRows, vegetationAt } from "../repos/vegetation3d.js";
 import { dayWeather } from "../repos/weather.js";
 import { cropModelAt } from "../repos/crop-model.js";
 import { CROP_MODELS, canopyFromModel } from "@fourmy/domain";
 import { uuidParam } from "./helpers.js";
+import { landscapeAt } from "../repos/landscape3d.js";
+import { IgnUnavailable } from "../ign/store.js";
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 /** Point d'injection pour les tests (pas d'appel réseau vers Open-Meteo). */
@@ -34,6 +36,27 @@ const binary = (data: Float32Array, source: "ign" | "flat" | "fallback") =>
 
 /** Relief (ADR-9, révisée) et plan 3D (ADR-8/10) — agent F. */
 export const plan3dRoutes = new Hono<Env>()
+  // Paysage (arbres, haies, pylônes, lignes électriques) de la BD TOPO autour de la ferme, à la date (parcelles exclues).
+  .get("/landscape3d", async (c) => {
+    const at = c.req.query("at") ?? new Date().toISOString().slice(0, 10);
+    if (!DAY.test(at) || Number.isNaN(Date.parse(at))) throw new BadRequest("at : date AAAA-MM-JJ attendue.");
+    // Emprise facultative (zone d'un rejeu) : ouest, sud, est, nord en degrés.
+    const raw = c.req.query("bbox");
+    let bbox: { west: number; south: number; east: number; north: number } | undefined;
+    if (raw) {
+      const [west, south, east, north] = raw.split(",").map(Number);
+      if ([west, south, east, north].some((v) => v === undefined || !Number.isFinite(v)) || west! >= east! || south! >= north!) throw new BadRequest("bbox : ouest,sud,est,nord attendus.");
+      bbox = { west: west!, south: south!, east: east!, north: north! };
+    }
+    try {
+      // `canopy=0` : sans le LiDAR HD (hauteurs par nature de la BD TOPO seulement).
+      return c.json(await landscapeAt(db(), c.get("farmId"), at, terrainDeps.fetch, bbox, { canopy: c.req.query("canopy") !== "0" }));
+    } catch (e) {
+      if (e instanceof IgnUnavailable) console.warn(`[landscape3d] IGN indisponible : ${e.message}`);
+      if (e instanceof IgnUnavailable) return problem(c, 502, "IGN indisponible", "Le paysage n'est pas encore en cache et l'IGN ne répond pas.");
+      throw e;
+    }
+  })
   // Végétation et météo du plan 3D (lot AA). La météo est facultative : une panne d'Open-Meteo n'empêche pas la végétation.
   .get("/vegetation3d", async (c) => {
     const at = c.req.query("at") ?? new Date().toISOString().slice(0, 10);

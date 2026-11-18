@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { WebIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
-import { AVATAR_TEMPLATES, buildAvatarGlb, inspectGlb, pngRatio, resolveAvatar, templateForKind, templateFromName, tyreDiameterM, widthFromName } from "../src/index.js";
+import { AVATAR_TEMPLATES, articulationOf, buildAvatarGlb, inspectGlb, pngRatio, resolveAvatar, templateForKind, templateFromName, tyreDiameterM, widthFromName } from "../src/index.js";
 
 // Extrait (anonyme) d'une fiche technique au format de la base matériel.
 const technical = {
@@ -104,5 +104,45 @@ describe("modèle glTF", () => {
       expect(triangles, template).toBeGreaterThan(10);
       expect(triangles, template).toBeLessThan(20_000);
     }
+  });
+});
+
+describe("nœuds articulés (rejeu 3D)", () => {
+  const nodesOf = async (template: string, workingWidthM?: number) => {
+    const r = resolveAvatar({ kind: "trailed_equipment", saved: { template: template as never, ...(workingWidthM ? { workingWidthM } : {}) } });
+    const model = await buildAvatarGlb(r.params);
+    const doc = await new WebIO().registerExtensions(ALL_EXTENSIONS).readBinary(model.glb);
+    const nodes = Object.fromEntries(doc.getRoot().listNodes().map((n) => [n.getName(), n]));
+    return { model, nodes };
+  };
+
+  it("pulvérisateur porté : relevage et demi-rampes en trois tronçons chaînés, pivots en place", async () => {
+    const { model, nodes } = await nodesOf("mounted_sprayer", 18);
+    expect(model.nodes.sort()).toEqual(["boom_left", "boom_left_2", "boom_left_3", "boom_right", "boom_right_2", "boom_right_3", "lift"]);
+    expect(nodes.lift!.getTranslation()[1]).toBeCloseTo(0.4); // pivot aux points bas d'attelage (y glTF = haut)
+    expect(nodes.boom_left!.getParentNode()?.getName()).toBe("lift");
+    expect(nodes.boom_left_2!.getParentNode()?.getName()).toBe("boom_left");
+    expect(nodes.boom_right_3!.getParentNode()?.getName()).toBe("boom_right_2");
+    // Pivot du premier tronçon au bord de la cuve (x glTF = gauche), tronçons de (9 − 1,5) / 3 = 2,5 m.
+    const inner = nodes.boom_left!.getTranslation()[0];
+    expect(inner).toBeGreaterThan(1);
+    expect(nodes.boom_right!.getTranslation()[0]).toBeCloseTo(-inner);
+    expect(nodes.boom_left_2!.getTranslation()[0]).toBeCloseTo((9 - inner) / 3);
+    // La rampe dépliée garde sa largeur de travail.
+    expect(model.bounds.max[1] - model.bounds.min[1]).toBeCloseTo(18, 0);
+  });
+
+  it("outil traîné : roues fixes, organes relevables ; remorque sans nœud mobile", async () => {
+    const trailed = await nodesOf("trailed_tool");
+    expect(trailed.model.nodes).toEqual(["lift"]);
+    expect(trailed.nodes.avatar!.getMesh()).not.toBeNull();
+    expect((await nodesOf("trailer")).model.nodes).toEqual([]);
+  });
+
+  it("articulation par gabarit", () => {
+    expect(articulationOf("mounted_sprayer")).toMatchObject({ booms: true });
+    expect(articulationOf("sower")?.liftM.headland).toBeGreaterThan(0);
+    expect(articulationOf("trailer")).toBeNull();
+    expect(articulationOf(null)).toBeNull();
   });
 });
