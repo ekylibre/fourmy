@@ -1,5 +1,5 @@
 ---
-import { Image, getImage } from "astro:assets";
+import { getImage } from "astro:assets";
 import Base from "../layouts/Base.astro";
 import FeatureFigure from "../components/FeatureFigure.astro";
 import { APP_URL } from "../lib/site";
@@ -8,9 +8,26 @@ import { catalogue } from "../lib/catalogue";
 import { release, formatDate } from "../lib/release";
 
 const latest = release.entries.slice(0, 3);
-// Boucle du rejeu 3D (videos/accueil-pulverisation) ; sa première image sert d'affiche et de repli.
-const poster = await getImage({ src: captures.get("accueil-3d")!, width: 1600, format: "webp" });
-const fiche = captures.get("accueil-fiche-pulverisation")!;
+// Rejeux 3D du haut de page (videos/accueil-rejeu), joués en alternance ; la première image de
+// chacun sert d'affiche et, pour le premier, de repli.
+const reels = [
+  {
+    src: "/videos/accueil-pulverisation",
+    poster: await getImage({ src: captures.get("accueil-3d")!, width: 1600, format: "webp" }),
+    label:
+      "Rejeu 3D d'une pulvérisation : le tracteur et son pulvérisateur traitent une parcelle de maïs ; la bande traitée se colore derrière la rampe, qui se relève au bout du champ avant la passe suivante. En incrustation, la fiche de l'intervention : produit à 1,51 L/ha pour un maximum de 3 L/ha, IFT herbicides de 0,08, 25 °C et vent de 11 km/h, conditions moyennes ; la surface traitée qui passe de 2,2 à 2,8 ha sur les 9 ha du chantier ; la carte de la parcelle Sarthou avec les passes traitées ; chantier de 6 parcelles de maïs, Claas Arion 430 et Amazone UF1201, rampe de 18 m",
+    caption:
+      "Rejeu du 5 octobre 2026 de 16 h 46 à 16 h 50, accéléré dix fois, ferme de grandes cultures du Béarn. Un tracteur et son pulvérisateur de 18 m dans le maïs, d'après la trace GPS ; relief et photo aérienne IGN.",
+  },
+  {
+    src: "/videos/accueil-broyage",
+    poster: await getImage({ src: captures.get("accueil-broyage")!, width: 1600, format: "webp" }),
+    label:
+      "Rejeu 3D d'un broyage : le tracteur et son broyeur entrent dans une prairie permanente et y font leurs premières passes ; la bande broyée se colore derrière l'outil. En incrustation, la fiche de l'intervention : 16 °C et vent de 8 km/h, sans pluie, 1 h 38 de travail, contrôle réglementaire conforme, aucun produit appliqué ; la surface broyée qui passe de 0,01 à 0,04 ha sur les 0,43 ha de l'intervention ; la carte de la parcelle Monassut-Audiracq ; Claas Arion 430 et Maschio Tigre 300, broyeur de 2,8 m",
+    caption:
+      "Rejeu du 28 octobre 2026 de 14 h 07 à 14 h 10, accéléré dix fois, même ferme. Le même tracteur et un broyeur de 2,8 m dans une prairie permanente, d'après la trace GPS ; relief et photo aérienne IGN.",
+  },
+];
 
 /** Les trois domaines de la page d'accueil : une capture, et ce que chacun couvre. */
 const pillars = [
@@ -72,31 +89,32 @@ const pillars = [
 
     <figure class="field">
       <div class="field-frame">
-        <video
-          class="field-drone"
-          autoplay
-          muted
-          loop
-          playsinline
-          preload="auto"
-          width="1600"
-          height="900"
-          poster={poster.src}
-          aria-label="Rejeu 3D : le tracteur et son pulvérisateur traitent une parcelle de maïs ; la bande traitée se colore derrière la rampe, qui se relève au bout du champ avant la passe suivante"
-          data-hero-video
-        >
-          <source src="/videos/accueil-pulverisation.webm" type="video/webm" />
-          <source src="/videos/accueil-pulverisation.mp4" type="video/mp4" />
-        </video>
+        {
+          reels.map((r, i) => (
+            <video
+              class="field-drone"
+              autoplay={i === 0}
+              muted
+              loop={i === 0}
+              playsinline
+              preload={i === 0 ? "auto" : "none"}
+              width="1600"
+              height="900"
+              poster={r.poster.src}
+              aria-label={r.label}
+              aria-hidden={i === 0 ? undefined : "true"}
+              data-hero-video
+              data-active={i === 0 ? "" : undefined}
+            >
+              <source src={`${r.src}.webm`} type="video/webm" />
+              <source src={`${r.src}.mp4`} type="video/mp4" />
+            </video>
+          ))
+        }
         <button class="field-toggle" type="button" data-hero-toggle aria-pressed="false">Mettre en pause</button>
-        <figure class="field-inset">
-          <Image src={fiche} alt="Fiche de la même intervention : IFT total et IFT de chaque parcelle de maïs, chacun avec son voyant vert, dose de référence respectée" widths={[300, 600]} sizes="18rem" format="webp" loading="eager" />
-          <figcaption>La fiche de l'intervention : IFT calculé par parcelle</figcaption>
-        </figure>
       </div>
       <figcaption class="field-caption">
-        Rejeu du 5 octobre 2026 de 16 h 46 à 16 h 50, accéléré dix fois, ferme de grandes cultures du Béarn. Un tracteur et son
-        pulvérisateur de 18 m dans le maïs, d'après la trace GPS ; relief et photo aérienne IGN.
+        {reels.map((r, i) => <span data-hero-caption hidden={i !== 0}>{r.caption}</span>)}
       </figcaption>
     </figure>
 
@@ -107,23 +125,54 @@ const pillars = [
     </dl>
   </section>
   <script>
-    // Boucle du haut de page : arrêtée si l'on demande moins d'animations, et toujours suspendable (WCAG 2.2.2).
-    const video = document.querySelector<HTMLVideoElement>("[data-hero-video]");
+    // Haut de page : les rejeux jouent chacun une fois, à tour de rôle, en fondu (une seconde avant la
+    // fin, ce qui saute le fondu de boucle de chaque fichier). Sans JavaScript, le premier boucle seul.
+    // Arrêtés si l'on demande moins d'animations, et toujours suspendables (WCAG 2.2.2).
+    const videos = [...document.querySelectorAll<HTMLVideoElement>("[data-hero-video]")];
+    const captions = [...document.querySelectorAll<HTMLElement>("[data-hero-caption]")];
     const toggle = document.querySelector<HTMLButtonElement>("[data-hero-toggle]");
-    if (video && toggle) {
-      const show = (paused: boolean) => {
+    if (videos.length && toggle) {
+      let current = 0;
+      let paused = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const show = () => {
         toggle.textContent = paused ? "Lire la vidéo" : "Mettre en pause";
         toggle.setAttribute("aria-pressed", String(paused));
       };
-      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        video.removeAttribute("autoplay");
-        video.pause();
-        show(true);
+      const activate = (i: number) => {
+        videos.forEach((v, k) => {
+          v.toggleAttribute("data-active", k === i);
+          if (k === i) v.removeAttribute("aria-hidden");
+          else v.setAttribute("aria-hidden", "true");
+        });
+        captions.forEach((c, k) => (c.hidden = k !== i));
+      };
+      const next = () => {
+        const from = videos[current];
+        current = (current + 1) % videos.length;
+        const to = videos[current];
+        to.currentTime = 0;
+        if (!paused) void to.play();
+        activate(current);
+        window.setTimeout(() => from.pause(), 1000);
+      };
+      videos.forEach((v, k) => {
+        v.loop = videos.length === 1;
+        v.addEventListener("timeupdate", () => {
+          if (k === current && !paused && v.duration && v.currentTime >= v.duration - 1) next();
+        });
+      });
+      // Le suivant se charge pendant que le premier joue.
+      videos[0].addEventListener("playing", () => videos.slice(1).forEach((v) => (v.preload = "auto")), { once: true });
+      if (paused) {
+        videos[0].removeAttribute("autoplay");
+        videos[0].pause();
       }
+      show();
       toggle.addEventListener("click", () => {
-        if (video.paused) void video.play();
-        else video.pause();
-        show(video.paused);
+        paused = !paused;
+        if (paused) videos[current].pause();
+        else void videos[current].play();
+        show();
       });
     }
   </script>

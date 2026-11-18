@@ -9,8 +9,8 @@ export const ARION = "81e18bca-4578-5f8d-aba4-2ac4ce8541f6";
 export const BASE = process.env.BASE ?? "http://localhost:5173";
 const devPassword = /DEV_PASSWORD\s*=\s*"([^"]+)"/.exec(readFileSync(new URL("../../../apps/api/src/cli/seed-dev.ts", import.meta.url), "utf8"))[1];
 
-/** Navigateur 1920 × 1080 connecté, sur le rejeu 3D de l'Arion au 05/10 (`t` : instant ISO). */
-export async function openReplay(t) {
+/** Navigateur 1920 × 1080 connecté, sur le rejeu 3D d'un matériel (`t` : instant ISO ; par défaut l'Arion au 05/10). */
+export async function openReplay(t, { jour = "2026-10-05", equipment = ARION } = {}) {
   const gpu = process.env.GPU_ARGS ? process.env.GPU_ARGS.split(" ") : ["--use-angle=gl", "--use-gl=angle"];
   const browser = await chromium.launch({ headless: !process.env.HEADED, args: [...gpu, "--ignore-gpu-blocklist"] });
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1, locale: "fr-FR", timezoneId: "Europe/Paris" });
@@ -20,7 +20,7 @@ export async function openReplay(t) {
   await page.getByLabel(/^Mot de passe/).fill(devPassword);
   await page.getByRole("button", { name: "Se connecter" }).click();
   await page.waitForURL((u) => !u.pathname.startsWith("/login"));
-  await page.goto(`${BASE}/f/${FARM}/3d-plan?at=2026-10-05&equipment=${ARION}&t=${encodeURIComponent(t)}&replay=1`);
+  await page.goto(`${BASE}/f/${FARM}/3d-plan?at=${jour}&equipment=${equipment}&t=${encodeURIComponent(t)}&replay=1`);
   await page.waitForFunction(() => globalThis.fourmyScene?.viewer?.entities.getById("track:vehicle"), null, { timeout: 120000 });
   // Plein cadre : la coque du plan 3D recouvre la page, sans les crédits ni les commandes.
   await page.evaluate(() => {

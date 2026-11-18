@@ -37,9 +37,8 @@ test.beforeEach(async ({ page }) => {
   await signIn(page);
 });
 
-// Le haut de page est une boucle vidéo du rejeu 3D, avec son affiche (accueil-3d) et l'extrait
-// de fiche (accueil-fiche-pulverisation) : videos/accueil-pulverisation (capture/film.mjs,
-// capture/encode.sh, capture/fiche.mjs).
+// Le haut de page est une boucle vidéo du rejeu 3D avec ses incrustations, et son affiche
+// (accueil-3d) : videos/accueil-rejeu (capture/film.mjs, capture/encode.sh).
 
 test("interopérabilité : attelage et parcours tirés du GPS, trace sur la photo IGN", async ({ page }) => {
   test.setTimeout(120_000);

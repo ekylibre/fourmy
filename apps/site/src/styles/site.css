@@ -75,26 +75,21 @@ main { padding-block: 3rem 5rem; }
 .field { margin: 2.5rem 0 0; }
 .field-frame { position: relative; width: min(100% - 2.5rem, 80rem); margin-inline: auto; }
 .field-drone { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 16px; border: 1px solid var(--lv-line); box-shadow: var(--lv-shadow-float); background: var(--lv-surface-sunken); }
+/* Rejeux superposés : le premier tient la place, les suivants le recouvrent ; l'actif est visible. */
+.field-drone + .field-drone { position: absolute; inset: 0; box-shadow: none; }
+.field-drone:not([data-active]) { opacity: 0; }
+.field-drone { transition: opacity 1s ease; }
+@media (prefers-reduced-motion: reduce) { .field-drone { transition: none; } }
 .field-toggle {
   position: absolute; left: 0.75rem; top: 0.75rem; padding: 0.35rem 0.7rem; border-radius: 8px; font: inherit; font-size: 0.85rem; font-weight: 600;
   color: var(--lv-ink); background: var(--lv-surface); border: 1px solid var(--lv-line); cursor: pointer;
 }
 .field-toggle:hover { background: var(--lv-surface-sunken); }
 .field-toggle:focus-visible { outline: 3px solid var(--lv-lichen); outline-offset: 2px; }
-.field-inset {
-  position: absolute; right: clamp(0.75rem, 3vw, 2.5rem); bottom: -3rem; width: clamp(10rem, 24vw, 19rem); margin: 0;
-  background: var(--lv-surface); padding: 0.4rem; border-radius: 12px; border: 1px solid var(--lv-line); box-shadow: var(--lv-shadow-float);
-}
-.field-inset img { border-radius: 8px; }
-.field-inset figcaption { font-size: 0.8rem; color: var(--lv-ink-muted); padding: 0.35rem 0.25rem 0.1rem; line-height: 1.35; }
 .field-caption {
   width: min(100% - 2.5rem, 80rem); margin: 1rem auto 0; font-size: 0.95rem; color: var(--lv-ink-muted);
-  padding-right: calc(clamp(10rem, 24vw, 19rem) + clamp(1.5rem, 4vw, 3.5rem)); /* la place de l'incrustation */
 }
 @media (max-width: 52rem) {
-  .field-inset { bottom: -2rem; width: 44%; }
-  .field-inset figcaption { display: none; }
-  .field-caption { padding-right: 0; margin-top: 3rem; }
   .facts { margin-top: 2.5rem; }
 }
 

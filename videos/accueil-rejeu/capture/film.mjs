@@ -1,19 +1,22 @@
-// Boucle du haut de page : rejeu de la pulvérisation de l'Arion 430 et de l'Amazone UF1201
-// le 05/10/2026, filmé image par image (horloge Cesium pilotée), caméra de poursuite lissée.
-//   FROM=16:46:20 SECONDS=200 FPS=30 DURATION=20 node capture/film.mjs
-import { mkdirSync, rmSync } from "node:fs";
+// Boucle du haut de page : rejeu 3D d'une intervention (capture/videos.mjs), filmé image par image
+// (horloge Cesium pilotée), caméra de poursuite lissée, incrustations de la fiche.
+//   VIDEO=broyage node capture/film.mjs     (FROM, SECONDS, FPS, DURATION, RANGE… pour ajuster)
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { openReplay, settle } from "./session.mjs";
-const dir = new URL(`../assets/raw/${process.env.SHOT ?? "boucle"}/`, import.meta.url).pathname;
+import { installer, lireDonnees, mettreAJour } from "./incrustations.mjs";
+import { instant, video } from "./videos.mjs";
+const incrust = process.env.INCRUST !== "0";
+const dir = new URL(`../assets/raw/${process.env.SHOT ?? video.sortie}/`, import.meta.url).pathname;
 rmSync(dir, { recursive: true, force: true });
 mkdirSync(dir, { recursive: true });
-const day = "2026-10-05";
-const from = Date.parse(`${day}T${process.env.FROM ?? "16:46:20"}+02:00`);
-const replaySeconds = Number(process.env.SECONDS ?? 200);
+const data = JSON.parse(readFileSync(new URL(`../assets/data/${video.donnees}.json`, import.meta.url), "utf8"));
+const from = instant(video.debut);
+const replaySeconds = video.secondes;
 const fps = Number(process.env.FPS ?? 30);
 const frames = Math.round(Number(process.env.DURATION ?? 20) * fps);
-const cam = { range: Number(process.env.RANGE ?? 62), pitch: Number(process.env.PITCH ?? -0.42), dh: Number(process.env.DH ?? 0.55), orbit: Number(process.env.ORBIT ?? 0.35) };
+const cam = video.camera;
 
-const { browser, page } = await openReplay(new Date(from).toISOString());
+const { browser, page } = await openReplay(new Date(from).toISOString(), { jour: video.jour, equipment: data.tractor });
 await page.waitForFunction(() => globalThis.fourmyScene.swathModel?.customShader, null, { timeout: 120000 });
 await page.evaluate(({ since }) => {
   const s = globalThis.fourmyScene;
@@ -24,7 +27,7 @@ await page.evaluate(({ since }) => {
   // Ni la trace de la journée ni le tracé parcouru : la bande violette suffit.
   if (s.trackLines) s.trackLines.show = false;
   for (const e of s.viewer.entities.values) if (e.id.startsWith("track:done:")) e.show = false;
-  // Bande de l'intervention seulement (pas les passes du début d'après-midi).
+  // Bande de l'intervention seulement (pas les passes d'une autre intervention le même jour).
   const m = s.swathModel;
   const old = m.customShader;
   const t0 = Date.parse(s.viewer.clock.currentTime.toString()) - old.uniforms.u_now.value * 1000;
@@ -37,7 +40,9 @@ await page.evaluate(({ since }) => {
   });
   m.customShader = shader;
   s.viewer.scene.preRender.addEventListener(() => shader.setUniform("u_now", (Date.parse(s.viewer.clock.currentTime.toString()) - t0) / 1000));
-}, { since: Date.parse(`${day}T16:24:00+02:00`) });
+}, { since: Date.parse(data.intervention.startedAt) });
+
+if (incrust) await installer(page, lireDonnees(data));
 
 const t0 = Date.now();
 let heading = null;
@@ -59,6 +64,7 @@ for (let i = 0; i < frames; i++) {
     globalThis.__camHeading = h;
     v.camera.lookAt(pos, { heading: h + cam.dh + cam.orbit * (k - 0.5), pitch: cam.pitch, range: cam.range });
   }, { at, cam: { ...cam, step: replaySeconds / frames }, k: i / frames, first: i === 0 });
+  if (incrust) await mettreAJour(page);
   await settle(page, 15000);
   await page.screenshot({ path: `${dir}f${String(i).padStart(5, "0")}.jpg`, type: "jpeg", quality: 92 });
   if (i % 60 === 0) console.log(`image ${i}/${frames}`, ((Date.now() - t0) / 1000).toFixed(0), "s");
