@@ -28,5 +28,20 @@
   "177d47b": "Plan 3D : chaque matériel a son avatar 3D (dimensions, couleur, logo) ; le rejeu des traces montre les tracteurs et leurs outils attelés",
   "2beb3c6": "Plan 3D : les tracteurs ont un avatar dans le style du kit Ekylibre, à leurs dimensions et à leurs couleurs",
   "7cd1a69": "Plan 3D : une erreur claire et un bouton pour recharger quand la vue ne peut pas s'afficher",
-  "74d84ac": "Plan 3D : la caméra suit le tracteur pendant le rejeu de sa journée"
+  "74d84ac": "Plan 3D : la caméra suit le tracteur pendant le rejeu de sa journée",
+  "339b79f": false,
+  "80602eb": false,
+  "f0ed16e": "Itinéraire technique de chaque parcelle : la frise des travaux de la campagne ou de la rotation, sur la fiche parcelle",
+  "45f30f1": "Itinéraire technique d'une activité : toutes ses parcelles réunies sur une frise, avec descente sur chaque parcelle",
+  "6a9a485": "Cartes IGN de la ferme téléchargées plus vite sur le serveur",
+  "0788b94": false,
+  "1d1937c": "Ma ferme : fiche de l'exploitation, certifications, sites et adresse assistée",
+  "3bc6816": false,
+  "d4d245c": "Ma ferme : préférences d'affichage, météo du siège et réglages regroupés",
+  "cca9da4": "Le logo de la ferme sur les documents imprimés",
+  "7fcf168": "Identité de la ferme reprise d'Ekylibre à l'import",
+  "d06558e": false,
+  "7389bb9": "Cartes IGN gardées sur le serveur, avec l'onglet Données IGN de Ma ferme",
+  "3b2beb3": "Relief et bâtiments du plan 3D servis par le cache IGN de la ferme",
+  "1aa83bb": "Copie hors ligne de la ferme dans le navigateur : cartes et données consultables sans réseau"
 }

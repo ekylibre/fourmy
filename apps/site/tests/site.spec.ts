@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-const PAGES = ["/", "/fonctionnalites/", "/roadmap/", "/changelog/", "/contact/", "/mentions-legales/", "/donnees-personnelles/"];
+const PAGES = ["/", "/fonctionnalites/", "/comparatif/", "/changelog/", "/installer/", "/contact/", "/mentions-legales/", "/donnees-personnelles/"];
 
 test("« Se connecter » en haut à droite mène à l'application", async ({ page }) => {
   await page.goto("/");
@@ -20,8 +20,14 @@ test("version et nouveautés calculées depuis l'historique", async ({ page }) =
   expect(version).toMatch(/^\d+\.\d+\.\d+$/);
   // La version actuelle peut n'avoir aucune entrée publique (correctif masqué
   // par « Public: non ») : on vérifie seulement que des versions sont listées.
-  await expect(page.getByRole("heading", { name: /^Version \d+\.\d+\.\d+$/ }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: /^\d+\.\d+\.\d+/ }).first()).toBeVisible();
   await expect(page.locator(".release li").first()).toBeVisible();
+  // Chaque livraison a sa page, et le flux RSS la reprend.
+  await page.getByRole("link", { name: /^Page de la version / }).first().click();
+  await expect(page.getByRole("heading", { level: 1, name: /^\d+\.\d+\.\d+/ })).toBeVisible();
+  const rss = await page.request.get("/changelog/rss.xml");
+  expect(rss.ok()).toBe(true);
+  expect(await rss.text()).toContain("<item><title>");
   // Aucun jargon interne publié.
   await expect(page.locator("main")).not.toContainText(/agent [A-G0]\b|feat\(|sc:/);
 });
@@ -42,3 +48,23 @@ for (const path of PAGES) {
     expect(violations.map((v) => `${v.id} : ${v.nodes.length}`)).toEqual([]);
   });
 }
+
+test("menu : comparatif, nouveautés et installer ; plus de roadmap", async ({ page }) => {
+  await page.goto("/");
+  const nav = page.getByRole("navigation", { name: "Navigation principale" });
+  await expect(nav.getByRole("link")).toHaveText(["Fonctionnalités", "Comparatif", "Nouveautés", "Installer", "Contact"]);
+});
+
+test("fonctionnalités rangées par module", async ({ page }) => {
+  await page.goto("/fonctionnalites/");
+  await expect(page.getByRole("navigation", { name: "Modules" }).getByRole("link").first()).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Réglementaire" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 3, name: "Contrôle réglementaire des traitements" })).toBeVisible();
+});
+
+test("comparatif : chaque case d'un autre logiciel renvoie à sa source", async ({ page }) => {
+  await page.goto("/comparatif/");
+  const table = page.getByRole("table");
+  await expect(table.locator("thead").getByRole("columnheader")).toHaveText([/Critère/, /Fourmy/, /MesParcelles/, /Smag Farmer/, /Geofolia/]);
+  await expect(table.getByRole("row").filter({ hasText: "Registre phytosanitaire" }).getByRole("link")).toHaveCount(4);
+});

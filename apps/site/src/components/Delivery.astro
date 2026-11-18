@@ -1,0 +1,51 @@
+---
+// Une livraison de la page Nouveautés : version, titre, date, nombre de changements,
+// puis les sections non vides (action requise, nouveautés, corrections).
+import { formatDate, type Delivery } from "../lib/release";
+
+interface Props {
+  d: Delivery;
+  /** Niveau du titre : 2 sur la liste, 1 sur la page de la version. */
+  level?: 1 | 2;
+  link?: boolean;
+}
+const { d, level = 2, link = true } = Astro.props;
+const Heading = level === 1 ? "h1" : "h2";
+const Sub = level === 1 ? "h2" : "h3";
+const sections = [
+  { id: "action", title: "Action requise", items: d.required },
+  { id: "nouveautes", title: "Nouveautés", items: d.features },
+  { id: "corrections", title: "Corrections", items: d.fixes },
+].filter((s) => s.items.length > 0);
+---
+
+<section class="release" id={level === 2 ? `v${d.version}` : undefined} aria-labelledby={`t${d.version}`}>
+  <header class="release-head">
+    <Heading id={`t${d.version}`}>
+      <span class="release-version">{d.version}</span>
+      {d.title && <span class="release-title">{d.title}</span>}
+    </Heading>
+    <p class="release-meta">
+      <time datetime={d.day}>{formatDate(d.day)}</time>
+      <span>{d.count} changement{d.count > 1 ? "s" : ""}</span>
+      {d.first !== d.version && <span>versions {d.first} à {d.version}</span>}
+      {d.required.length > 0 && <span class="badge badge-action">Action requise</span>}
+    </p>
+  </header>
+  {
+    sections.map((s) => (
+      <div class={`release-part release-${s.id}`}>
+        <Sub>{s.title}</Sub>
+        <ul>
+          {s.items.map((e) => (
+            <li>
+              {e.text}
+              <span class="release-item-version">{e.version}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ))
+  }
+  {link && <p class="release-link"><a href={`/changelog/${d.version}/`}>Page de la version {d.version}</a></p>}
+</section>

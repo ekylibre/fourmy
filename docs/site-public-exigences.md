@@ -7,7 +7,8 @@
 
 1. Présenter Fourmy au public (agriculteurs, partenaires, contributeurs) sur
    **fourmy.org** et **www.fourmy.org** : le projet, ce qu'il fait déjà
-   (fonctionnalités illustrées), où il va (roadmap), ce qui change (changelog).
+   (fonctionnalités illustrées), comment il se compare (comparatif), ce qui change
+   (nouveautés), comment l'installer.
 2. Donner l'accès à l'application : **bouton « Se connecter » en haut à droite**.
 3. Recevoir les demandes : **formulaire de contact** vers `contact@fourmy.org`.
 4. Rester à jour **sans effort** : version, changelog et fonctionnalités
@@ -33,22 +34,31 @@
 
 ### Site fourmy.org
 
-- **FS-1 En-tête** : logo, navigation (Projet, Fonctionnalités, Roadmap,
-  Changelog, Contact), bouton **« Se connecter »** en haut à droite vers
+- **FS-1 En-tête** : logo, navigation (Fonctionnalités, Comparatif, Nouveautés,
+  Installer, Contact, comme lyvre.org), bouton **« Se connecter »** en haut à droite vers
   l'application (`https://dev.fourmy.org` aujourd'hui ; URL configurable pour
   la production Eyona). Version courante affichée discrètement (pied de page).
 - **FS-2 Accueil / projet** : ce qu'est Fourmy (jumeau numérique de la ferme,
   réécriture d'Ekylibre, logiciel libre AGPL), pour qui, ce qui le distingue
   (carte et plan 3D dans le temps, hors ligne sur mobile, registre phyto
   calculé, réversibilité), lien vers ekylibre.com (éditeur) et Lyvre.
-- **FS-3 Fonctionnalités illustrées** : une carte par fonctionnalité livrée
-  (titre, phrase, capture, état « disponible / en test / à venir »). Captures
-  générées automatiquement depuis l'application sur les **fermes de test**.
-- **FS-4 Roadmap** : jalons à venir (ex. mobile sur appareil, production
-  Eyona, registre PDF, OpenAPI, intégrations météo…), avec état et horizon ;
-  source unique dans le dépôt (§4).
-- **FS-5 Changelog** : par version, les nouveautés et corrections lisibles
-  par un agriculteur, dates comprises.
+- **FS-3 Fonctionnalités illustrées** : rangées par module, dans l'ordre du menu
+  de l'application (`apps/site/src/content/features.yaml`) ; une fiche par
+  fonctionnalité (titre, phrase, capture, état « disponible / en test / à
+  venir »). Captures générées depuis l'application sur les **fermes de test**
+  (`apps/web/e2e/captures*.spec.ts`), sans la photo ni le nom du compte.
+- **FS-4 Comparatif** (novembre 2026, remplace la roadmap, retirée et redirigée
+  vers les fonctionnalités) : Fourmy face à MesParcelles, Smag Farmer et
+  Geofolia (`apps/site/src/content/comparatif.yaml`). Chaque case d'un autre
+  logiciel renvoie à la page de l'éditeur qui la justifie ; « · » veut dire
+  « rien trouvé », pas « absent ». Date de lecture des pages affichée.
+- **FS-5 Nouveautés** (`/changelog/`, comme lyvre.org/nouveautes) : une
+  livraison par jour, sous sa dernière version, avec un titre
+  (`apps/site/src/content/nouveautes.yaml`), le nombre de changements et les
+  sections Action requise, Nouveautés, Corrections ; une page par livraison
+  (`/changelog/<version>/`) et un flux RSS (`/changelog/rss.xml`).
+- **FS-5 bis Installer** : démarrage rapide Docker Compose, serveur, reprise
+  Ekylibre, mise à jour, intégrations, application mobile, aide.
 - **FS-6 Contact** : nom, e-mail, profil (agriculteur, partenaire,
   développeur, autre), message, consentement ; accusé de réception à
   l'écran ; message reçu sur `contact@fourmy.org` avec réponse possible
@@ -148,9 +158,10 @@
 3. **Domaine canonique** : `fourmy.org` (www redirigé) — proposé.
 4. **Adresse de l'application en production** (Eyona) : `app.fourmy.org` ?
    Le bouton « Se connecter » pointe vers dev.fourmy.org en attendant.
-5. **Roadmap** : contenu à valider. La page publique (`apps/site/src/content/roadmap.yaml`)
-   est tirée de la roadmap GitHub ([Fourmy — Roadmap](https://github.com/orgs/ekylibre/projects/2)),
-   sans noms de fermes ni détails internes.
+5. **Roadmap** : page publique retirée en novembre 2026 ; la roadmap reste sur
+   GitHub ([Fourmy — Roadmap](https://github.com/orgs/ekylibre/projects/2)).
+   La page Installer donne le `git clone` du dépôt, encore privé : à ouvrir avant
+   ou avec la mise en ligne de cette page.
 6. **Historique Git dans Dokploy** : réglé. Dokploy clone sans historique,
    l'image du site est donc construite par la CI (`docs/deploiement.md`) ;
    premier déploiement le 2026-11-07.

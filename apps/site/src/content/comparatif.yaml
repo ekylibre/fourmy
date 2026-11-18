@@ -1,0 +1,175 @@
+# Comparatif de fourmy.org (/comparatif/). Chaque case d'un autre logiciel renvoie à la page de
+# l'éditeur qui la justifie (u). Statuts (s) : oui | partiel (en partie, option payante ou module
+# tiers) | non | nt (rien trouvé chez l'éditeur : pas une absence prouvée).
+# Pages des éditeurs lues le 18/11/2026 ; une case de Fourmy peut renvoyer à sa fonctionnalité (f).
+date: 18/11/2026
+logiciels:
+  - id: mp
+    nom: MesParcelles
+    url: https://mesparcelles.fr/
+    base: Réseau des Chambres d'agriculture ; abonnement annuel
+  - id: smag
+    nom: Smag Farmer
+    url: https://smag.tech/nos-logiciels/logiciel-de-gestion-de-parcelles/
+    base: SMAG, groupe InVivo ; tarif fixé par le distributeur
+  - id: geo
+    nom: Geofolia
+    url: https://www.isagri.fr/geofolia/logiciel-de-gestion-parcellaire
+    base: ISAGRI ; formules environnement + et Performance
+
+# Raccourcis des pages lues.
+sources:
+  mpA: &mpA https://mesparcelles.fr/
+  mpB: &mpB https://mesparcelles.fr/nos-formules-dabonnement
+  mpC: &mpC https://mesparcelles.fr/nos-solutions-metiers/gestion-parcellaire
+  mpD: &mpD https://mesparcelles.fr/nos-solutions-metiers/echanges-de-donnees
+  smag: &smag https://smag.tech/nos-logiciels/logiciel-de-gestion-de-parcelles/
+  geo: &geo https://www.isagri.fr/geofolia/logiciel-de-gestion-parcellaire
+
+groupes:
+  - titre: Accès et prix
+    criteres:
+      - nom: Application web
+        fourmy: { s: oui, t: "dans le navigateur, sur ordinateur et téléphone" }
+        mp: { s: oui, t: "« 100 % en ligne »", u: *mpA }
+        smag: { s: oui, t: "logiciel web et mobile", u: *smag }
+        geo: { s: partiel, t: "accessible sur PC et smartphone, mode d'accès non précisé", u: *geo }
+      - nom: Application mobile sur les stores
+        fourmy: { s: partiel, t: "en test, pas encore publiée", f: mobile }
+        mp: { s: oui, t: "App Store et Google Play", u: *mpA }
+        smag: { s: oui, t: "application mobile synchronisée avec le web", u: *smag }
+        geo: { s: oui, t: "application smartphone", u: *geo }
+      - nom: Saisie au champ sans réseau
+        fourmy: { s: partiel, t: "application mobile en test ; copie de la ferme consultable hors ligne dans le navigateur", f: mobile }
+        mp: { s: nt }
+        smag: { s: oui, t: "interventions saisies avec ou sans réseau", u: *smag }
+        geo: { s: nt }
+      - nom: Prix publié
+        fourmy: { s: oui, t: "gratuit" }
+        mp: { s: non, t: "abonnement annuel, montant non affiché", u: *mpB }
+        smag: { s: non, t: "tarif fixé par le distributeur", u: *smag }
+        geo: { s: oui, t: "à partir de 42,9 € par mois (environnement +)", u: *geo }
+      - nom: Gratuit
+        fourmy: { s: oui }
+        mp: { s: partiel, t: "fonctions cartographiques gratuites avec un outil d'aide à la décision", u: *mpB }
+        smag: { s: partiel, t: "essai gratuit", u: *smag }
+        geo: { s: nt }
+      - nom: Logiciel libre, auto-hébergeable
+        fourmy: { s: oui, t: "licence GNU AGPL v3, installation Docker" }
+        mp: { s: nt }
+        smag: { s: nt }
+        geo: { s: nt }
+
+  - titre: Parcellaire et cartes
+    criteres:
+      - nom: Cartographie du parcellaire
+        fourmy: { s: oui, t: "photo aérienne, carte et relief IGN", f: carte }
+        mp: { s: oui, t: "espace cartographique", u: *mpC }
+        smag: { s: oui, t: "gestion du parcellaire", u: *smag }
+        geo: { s: oui, t: "cartographie", u: *geo }
+      - nom: PAC
+        fourmy: { s: partiel, t: "îlots et parcelles du registre graphique repris ; pas d'export TéléPAC" }
+        mp: { s: oui, t: "aide à la déclaration, transfert vers TéléPAC", u: *mpC }
+        smag: { s: oui, t: "import du dossier PAC, export vers TéléPAC", u: *smag }
+        geo: { s: partiel, t: "diagnostics PAC cités, export non détaillé", u: *geo }
+      - nom: La ferme à une date passée
+        fourmy: { s: oui, t: "parcellaire, stocks et cuves datés, frise dans le temps", f: frise }
+        mp: { s: nt }
+        smag: { s: nt }
+        geo: { s: nt }
+      - nom: Plan 3D et rejeu des chantiers
+        fourmy: { s: oui, t: "relief IGN, tracteur et outil rejoués d'après le GPS", f: plan-3d }
+        mp: { s: nt }
+        smag: { s: nt }
+        geo: { s: nt }
+      - nom: Indices de végétation par satellite
+        fourmy: { s: partiel, t: "NDVI, NDRE, NDMI Sentinel-2, en test", f: satellite }
+        mp: { s: partiel, t: "par un prestataire, pour la modulation", u: *mpD }
+        smag: { s: oui, t: "indices de végétation et télédétection", u: *smag }
+        geo: { s: partiel, t: "images de biomasse en option (Spotifarm)", u: *geo }
+
+  - titre: Interventions et réglementaire
+    criteres:
+      - nom: Saisie des interventions
+        fourmy: { s: oui, t: "un formulaire pour toutes les procédures", f: interventions }
+        mp: { s: oui, t: "saisie des interventions, pâturage compris", u: *mpB }
+        smag: { s: oui, t: "du semis à la récolte", u: *smag }
+        geo: { s: oui, t: "travaux réalisés ou prévisionnels", u: *geo }
+      - nom: Contrôle des traitements à la saisie
+        fourmy: { s: oui, t: "usage, dose, applications, ZNT, délais et mélanges d'après E-Phy", f: controle-phyto }
+        mp: { s: partiel, t: "contrôle à chaque saisie, ZNT non citée", u: *mpC }
+        smag: { s: oui, t: "produits avec AMM, SPE et ZNT", u: *smag }
+        geo: { s: oui, t: "alertes dose, mélange et ZNT", u: *geo }
+      - nom: Registre phytosanitaire
+        fourmy: { s: oui, t: "au format réglementaire 2027", f: registre-reglementaire }
+        mp: { s: oui, t: "vérification du registre", u: *mpC }
+        smag: { s: oui, t: "registre au format numérique", u: *smag }
+        geo: { s: oui, t: "documents réglementaires édités", u: *geo }
+      - nom: IFT
+        fourmy: { s: oui, t: "calculé par le service du ministère", f: registre }
+        mp: { s: oui, t: "calculs certifiés par le ministère", u: *mpC }
+        smag: { s: oui, t: "méthode certifiée par le ministère", u: *smag }
+        geo: { s: oui, t: "méthode du ministère", u: *geo }
+      - nom: Conditions de pulvérisation et météo
+        fourmy: { s: oui, t: "météo de chaque intervention, seuils de la ferme", f: meteo-interventions }
+        mp: { s: nt }
+        smag: { s: oui, t: "météo à la commune et indications de traitement", u: *smag }
+        geo: { s: oui, t: "stations météo connectées", u: *geo }
+      - nom: Plan prévisionnel de fumure
+        fourmy: { s: partiel, t: "en test, Nouvelle-Aquitaine", f: plan-fumure }
+        mp: { s: oui, t: "prévisionnel de fumure", u: *mpC }
+        smag: { s: oui, t: "plan prévisionnel de fumure", u: *smag }
+        geo: { s: oui, t: "plan de fumure, option certifiée COMIFER", u: *geo }
+      - nom: Cahier d'épandage, directive nitrates
+        fourmy: { s: partiel, t: "en test", f: cahier-fertilisation }
+        mp: { s: oui, t: "cahier d'épandage et directive nitrates", u: *mpC }
+        smag: { s: nt }
+        geo: { s: partiel, t: "cahier d'épandage, directive non citée", u: *geo }
+      - nom: Documents de certification (HVE, bio)
+        fourmy: { s: partiel, t: "certifications des parcelles et produits utilisables en bio ; pas de dossier HVE" }
+        mp: { s: oui, t: "HVE et GlobalG.A.P. cités", u: *mpC }
+        smag: { s: partiel, t: "option HVE", u: *smag }
+        geo: { s: oui, t: "HVE, bio, GlobalG.A.P.", u: *geo }
+
+  - titre: Matériels, stocks et échanges
+    criteres:
+      - nom: Stocks d'intrants
+        fourmy: { s: oui, t: "tenus par les interventions", f: stocks }
+        mp: { s: nt }
+        smag: { s: oui, t: "gestion des stocks", u: *smag }
+        geo: { s: partiel, t: "en option (environnement +)", u: *geo }
+      - nom: Matériels et entretien
+        fourmy: { s: oui, t: "fiche, relevés d'heures, plan d'entretien", f: materiels }
+        mp: { s: nt }
+        smag: { s: partiel, t: "équipements et matériel", u: *smag }
+        geo: { s: partiel, t: "carnet d'entretien (formule Performance)", u: *geo }
+      - nom: Traces GPS des tracteurs
+        fourmy: { s: oui, t: "boîtiers Traccar, parcours transformés en interventions", f: parcours }
+        mp: { s: nt }
+        smag: { s: nt }
+        geo: { s: partiel, t: "capteurs connectés EasyTrack", u: *geo }
+      - nom: Cartes de modulation et consoles
+        fourmy: { s: partiel, t: "ISO-XML, Shapefile et agrirouter, en test", f: modulation }
+        mp: { s: partiel, t: "par un prestataire, envoyées à la console", u: *mpD }
+        smag: { s: partiel, t: "par des outils partenaires", u: *smag }
+        geo: { s: partiel, t: "modulation azotée en option (Spotifarm)", u: *geo }
+      - nom: Échanges avec coopérative et négoce
+        fourmy: { s: non }
+        mp: { s: partiel, t: "données partagées avec vos partenaires", u: *mpD }
+        smag: { s: oui, t: "bons d'apport et de livraison importés", u: *smag }
+        geo: { s: partiel, t: "échange de données avec les partenaires", u: *geo }
+      - nom: Équipe, conseiller
+        fourmy: { s: oui, t: "rôles, lecture seule pour le conseiller, invitations", f: equipe }
+        mp: { s: oui, t: "conseillers des Chambres", u: *mpC }
+        smag: { s: oui, t: "données partagées avec le technicien", u: *smag }
+        geo: { s: partiel, t: "logiciel collaboratif", u: *geo }
+      - nom: Cuverie
+        fourmy: { s: oui, t: "contenu de chaque cuve à n'importe quelle date", f: cuverie }
+        mp: { s: nt }
+        smag: { s: nt }
+        geo: { s: nt }
+      - nom: Comptabilité
+        fourmy: { s: partiel, t: "dans Lyvre, logiciel libre à part" }
+        mp: { s: nt }
+        smag: { s: non, t: "ne remplace pas un logiciel de comptabilité", u: *smag }
+        geo: { s: partiel, t: "ISACOMPTA, logiciel compatible à part", u: *geo }
