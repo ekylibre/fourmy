@@ -72,6 +72,31 @@ production) via `packages/migrator-ekylibre`. Les accès aux services externes
 dans **Intégrations** (responsable). Ils y sont chiffrés avec
 `FOURMY_SECRETS_KEY`, testés avant d'être enregistrés et jamais réaffichés.
 
+### Copier une ferme d'une base à une autre
+
+Pour faire tester sur dev.fourmy.org une ferme préparée sur un poste,
+`docker/exporter-ferme.sh` l'exporte en un fichier SQL. Les deux bases doivent
+avoir les mêmes migrations, et le fichier vérifie ce point lui-même. Les
+référentiels (Lexicon, E-Phy, BBCH, taxonomie) ne sont pas copiés : chaque
+instance les a déjà.
+
+```sh
+docker/exporter-ferme.sh <farm_id> postgres://…/fourmy > ferme.sql
+ssh <serveur> 'docker exec -i <conteneur db> sh -c "psql -X -v ON_ERROR_STOP=1 -U \$POSTGRES_USER -d \$POSTGRES_DB"' < ferme.sql
+```
+
+Le chargement se fait en une seule transaction : une ferme déjà présente ou
+des migrations différentes n'écrivent rien. Ne sont pas copiés :
+- les comptes et les adhésions : créer le compte du responsable (§ Premier
+  démarrage), le rattacher, puis inviter les autres depuis « Ma ferme » →
+  Équipe ;
+- les intégrations, dont les accès sont chiffrés avec la clé de la source :
+  les ressaisir dans « Intégrations » ;
+- le journal d'audit, les événements sortants et les files agrirouter.
+
+Le fichier contient des données personnelles. Il ne se commite pas, et il
+faut le supprimer après le chargement.
+
 ## Vérification
 
 Essai complet de `compose.deploy.yml` en local, en mode production
