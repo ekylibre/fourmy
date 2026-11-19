@@ -29,9 +29,9 @@ describe.skipIf(!url)("mes fermes, articles (intégration)", () => {
 
   it("chacun ne voit que ses fermes, avec son rôle", async () => {
     const mine = await (await app.request("/api/v1/me/farms", { headers: workerOnA.headers })).json();
-    expect(mine.items).toEqual([{ id: a.farmId, name: "Ferme Alpha", role: "worker" }]);
+    expect(mine.items).toEqual([{ id: a.farmId, name: "Ferme Alpha", role: "worker", onboarding: null }]);
     const other = await (await app.request("/api/v1/me/farms", { headers: b.headers })).json();
-    expect(other.items).toEqual([{ id: b.farmId, name: "Ferme Bêta", role: "owner" }]);
+    expect(other.items).toEqual([{ id: b.farmId, name: "Ferme Bêta", role: "owner", onboarding: null }]);
     expect((await app.request("/api/v1/me/farms")).status).toBe(401);
   });
 

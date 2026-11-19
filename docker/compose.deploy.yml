@@ -53,6 +53,10 @@ services:
       FOURMY_TRUSTED_PROXY_HOPS: "2"
       # Imports Ekylibre depuis l'API : serveur des bases sources restaurées.
       EKYLIBRE_SOURCES_URL: ${EKYLIBRE_SOURCES_URL:-postgres://${POSTGRES_USER:-fourmy}:${POSTGRES_PASSWORD}@db:5432/}
+      FOURMY_EKYLIBRE_UPLOADS_DIR: /var/lib/fourmy/ekylibre-uploads
+      # Recherche Sirene de l'INSEE (assistant : identité de la ferme) ; vide, saisie manuelle.
+      SIRENE_API_KEY: ${SIRENE_API_KEY:-}
+      SIRENE_API_URL: ${SIRENE_API_URL:-https://api.insee.fr/api-sirene/4}
       # agrirouter (cartes de modulation vers les machines) : désactivé sans identifiants.
       AGRIROUTER_CLIENT_ID: ${AGRIROUTER_CLIENT_ID:-}
       AGRIROUTER_CLIENT_SECRET: ${AGRIROUTER_CLIENT_SECRET:-}
@@ -65,6 +69,8 @@ services:
     volumes:
       - fourmy_ign_cache:/var/cache/fourmy/ign
       - fourmy_agrirouter_files:/var/cache/fourmy/agrirouter
+      # Sauvegardes Ekylibre déposées (assistant) : reçues par l'API, restaurées par le worker.
+      - fourmy_ekylibre_uploads:/var/lib/fourmy/ekylibre-uploads
 
   # Tâches de fond : intégrations des fermes (Traccar : chaque minute), Lexicon,
   # eau, IFT, météo, heures estimées des matériels, alertes d'entretien,
@@ -86,6 +92,9 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-fourmy}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-fourmy}
       NODE_ENV: production
       FOURMY_SECRETS_KEY: ${FOURMY_SECRETS_KEY}
+      # Reprise d'Ekylibre depuis l'assistant : bases jetables restaurées et migrées par le worker.
+      EKYLIBRE_SOURCES_URL: ${EKYLIBRE_SOURCES_URL:-postgres://${POSTGRES_USER:-fourmy}:${POSTGRES_PASSWORD}@db:5432/}
+      FOURMY_EKYLIBRE_UPLOADS_DIR: /var/lib/fourmy/ekylibre-uploads
       # agrirouter (cartes de modulation vers les machines) : désactivé sans identifiants.
       AGRIROUTER_CLIENT_ID: ${AGRIROUTER_CLIENT_ID:-}
       AGRIROUTER_CLIENT_SECRET: ${AGRIROUTER_CLIENT_SECRET:-}
@@ -111,6 +120,8 @@ services:
     volumes:
       - fourmy_ign_cache:/var/cache/fourmy/ign
       - fourmy_agrirouter_files:/var/cache/fourmy/agrirouter
+      # Sauvegardes Ekylibre déposées (assistant) : reçues par l'API, restaurées par le worker.
+      - fourmy_ekylibre_uploads:/var/lib/fourmy/ekylibre-uploads
 
   web:
     build:
@@ -140,3 +151,4 @@ volumes:
   fourmy_pgdata:
   fourmy_ign_cache:
   fourmy_agrirouter_files:
+  fourmy_ekylibre_uploads:

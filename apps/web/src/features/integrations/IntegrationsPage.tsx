@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
-import { Alert, Anchor, Badge, Button, Group, List, Paper, PasswordInput, Stack, Switch, Table, Text, TextInput, Title } from "@mantine/core";
+import { Alert, Anchor, Badge, Box, Button, Group, Image, List, Modal, Paper, PasswordInput, SimpleGrid, Stack, Switch, Table, Text, TextInput, ThemeIcon, Title, Tooltip } from "@mantine/core";
+import { Cable, CloudRain, CloudSun, Gauge, Lightbulb, Navigation, Plug, Satellite, Sun, Thermometer, Tractor, type LucideIcon } from "lucide-react";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { INTEGRATION_CATEGORIES, type Integration, type IntegrationProviderDefinition } from "@fourmy/contracts";
+import { INTEGRATION_CATEGORIES, type Integration, type IntegrationCategory, type IntegrationProviderDefinition } from "@fourmy/contracts";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { formatDate } from "../../app/labels";
@@ -18,10 +19,135 @@ const STATUS: Record<Integration["status"], { label: string; color: string }> = 
   disconnected: { label: "Déconnectée", color: "brique" },
 };
 
+/** Logo officiel de chaque service (public/integrations, provenance dans SOURCES.md). */
+const PROVIDER_LOGOS: Record<string, string> = {
+  traccar: "/integrations/traccar.png",
+  openweather: "/integrations/openweather.svg",
+  meteoblue: "/integrations/meteoblue.png",
+  weenat: "/integrations/weenat.webp",
+  sencrop: "/integrations/sencrop.png",
+  copernicus: "/integrations/copernicus.png",
+  agrirouter: "/integrations/agrirouter.svg",
+  "open-meteo": "/integrations/open-meteo.png",
+};
+
+/** Feu d'un service : vert allumé (actif), rouge (en erreur), éteint (non configuré ou désactivé). */
+type Light = "on" | "error" | "off";
+
+function StatusLight({ light, label, pulse }: { light: Light; label: string; pulse?: boolean }) {
+  const color = light === "on" ? "var(--mantine-color-lichen-6)" : light === "error" ? "var(--mantine-color-brique-6)" : "var(--mantine-color-gray-4)";
+  return (
+    <Tooltip label={label} withArrow>
+      <Box
+        role="img"
+        aria-label={label}
+        w={14}
+        h={14}
+        style={{
+          flex: "none",
+          borderRadius: "50%",
+          background: light === "off" ? "transparent" : color,
+          border: `2px solid ${color}`,
+          boxShadow: light === "off" ? "none" : `0 0 6px 1px ${color}`,
+          animation: pulse ? "fourmy-pulse 1.2s ease-in-out infinite" : undefined,
+        }}
+      />
+    </Tooltip>
+  );
+}
+
+/** Icône de chaque catégorie et de chaque service (lucide, à défaut de logo). */
+const CATEGORY_ICONS: Record<IntegrationCategory, LucideIcon> = {
+  weather: CloudSun,
+  gps_equipment: Navigation,
+  remote_sensing: Satellite,
+  machine_data: Tractor,
+  decision_support: Lightbulb,
+};
+const PROVIDER_ICONS: Record<string, LucideIcon> = {
+  traccar: Navigation,
+  openweather: CloudSun,
+  meteoblue: CloudRain,
+  weenat: Thermometer,
+  sencrop: Gauge,
+  copernicus: Satellite,
+  agrirouter: Cable,
+  "open-meteo": Sun,
+};
+
+/** Tuile d'un service : icône, nom, état, et sa configuration dans une fenêtre. */
+function ProviderTile({
+  provider,
+  title,
+  summary,
+  badge,
+  children,
+}: {
+  provider: string;
+  title: string;
+  summary: string;
+  badge: ReactNode;
+  children?: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const Icon = PROVIDER_ICONS[provider] ?? Plug;
+  const logo = PROVIDER_LOGOS[provider];
+  const [name] = title.split(" — ");
+  return (
+    <Paper withBorder p="sm" radius="md" data-testid={`tile-${provider}`}>
+      <Stack gap={6} h="100%">
+        <Group justify="space-between" wrap="nowrap" align="flex-start">
+          <Group gap="xs" wrap="nowrap">
+            {logo ? (
+              <Box w={40} h={40} p={4} bg="white" style={{ flex: "none", borderRadius: 8, border: "1px solid var(--mantine-color-default-border)" }}>
+                <Image src={logo} alt={`Logo ${name}`} w="100%" h="100%" fit="contain" />
+              </Box>
+            ) : (
+              <ThemeIcon variant="light" color="lichen" size={40} radius="md">
+                <Icon size={18} />
+              </ThemeIcon>
+            )}
+            <Title order={3} size="h5">
+              {title}
+            </Title>
+          </Group>
+          {badge}
+        </Group>
+        <Text size="xs" c="dimmed" lineClamp={3} style={{ flex: 1 }}>
+          {summary}
+        </Text>
+        {children && (
+          <Button size="xs" variant="light" w="fit-content" onClick={() => setOpen(true)} aria-label={`Configurer ${name}`}>
+            Configurer
+          </Button>
+        )}
+      </Stack>
+      {children && (
+        <Modal opened={open} onClose={() => setOpen(false)} title={title} size="lg">
+          {children}
+        </Modal>
+      )}
+    </Paper>
+  );
+}
+
+const statusBadge = (integration: Integration | null) =>
+  !integration ? (
+    <StatusLight light="off" label="Non configurée" />
+  ) : !integration.enabled ? (
+    <StatusLight light="off" label="Désactivée" />
+  ) : integration.status === "error" || integration.status === "disconnected" ? (
+    <StatusLight light="error" label={STATUS[integration.status].label} />
+  ) : (
+    <StatusLight light="on" label={integration.running ? "Synchronisation…" : STATUS[integration.status].label} pulse={integration.running} />
+  );
+
 /**
- * Intégrations de la ferme (responsable) : un formulaire par fournisseur,
- * construit à partir de sa description. Le secret saisi est envoyé une fois,
- * chiffré par le serveur et jamais réaffiché (seuls ses 4 derniers caractères).
+ * Intégrations de la ferme (responsable) : un pavé par catégorie, une tuile
+ * par service (icône, état) ; la configuration, construite à partir de la
+ * description du service, s'ouvre dans une fenêtre. Le secret saisi est
+ * envoyé une fois, chiffré par le serveur et jamais réaffiché (seuls ses 4
+ * derniers caractères).
  */
 export function IntegrationsPage() {
   const farm = useFarm();
@@ -37,46 +163,68 @@ export function IntegrationsPage() {
 
   return (
     <Stack>
+      {/* Feu d'un service en cours de synchronisation : il pulse. */}
+      <style>{"@keyframes fourmy-pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.35 } }"}</style>
       <Title order={1}>Intégrations</Title>
       <Text c="dimmed" size="sm">
         Services externes reliés à cette ferme. Les accès (jetons, mots de passe) sont chiffrés et ne sont jamais réaffichés.
       </Text>
-      {INTEGRATION_CATEGORIES.map(({ category, label, description }) => {
-        const inCategory = providers.filter((d) => d.category === category);
-        const withOpenMeteo = category === "weather";
-        if (!inCategory.length && !withOpenMeteo) return null;
-        return (
-          <Stack key={category} gap="sm" component="section" aria-labelledby={`integrations-${category}`}>
-            <div>
-              <Title order={2} size="h3" id={`integrations-${category}`}>
-                {label}
-              </Title>
-              <Text size="sm" c="dimmed">
-                {description}
-              </Text>
-            </div>
-            {inCategory.map((definition) =>
-              definition.connect === "oauth" ? (
-                <AgrirouterCard
-                  key={definition.provider}
-                  farmId={farm.id}
-                  definition={definition}
-                  integration={items.find((i) => i.provider === definition.provider) ?? null}
-                />
-              ) : (
-                <ProviderCard
-                  key={definition.provider}
-                  farmId={farm.id}
-                  definition={definition}
-                  integration={items.find((i) => i.provider === definition.provider) ?? null}
-                />
-              ),
-            )}
-            {withOpenMeteo && <StationsCard farmId={farm.id} />}
-            {withOpenMeteo && <OpenMeteoCard />}
-          </Stack>
-        );
-      })}
+      <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
+        {INTEGRATION_CATEGORIES.map(({ category, label, description }) => {
+          const inCategory = providers.filter((d) => d.category === category);
+          const withOpenMeteo = category === "weather";
+          if (!inCategory.length && !withOpenMeteo) return null;
+          const Icon = CATEGORY_ICONS[category] ?? Plug;
+          const active = inCategory.filter((d) => items.some((i) => i.provider === d.provider && i.enabled)).length + (withOpenMeteo ? 1 : 0);
+          return (
+            <Paper key={category} p="md" radius="md" component="section" aria-labelledby={`integrations-${category}`}>
+              <Stack gap="sm">
+                <Group justify="space-between" wrap="nowrap">
+                  <Group gap="sm" wrap="nowrap">
+                    <ThemeIcon size={40} radius="md" variant="filled" color="lichen">
+                      <Icon size={22} />
+                    </ThemeIcon>
+                    <div>
+                      <Title order={2} size="h4" id={`integrations-${category}`}>
+                        {label}
+                      </Title>
+                      <Text size="xs" c="dimmed">
+                        {description}
+                      </Text>
+                    </div>
+                  </Group>
+                  <Badge variant="light" color={active ? "lichen" : "gray"} style={{ flex: "none" }}>
+                    {active} active{active > 1 ? "s" : ""}
+                  </Badge>
+                </Group>
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+                  {inCategory.map((definition) => {
+                    const integration = items.find((i) => i.provider === definition.provider) ?? null;
+                    return (
+                      <ProviderTile key={definition.provider} provider={definition.provider} title={definition.label} summary={definition.description} badge={statusBadge(integration)}>
+                        {definition.connect === "oauth" ? (
+                          <AgrirouterCard farmId={farm.id} definition={definition} integration={integration} />
+                        ) : (
+                          <ProviderCard farmId={farm.id} definition={definition} integration={integration} />
+                        )}
+                      </ProviderTile>
+                    );
+                  })}
+                  {withOpenMeteo && (
+                    <ProviderTile
+                      provider="open-meteo"
+                      title="Open-Meteo — météo"
+                      summary="Gratuit et sans clé : prévisions et historique depuis 1940. Utilisé quand ni meteoblue ni OpenWeather ne sont actifs."
+                      badge={<StatusLight light="on" label="Actif par défaut" />}
+                    />
+                  )}
+                </SimpleGrid>
+                {withOpenMeteo && <StationsCard farmId={farm.id} />}
+              </Stack>
+            </Paper>
+          );
+        })}
+      </SimpleGrid>
     </Stack>
   );
 }
@@ -269,20 +417,6 @@ function AgrirouterCard({ farmId, definition, integration }: { farmId: string; d
   );
 }
 
-function OpenMeteoCard() {
-  return (
-    <Paper p="md" data-testid="integration-open-meteo">
-      <Group justify="space-between">
-        <Title order={3}>Open-Meteo — météo</Title>
-        <Badge color="lichen">Actif par défaut</Badge>
-      </Group>
-      <Text size="sm" c="dimmed" mt={4}>
-        Gratuit et sans clé : prévisions et historique depuis 1940 pour la météo des interventions et les conditions de
-        pulvérisation. Utilisé quand ni meteoblue ni OpenWeather ne sont actifs, et pour le passé quand aucune station Weenat ou Sencrop n'est assez proche.
-      </Text>
-    </Paper>
-  );
-}
 
 function ProviderCard({
   farmId,

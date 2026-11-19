@@ -8,6 +8,8 @@ import { Loading } from "../components/states";
 import { CellarPage } from "../features/cellar/CellarPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { FarmsPage } from "../features/farms/FarmsPage";
+import { OnboardingFarmPage } from "../features/onboarding/OnboardingFarmPage";
+import { OnboardingPage } from "../features/onboarding/OnboardingPage";
 import { FarmProfilePage } from "../features/farm/FarmProfilePage";
 import { ImportsPage } from "../features/imports/ImportsPage";
 import { InterventionsPage } from "../features/interventions/InterventionsPage";
@@ -59,7 +61,8 @@ function RequireAuth({ children }: { children: ReactNode }) {
     globalThis.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
     return () => globalThis.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
   }, [refetch]);
-  if (session.isLoading) return <Loading />;
+  // Pas de session en cache mais une relecture en cours (connexion qui vient d'aboutir) : on attend.
+  if (session.isLoading || (!session.data && session.isFetching)) return <Loading />;
   // Retour à la page demandée après la connexion (lien venu d'agrirouter, favori…).
   const next = location.pathname === "/" ? "" : `?next=${encodeURIComponent(location.pathname + location.search)}`;
   return session.data ? <>{children}</> : <Navigate to={`/login${next}`} replace />;
@@ -127,12 +130,24 @@ function TeamRedirect() {
   return <Navigate to={`${location.pathname.replace(/\/team\/?$/, "/farm")}?${params}`} replace />;
 }
 
-export const routes = [
+const pages = [
   { path: "/", element: <Navigate to="/farms" replace /> },
   { path: "/login", element: <LoginPage /> },
   // Invitation à rejoindre une ferme (lot P3) : publique, avant connexion.
   { path: "/invitation/:token", element: <InvitationPage /> },
   { path: "/farms", element: <RequireAuth><FarmsPage /></RequireAuth> },
+  // Assistant de premier démarrage (lot IM6) : création de la ferme, puis étapes dans la ferme, sans le menu.
+  { path: "/onboarding", element: <RequireAuth><OnboardingFarmPage /></RequireAuth> },
+  {
+    path: "/f/:farmId/onboarding/:step?",
+    element: (
+      <RequireAuth>
+        <FarmProvider fallback={<FarmFallback />}>
+          <OnboardingPage />
+        </FarmProvider>
+      </RequireAuth>
+    ),
+  },
   // Retour du consentement agrirouter (adresse enregistrée chez agrirouter, sans ferme dans le chemin).
   { path: "/agrirouter/callback", element: <RequireAuth><AgrirouterCallbackPage /></RequireAuth> },
   // Connexion lancée depuis agrirouter (Deep URL fourmy.org/agrirouter) : choix de la ferme et confirmation.
@@ -203,6 +218,14 @@ export const routes = [
   },
   { path: "*", element: <Navigate to="/farms" replace /> },
 ];
+
+/**
+ * Toutes les pages sous une racine sans chemin qui porte l'écran d'erreur :
+ * aucune page (connexion, fermes, assistant, éditions…) ne tombe sur l'écran
+ * par défaut de React Router. Les pages de la ferme gardent le leur, dans le
+ * menu.
+ */
+export const routes = [{ errorElement: <RouteError />, children: pages }];
 
 export function createRouter() {
   return createBrowserRouter(routes);

@@ -104,6 +104,27 @@ describe("Imports de fichiers", () => {
     expect(screen.getByText(/Supprimé :/)).toBeInTheDocument();
   });
 
+  it("sauvegarde Ekylibre : envoi avec progression, puis restauration en attente", async () => {
+    const user = userEvent.setup();
+    const queued = run({ source: "file-ekylibre", format: null, status: "running", preview: null, file: null });
+    const ekylibre = { ...queued, source: "ekylibre-file:ferme-test", report: { phase: "queued", tenant: "ferme-test", file: { name: "ferme-test.zip", size: 10 } } };
+    let received = "";
+    server.use(
+      http.get(`*/api/v1/farms/${FARM}/imports`, () => HttpResponse.json({ items: received ? [ekylibre] : [] })),
+      http.get(`*/api/v1/farms/${FARM}/imports/:id`, () => HttpResponse.json(ekylibre)),
+      http.post(`*/api/v1/farms/${FARM}/imports/ekylibre/upload`, async ({ request }) => {
+        received = decodeURIComponent(request.headers.get("x-file-name") ?? "");
+        return HttpResponse.json(ekylibre, { status: 201 });
+      }),
+    );
+    renderApp(`/f/${FARM}/imports`);
+    const section = await screen.findByLabelText("Reprise d'Ekylibre", {}, { timeout: 10_000 });
+    await user.upload(section.querySelector<HTMLInputElement>('input[type="file"]')!, new File(["PK"], "ferme-test.zip", { type: "application/zip" }));
+    await waitFor(() => expect(received).toBe("ferme-test.zip"));
+    expect((await screen.findAllByText("En attente de restauration")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Sauvegarde Ekylibre (ferme-test)").length).toBeGreaterThan(0);
+  });
+
   it("un fichier refusé est expliqué", async () => {
     const user = userEvent.setup();
     server.use(

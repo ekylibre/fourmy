@@ -20,6 +20,12 @@ import {
 import { setLogo } from "../repos/equipments.js";
 import { queueAutoRefresh } from "../ign/cache.js";
 import { logoUpload } from "./equipments.js";
+import { saveOnboarding } from "../repos/farms.js";
+import { z } from "zod";
+
+const onboardingWrite = z
+  .object({ step: z.enum(["farm", "files", "preview", "matching", "settings", "import", "done"]).optional(), completed: z.boolean().optional() })
+  .strict();
 import { BadRequest, domainCtx, problem, uuidParam } from "./helpers.js";
 
 /**
@@ -53,6 +59,8 @@ async function refreshIgn(c: Parameters<typeof domainCtx>[0]) {
 
 export const farmProfileRoutes = new Hono<Env>()
   .get("/farm", async (c) => c.json(await getProfile(db(), c.get("farmId"), c.get("role") === "owner")))
+  // Assistant de premier démarrage (lot IM6) : étape courante, ou fin.
+  .put("/farm/onboarding", requireOwner, async (c) => c.json(await saveOnboarding(db(), c.get("farmId"), await body(c, onboardingWrite))))
   .put("/farm/identity", requireOwner, async (c) => c.json(await putIdentity(db(), c.get("farmId"), domainCtx(c), await body(c, farmProfileIdentity))))
   .post("/farm/certifications", requireOwner, async (c) =>
     c.json(await createFarmCertification(db(), c.get("farmId"), domainCtx(c), await body(c, farmCertificationWrite)), 201),

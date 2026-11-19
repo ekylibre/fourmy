@@ -56,10 +56,7 @@ export async function startImport(
   });
 
   const job = migrate({ sourceUrl: src, targetUrl, farmId, runId })
-    .then(async (report) => {
-      await importSecrets(db, farmId, runId, report.secrets);
-      await geocodeImportedHeadquarters(db, farmId, runId);
-    })
+    .then((report) => finishEkylibreImport(db, farmId, runId, report.secrets))
     .catch(async (e: unknown) => {
     const sqlc = postgres(targetUrl, { max: 1, onnotice: () => {} });
     try {
@@ -71,6 +68,12 @@ export async function startImport(
   });
   onSettled?.(job);
   return run;
+}
+
+/** Après la migration : clé OpenWeatherMap reprise, siège géocodé (import par base source ou sauvegarde déposée). */
+export async function finishEkylibreImport(db: Database, farmId: string, runId: string, secrets: { openweather?: string }): Promise<void> {
+  await importSecrets(db, farmId, runId, secrets);
+  await geocodeImportedHeadquarters(db, farmId, runId);
 }
 
 /**

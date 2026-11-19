@@ -66,7 +66,7 @@ async function select(tx: Tx, year: number, id?: string): Promise<Activity[]> {
                (SELECT t.label FROM taxonomy t WHERE t.reference_name = coalesce(a.cultivation, lx.specie)) AS cultivation_label,
                -- Couleur : celle de l'activité, sinon celle de sa variété (nomenclature d'Ekylibre), sinon de la référence.
                coalesce(a.color, fourmy_variety_color(coalesce(a.cultivation, lx.specie)), lx.color) AS color, a.suspended,
-               fourmy_activity_picture(coalesce(a.cultivation, lx.specie), a.family) AS picture,
+               fourmy_activity_picture(coalesce(a.cultivation, lx.specie), a.family, a.reference) AS picture,
                crop.code AS crop_code, crop.label AS crop_label, crop.oepp AS crop_oepp, a.crop_code IS NOT NULL AS crop_chosen,
                prod.parcel_ids, prod.area_m2
         FROM activities a
@@ -216,7 +216,7 @@ export async function searchReferences(db: Database, farmId: string, q: string, 
       sql`SELECT lx.reference_name, lx.label, lx.family, lx.specie,
                  (SELECT t.label FROM taxonomy t WHERE t.reference_name = lx.specie) AS specie_label,
                  coalesce(fourmy_variety_color(lx.specie), lx.color) AS color,
-                 fourmy_activity_picture(lx.specie, lx.family) AS picture
+                 fourmy_activity_picture(lx.specie, lx.family, lx.reference_name) AS picture
           FROM lexicon_productions lx
           WHERE (lx.label ILIKE ${pattern} OR lx.reference_name ILIKE ${pattern})
             ${family ? sql`AND lx.family = ${family}` : sql``}

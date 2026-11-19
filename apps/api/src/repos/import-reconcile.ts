@@ -284,11 +284,51 @@ async function resolveReference(
     );
     if (byCap) return { ref: byCap, via: "cap_code" };
   }
-  const [byName] = await rows<ReferenceRow>(
+  const byLabel = await referenceByLabel(tx, p);
+  return byLabel ? { ref: byLabel, via: "label" } : null;
+}
+
+/** Mots d'un libellé, sans accent ni casse ni pluriel (« Légumineuses » → « legumineuse »). */
+export function labelWords(label: string): string[] {
+  return label
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[’']/g, " ")
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 3 && !["des", "les", "pour", "avec", "sur", "autre", "autres"].includes(w))
+    .map((w) => w.replace(/(s|x)$/, ""));
+}
+
+/**
+ * Production de référence d'après le libellé seul (historique Geofolia : pas
+ * de code AgroEDI). Le premier mot est l'espèce (« Colza oléagineux
+ * d'hiver » → « Colza d'hiver ») : il doit se retrouver dans le libellé
+ * Lexicon ; puis le plus de mots en commun (racines de 6 lettres), puis la
+ * saison (hiver, printemps).
+ */
+export async function referenceByLabel(tx: Tx, p: BundleParcel): Promise<ReferenceRow | null> {
+  const words = labelWords(p.crop.label);
+  if (!words.length) return null;
+  const [exact] = await rows<ReferenceRow>(
     tx,
-    sql`SELECT reference_name, label, family, specie, usage, season FROM lexicon_productions WHERE lower(label) = lower(${c.label}) LIMIT 1`,
+    sql`SELECT reference_name, label, family, specie, usage, season FROM lexicon_productions WHERE lower(label) = lower(${p.crop.label}) LIMIT 1`,
   );
-  return byName ? { ref: byName, via: "label" } : null;
+  if (exact) return exact;
+  const stem = (w: string) => w.slice(0, 6);
+  const head = stem(words[0]!);
+  const all = await rows<ReferenceRow>(tx, sql`SELECT reference_name, label, family, specie, usage, season FROM lexicon_productions ORDER BY reference_name`);
+  const season = seasonOf(p);
+  const scored = all
+    .map((r) => {
+      const theirs = labelWords(r.label).map(stem);
+      if (theirs[0] !== head) return null;
+      const common = new Set(words.map(stem).filter((w) => theirs.includes(w))).size;
+      return { r, score: common * 10 + (season && r.season === season ? 5 : 0) - (season && r.season && r.season !== season ? 5 : 0) - theirs.length };
+    })
+    .filter((x): x is { r: ReferenceRow; score: number } => !!x)
+    .sort((x, y) => y.score - x.score);
+  return scored[0]?.r ?? null;
 }
 
 function natureOf(p: BundleParcel, ref: ReferenceRow | null): "field_crop" | "grassland" {

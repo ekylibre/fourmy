@@ -16,7 +16,7 @@ plan : [`claudedocs/workflow_import_onboarding.md`](../claudedocs/workflow_impor
 | IM3 TelePAC | îlots, parcelles PAC, haies et arbres déclarés | ✅ |
 | IM4 DAPLOS | lecteur `ekylibre/agroedei-edifact-daplos-reader` 2.0.0, dédoublonnage avec Geofolia | ✅ |
 | IM5 | historique N-1…N-5, apports prévus, annulation, page Imports | ✅ |
-| IM6 | assistant de premier démarrage | à faire |
+| IM6 | assistant de premier démarrage | ✅ |
 
 Les trois formats s'importent de bout en bout : export Geofolia (IM2),
 dossier PAC TelePAC (IM3), EDI DAPLOS (IM4).
@@ -192,6 +192,76 @@ procédure, activités, laissés de côté, avertissements, SIRET à confirmer),
 import, rapport, annulation ; liste des imports de la ferme. Composants
 `FileImport`, `ImportPreview`, `ImportReport` repris par l'assistant (IM6).
 
+## Assistant de premier démarrage (lot IM6)
+
+Pour un compte « à embarquer » (`create-user --onboarding`,
+[`deploiement.md`](deploiement.md)) : après la connexion, `/farms` mène à
+`/onboarding` s'il n'a aucune ferme, ou reprend l'assistant d'une ferme dont
+la mise en route n'est pas finie (`farm_settings.onboarding`).
+
+| Étape | Écran | Appels |
+|---|---|---|
+| 1 Ma ferme | nom, raison sociale, SIRET, PACAGE, adresse ; « Pré-remplir depuis un fichier » | `POST /me/onboarding/identity` (rien n'est gardé), `POST /me/farms` |
+| 2 Mes fichiers | dépôt multiple, format reconnu, aide « où trouver cet export » | `POST /imports/files` |
+| 3 Aperçu | aperçu de chaque fichier (`ImportPreview` sans ses boutons) | `GET /imports` |
+| 4 Rapprochements | noms des activités, personnes à reprendre, articles reconnus ou créés | `PUT /imports/:id/decisions` |
+| 5 Paramétrage | liens vers Ma ferme, Équipe, Activités, Intégrations (nouvel onglet) | — |
+| 6 Import | Geofolia, puis DAPLOS, puis dossier PAC (les parcelles culturales d'abord, D2), un fichier après l'autre ; rapports | `POST /imports/:id/apply` |
+| 7 Fin | liens : tableau de bord, carte, interventions, registre, fertilisation, Imports | `PUT /farm/onboarding` (`completedAt`) |
+
+`POST /me/farms` crée, dans une transaction : la ferme, l'adhésion du
+responsable, ses réglages (`onboarding: { step: "files" }`), la campagne de
+l'année, la personne liée au compte, l'adresse du siège (géocodée si l'IGN la
+trouve), et consomme le droit du compte (`users.farm_creation_quota`) : deux
+envois simultanés ne créent qu'une ferme ; sans droit, **403**.
+`PUT /farm/onboarding` (responsable) enregistre l'étape, ou la fin
+(`completed: true`). Chaque étape est gardée : fermer la page reprend au
+même endroit.
+
+Recette : assistant parcouru de bout en bout avec les trois fichiers réels
+de la ferme pilote (e2e local, `FOURMY_IMPORT_SAMPLES`) : 41 parcelles,
+tableau de bord atteint sans intervention en base.
+
+## Reprise d'Ekylibre depuis une sauvegarde déposée
+
+Dans l'assistant (« Mes fichiers ») et sur la page Imports : le responsable
+dépose la **sauvegarde de tenant** Ekylibre (zip, format 3 : `manifest.yml`
+et `<tenant>.sql`, **2 Go au plus**). Le travail lourd est fait par le
+**worker**, pas par l'API.
+
+1. `POST /imports/ekylibre/upload` (corps brut `application/zip`, nom dans
+   `X-File-Name`) : l'API écrit le zip **en flux** sur le volume partagé
+   avec le worker (`FOURMY_EKYLIBRE_UPLOADS_DIR`), vérifie la sauvegarde
+   (manifeste, tenant, format, dump) et crée l'import `running`
+   (`report.phase = queued`). Pas une sauvegarde : **400** ; plus de 2 Go :
+   **413** ; un autre import en cours : **409** ; `EKYLIBRE_SOURCES_URL`
+   absent : **503**. nginx relaie cette route seule jusqu'à 2 Go, sans tampon.
+2. Le worker (toutes les 15 s, hors de sa boucle) restaure le dump dans une
+   **base jetable** `ekylibre_src_up_<import>` (`apps/api/src/ekylibre/restore.ts`) :
+   PostGIS et le schéma du tenant créés par le serveur ; instructions
+   exécutées sous le rôle `fourmy_restore` (sans connexion ni privilège) et
+   **filtrées par liste blanche** (tables, séquences, index, vues, types,
+   fonctions `plpgsql`/`sql`, déclencheurs, contraintes, `COPY … FROM stdin`,
+   `setval`, réglages de session connus) ; ignorés : propriétaires, droits,
+   commentaires, schéma, extensions ; **refusés et comptés** : changement de
+   rôle, `COPY … PROGRAM` ou fichier serveur, `DO`, fonctions en autre
+   langage, règles, écritures directes, commandes psql. La base passe en
+   lecture seule ; l'import devient « à valider » (`analyzed`, compte rendu
+   dans `report.restore`).
+3. `POST /imports/:id/apply` : la migration existante
+   (`@fourmy/migrator-ekylibre`) est confiée au worker
+   (`phase = migrate-queued`), puis la clé OpenWeatherMap et le siège comme
+   pour la reprise par base source ; base et fichier supprimés ensuite.
+4. Abandon ou échec : base et fichier supprimés par le worker
+   (`phase = cleaned`).
+
+Recette locale sur deux sauvegardes réelles : 21 Mo (restaurée en 12 s,
+migrée en 1,4 s : 111 parcelles, 26 interventions) et 80 Mo (15 s + 6 s :
+162 parcelles, 588 interventions) ; aucune erreur de restauration,
+7 `CREATE RULE` écartées (inutiles à la reprise).
+Pas d'annulation pour cette reprise (celle de la migration Ekylibre n'existe
+pas) ; un rejeu ne duplique pas (UUID v5 du migrateur).
+
 ## Reconnaissance du format
 
 Par le contenu, jamais par l'extension (`packages/importers/src/detect.ts`) :
@@ -266,7 +336,15 @@ En local : `FOURMY_LEXICON_API_KEY=lex_… corepack pnpm --filter @fourmy/lexico
   annulation complète et partielle).
 - Web : `apps/web/test/file-imports.test.tsx` ; e2e
   `apps/web/e2e/file-imports.spec.ts` (dépôt → aperçu → import → rapport →
-  annulation, sur une ferme créée pour l'occasion).
+  annulation, sur une ferme créée pour l'occasion) et
+  `apps/web/e2e/onboarding.spec.ts` (compte neuf → trois fichiers → reprise à
+  l'étape 4 → tableau de bord ; compte sans droit).
+- API : `apps/api/test/onboarding.integration.test.ts` (création avec et
+  sans droit, double envoi, identité depuis les trois formats) ;
+  `ekylibre-restore.test.ts` (découpage du dump, liste blanche) et
+  `ekylibre-upload.integration.test.ts` (sauvegarde synthétique avec des
+  instructions malveillantes : restaurée sans elles, base en lecture seule,
+  nettoyage ; vraie sauvegarde en local avec `FOURMY_EKYLIBRE_SAMPLES`).
 - Jeux anonymisés (`packages/importers/test/fixtures`) : tirés des exports
   réels d'une même ferme par `scripts/anonymize-*.mjs` ; le jeu DAPLOS est
   calé sur le jeu Geofolia (mêmes parcelles, mêmes GUID anonymisés, même

@@ -174,7 +174,7 @@ export async function parcelSheet(db: Database, farmId: string, parcelId: string
       tx,
       sql`SELECT c.year, a.id AS activity_id, a.name, pr.declared,
                  coalesce(a.color, fourmy_variety_color(coalesce(a.cultivation, lx.specie)), lx.color) AS color,
-                 fourmy_activity_picture(coalesce(a.cultivation, lx.specie), a.family) AS picture
+                 fourmy_activity_picture(coalesce(a.cultivation, lx.specie), a.family, a.reference) AS picture
           FROM productions pr JOIN campaigns c ON c.id = pr.campaign_id
           LEFT JOIN activities a ON a.id = pr.activity_id LEFT JOIN lexicon_productions lx ON lx.reference_name = a.reference
           WHERE pr.land_parcel_id = ${parcelId} ORDER BY c.year DESC, pr.declared, a.name`,

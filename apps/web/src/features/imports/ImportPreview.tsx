@@ -31,7 +31,18 @@ const createLink = (x: { create: number; link: number }) => (x.link ? `${fmt(x.c
  * reliera, ce qu'il laissera de côté et pourquoi, les avertissements. Le
  * responsable valide (écriture en tâche de fond) ou abandonne.
  */
-export function ImportPreview({ farmId, run, onChange }: { farmId: string; run: ImportRunView; onChange: (run: ImportRunView) => void }) {
+export function ImportPreview({
+  farmId,
+  run,
+  onChange,
+  actions = true,
+}: {
+  farmId: string;
+  run: ImportRunView;
+  onChange: (run: ImportRunView) => void;
+  /** Boutons Importer / Abandonner (l'assistant importe à son étape « Import »). */
+  actions?: boolean;
+}) {
   const client = useQueryClient();
   const p = run.preview as Preview;
   const r = p.reconciliation;
@@ -149,7 +160,7 @@ export function ImportPreview({ farmId, run, onChange }: { farmId: string; run: 
           </Alert>
         ))}
 
-      {editable && (
+      {editable && actions && (
         <Group>
           {p.farm.siretMatches === false && (
             <Checkbox

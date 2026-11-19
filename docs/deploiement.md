@@ -47,6 +47,7 @@ l'API partagent la même origine : cookies de session sans CORS.
 | `FOURMY_IFT_API_URL` | **en production** | API IFT du ministère (ouverte, sans compte). Par défaut la **préproduction** `https://ecoagri-pprd.api.agriculture.gouv.fr/ift/v5/api` (local, dev.fourmy.org) ; la production règle `https://ecoagri.api.agriculture.gouv.fr/ift/v5/api` |
 | `AGRIROUTER_CLIENT_ID`, `AGRIROUTER_CLIENT_SECRET`, `AGRIROUTER_APPLICATION_ID`, `AGRIROUTER_SOFTWARE_VERSION_ID` | non | application Fourmy enregistrée chez agrirouter (cartes de modulation vers les machines, [`modulation.md`](modulation.md)) ; sans elles, la connexion agrirouter est désactivée. `AGRIROUTER_REDIRECT_URI` vaut `${PUBLIC_URL}/agrirouter/callback` par défaut et doit être déclarée telle quelle dans le client OAuth ; `AGRIROUTER_ENVIRONMENT` : `production` (défaut) ou `qa` |
 | `FOURMY_OSRM_URL` | non | service OSRM auto-hébergé (profil tracteur) qui recale les déplacements du rejeu 3D sur la route ([`routage-osrm.md`](routage-osrm.md)) ; sans lui, la trace reste brute |
+| `SIRENE_API_KEY` | non | clé de l'API Sirene de l'INSEE (portail-api.insee.fr) : autocomplétion du SIRET et de la raison sociale dans l'assistant ; sans elle, saisie manuelle |
 | `EKYLIBRE_SOURCES_URL` | non | serveur des bases Ekylibre restaurées pour les imports depuis l'interface |
 | `FOURMY_IGN_CACHE_MAX_GB` | non | quota du cache des tuiles IGN, 20 Go par défaut (worker) ; au-delà, les tuiles les moins lues hors des zones des fermes sont supprimées d'abord |
 | `FOURMY_IGN_PRELOAD_CONCURRENCY` | non | requêtes simultanées vers l'IGN pendant un préchargement, 8 par défaut (worker) |
@@ -64,6 +65,35 @@ Aucun secret dans le dépôt : ils sont générés directement dans Dokploy.
    `printf '%s' "$MOT_DE_PASSE" | docker compose exec -T api node apps/api/dist/cli/create-user.js --email … --name …`
 5. Rattacher chaque compte à sa ferme : « Ma ferme », onglet **Équipe**
    (responsable), ou au premier démarrage par l'administrateur en base.
+
+## Embarquer un nouvel agriculteur
+
+Un agriculteur qui n'a pas encore de ferme dans Fourmy la crée lui-même avec
+l'**assistant de premier démarrage** (`/onboarding`) : sa ferme (pré-remplie
+depuis un export), ses fichiers (dossier PAC TelePAC, Geofolia, DAPLOS), un
+aperçu, les rapprochements, le paramétrage, l'import, puis le tableau de bord.
+
+1. Créer son compte avec le droit de créer une ferme :
+   `printf '%s' "$MOT_DE_PASSE" | docker compose exec -T api node apps/api/dist/cli/create-user.js --email … --name … --onboarding`
+   (`users.farm_creation_quota` = 1 ; consommé à la création de la ferme).
+2. Lui transmettre l'adresse de Fourmy, son e-mail et son mot de passe. À sa
+   première connexion, il arrive dans l'assistant ; s'il ferme la page, il le
+   reprend à la même étape.
+3. Ses fichiers restent 30 jours sur le serveur, puis sont purgés ; chaque
+   import s'annule depuis la page **Imports** de sa ferme.
+
+Un compte sans ce droit et sans ferme voit « Vous n'êtes membre d'aucune
+ferme » et l'invitation à contacter l'administrateur.
+
+Un agriculteur qui vient d'Ekylibre dépose sa **sauvegarde de tenant** (zip,
+2 Go au plus) dans l'assistant : l'API la reçoit sur le volume
+`fourmy_ekylibre_uploads` (partagé avec le worker), le worker la restaure
+dans une base jetable sur `EKYLIBRE_SOURCES_URL` (rôle capable de créer une
+base et PostGIS : celui de Postgres dans le compose), puis la migre. Prévoir
+sur le serveur de base de quoi accueillir la sauvegarde restaurée le temps
+de l'import (de l'ordre de deux fois la taille du dump), et sur le volume la
+taille du zip. Le relais nginx de l'application accepte 2 Go sur cette seule
+route.
 
 ## Fermes
 

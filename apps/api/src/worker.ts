@@ -19,6 +19,7 @@ import { confirmAgrirouterInbox, runAgrirouterListener } from "./integrations/ag
 import { drainAgrirouterOutbox } from "./integrations/agrirouter-outbox.js";
 import { readAgrirouterInbox } from "./integrations/agrirouter-read.js";
 import { purgeExpiredImportFiles } from "./repos/file-imports.js";
+import { ekylibreUploadsTick } from "./repos/ekylibre-uploads.js";
 
 /**
  * Worker : synchronise les intégrations actives de toutes les fermes
@@ -178,6 +179,16 @@ async function importFilesTick(): Promise<void> {
   const r = await purgeExpiredImportFiles(db());
   if (r.files || r.runs) console.log(`[worker] imports : ${r.files} fichier(s) expiré(s) supprimé(s), ${r.runs} analyse(s) abandonnée(s)`);
 }
+
+/**
+ * Reprise d'Ekylibre déposée dans l'interface : restauration, migration,
+ * nettoyage. Toutes les 15 s, hors de la boucle (une grosse sauvegarde se
+ * restaure en plusieurs minutes sans retarder les autres tâches).
+ */
+const ekylibreTimer = setInterval(() => {
+  if (!stopping) ekylibreUploadsTick(db());
+}, 15_000);
+ekylibreTimer.unref();
 
 async function tick(): Promise<void> {
   for (const [name, job] of [

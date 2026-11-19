@@ -5,8 +5,9 @@ import { api, ApiError, farmPath } from "../../app/api";
 import { useConfirm } from "../../components/confirm";
 import { COUNT_LABELS, type FileImportReport, type RevertReport } from "./fileImport";
 
-/** Une ligne de comptes : créés, reliés, laissés de côté (seulement ce qui n'est pas nul). */
-function countText(v: Record<string, number>): string {
+/** Une ligne de comptes : créés, reliés, laissés de côté (seulement ce qui n'est pas nul) ; un nombre seul (reprise Ekylibre). */
+function countText(v: Record<string, number> | number): string {
+  if (typeof v === "number") return v ? v.toLocaleString("fr-FR") : "";
   const names: Record<string, string> = { created: "créés", linked: "reliés", skipped: "laissés de côté", failed: "en échec", alreadyImported: "déjà importés", islets: "îlots", parcels: "parcelles" };
   return Object.entries(v)
     .filter(([, n]) => n > 0)
@@ -19,7 +20,17 @@ function countText(v: Record<string, number>): string {
  * annulation : ce que l'import a créé et que personne n'a modifié depuis est
  * supprimé ; le reste est gardé et signalé.
  */
-export function ImportReport({ farmId, run, onChange }: { farmId: string; run: ImportRunView; onChange: (run: ImportRunView) => void }) {
+export function ImportReport({
+  farmId,
+  run,
+  onChange,
+  revertable = true,
+}: {
+  farmId: string;
+  run: ImportRunView;
+  onChange: (run: ImportRunView) => void;
+  revertable?: boolean;
+}) {
   const client = useQueryClient();
   const { confirm, element } = useConfirm();
   const r = (run.report ?? {}) as FileImportReport;
@@ -89,7 +100,7 @@ export function ImportReport({ farmId, run, onChange }: { farmId: string; run: I
           )}
         </>
       )}
-      {run.status === "completed" && run.format && (
+      {revertable && run.status === "completed" && run.format && (
         <Button
           color="brique"
           variant="light"

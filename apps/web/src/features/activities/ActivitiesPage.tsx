@@ -1,6 +1,6 @@
 import { useArea } from "../../app/prefs";
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { Alert, Badge, Button, ColorInput, Group, Modal, MultiSelect, Paper, Select, SimpleGrid, Stack, Switch, Text, TextInput, Title } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
@@ -30,26 +30,48 @@ export function ActivitiesPage() {
   const owner = farm.role === "owner";
   const [editing, setEditing] = useState<Activity | "new" | null>(null);
   const [parcelsOf, setParcelsOf] = useState<Activity | null>(null);
+  // « Actives uniquement » : les activités qui ont des parcelles pour la campagne affichée (gardé dans l'adresse).
+  const [params, setParams] = useSearchParams();
+  const activeOnly = params.get("actives") === "1";
+  const setActiveOnly = (on: boolean) =>
+    setParams(
+      (prev) => {
+        const n = new URLSearchParams(prev);
+        if (on) n.set("actives", "1");
+        else n.delete("actives");
+        return n;
+      },
+      { replace: true },
+    );
 
   if (list.isLoading) return <Loading />;
   if (list.error) return <ErrorAlert error={list.error} />;
-  const items = list.data!.items;
+  const all = list.data!.items;
+  const items = activeOnly ? all.filter((a) => a.parcelIds.length > 0) : all;
   const families = ACTIVITY_FAMILIES.filter((f) => items.some((a) => a.family === f));
 
   return (
     <Stack>
       <Group justify="space-between">
         <Title order={1}>Activités {year}</Title>
-        {owner && (
-          <Button leftSection={<Plus size={16} />} onClick={() => setEditing("new")}>
-            Nouvelle activité
-          </Button>
-        )}
+        <Group>
+          <Switch
+            label={activeOnly ? `Actives uniquement (${items.length} sur ${all.length})` : "Actives uniquement"}
+            checked={activeOnly}
+            onChange={(e) => setActiveOnly(e.currentTarget.checked)}
+          />
+          {owner && (
+            <Button leftSection={<Plus size={16} />} onClick={() => setEditing("new")}>
+              Nouvelle activité
+            </Button>
+          )}
+        </Group>
       </Group>
       <Text c="dimmed" size="sm">
         L'activité d'une parcelle désigne sa culture : usages phytosanitaires contrôlés, culture IFT, image. Parcelles et surfaces de la campagne {year}.
       </Text>
-      {items.length === 0 && <Alert color="ardoise">Aucune activité : créez-en une, ou reprenez celles d'Ekylibre (Imports).</Alert>}
+      {all.length === 0 && <Alert color="ardoise">Aucune activité : créez-en une, ou reprenez celles d'Ekylibre (Imports).</Alert>}
+      {all.length > 0 && items.length === 0 && <Alert color="ardoise">Aucune activité n'a de parcelle pour la campagne {year}.</Alert>}
       {families.map((family) => (
         <Stack key={family} gap="xs">
           <Title order={3}>{ACTIVITY_FAMILY_LABELS[family]}</Title>

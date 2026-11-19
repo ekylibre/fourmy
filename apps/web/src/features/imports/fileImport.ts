@@ -29,15 +29,69 @@ export const RUN_STATUS_LABELS: Record<ImportRunStatus, { label: string; color: 
   reverted: { label: "Annulé", color: "gray" },
 };
 
-/** Libellé d'un import : format du fichier, ou reprise Ekylibre. */
+/** Libellé d'un import : format du fichier, sauvegarde ou reprise Ekylibre. */
 export function sourceLabel(run: Pick<ImportRunView, "source" | "format">): string {
   if (run.format) return IMPORT_FORMAT_LABELS[run.format as ImportFormat];
+  if (run.source.startsWith(EKYLIBRE_FILE)) return `Sauvegarde Ekylibre (${run.source.slice(EKYLIBRE_FILE.length)})`;
   return run.source.startsWith("ekylibre:") ? "Reprise Ekylibre" : run.source;
+}
+
+/** Sauvegarde de tenant Ekylibre déposée (restaurée puis migrée par le worker). */
+export const EKYLIBRE_FILE = "ekylibre-file:";
+export const isEkylibreBackup = (run: Pick<ImportRunView, "source">) => run.source.startsWith(EKYLIBRE_FILE);
+export const EKYLIBRE_MAX_BYTES = 2 * 1024 ** 3;
+
+/** État d'une sauvegarde Ekylibre déposée, lisible. */
+export function ekylibrePhase(run: ImportRunView): string | null {
+  if (!isEkylibreBackup(run)) return null;
+  const r = (run.report ?? {}) as { phase?: string; progress?: number; error?: string };
+  if (run.status === "failed") return "Échec";
+  switch (r.phase) {
+    case "queued":
+      return "En attente de restauration";
+    case "restoring":
+      return `Restauration${r.progress ? ` : ${r.progress} %` : "…"}`;
+    case "restored":
+      return "Prête à importer";
+    case "migrate-queued":
+    case "migrating":
+      return "Reprise en cours…";
+    default:
+      return null;
+  }
+}
+
+/**
+ * Dépôt d'une sauvegarde de tenant Ekylibre (jusqu'à 2 Go), envoyée telle
+ * quelle avec la progression de l'envoi (XMLHttpRequest : fetch ne la donne pas).
+ */
+export function uploadEkylibreBackup(farmId: string, file: File, onProgress: (pct: number) => void): Promise<ImportRunView> {
+  if (file.size > EKYLIBRE_MAX_BYTES) return Promise.reject(new ApiError(413, "Sauvegarde trop volumineuse", "2 Go au plus."));
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${BASE}${farmPath(farmId, "/imports/ekylibre/upload")}`);
+    xhr.withCredentials = true;
+    xhr.setRequestHeader("content-type", "application/zip");
+    xhr.setRequestHeader("x-file-name", encodeURIComponent(file.name));
+    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(Math.round((e.loaded / e.total) * 100));
+    xhr.onload = () => {
+      let body: Record<string, unknown> = {};
+      try {
+        body = JSON.parse(xhr.responseText);
+      } catch {
+        /* corps non JSON */
+      }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(body as unknown as ImportRunView);
+      else reject(new ApiError(xhr.status, String(body.title ?? `Erreur ${xhr.status}`), body.detail as string | undefined));
+    };
+    xhr.onerror = () => reject(new ApiError(0, "Envoi interrompu", "Vérifiez la connexion et recommencez."));
+    xhr.send(file);
+  });
 }
 
 /** Rapport d'un import de fichier terminé (et de son annulation). */
 export interface FileImportReport {
-  counts?: Record<string, Record<string, number>>;
+  counts?: Record<string, Record<string, number> | number>;
   failures?: { label: string; on: string; reason: string }[];
   skipped?: { label: string; on: string; reason: string }[];
   compliance?: { phytoDanger: number; nitrateDanger: number };
