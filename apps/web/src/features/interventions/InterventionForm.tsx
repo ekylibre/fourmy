@@ -59,6 +59,7 @@ import { withStart } from "./periods";
 import { bbchOptionLabel, useBbchStages } from "../reference/phyto-reference";
 import { CrewsEditor, CrewsSummary, PeriodsEditor, crewRowsOf, crewsBody, newCrew, toLocal, type CrewRow } from "./Crews";
 import { ComplianceSummary, TreatmentCheckView, useComplianceCheck, type ComplianceDraft } from "./CompliancePanel";
+import { CertificationCheckSection, useCertificationCheck } from "../certification/controls";
 import type { Activity, InterventionWeather } from "@fourmy/contracts";
 import type { FeatureCollection, Geometry } from "geojson";
 import { SprayingConditions, WeatherFields, type WeatherRequestDraft } from "../weather/Weather";
@@ -268,6 +269,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
     : periods;
   const [purposes, setPurposes] = useState<TreatmentPurpose[]>(planned?.purposes ?? []);
   const [notes, setNotes] = useState(planned?.notes ?? "");
+  const [justification, setJustification] = useState((toComplete ?? editing)?.justification ?? "");
   // Stade BBCH (registre phyto réglementaire, lot X) : stades de la culture des parcelles choisies.
   const [bbch, setBbch] = useState<string | null>(planned?.bbch?.code ?? null);
   const [error, setError] = useState<string | null>(null);
@@ -386,6 +388,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       crews: inCrews ? crewsBody(crews) : [],
       purposes,
       ...(notes.trim() ? { notes: notes.trim() } : {}),
+      ...(justification.trim() ? { justification: justification.trim() } : {}),
       ...(shape === "treatment" ? { bbch } : {}),
       compliance: { usages: usageChoices, ...(overrideReason.trim() ? { reason: overrideReason.trim() } : {}) },
       ...(weather ? { weather } : {}),
@@ -450,6 +453,17 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
     }
   }
   const fertilizationCheck = useFertilizationCheck(farmId, fertDraft);
+  // Contrôles HVE et AB (lot CT1) : seulement sur une parcelle certifiée à la date.
+  let certDraft: object | null = null;
+  if (code) {
+    try {
+      const full = body();
+      if (full.targets.some((t) => t.kind === "land_parcel")) certDraft = { ...full, periods: flatPeriods(full), ...(justification.trim() ? { justification: justification.trim() } : {}) };
+    } catch {
+      certDraft = null; // date en cours de saisie
+    }
+  }
+  const certificationCheck = useCertificationCheck(farmId, certDraft);
   const compliance = complianceCheck.result;
   const chooseUsage = (articleId: string, usageId: string | null) =>
     setUsageChoices((m) => {
@@ -462,6 +476,8 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
     ...(compliance ? dangerMessages(compliance) : []),
     // Directive nitrates (lot AI) : épandage en période d'interdiction, même motif que le phyto.
     ...(fertilizationCheck.result?.indicators ?? []).filter((i) => i.level === "danger").map((i) => `${i.parcelName ? `${i.parcelName} : ` : ""}${i.message}`),
+    // Certification (lot CT1) : même motif.
+    ...(certificationCheck?.findings ?? []).filter((f) => f.level === "danger").map((f) => f.message),
   ];
 
   const submit = useMutation({
@@ -726,6 +742,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       />
       <ComplianceSummary check={complianceCheck} />
       <FertilizationSummary check={fertilizationCheck} />
+      <CertificationCheckSection check={certificationCheck} />
     </Stack>
   );
 
@@ -994,6 +1011,17 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
 
             <Divider label={shape === "maintenance" ? "4 · Notes" : "5 · Notes"} labelPosition="left" />
             <Textarea label="Notes" autosize minRows={2} maxLength={2000} value={notes} onChange={(e) => setNotes(e.currentTarget.value)} />
+            {certificationCheck && (shape === "treatment" || inputs.length > 0) && (
+              <Textarea
+                label="Justification (Agriculture biologique)"
+                description="Pourquoi ce traitement ou cet apport : observation, risque, échec des mesures préventives."
+                autosize
+                minRows={2}
+                maxLength={2000}
+                value={justification}
+                onChange={(e) => setJustification(e.currentTarget.value)}
+              />
+            )}
 
             {error && (
               <Alert color="brique" title="Enregistrement refusé">

@@ -342,6 +342,30 @@ export const handlers = [
     const sheet = demoPersonSheet(String(params.id));
     return sheet ? HttpResponse.json(sheet) : HttpResponse.json({ title: "Personne introuvable", status: 404 }, { status: 404 });
   }),
+  // Contrôles HVE et AB (lot CT1) : une parcelle de démo est certifiée AB depuis 2020.
+  http.get(`*${base}/control/availability`, () => HttpResponse.json({ hve: false, ab: true })),
+  http.post(`*${base}/control/check`, () => HttpResponse.json({ check: null })),
+  http.get(`*${base}/control/:kind`, ({ request, params }) => {
+    const campaign = Number(new URL(request.url).searchParams.get("campaign"));
+    return HttpResponse.json({
+      kind: params.kind,
+      campaign,
+      period: { from: `${campaign}-01-01`, to: `${campaign}-12-31` },
+      verdict: "ok",
+      sections: [
+        {
+          id: "perimeter",
+          label: "Périmètre",
+          level: "ok",
+          findings: [{ ruleId: "ab.perimeter", level: "ok", message: "1 parcelle(s) en conversion ou certifiée(s) AB, 2,5 ha sur 12 ha.", refs: {}, source: "Règlement (UE) 2018/848, art. 9.2 et 9.7" }],
+        },
+      ],
+      refsVersion: "2026-11-19.1",
+      computedAt: "2026-11-19T08:00:00.000Z",
+      exportedAt: null,
+      changedSinceExport: false,
+    });
+  }),
   http.get(`*${base}/registers/phyto`, ({ request }) => {
     const url = new URL(request.url);
     if (url.searchParams.get("format") === "csv") {
