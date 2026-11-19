@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import postgres from "postgres";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { emptyBundle, registerReader } from "@fourmy/importers";
 import { createApp } from "../src/app.js";
 import { purgeExpiredImportFiles } from "../src/repos/file-imports.js";
@@ -8,13 +10,16 @@ import { setupFarm, addMember, teardown } from "./helpers.js";
 
 /**
  * Imports de fichiers, lot IM1 (claudedocs/workflow_import_onboarding.md) :
- * dépôt, reconnaissance, suivi, décisions, abandon, purge. Les lecteurs
- * arrivent en IM2 à IM4 : un faux lecteur TelePAC sert ici à l'aperçu.
+ * dépôt, reconnaissance, suivi, décisions, abandon, purge. Le jeu DAPLOS
+ * anonymisé sert de fichier ; un faux lecteur TelePAC sert à l'aperçu.
  */
 const url = process.env.DATABASE_URL;
 const app = createApp();
 
-const daplos = "EI400000000000035  999999999999999  1   \r\nDE                                    2026111800630.95\r\n";
+const emptyDaplos = "EI400000000000035  999999999999999  1   \r\nDE                                    2026111800630.95\r\n";
+const fixture = readFileSync(join(import.meta.dirname, "..", "..", "..", "packages", "importers", "test", "fixtures", "daplos-pilote.dap"));
+/** Le jeu DAPLOS, rendu unique par une ligne vide finale (autre empreinte, même contenu). */
+const daplos = (variant = 0) => new Uint8Array(Buffer.concat([fixture, Buffer.from("\r\n".repeat(variant))]));
 const telepac = (pacage: string) =>
   `<?xml version="1.0" encoding="ISO-8859-1"?>\n<producteurs xmlns="urn:x-telepac:fr.gouv.agriculture.telepac:echange-producteur"><producteur numero-pacage="${pacage}"/></producteurs>`;
 
@@ -56,7 +61,7 @@ describe.skipIf(!url)("imports de fichiers (intégration)", () => {
   };
 
   it("réservé au responsable ; le suivi se lit par les membres", async () => {
-    expect((await upload(worker.headers, "x.dap", daplos)).status).toBe(403);
+    expect((await upload(worker.headers, "x.dap", daplos())).status).toBe(403);
     expect((await app.request(`${base()}/imports`, { headers: worker.headers })).status).toBe(200);
   });
 
@@ -70,16 +75,21 @@ describe.skipIf(!url)("imports de fichiers (intégration)", () => {
     expect(n).toBe(0);
   });
 
-  it("reconnaît un DAPLOS sans lecteur : analysé, bloquant, fichier gardé une seule fois", async () => {
-    const first = await upload(owner.headers, "C:\\exports\\40000000000003.dap", daplos);
+  it("reconnaît et lit un DAPLOS ; un DAPLOS sans culture est refusé sans rien garder ; fichier gardé une seule fois", async () => {
+    const empty = await upload(owner.headers, "vide.dap", emptyDaplos);
+    expect(empty.status).toBe(422);
+    const [{ n: none }] = await sql`SELECT count(*)::int AS n FROM import_files WHERE farm_id = ${farmId}`;
+    expect(none).toBe(0);
+
+    const first = await upload(owner.headers, "C:\\exports\\40000000000003.dap", daplos());
     expect(first.status).toBe(201);
     const run = await first.json();
     expect(run).toMatchObject({ source: "file:daplos", format: "daplos", status: "analyzed", file: { name: "40000000000003.dap" } });
-    expect(run.preview).toMatchObject({ readable: false, format: "daplos" });
-    expect(run.preview.warnings[0].level).toBe("blocking");
+    expect(run.preview).toMatchObject({ readable: true, format: "daplos", farm: { siretMatches: true } });
+    expect(run.preview.warnings.some((w: { level: string }) => w.level === "blocking")).toBe(false);
 
     // Même contenu : même fichier, même analyse en attente.
-    const again = await upload(owner.headers, "copie.dap", daplos);
+    const again = await upload(owner.headers, "copie.dap", daplos());
     expect(again.status).toBe(200);
     expect((await again.json()).id).toBe(run.id);
     const [{ n }] = await sql`SELECT count(*)::int AS n FROM import_files WHERE farm_id = ${farmId}`;
@@ -120,14 +130,14 @@ describe.skipIf(!url)("imports de fichiers (intégration)", () => {
   });
 
   it("une ferme ne voit ni les imports ni les fichiers d'une autre", async () => {
-    const mine = await (await upload(other.headers, "x.dap", daplos.replace("EI3", "EI4"), otherFarmId)).json();
+    const mine = await (await upload(other.headers, "x.dap", daplos(1), otherFarmId)).json();
     expect((await app.request(`${base()}/imports/${mine.id}`, { headers: owner.headers })).status).toBe(404);
     const theirs = await (await app.request(`/api/v1/farms/${otherFarmId}/imports`, { headers: other.headers })).json();
     expect(theirs.items).toHaveLength(1);
   });
 
   it("purge : fichiers expirés supprimés, analyses sans fichier abandonnées", async () => {
-    const run = await (await upload(owner.headers, "vieux.dap", daplos.replace("EI3", "EI5"))).json();
+    const run = await (await upload(owner.headers, "vieux.dap", daplos(2))).json();
     await sql`UPDATE import_files SET expires_at = now() - interval '1 day' WHERE farm_id = ${farmId} AND name = 'vieux.dap'`;
     const r = await purgeExpiredImportFiles(db());
     expect(r.files).toBeGreaterThanOrEqual(1);

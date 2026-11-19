@@ -57,8 +57,8 @@ describe("reconnaissance du format", () => {
     failsWith(() => detectFormat("casse.zip", bytes("PK\u0003\u0004 pas une archive")), "corrupt_file");
   });
 
-  it("un format reconnu sans lecteur est analysé sans bundle", () => {
-    expect(analyzeFile("x.dap", bytes(daplos))).toEqual({ format: "daplos", bundle: null });
+  it("un DAPLOS sans culture est reconnu puis refusé comme illisible", () => {
+    failsWith(() => analyzeFile("x.dap", bytes(daplos)), "corrupt_file");
   });
 });
 

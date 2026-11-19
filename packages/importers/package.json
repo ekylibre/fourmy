@@ -21,6 +21,7 @@
   "dependencies": {
     "@fourmy/contracts": "workspace:*",
     "@fourmy/isoxml": "workspace:*",
+    "@osfarm/agroedei-edifact-daplos-reader": "github:ekylibre/agroedei-edifact-daplos-reader#8eaf6a623e930f2c275fa4fdc10735b0a769f33f",
     "proj4": "2.20.9"
   },
   "devDependencies": {

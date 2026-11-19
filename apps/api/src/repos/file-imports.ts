@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
 import { importDecisions, type ImportDecisions, type ImportPreview, type ImportRunView } from "@fourmy/contracts";
 import type { DomainCtx } from "@fourmy/domain";
-import { analyzeFile, buildPreview, isBlocked, type FileAnalysis } from "@fourmy/importers";
+import { analyzeFile, buildPreview, detectFormat, isBlocked, type FileAnalysis, type ReaderOptions } from "@fourmy/importers";
 import { Conflict, NotFound } from "../routes/helpers.js";
 import { applyPlan } from "./import-apply.js";
 import { reconcile } from "./import-reconcile.js";
@@ -16,6 +16,29 @@ import { reconcile } from "./import-reconcile.js";
  */
 
 const rows = async <T>(tx: Tx, q: ReturnType<typeof sql>) => (await tx.execute(q)) as unknown as T[];
+
+/**
+ * Libellés AgroEDI du jeu Lexicon réservé (`lexicon_agroedi_codes`), par
+ * table : passés au lecteur DAPLOS, prioritaires sur ceux du paquet. Vide
+ * sans clé Lexicon : le lecteur garde ses libellés.
+ */
+async function agroediDictionary(q: Pick<Tx, "execute">): Promise<ReaderOptions["dictionary"]> {
+  const list = (await q.execute(sql`SELECT table_id::text AS t, trim(code) AS code, label FROM lexicon_agroedi_codes WHERE label IS NOT NULL`)) as unknown as {
+    t: string;
+    code: string;
+    label: string;
+  }[];
+  if (!list.length) return undefined;
+  const out: Record<string, Record<string, string>> = {};
+  for (const r of list) (out[r.t] ??= {})[r.code] = r.label;
+  return out;
+}
+
+/** Lecture d'un fichier, avec le référentiel dont son format a besoin (libellés AgroEDI pour DAPLOS). */
+async function analyze(q: Pick<Tx, "execute">, name: string, bytes: Uint8Array): Promise<FileAnalysis> {
+  const options: ReaderOptions = detectFormat(name, bytes) === "daplos" ? { dictionary: await agroediDictionary(q) } : {};
+  return analyzeFile(name, bytes, options);
+}
 
 const VIEW = sql`
   SELECT r.id, r.source, r.format, r.status, r.started_at, r.finished_at, r.preview, r.decisions, r.report,
@@ -98,7 +121,7 @@ export async function analyzeUpload(
   upload: { name: string; bytes: Uint8Array },
 ): Promise<{ run: ImportRunView; created: boolean }> {
   const name = cleanFileName(upload.name);
-  const analysis = analyzeFile(name, upload.bytes);
+  const analysis = await analyze(db, name, upload.bytes);
   const sha256 = createHash("sha256").update(upload.bytes).digest("hex");
 
   return withFarm(db, farmId, async (tx) => {
@@ -156,7 +179,7 @@ export async function saveDecisions(db: Database, farmId: string, id: string, de
       ? await rows<{ name: string; bytes: Buffer }>(tx, sql`SELECT name, bytes FROM import_files WHERE id = ${run.file_id}`)
       : [];
     if (!file) throw new Conflict("Le fichier de cet import a expiré : déposez-le à nouveau.");
-    const preview = await previewOf(tx, farmId, analyzeFile(file.name, new Uint8Array(file.bytes)), file.name, decisions);
+    const preview = await previewOf(tx, farmId, await analyze(tx, file.name, new Uint8Array(file.bytes)), file.name, decisions);
     await tx.execute(sql`
       UPDATE import_runs SET decisions = ${JSON.stringify(decisions)}::jsonb, preview = ${JSON.stringify(preview)}::jsonb
       WHERE id = ${id}`);
@@ -225,7 +248,7 @@ export async function applyRun(
     if (!file) throw new Conflict("Le fichier de cet import a expiré : déposez-le à nouveau.");
     const [d] = await rows<{ decisions: unknown }>(tx, sql`SELECT decisions FROM import_runs WHERE id = ${id}`);
     const decisions = importDecisions.safeParse(d?.decisions ?? {});
-    const preview = await previewOf(tx, farmId, analyzeFile(file.name, new Uint8Array(file.bytes)), file.name, decisions.success ? decisions.data : {});
+    const preview = await previewOf(tx, farmId, await analyze(tx, file.name, new Uint8Array(file.bytes)), file.name, decisions.success ? decisions.data : {});
     if (isBlocked(preview)) {
       const blocking = preview.warnings.filter((w) => w.level === "blocking").map((w) => w.message);
       throw new Conflict(`Import impossible : ${blocking.join(" ")}`);
@@ -240,7 +263,7 @@ export async function applyRun(
       tx,
       sql`SELECT f.name, f.bytes, r.decisions FROM import_runs r JOIN import_files f ON f.id = r.file_id WHERE r.id = ${id}`,
     );
-    const analysis = analyzeFile(row!.name, new Uint8Array(row!.bytes));
+    const analysis = await analyze(tx, row!.name, new Uint8Array(row!.bytes));
     const parsed = importDecisions.safeParse(row!.decisions ?? {});
     const plan = await reconcile(tx, farmId, analysis.bundle!, parsed.success ? parsed.data : {});
     const report = await applyPlan(tx, farmId, ctx, id, analysis.bundle!, plan);

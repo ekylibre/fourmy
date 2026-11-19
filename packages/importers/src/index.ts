@@ -15,11 +15,14 @@ export * from "./geofolia.js";
 export * from "./interventions.js";
 export * from "./covers.js";
 export * from "./telepac.js";
+export * from "./daplos.js";
 
 import { registerReader } from "./readers.js";
 import { readGeofolia } from "./geofolia.js";
 import { readTelepac } from "./telepac.js";
+import { readDaplos } from "./daplos.js";
 
 // Lecteurs disponibles (lots IM2 à IM4).
 registerReader("geofolia", readGeofolia);
 registerReader("telepac", readTelepac);
+registerReader("daplos", readDaplos);

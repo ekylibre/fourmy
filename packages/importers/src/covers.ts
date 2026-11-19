@@ -46,6 +46,14 @@ const SPECIES_FAMILY: Record<string, "cruciferes" | "legumineuses" | "graminees_
   ZBT: "legumineuses", // féverole
 };
 
+/** Espèces semées presque toujours en couvert (moutardes, navette, radis, phacélie). */
+const COVER_ONLY = new Set(["ZDA", "ZDC", "ZDE", "ZDN", "ZEJ"]);
+
+/** Espèce AgroEDI (table 18) qui ne se cultive guère qu'en couvert d'interculture. */
+export function isCoverSpecies(code: string | null | undefined): boolean {
+  return !!code && COVER_ONLY.has(code.trim());
+}
+
 const KEYWORDS: [RegExp, "cruciferes" | "legumineuses" | "graminees_seigle_avoine" | "graminees_ray_grass" | "hydrophyllacees"][] = [
   [/moutarde|radis|navette|colza|chou|cameline/i, "cruciferes"],
   [/phac[ée]lie/i, "hydrophyllacees"],
@@ -80,7 +88,7 @@ export function coverOf(bundle: ImportBundle, p: BundleParcel): CoverInfo | null
   if (!p.secondary) return null;
   const units = bundle.workUnits.filter((u) => u.parcelKey === p.key);
   const harvested = units.some((u) => u.outputs.length > 0);
-  if (!COVER_LABEL.test(p.crop.label) && !(p.crop.aeeUsage === "ZPB" && !harvested)) return null;
+  if (!COVER_LABEL.test(p.crop.label) && !(p.crop.aeeUsage === "ZPB" && !harvested) && !isCoverSpecies(p.crop.aeeCode)) return null;
   // Semences employées pour ce couvert (noms des articles des semis).
   const articles = new Map(bundle.articles.map((a) => [a.key, a]));
   const seeds = [...new Set(units.flatMap((u) => u.inputs.map((i) => articles.get(i.articleKey)).filter((a) => a?.nature === "seed").map((a) => a!.name)))];

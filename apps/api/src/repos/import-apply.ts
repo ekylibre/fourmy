@@ -92,6 +92,25 @@ export async function applyPlan(tx: Tx, farmId: string, ctx: DomainCtx, runId: s
     await tx.execute(sql`UPDATE farms SET email = ${bundle.farm.email.slice(0, 200)} WHERE id = ${farmId} AND email IS NULL`);
   }
 
+  // Adresse (DAPLOS, segment de l'exploitation) : au siège, seulement s'il n'en a pas ; siège créé s'il manque.
+  const addr = bundle.farm.address;
+  if (addr && (addr.line1 || addr.city)) {
+    const line1 = addr.line1?.slice(0, 200) ?? null;
+    const line2 = addr.line2?.slice(0, 200) ?? null;
+    const postal = addr.postalCode && /^\d{5}$/.test(addr.postalCode) ? addr.postalCode : null;
+    const city = addr.city?.slice(0, 120) ?? null;
+    const [hq] = await tx.execute(sql`SELECT id FROM farm_sites WHERE is_headquarters`) as unknown as { id: string }[];
+    if (hq) {
+      await tx.execute(sql`
+        UPDATE farm_sites SET address_line1 = ${line1}, address_line2 = ${line2}, postal_code = ${postal}, city = ${city}, updated_at = now()
+        WHERE id = ${hq.id} AND address_line1 IS NULL AND address_line2 IS NULL AND postal_code IS NULL AND city IS NULL`);
+    } else {
+      await tx.execute(sql`
+        INSERT INTO farm_sites (id, farm_id, name, is_headquarters, address_line1, address_line2, postal_code, city, position)
+        VALUES (${ctx.newId()}, ${farmId}, 'Siège', true, ${line1}, ${line2}, ${postal}, ${city}, 0)`);
+    }
+  }
+
   for (const c of plan.campaigns.filter((x) => x.create)) {
     await tx.execute(sql`
       INSERT INTO campaigns (id, farm_id, year, starts_on, stops_on)
