@@ -42,6 +42,7 @@ l'API partagent la même origine : cookies de session sans CORS.
 | `FOURMY_SMTP_HOST`, `_PORT`, `_USER`, `_PASSWORD`, `_FROM` | non | envoi du formulaire de contact de fourmy.org vers `FOURMY_CONTACT_TO` (contact@fourmy.org), et des alertes d'entretien aux membres choisis (page Entretien) ; sans eux, le formulaire répond « indisponible » et les alertes attendent (rien n'est marqué envoyé) |
 | `SITE_IMAGE` | non | image du site, `ghcr.io/ekylibre/fourmy-site:main` par défaut (prod : une étiquette `sha-…` précise) |
 | `FOURMY_LEXICON_PACKAGES_URL` | non | serveur des paquets Lexicon (référentiel phyto, taxonomie, productions de référence et images des activités), `https://lexicon-packages.osfarm.org` par défaut ; `off` pour ne pas synchroniser (`docs/phyto.md`) |
+| `FOURMY_LEXICON_API_KEY` | non | clé d'adhérent OSFarm (`lex_…`, portée `bundle:fourmy`) : le worker synchronise alors le bundle `https://lexicon.osfarm.org/bundles/fourmy`, qui ajoute le dictionnaire AgroEDI (libellés et cultures des imports DAPLOS et Geofolia, [`imports.md`](imports.md)) ; sans elle, dépôt public, imports moins précis. Une clé par instance |
 | — | — | Météo : Open-Meteo sans clé par défaut ; les clés OpenWeather et meteoblue se saisissent par ferme dans **Intégrations** (`docs/meteo.md`), pas en variable du serveur |
 | `FOURMY_IFT_API_URL` | **en production** | API IFT du ministère (ouverte, sans compte). Par défaut la **préproduction** `https://ecoagri-pprd.api.agriculture.gouv.fr/ift/v5/api` (local, dev.fourmy.org) ; la production règle `https://ecoagri.api.agriculture.gouv.fr/ift/v5/api` |
 | `AGRIROUTER_CLIENT_ID`, `AGRIROUTER_CLIENT_SECRET`, `AGRIROUTER_APPLICATION_ID`, `AGRIROUTER_SOFTWARE_VERSION_ID` | non | application Fourmy enregistrée chez agrirouter (cartes de modulation vers les machines, [`modulation.md`](modulation.md)) ; sans elles, la connexion agrirouter est désactivée. `AGRIROUTER_REDIRECT_URI` vaut `${PUBLIC_URL}/agrirouter/callback` par défaut et doit être déclarée telle quelle dans le client OAuth ; `AGRIROUTER_ENVIRONMENT` : `production` (défaut) ou `qa` |
@@ -92,7 +93,10 @@ des migrations différentes n'écrivent rien. Ne sont pas copiés :
   Équipe ;
 - les intégrations, dont les accès sont chiffrés avec la clé de la source :
   les ressaisir dans « Intégrations » ;
-- le journal d'audit, les événements sortants et les files agrirouter.
+- le journal d'audit, les événements sortants et les files agrirouter ;
+- les fichiers déposés pour un import ([`imports.md`](imports.md)) : les
+  imports et leur provenance sont copiés, pour qu'un fichier réimporté sur la
+  cible ne crée pas de doublons, mais sans le fichier lui-même.
 
 Le fichier contient des données personnelles. Il ne se commite pas, et il
 faut le supprimer après le chargement.

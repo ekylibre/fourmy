@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { sql } from "drizzle-orm";
 import postgres from "postgres";
-import { LEXICON_PACKAGES_URL, syncLexicon } from "@fourmy/lexicon";
+import { lexiconSourceFromEnv, syncLexicon } from "@fourmy/lexicon";
 import { db } from "../db.js";
 import { upsertLocalUser } from "../users.js";
 
@@ -26,13 +26,15 @@ const added = (await db().execute(sql`
 console.log(`Compte de dev : ${DEV_EMAIL} / ${DEV_PASSWORD} — ${added.length} appartenance(s) ajoutée(s).`);
 
 // Référentiel Lexicon (sinon chargé seulement par le worker) : nouvelles
-// versions uniquement ; FOURMY_LEXICON_PACKAGES_URL=off pour s'en passer (hors ligne).
-const lexiconUrl = process.env.FOURMY_LEXICON_PACKAGES_URL;
-if (lexiconUrl !== "off") {
+// versions uniquement ; FOURMY_LEXICON_PACKAGES_URL=off pour s'en passer (hors ligne),
+// FOURMY_LEXICON_API_KEY pour le bundle « fourmy » (jeu agroedi en plus).
+const lexiconSource = lexiconSourceFromEnv();
+if (lexiconSource) {
   const client = postgres(url, { max: 1, onnotice: () => {} });
   try {
-    for (const r of await syncLexicon(client, { base: lexiconUrl || LEXICON_PACKAGES_URL })) {
-      console.log(`Lexicon ${r.name} ${r.version} : ${r.status === "loaded" ? "chargé" : "déjà à jour"}`);
+    for (const r of await syncLexicon(client, lexiconSource)) {
+      if (r.status === "absent") console.log(`Lexicon ${r.name} : absent de la source (clé FOURMY_LEXICON_API_KEY requise)`);
+      else console.log(`Lexicon ${r.name} ${r.version} : ${r.status === "loaded" ? "chargé" : "déjà à jour"}`);
     }
   } catch (e) {
     console.warn(`⚠ Lexicon non chargé (${e instanceof Error ? e.message : String(e)}) : relancer \`corepack pnpm --filter @fourmy/lexicon sync\`.`);

@@ -95,6 +95,8 @@ services:
       AGRIROUTER_ENVIRONMENT: ${AGRIROUTER_ENVIRONMENT:-production}
       # Référentiel phyto et IFT (docs/phyto.md) : serveurs publics par défaut.
       FOURMY_LEXICON_PACKAGES_URL: ${FOURMY_LEXICON_PACKAGES_URL:-}
+      # Clé du bundle Lexicon « fourmy » (jeu AgroEDI pour les imports DAPLOS et Geofolia).
+      FOURMY_LEXICON_API_KEY: ${FOURMY_LEXICON_API_KEY:-}
       FOURMY_IFT_API_URL: ${FOURMY_IFT_API_URL:-https://ecoagri-pprd.api.agriculture.gouv.fr/ift/v5/api}
       # Alertes d'entretien par e-mail (lien vers la page Entretien) : même SMTP que l'API.
       BETTER_AUTH_URL: ${PUBLIC_URL}

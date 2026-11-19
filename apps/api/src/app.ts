@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { DomainError } from "@fourmy/domain";
+import { ImportFileError } from "@fourmy/importers";
 import { auth, farmScope, type Env } from "./context.js";
 import { getAuth } from "./auth.js";
 import { contactRoutes } from "./contact.js";
@@ -50,6 +51,7 @@ export function createApp() {
     if (err instanceof NotFound) return problem(404, "Introuvable", err.message);
     if (err instanceof Conflict) return problem(409, "Conflit", err.message);
     if (err instanceof DomainError) return problem(422, "Règle métier", err.message);
+    if (err instanceof ImportFileError) return problem(422, "Fichier refusé", err.message);
     // Contrainte d'unicité (ex. un compte déjà rattaché à une autre personne).
     const code = (err as { code?: string; cause?: { code?: string } }).code ?? (err as { cause?: { code?: string } }).cause?.code;
     if (code === "23505") return problem(409, "Conflit", "Cet élément existe déjà.");

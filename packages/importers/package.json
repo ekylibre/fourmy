@@ -1,0 +1,30 @@
+{
+  "name": "@fourmy/importers",
+  "version": "0.0.0",
+  "description": "Imports de fichiers agricoles (DAPLOS, Geofolia, TelePAC) vers un modèle commun, sans accès à la base",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@fourmy/contracts": "workspace:*",
+    "@fourmy/isoxml": "workspace:*",
+    "proj4": "2.20.9"
+  },
+  "devDependencies": {
+    "@types/geojson": "7946.0.16",
+    "vitest": "4.1.12"
+  }
+}
