@@ -115,7 +115,7 @@ export async function personWork(db: Database, farmId: string, id: string, day: 
               JOIN interventions i ON i.id = t.intervention_id
               LEFT JOIN land_parcel_versions v ON v.land_parcel_id = t.ref_id AND v.valid @> i.started_at
               LEFT JOIN campaigns c ON (i.started_at AT TIME ZONE 'Europe/Paris')::date BETWEEN c.starts_on AND c.stops_on
-              LEFT JOIN productions pr ON pr.land_parcel_id = t.ref_id AND pr.campaign_id = c.id AND pr.activity_id IS NOT NULL
+              LEFT JOIN productions pr ON pr.land_parcel_id = t.ref_id AND pr.campaign_id = c.id AND pr.activity_id IS NOT NULL AND NOT pr.declared
               LEFT JOIN activities a ON a.id = pr.activity_id
               WHERE t.role = 'target' AND t.ref_type = 'land_parcel' AND t.intervention_id IN (${list(ids)})
               ORDER BY t.id, a.name`,

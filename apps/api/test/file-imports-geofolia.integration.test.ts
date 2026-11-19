@@ -58,8 +58,10 @@ describe.skipIf(!url)("import Geofolia (intégration)", () => {
     // 13 cultures : 8 productions (dont 2 dérobées), 5 couverts d'interculture (CINE).
     expect(r.productions).toEqual({ create: 8, link: 0 });
     expect(r.covers).toEqual({ create: 5, link: 0, skip: 0 });
-    expect(r.campaigns).toEqual([2026]);
-    expect(r.activities.map((a: { name: string }) => a.name).sort()).toEqual(["Carotte Amsterdam", "Epinard", "Maïs fourrage", "Prairie temporaire"]);
+    // 2026, et les campagnes passées des cultures N-1…N-5 (historique, lot IM5).
+    expect(r.campaigns).toEqual([2021, 2022, 2023, 2024, 2025, 2026]);
+    // Activités des cultures de la campagne ; les autres viennent de l'historique (cultures N-1…N-5).
+    expect(r.activities.filter((a: { productions: number }) => a.productions > 0).map((a: { name: string }) => a.name).sort()).toEqual(["Carotte Amsterdam", "Epinard", "Maïs fourrage", "Prairie temporaire"]);
     expect(r.articles.every((a: { action: string }) => a.action === "create")).toBe(true);
     expect(r.interventions.create).toBeGreaterThan(150);
     expect(r.interventions.alreadyImported).toBe(0);

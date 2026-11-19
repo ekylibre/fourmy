@@ -165,7 +165,9 @@ export async function previousOf(tx: Tx, farmId: string, parcelId: string, campa
         FROM productions pr
         JOIN campaigns c ON c.id = pr.campaign_id AND c.year = ${campaign - 1}
         JOIN land_parcels lp ON lp.id = pr.land_parcel_id
-        JOIN land_parcel_versions v ON v.land_parcel_id = lp.id AND v.valid @> make_date(${campaign - 1}, 6, 1)::timestamptz
+        -- Forme de la parcelle au précédent ; à défaut (historique importé, sans version antidatée), sa première forme.
+        JOIN LATERAL (SELECT shape FROM land_parcel_versions WHERE land_parcel_id = lp.id
+                      ORDER BY (valid @> make_date(${campaign - 1}, 6, 1)::timestamptz) DESC, lower(valid) LIMIT 1) v ON true
         LEFT JOIN activities a ON a.id = pr.activity_id, cur
         WHERE pr.farm_id = ${farmId} AND ST_Intersects(v.shape, cur.shape)
         ORDER BY share DESC NULLS LAST LIMIT 1`,

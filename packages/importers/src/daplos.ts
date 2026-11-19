@@ -233,7 +233,15 @@ export function readDaplos(bytes: Uint8Array, fileName: string, options: DaplosO
       for (const h of c.crop_histories ?? []) {
         const order = Number(h.previous_order);
         if (!Number.isInteger(order) || order >= 0 || order < -5) continue;
-        bundle.history.push({ parcelKey: key, campaign: campaign + order, aeeCode: text(h.crop_specie_edicode), label: daplosCropLabel(h) });
+        bundle.history.push({
+          parcelKey: key,
+          campaign: campaign + order,
+          aeeCode: text(h.crop_specie_edicode),
+          aeeComplement: text(h.crop_specie_number),
+          aeeSowingPeriod: text(h.crop_sowing_period_edicode),
+          aeeUsage: text(h.crop_final_usage_edicode),
+          label: daplosCropLabel(h),
+        });
       }
     }
   }

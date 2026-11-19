@@ -532,7 +532,7 @@ export async function coverLossAnomalies(db: Database, farmId: string, from: str
     );
     const vines = await rows<{ parcel_id: string; year: number }>(
       tx,
-      sql`SELECT p.land_parcel_id AS parcel_id, c.year FROM productions p JOIN campaigns c ON c.id = p.campaign_id WHERE p.nature = 'vine'`,
+      sql`SELECT p.land_parcel_id AS parcel_id, c.year FROM productions p JOIN campaigns c ON c.id = p.campaign_id WHERE p.nature = 'vine' AND NOT p.declared`,
     );
     const dismissed = await rows<{ parcel_id: string; d: string }>(tx, sql`SELECT land_parcel_id AS parcel_id, event_to::text AS d FROM remote_sensing_dismissals`);
 

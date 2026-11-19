@@ -313,6 +313,12 @@ la ferme proposée depuis `DATF`.
 
 ## IM5 — Historique, plan de fumure, annulation
 
+> ✅ Réalisé le 19/11/2026 (branche `feat/import-im5-history`). Écarts : les
+> apports prévus étaient déjà écrits en interventions planifiées depuis IM2
+> (ajout : note « Prévu dans Geofolia ») ; annulation synchrone, en une
+> transaction (pas d'état `reverting` observable) ; auteur de l'import non
+> affiché dans la liste ; identité et adresse du siège non annulées.
+
 Branche `feat/import-im5-historique`.
 
 5.1 **Productions déclarées** (§5.2) : écriture des N-1…N-5 (Geofolia) et

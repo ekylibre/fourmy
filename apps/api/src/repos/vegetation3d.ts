@@ -38,7 +38,7 @@ export async function vegetationAt(db: Database, farmId: string, day: string): P
         JOIN land_parcels lp ON lp.id = v.land_parcel_id
         LEFT JOIN LATERAL (
           SELECT p.nature, coalesce(p.cultivation, p.species) AS species FROM productions p JOIN campaigns c ON c.id = p.campaign_id
-          WHERE p.land_parcel_id = v.land_parcel_id AND c.year = extract(year FROM ${day}::date)::int
+          WHERE p.land_parcel_id = v.land_parcel_id AND c.year = extract(year FROM ${day}::date)::int AND NOT p.declared
           ORDER BY p.updated_at DESC LIMIT 1) prod ON true
         LEFT JOIN parcel_rows pr ON pr.land_parcel_id = v.land_parcel_id
         CROSS JOIN LATERAL (

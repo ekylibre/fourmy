@@ -220,7 +220,15 @@ function Sheet({ sheet: s }: { sheet: ParcelSheet }) {
                           )}
                         </Table.Td>
                         <Table.Td ta="right" className="lv-num">{c?.areaM2 ? area(c.areaM2) : "—"}</Table.Td>
-                        <Table.Td>{p?.activity ? <ActivityBadge activity={p.activity} /> : "—"}</Table.Td>
+                        <Table.Td>
+                          {p?.activity ? <ActivityBadge activity={p.activity} /> : "—"}
+                          {p?.declared && (
+                            <Text span size="xs" c="dimmed">
+                              {" "}
+                              · historique importé
+                            </Text>
+                          )}
+                        </Table.Td>
                       </Table.Tr>
                     );
                   })}

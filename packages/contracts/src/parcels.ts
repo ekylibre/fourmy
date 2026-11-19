@@ -50,7 +50,8 @@ export interface ParcelSheet {
   pacIslet: string | null;
   since: string;
   until: string | null;
-  productions: { year: number; activity: { id: string; name: string; color: string | null; pictureUrl: string | null } | null }[];
+  /** `declared` : culture d'une campagne passée, importée (historique), sans intervention. */
+  productions: { year: number; declared?: boolean; activity: { id: string; name: string; color: string | null; pictureUrl: string | null } | null }[];
   cadastre: { idu: string; label: string | null; areaM2: number | null; overlapM2: number | null; geometry: GeoJsonGeometry }[];
   /** Parcelles PAC : RPG anonyme (recherche), ou dossier PAC importé (TelePAC : îlot et n° de parcelle). */
   cap: {

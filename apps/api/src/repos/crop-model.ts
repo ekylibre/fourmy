@@ -221,7 +221,7 @@ async function seasons(tx: Tx, farmId: string, at: string, parcelId?: string): P
       -- Culture : la production de la campagne du semis (un semis d'automne prépare la campagne suivante).
       LEFT JOIN LATERAL (
         SELECT coalesce(p.cultivation, p.species) AS species FROM productions p JOIN campaigns c ON c.id = p.campaign_id
-        WHERE p.land_parcel_id = lp.id
+        WHERE p.land_parcel_id = lp.id AND NOT p.declared
           AND c.year = coalesce(extract(year FROM s.sown_on::date + interval '5 months')::int, extract(year FROM ${at}::date)::int)
         ORDER BY p.updated_at DESC LIMIT 1) prod ON true
       LEFT JOIN parcel_soils ps ON ps.land_parcel_id = lp.id
