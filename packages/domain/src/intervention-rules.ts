@@ -18,10 +18,15 @@ import { isIrrigation } from "@fourmy/contracts";
 export interface RuleContext {
   /** Nature de chaque article référencé (intrants, sorties). */
   articleKind: (articleId: string) => ArticleKind | undefined;
+  /**
+   * Historique importé d'un autre logiciel : la destination d'une récolte
+   * n'y est pas connue (FR-EVO-5) ; elle n'est alors pas exigée.
+   */
+  allowMissingDestination?: boolean;
 }
 
 type Body = Pick<InterventionCompleteWrite, "periods" | "targets" | "inputs" | "outputs" | "purposes"> &
-  Partial<Pick<InterventionPlanWrite, "procedure" | "maintenance" | "tools" | "irrigation">>;
+  Partial<Pick<InterventionPlanWrite, "procedure" | "maintenance" | "tools" | "irrigation" | "sowing">>;
 
 const MIN_INPUT_KIND: Partial<Record<ProcedureDefinition["shape"], ArticleKind>> = {
   treatment: "phyto",
@@ -87,7 +92,7 @@ export function validateIntervention(
     const k = ctx.articleKind(o.articleId);
     if (!k) errors.push(`Sortie n° ${idx + 1} : article inconnu.`);
     else if (!procedure.outputKinds.includes(k)) errors.push(`« ${procedure.label} » ne produit pas de ${KIND_LABELS[k]}.`);
-    if (mode === "complete" && !o.to?.placeId && !o.to?.containerId) {
+    if (mode === "complete" && !ctx.allowMissingDestination && !o.to?.placeId && !o.to?.containerId) {
       errors.push(`Sortie n° ${idx + 1} : précisez où elle est rangée (lieu ou cuve).`);
     }
   });
@@ -103,6 +108,9 @@ export function validateIntervention(
   } else if (body.irrigation) {
     errors.push("La dose d'eau ne concerne que les irrigations.");
   }
+
+  // Technique de semis : réservée aux semis.
+  if (body.sowing && procedure.shape !== "sowing") errors.push("La technique de semis ne concerne que les semis.");
 
   // Motifs : réservés aux traitements.
   if (body.purposes.length > 0 && procedure.shape !== "treatment") {

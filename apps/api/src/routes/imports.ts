@@ -6,7 +6,7 @@ import { MAX_FILE_BYTES } from "@fourmy/importers";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import { startImport, ImportsNotConfigured } from "../repos/imports.js";
-import { analyzeUpload, discardRun, getRun, listRuns, saveDecisions } from "../repos/file-imports.js";
+import { analyzeUpload, applyRun, discardRun, getRun, listRuns, saveDecisions } from "../repos/file-imports.js";
 import { BadRequest, problem, uuidParam } from "./helpers.js";
 
 const importWrite = z.object({ sourceDatabase: z.string() });
@@ -57,4 +57,12 @@ export const importRoutes = new Hono<Env>()
     if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.message);
     return c.json(await saveDecisions(db(), c.get("farmId"), uuidParam(c, "id"), parsed.data));
   })
-  .post("/imports/:id/discard", requireOwner, async (c) => c.json(await discardRun(db(), c.get("farmId"), uuidParam(c, "id"))));
+  .post("/imports/:id/discard", requireOwner, async (c) => c.json(await discardRun(db(), c.get("farmId"), uuidParam(c, "id"))))
+  // Écriture en tâche de fond : 202, puis suivi par GET /imports/:id.
+  .post("/imports/:id/apply", requireOwner, async (c) => {
+    const run = await applyRun(db(), c.get("farmId"), c.get("userId"), uuidParam(c, "id"), (p) => {
+      pendingImports.add(p);
+      void p.finally(() => pendingImports.delete(p));
+    });
+    return c.json(run, 202, { location: `imports/${run.id}` });
+  });

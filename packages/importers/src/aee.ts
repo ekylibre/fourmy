@@ -82,9 +82,13 @@ export function harvestProcedure(usage: string | null | undefined): "grains_harv
 
 // --- Table 11 : état de l'évènement -------------------------------------------
 
-/** `ZK1` évènement prévu → planifié ; `ZK2` réalisé (et inconnu) → réalisé. */
+/**
+ * `ZK1` évènement prévu et `ZK3` (« Plan de fumure » de Geofolia) → planifié ;
+ * `ZK2` réalisé (et inconnu) → réalisé.
+ */
 export function eventStatus(code: string | null | undefined): "planned" | "done" {
-  return code?.trim() === "ZK1" ? "planned" : "done";
+  const c = code?.trim();
+  return c === "ZK1" || c === "ZK3" ? "planned" : "done";
 }
 
 // --- Table 26 : catégorie d'intervention ---------------------------------------

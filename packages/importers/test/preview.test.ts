@@ -3,6 +3,8 @@ import { buildPreview, emptyBundle, isBlocked, type BundleParcel, type BundleWor
 
 const parcel = (key: string, areaM2: number, aeeUsage: string | null): BundleParcel => ({
   key,
+  landKey: key,
+  secondary: false,
   campaign: 2026,
   name: `Parcelle ${key}`,
   shape: null,
@@ -59,7 +61,7 @@ describe("aperçu d'un fichier", () => {
   it("compte le contenu, propose les procédures et la récolte de grains d'après l'usage", () => {
     const p = buildPreview({ format: "geofolia", bundle: bundle() }, ctx);
     expect(p.readable).toBe(true);
-    expect(p.counts).toMatchObject({ parcels: 2, areaHa: 2.03, workUnits: 5 });
+    expect(p.counts).toMatchObject({ parcels: 2, productions: 2, areaHa: 2.03, workUnits: 5 });
     expect(p.farm.siretMatches).toBe(true);
     expect(p.operations).toEqual([
       { code: "SEX", label: "Traitement phytosanitaire", procedure: "spraying", done: 2, planned: 0 },

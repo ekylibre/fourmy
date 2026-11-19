@@ -81,6 +81,16 @@ describe("règles de forme", () => {
     expect(validateIntervention(harvest, ok, "complete", ctx)).toEqual([]);
   });
 
+  it("historique importé : récolte sans destination admise ; technique de semis réservée aux semis", () => {
+    const harvest = getProcedure("harvesting");
+    const noDest = { ...empty, periods: day, targets: [parcel], outputs: [{ articleId: HARVEST, quantity: 5.54, per: "total" as const }] };
+    expect(validateIntervention(harvest, noDest, "complete", { ...ctx, allowMissingDestination: true })).toEqual([]);
+    expect(validateIntervention(getProcedure("plowing"), { ...empty, sowing: { technique: "direct" } }, "plan", ctx)).toEqual([
+      "La technique de semis ne concerne que les semis.",
+    ]);
+    expect(validateIntervention(getProcedure("sowing"), { ...empty, sowing: { technique: "direct" } }, "plan", ctx)).toEqual([]);
+  });
+
   it("un entretien porte sur un matériel ; les motifs sont réservés aux traitements", () => {
     const maint = getProcedure("equipment_maintenance");
     expect(validateIntervention(maint, { ...empty, periods: day, targets: [tractor] }, "complete", ctx)).toEqual([]);

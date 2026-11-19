@@ -27,6 +27,25 @@ productions : une production = une parcelle × une campagne.
   d'Ekylibre crée les activités de la ferme d'origine (même famille,
   référence, variété) et retire les activités déduites devenues vides.
 
+## Cultures successives : productions datées (migration 0063)
+
+Une parcelle peut porter plusieurs cultures la même campagne (culture
+principale puis dérobée). Une production peut avoir une date de début et de
+fin (`productions.started_on`, `stopped_on` : semis → récolte, remplies par
+les imports de fichiers). La culture d'une parcelle à une date est donnée par
+`fourmy_production_at(parcelle, jour)` : la production datée en place ce
+jour-là, sinon une production non datée de la campagne, sinon une production
+datée de la campagne même hors de ses dates. Le contrôle phyto, l'IFT, le
+registre et le cahier de fertilisation l'emploient.
+
+**Alerte de saisie** : quand deux productions datées d'une parcelle se
+recoupent pendant une intervention (planification, réalisation,
+modification), Fourmy prévient (« À vérifier ») et dit quelle culture le
+contrôle retient, sans bloquer.
+
+Les couverts d'interculture (CINE, CIE) ne sont pas des productions : ils
+vont dans `cover_crops` (fertilisation, lot AI).
+
 ## Couleur par défaut
 
 Nomenclature d'Ekylibre `db/nomenclatures/colors.yml` (193 variétés,

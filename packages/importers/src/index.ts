@@ -11,3 +11,12 @@ export * from "./aee.js";
 export * from "./geo.js";
 export * from "./readers.js";
 export * from "./preview.js";
+export * from "./geofolia.js";
+export * from "./interventions.js";
+export * from "./covers.js";
+
+import { registerReader } from "./readers.js";
+import { readGeofolia } from "./geofolia.js";
+
+// Lecteurs disponibles (lots IM2 à IM4).
+registerReader("geofolia", readGeofolia);

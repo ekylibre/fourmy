@@ -46,6 +46,52 @@ const identity = z.object({
     .nullable(),
 });
 
+const action = z.enum(["create", "link", "skip"]);
+
+/**
+ * Rapprochement avec la ferme (lot IM2) : ce que l'écriture créera, reliera
+ * ou laissera de côté. Recalculé à l'écriture (la ferme a pu changer).
+ */
+export const importReconciliation = z.object({
+  parcels: z.object({ create: z.number().int(), link: z.number().int(), skip: z.number().int() }),
+  productions: z.object({ create: z.number().int(), link: z.number().int() }),
+  /** Couverts d'interculture (CINE, CIE…) : couverts de la parcelle, pas des productions. */
+  covers: z.object({ create: z.number().int(), link: z.number().int(), skip: z.number().int() }),
+  campaigns: z.array(z.number().int()),
+  activities: z.array(
+    z.object({
+      key: z.string(),
+      name: z.string(),
+      action,
+      reference: z.string().nullable(),
+      referenceLabel: z.string().nullable(),
+      /** Comment la référence a été trouvée : code combiné AgroEDI, code d'espèce, libellé. */
+      via: z.enum(["agroedi_crop", "agroedi_species", "label", "existing", "decision"]).nullable(),
+      productions: z.number().int(),
+    }),
+  ),
+  articles: z.array(
+    z.object({
+      key: z.string(),
+      name: z.string(),
+      kind: z.string(),
+      unit: z.string(),
+      action,
+      /** Article de la ferme relié, ou produit E-Phy reconnu. */
+      match: z.string().nullable(),
+      via: z.enum(["link", "amm", "name", "decision"]).nullable(),
+    }),
+  ),
+  people: z.array(z.object({ key: z.string(), name: z.string(), action })),
+  interventions: z.object({
+    create: z.number().int(),
+    alreadyImported: z.number().int(),
+    skipped: z.array(z.object({ label: z.string(), on: z.string(), reason: z.string() })),
+    byProcedure: z.array(z.object({ procedure: z.string(), done: z.number().int(), planned: z.number().int() })),
+  }),
+});
+export type ImportReconciliation = z.infer<typeof importReconciliation>;
+
 /**
  * Aperçu d'un fichier analysé : ce que le fichier contient (comptes,
  * opérations) et les avertissements. `reconciliation` (création ou lien des
@@ -67,7 +113,9 @@ export const importPreview = z.object({
     siretMatches: z.boolean().nullable(),
   }),
   counts: z.object({
+    /** Parcelles (terres) et productions (cultures, dont secondaires). */
     parcels: z.number().int(),
+    productions: z.number().int(),
     areaHa: z.number(),
     history: z.number().int(),
     articles: z.number().int(),
@@ -89,7 +137,7 @@ export const importPreview = z.object({
   ),
   notImported: z.array(z.object({ kind: z.string(), label: z.string(), count: z.number().int() })),
   warnings: z.array(importWarning),
-  reconciliation: z.unknown().nullable(),
+  reconciliation: importReconciliation.nullable(),
 });
 export type ImportPreview = z.infer<typeof importPreview>;
 

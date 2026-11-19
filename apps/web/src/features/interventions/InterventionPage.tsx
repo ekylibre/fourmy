@@ -15,7 +15,7 @@ import { getProcedure, TREATMENT_PURPOSE_LABELS } from "@fourmy/contracts";
 import { displayStatus, type Light } from "@fourmy/domain";
 import { api, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
-import { formatDateTime, formatNumber, formatPeriod, procedureLabel, unitLabel } from "../../app/labels";
+import { formatDateTime, formatDays, formatNumber, formatPeriod, procedureLabel, unitLabel } from "../../app/labels";
 import { useActivities, useCertifications, useArticles, useIntervention, useParcelNames, usePeople, usePhytoArticles, useSnapshot } from "../../app/queries";
 import { RegulatoryPictos } from "../phyto/Hazards";
 import { activeDuring, CertificationBadges } from "../certifications/Certifications";
@@ -33,10 +33,10 @@ import { ComplianceSection, IftSection } from "./RegulatorySections";
 import { NitrateCheckSection } from "../fertilization/FertilizationChecks";
 import { SprayingConditions, WeatherLine } from "../weather/Weather";
 import { irrigationVolumeM3 } from "./IrrigationFields";
-import { IRRIGATION_METHOD_LABELS } from "@fourmy/contracts";
+import { IRRIGATION_METHOD_LABELS, SOWING_TECHNIQUE_LABELS } from "@fourmy/contracts";
 
 const EMPTY_FC: FeatureCollection = { type: "FeatureCollection", features: [] };
-const ORIGINS: Record<string, string> = { web: "Web", mobile: "Mobile", migration: "Reprise d'Ekylibre", plugin: "Extension" };
+const ORIGINS: Record<string, string> = { web: "Web", mobile: "Mobile", migration: "Reprise d'Ekylibre", plugin: "Extension", import: "Import de fichier" };
 
 /**
  * Fiche d'une intervention (exigence INT-UI-2) : ce qui a été fait, où, avec
@@ -312,6 +312,18 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
       <Stack gap="sm">
         {i.staffing === "crews" && i.crews.length ? (
           <CrewsView i={i} names={names} />
+        ) : i.periodPrecision === "day" && i.periods.length ? (
+          // Importée d'un autre logiciel : seule la date est connue, pas les heures.
+          <Group gap={6} aria-label="Période de travail">
+            <CalendarClock size={16} aria-hidden color="var(--mantine-color-dimmed)" />
+            <Text className="lv-num" size="sm">
+              {i.status === "planned" ? "Prévue " : "Réalisée "}
+              {formatDays(i.periods[0]!.startedAt, i.periods.at(-1)!.stoppedAt)}
+            </Text>
+            <Text size="xs" c="dimmed">
+              (heures non connues)
+            </Text>
+          </Group>
         ) : i.periods.length ? (
           <Stack gap={6}>
             {i.periods.map((p) => {
@@ -456,6 +468,15 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
     </Paper>
   );
 
+  const sowingPanel = i.sowing && (
+    <Paper p="md" withBorder aria-label="Semis">
+      <Title order={4} mb="xs">
+        Semis
+      </Title>
+      <Text>{SOWING_TECHNIQUE_LABELS[i.sowing.technique]}</Text>
+    </Paper>
+  );
+
   const irrigationPanel = i.irrigation && (
     <Paper p="md" withBorder aria-label="Irrigation">
       <Title order={4} mb="xs">
@@ -523,6 +544,7 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
             {inputsPanel}
             <MaintenanceSummary farmId={farm.id} intervention={i} names={names.equipment} />
             {irrigationPanel}
+            {sowingPanel}
           </Stack>
         </Grid.Col>
 
@@ -582,7 +604,11 @@ function History({ intervention: i, names }: { intervention: InterventionDetail;
   if (i.history.length === 0) {
     return (
       <Text size="sm" c="dimmed">
-        {i.origin === "migration" ? "Importée d'Ekylibre ; aucune modification depuis dans Fourmy." : "Aucun historique."}
+        {i.origin === "migration"
+          ? "Importée d'Ekylibre ; aucune modification depuis dans Fourmy."
+          : i.origin === "import"
+            ? "Importée d'un fichier (Geofolia, DAPLOS) ; aucune modification depuis dans Fourmy."
+            : "Aucun historique."}
       </Text>
     );
   }

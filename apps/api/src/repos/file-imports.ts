@@ -1,15 +1,18 @@
 import { createHash, randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
-import { importDecisions, type ImportDecisions, type ImportRunView } from "@fourmy/contracts";
-import { analyzeFile, buildPreview } from "@fourmy/importers";
+import { importDecisions, type ImportDecisions, type ImportPreview, type ImportRunView } from "@fourmy/contracts";
+import type { DomainCtx } from "@fourmy/domain";
+import { analyzeFile, buildPreview, isBlocked, type FileAnalysis } from "@fourmy/importers";
 import { Conflict, NotFound } from "../routes/helpers.js";
+import { applyPlan } from "./import-apply.js";
+import { reconcile } from "./import-reconcile.js";
 
 /**
- * Imports de fichiers DAPLOS, Geofolia, TelePAC, lot IM1
- * (claudedocs/conception_import_onboarding.md §7.1) : dépôt, analyse,
- * décisions, abandon. Rien n'est écrit dans les données de la ferme avant
- * l'écriture (lot IM2) : seulement le fichier et son suivi.
+ * Imports de fichiers DAPLOS, Geofolia, TelePAC
+ * (claudedocs/conception_import_onboarding.md §7.1) : dépôt, analyse et
+ * rapprochement avec la ferme (lecture seule), décisions, abandon, puis
+ * écriture (`applyRun`, en tâche de fond, une transaction par fichier).
  */
 
 const rows = async <T>(tx: Tx, q: ReturnType<typeof sql>) => (await tx.execute(q)) as unknown as T[];
@@ -74,6 +77,13 @@ async function farmSiret(tx: Tx, farmId: string): Promise<string | null> {
   return farm?.siret ?? null;
 }
 
+/** Aperçu complet : contenu du fichier, puis rapprochement avec la ferme s'il est lisible. */
+async function previewOf(tx: Tx, farmId: string, analysis: FileAnalysis, fileName: string, decisions: ImportDecisions): Promise<ImportPreview> {
+  const preview = buildPreview(analysis, { fileName, farmSiret: await farmSiret(tx, farmId), decisions });
+  if (analysis.bundle) preview.reconciliation = (await reconcile(tx, farmId, analysis.bundle, decisions)).summary;
+  return preview;
+}
+
 /**
  * Dépôt d'un fichier : format reconnu et fichier lu avant tout écrit
  * (un fichier refusé ne laisse rien), puis fichier stocké (un même contenu
@@ -109,7 +119,7 @@ export async function analyzeUpload(
     );
     const parsed = importDecisions.safeParse(pending?.decisions ?? {});
     const decisions = parsed.success ? parsed.data : {};
-    const preview = buildPreview(analysis, { fileName: name, farmSiret: await farmSiret(tx, farmId), decisions });
+    const preview = await previewOf(tx, farmId, analysis, name, decisions);
 
     if (pending) {
       await tx.execute(sql`UPDATE import_runs SET preview = ${JSON.stringify(preview)}::jsonb WHERE id = ${pending.id}`);
@@ -146,11 +156,7 @@ export async function saveDecisions(db: Database, farmId: string, id: string, de
       ? await rows<{ name: string; bytes: Buffer }>(tx, sql`SELECT name, bytes FROM import_files WHERE id = ${run.file_id}`)
       : [];
     if (!file) throw new Conflict("Le fichier de cet import a expiré : déposez-le à nouveau.");
-    const preview = buildPreview(analyzeFile(file.name, new Uint8Array(file.bytes)), {
-      fileName: file.name,
-      farmSiret: await farmSiret(tx, farmId),
-      decisions,
-    });
+    const preview = await previewOf(tx, farmId, analyzeFile(file.name, new Uint8Array(file.bytes)), file.name, decisions);
     await tx.execute(sql`
       UPDATE import_runs SET decisions = ${JSON.stringify(decisions)}::jsonb, preview = ${JSON.stringify(preview)}::jsonb
       WHERE id = ${id}`);
@@ -193,4 +199,62 @@ export async function purgeExpiredImportFiles(db: Database): Promise<{ files: nu
     );
     return { files: files.length, runs: runs.length };
   });
+}
+
+/**
+ * Écriture d'un import analysé (lot IM2) : contrôlé ici (fichier présent,
+ * aucun avertissement bloquant, aucun autre import en cours), puis mené en
+ * tâche de fond dans une seule transaction — rapprochement recalculé, puis
+ * écriture. Réponse immédiate : l'import passe « en cours ».
+ */
+export async function applyRun(
+  db: Database,
+  farmId: string,
+  userId: string,
+  id: string,
+  onSettled?: (p: Promise<unknown>) => void,
+): Promise<ImportRunView> {
+  const run = await withFarm(db, farmId, async (tx) => {
+    const current = await pendingRun(tx, id);
+    const [busy] = await rows<{ id: string }>(
+      tx,
+      sql`SELECT id FROM import_runs WHERE status IN ('running', 'reverting') AND id <> ${id} AND started_at > now() - interval '6 hours'`,
+    );
+    if (busy) throw new Conflict("Un import est déjà en cours pour cette ferme.");
+    const [file] = current.file_id ? await rows<{ name: string; bytes: Buffer }>(tx, sql`SELECT name, bytes FROM import_files WHERE id = ${current.file_id}`) : [];
+    if (!file) throw new Conflict("Le fichier de cet import a expiré : déposez-le à nouveau.");
+    const [d] = await rows<{ decisions: unknown }>(tx, sql`SELECT decisions FROM import_runs WHERE id = ${id}`);
+    const decisions = importDecisions.safeParse(d?.decisions ?? {});
+    const preview = await previewOf(tx, farmId, analyzeFile(file.name, new Uint8Array(file.bytes)), file.name, decisions.success ? decisions.data : {});
+    if (isBlocked(preview)) {
+      const blocking = preview.warnings.filter((w) => w.level === "blocking").map((w) => w.message);
+      throw new Conflict(`Import impossible : ${blocking.join(" ")}`);
+    }
+    await tx.execute(sql`UPDATE import_runs SET status = 'running', preview = ${JSON.stringify(preview)}::jsonb WHERE id = ${id}`);
+    return readRun(tx, id);
+  });
+
+  const ctx: DomainCtx = { now: new Date().toISOString(), newId: () => crypto.randomUUID(), actor: userId, origin: "import" };
+  const job = withFarm(db, farmId, async (tx) => {
+    const [row] = await rows<{ name: string; bytes: Buffer; decisions: unknown }>(
+      tx,
+      sql`SELECT f.name, f.bytes, r.decisions FROM import_runs r JOIN import_files f ON f.id = r.file_id WHERE r.id = ${id}`,
+    );
+    const analysis = analyzeFile(row!.name, new Uint8Array(row!.bytes));
+    const parsed = importDecisions.safeParse(row!.decisions ?? {});
+    const plan = await reconcile(tx, farmId, analysis.bundle!, parsed.success ? parsed.data : {});
+    const report = await applyPlan(tx, farmId, ctx, id, analysis.bundle!, plan);
+    await tx.execute(sql`
+      UPDATE import_runs SET status = 'completed', finished_at = now(), report = ${JSON.stringify(report)}::jsonb WHERE id = ${id}`);
+  }).catch(async (e: unknown) => {
+    console.error(`[imports] import ${id} en échec :`, e);
+    await withFarm(db, farmId, (tx) =>
+      tx.execute(sql`
+        UPDATE import_runs SET status = 'failed', finished_at = now(),
+          report = ${JSON.stringify({ error: e instanceof Error ? e.message : String(e) })}::jsonb
+        WHERE id = ${id}`),
+    );
+  });
+  onSettled?.(job);
+  return run;
 }

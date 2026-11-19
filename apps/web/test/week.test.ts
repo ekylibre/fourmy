@@ -24,6 +24,14 @@ describe("semaine de la frise", () => {
     expect(weekLabel(weekOf("2026-01-01"))).toBe("du 29 déc. 2025 au 4 janv. 2026");
   });
 
+  it("une intervention importée (date seule) occupe sa journée, pas le lendemain", () => {
+    // Minuit local au minuit suivant (l'import les calcule à l'heure de Paris).
+    const startedAt = new Date(2026, 3, 1).toISOString();
+    const stoppedAt = new Date(2026, 3, 2).toISOString();
+    const imported = { ...base, periodPrecision: "day" as const, periods: [{ startedAt, stoppedAt }] };
+    expect(slots(imported)).toEqual([{ day: "2026-04-01", startedAt, stoppedAt, allDay: true }]);
+  });
+
   it("une intervention sur plusieurs périodes a un créneau par jour travaillé", () => {
     const vine = {
       ...base,

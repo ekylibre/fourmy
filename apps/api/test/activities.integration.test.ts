@@ -161,6 +161,32 @@ describe.skipIf(!url)("activités (intégration)", () => {
     expect((await send("DELETE", `/certifications/${cert.id}`)).status).toBe(204);
   });
 
+  it("couvert d'interculture en place et culture datée pas encore semée : contrôlé comme une jachère", async () => {
+    // Maïs semé le 25/05 (production datée), couvert du 01/03 au 20/05 : le 10/05, c'est le couvert qui est en place.
+    const corn = await (await send("POST", "/activities?year=2025", { name: "Maïs daté", family: "plant_farming", reference: CORN })).json();
+    const list = await (await send("GET", "/activities?year=2025")).json();
+    const fallow = list.items.find((a: { name: string }) => a.name === "Jachère");
+    await send("PUT", `/activities/${fallow.id}/parcels`, { year: 2025, parcelIds: [] });
+    await send("PUT", `/activities/${corn.id}/parcels`, { year: 2025, parcelIds: [parcelId] });
+    await sql`UPDATE productions SET started_on = '2025-05-25', stopped_on = '2025-10-15' WHERE activity_id = ${corn.id}`;
+    const coverId = crypto.randomUUID();
+    await sql`INSERT INTO cover_crops (id, farm_id, land_parcel_id, campaign, kind, family, species, sown_on, destroyed_on, exported)
+              VALUES (${coverId}, ${farmId}, ${parcelId}, 2025, 'sown', 'cruciferes', 'Moutarde', '2025-03-01', '2025-05-20', false)`;
+    try {
+      const k = await check();
+      expect(k.usages.map((u: { id: string }) => u.id)).toEqual(["acti-u2"]);
+      expect(k.indicators[0].message).toMatch(/Couvert d'interculture \(Moutarde\)/);
+      // Le maïs semé plus tôt (le 05/05) est en place le 10/05 : c'est lui qui est contrôlé.
+      await sql`UPDATE productions SET started_on = '2025-05-05' WHERE activity_id = ${corn.id}`;
+      expect((await check()).usageId).toBe("acti-u1");
+    } finally {
+      await sql`DELETE FROM cover_crops WHERE id = ${coverId}`;
+      await send("PUT", `/activities/${corn.id}/parcels`, { year: 2025, parcelIds: [] });
+      await send("PUT", `/activities/${fallow.id}/parcels`, { year: 2025, parcelIds: [parcelId] });
+      await send("DELETE", `/activities/${corn.id}`);
+    }
+  });
+
   it("images du référentiel servies sans session, avec cache", async () => {
     const r = await app.request("/api/v1/lexicon/pictures/varieties/fourmy_test");
     expect(r.status).toBe(200);

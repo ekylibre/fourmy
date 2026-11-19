@@ -73,6 +73,18 @@ export function formatPeriod(startedAt: string, stoppedAt: string): string {
   return `${formatDateTime(startedAt)} → ${end}`;
 }
 
+/**
+ * Période connue au jour près (intervention importée d'un autre logiciel) :
+ * « le 01/04/2026 », ou « du 01/04/2026 au 02/04/2026 ». La fin est le
+ * minuit qui suit le dernier jour.
+ */
+export function formatDays(startedAt: string, stoppedAt: string): string {
+  const last = new Date(new Date(stoppedAt).getTime() - 1);
+  const first = formatDate(startedAt);
+  const end = formatDate(last.toISOString());
+  return first === end ? `le ${first}` : `du ${first} au ${end}`;
+}
+
 /** Volume lisible : mégaoctets entiers, gigaoctets à une décimale. */
 export function formatBytes(bytes: number): string {
   if (bytes >= 1e9) return `${(bytes / 1e9).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} Go`;

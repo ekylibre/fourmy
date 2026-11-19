@@ -479,20 +479,23 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         return { warnings: r.warnings, id: editing.id };
       }
       const id = planned?.id ?? newId;
+      let planWarnings: string[] = [];
       if (!planned) {
         // Réalisée d'emblée : on crée l'intervention puis on la réalise avec tout son contenu.
-        await api.post<Intervention>(
+        const created = await api.post<Intervention & { warnings?: string[] }>(
           farmPath(farmId, "/interventions"),
           mode === "planned"
             ? { id, procedure: code, ...full, periods: [], plannedAt: flatPeriods(full)[0]?.startedAt }
             : { id, procedure: code },
         );
+        planWarnings = created.warnings ?? [];
       }
       if (completing) {
         const r = await api.post<{ warnings: string[] }>(farmPath(farmId, `/interventions/${id}/complete`), full);
         return { warnings: r.warnings, id };
       }
-      return { warnings: [] as string[], id };
+      // Planification : alertes non bloquantes (cultures qui se recoupent sur une parcelle…).
+      return { warnings: planWarnings, id };
     },
     onSuccess: (r) => {
       for (const w of r.warnings) notifications.show({ color: "paille", title: "À vérifier", message: w, autoClose: 10_000 });

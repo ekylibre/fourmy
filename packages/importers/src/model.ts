@@ -1,4 +1,5 @@
 import type { MultiPolygon, Point, Polygon } from "geojson";
+import type { TreatmentPurpose } from "@fourmy/contracts";
 
 /**
  * Modèle commun des imports (claudedocs/conception_import_onboarding.md §4) :
@@ -69,9 +70,20 @@ export interface BundleCrop {
   destination: string | null;
 }
 
+/**
+ * Une culture d'une campagne sur une parcelle. Plusieurs cultures peuvent
+ * partager la même terre la même campagne (culture principale, puis
+ * interculture ou dérobée : « parcelle secondaire » de Geofolia) : elles
+ * ont la même `landKey`, et deviennent des productions d'une même parcelle
+ * Fourmy.
+ */
 export interface BundleParcel {
   /** Numéro de travail (« 143 »), ou « îlot/parcelle » PAC. */
   key: string;
+  /** Clé de la terre : celle de la culture principale (= `key` pour elle). */
+  landKey: string;
+  /** Culture secondaire (interculture, dérobée) sur la terre d'une autre. */
+  secondary: boolean;
   campaign: number;
   name: string;
   shape: MultiPolygon | null;
@@ -143,6 +155,10 @@ export interface BundleArticle {
   composition: Partial<Record<Nutrient, number>> | null;
   /** Espèce (semence, récolte). */
   species: string | null;
+  /** Motif de traitement d'un phyto (herbicide…), s'il est connu. */
+  purpose?: TreatmentPurpose;
+  /** Fertilisant organique (effluent d'élevage, sous-produit). */
+  organic?: boolean;
   sourceIds: Record<string, string>;
 }
 

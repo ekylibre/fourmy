@@ -169,6 +169,9 @@ function toIntervention(r: Record<string, unknown>): Intervention {
     ift: (r.ift as Intervention["ift"]) ?? null,
     weather: (r.weather as Intervention["weather"]) ?? null,
     irrigation: r.irrigation ? { depthMm: Number((r.irrigation as { depthMm: number }).depthMm), method: (r.irrigation as { method?: IrrigationMethod | null }).method ?? null } : null,
+    sowing: (r.sowing as Intervention["sowing"]) ?? null,
+    periodPrecision: (r.period_precision as Intervention["periodPrecision"]) ?? "time",
+    affectsStock: r.affects_stock === undefined ? true : Boolean(r.affects_stock),
     maintenance:
       maint || ops.length
         ? {
@@ -203,6 +206,8 @@ function withCrews(out: Intervention, rows: CrewRow[] | undefined, meters: Map<s
     periods: c.periods.map((p) => ({ startedAt: iso(p.startedAt)!, stoppedAt: iso(p.stoppedAt)! })),
   }));
   const read = out.staffing === "crews" ? { ...out, crews, ...flattenCrews(crews) } : out;
+  // Dates seules (intervention importée) : la période couvre le jour, pas de durée de travail.
+  if (read.periodPrecision === "day") return { ...read, spanS: null, workDurationS: null };
   return { ...read, ...crewDurations(read) };
 }
 
@@ -211,7 +216,8 @@ async function readInterventions(tx: Tx, where: SQL, limit = 1000): Promise<Inte
     tx,
     sql`
       SELECT i.id, i.farm_id, i.procedure, i.status, i.started_at, i.stopped_at, i.origin, i.client_id, i.staffing,
-             i.purposes, i.notes, i.bbch, (SELECT st.label FROM ref_bbch_stages st WHERE st.code = i.bbch) AS bbch_label, i.compliance, i.nitrate_check, i.ift, i.weather, i.maintenance, i.irrigation, i.created_at, i.updated_at,
+             i.purposes, i.notes, i.bbch, (SELECT st.label FROM ref_bbch_stages st WHERE st.code = i.bbch) AS bbch_label, i.compliance, i.nitrate_check, i.ift, i.weather, i.maintenance, i.irrigation,
+             i.sowing, i.period_precision, i.affects_stock, i.created_at, i.updated_at,
              (SELECT coalesce(json_agg(json_build_object('equipment_id', m.equipment_id, 'value', m.value, 'correction', m.correction,
                                                          'correction_reason', m.correction_reason)), '[]')
                 FROM meter_readings m WHERE m.intervention_id = i.id) AS meters,
@@ -320,7 +326,7 @@ const TABLE_OF: Record<TargetKind, "land_parcels" | "equipments" | "places" | "c
   container: "containers",
 };
 
-async function validate(tx: Tx, procedureCode: string, raw: Body, mode: "plan" | "complete") {
+async function validate(tx: Tx, procedureCode: string, raw: Body, mode: "plan" | "complete", origin?: DomainCtx["origin"]) {
   const crewErrors = crewRules(raw, await crewNames(tx, raw));
   if (crewErrors.length) throw new DomainError(crewErrors.join(" "));
   if (raw.bbch) {
@@ -331,6 +337,8 @@ async function validate(tx: Tx, procedureCode: string, raw: Body, mode: "plan" |
   const articles = await loadArticles(tx, [...body.inputs.map((i) => i.articleId), ...body.outputs.map((o) => o.articleId)]);
   const errors = validateIntervention(getProcedure(procedureCode), body, mode, {
     articleKind: (id) => articles.get(id)?.kind,
+    // Historique importé d'un autre logiciel : destination de récolte inconnue (FR-EVO-5).
+    allowMissingDestination: origin === "import",
   });
   if (errors.length) throw new DomainError(errors.join(" "));
   // Unité de saisie d'un intrant (fertilisants seulement) : convertible dans celle de l'article.
@@ -466,6 +474,11 @@ async function writeBody(tx: Tx, interventionId: string, body: Body, articles: M
 }
 
 /** Irrigation : dose d'eau et matériel, sur les seules procédures d'irrigation (la règle du domaine l'a vérifié). */
+async function writeSowing(tx: Tx, interventionId: string, body: Pick<Body, "sowing">) {
+  const v = body.sowing;
+  await tx.execute(sql`UPDATE interventions SET sowing = ${v ? JSON.stringify({ technique: v.technique }) : null}::jsonb WHERE id = ${interventionId}`);
+}
+
 async function writeIrrigation(tx: Tx, interventionId: string, body: Pick<Body, "irrigation">) {
   const v = body.irrigation;
   await tx.execute(sql`
@@ -541,6 +554,51 @@ async function crewOverlapWarnings(tx: Tx, interventionId: string, body: Body): 
     (r) =>
       `${r.name ?? "Un matériel"} travaille aussi dans une autre intervention (${getProcedure(r.procedure).label}) le ${new Date(r.started_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}, sur une période qui se chevauche.`,
   );
+}
+
+/**
+ * Cultures qui se recoupent (productions datées, lot IM2) : deux productions
+ * datées d'une même parcelle en place pendant l'intervention. Le contrôle
+ * réglementaire n'en retient qu'une (`fourmy_production_at`) ; l'alerte dit
+ * laquelle, sans bloquer.
+ */
+async function productionOverlapWarnings(tx: Tx, body: Pick<Body, "targets" | "periods"> & { plannedAt?: string }): Promise<string[]> {
+  const parcels = body.targets.filter((t) => t.kind === "land_parcel").map((t) => t.id);
+  const starts = body.periods.map((p) => p.startedAt).sort();
+  const stops = body.periods.map((p) => p.stoppedAt).sort();
+  const from = starts[0] ?? body.plannedAt;
+  if (!parcels.length || !from) return [];
+  const to = stops.at(-1) ?? from;
+  const list = await rows<{ parcel_id: string; parcel: string; name: string; started_on: string; stopped_on: string | null; chosen: boolean }>(
+    tx,
+    sql`WITH span AS (
+          SELECT (${from}::timestamptz AT TIME ZONE 'Europe/Paris')::date AS d0,
+                 ((${to}::timestamptz - interval '1 millisecond') AT TIME ZONE 'Europe/Paris')::date AS d1)
+        SELECT p.land_parcel_id AS parcel_id, lp.name AS parcel, coalesce(a.name, p.cultivation, 'culture sans activité') AS name,
+               p.started_on::text, p.stopped_on::text,
+               p.id = fourmy_production_at(p.land_parcel_id, greatest(span.d0, least(span.d1, span.d0))) AS chosen
+        FROM productions p JOIN land_parcels lp ON lp.id = p.land_parcel_id LEFT JOIN activities a ON a.id = p.activity_id, span
+        WHERE p.land_parcel_id IN (${sql.join(parcels.map((id) => sql`${id}::uuid`), sql`, `)})
+          AND NOT p.declared AND p.started_on IS NOT NULL
+          AND p.started_on <= span.d1 AND coalesce(p.stopped_on, 'infinity'::date) >= span.d0
+        ORDER BY lp.name, p.started_on`,
+  );
+  const fr = (d: string | null) => (d ? new Date(`${d}T12:00:00Z`).toLocaleDateString("fr-FR") : "…");
+  const byParcel = new Map<string, typeof list>();
+  for (const r of list) byParcel.set(r.parcel_id, [...(byParcel.get(r.parcel_id) ?? []), r]);
+  const out: string[] = [];
+  for (const crops of byParcel.values()) {
+    // Deux productions qui se recoupent entre elles (pas seulement chacune avec l'intervention).
+    const overlapping = crops.filter((a) => crops.some((b) => b !== a && a.started_on <= (b.stopped_on ?? "9999") && b.started_on <= (a.stopped_on ?? "9999")));
+    if (overlapping.length < 2) continue;
+    const chosen = overlapping.find((c) => c.chosen) ?? overlapping[0]!;
+    out.push(
+      `« ${chosen.parcel} » porte ${overlapping.length} cultures qui se recoupent pendant l'intervention : ` +
+        overlapping.map((c) => `${c.name} (${fr(c.started_on)} → ${fr(c.stopped_on)})`).join(", ") +
+        `. Le contrôle réglementaire retient ${chosen.name} : vérifiez les dates des cultures.`,
+    );
+  }
+  return out;
 }
 
 async function outbox(tx: Tx, farmId: string, event: ReturnType<typeof buildEvent>) {
@@ -623,31 +681,44 @@ async function recordNitrateCheck(tx: Tx, ctx: DomainCtx, interventionId: string
 // Planification
 // ---------------------------------------------------------------------------
 
+/**
+ * Options d'écriture propres aux imports de fichiers : périodes connues au
+ * jour près, et aucun mouvement de stock (l'historique d'un autre logiciel
+ * rendrait les stocks négatifs) — `origin = import` le fixe d'office.
+ */
+export interface PlanOptions {
+  periodPrecision?: "time" | "day";
+}
+
 export async function planInTx(
   tx: Tx,
   farmId: string,
   ctx: DomainCtx,
   input: InterventionPlanWrite,
   clientId: string | null = null,
-): Promise<{ intervention: Intervention; created: boolean }> {
+  options: PlanOptions = {},
+): Promise<{ intervention: Intervention; created: boolean; warnings: string[] }> {
   const id = input.id ?? ctx.newId();
   const existing = await rows(tx, sql`SELECT 1 FROM interventions WHERE id = ${id}`);
-  if (existing.length > 0) return { intervention: await readIntervention(tx, id), created: false };
-  const articles = await validate(tx, input.procedure, input, "plan");
+  if (existing.length > 0) return { intervention: await readIntervention(tx, id), created: false, warnings: [] };
+  const articles = await validate(tx, input.procedure, input, "plan", ctx.origin);
   const body = flat(input);
   const bounds = periodBounds(body.periods);
   await tx.execute(sql`
-    INSERT INTO interventions (id, farm_id, procedure, status, started_at, stopped_at, origin, client_id, purposes, notes, staffing, bbch)
+    INSERT INTO interventions (id, farm_id, procedure, status, started_at, stopped_at, origin, client_id, purposes, notes, staffing, bbch,
+                               affects_stock, period_precision)
     VALUES (${id}, ${farmId}, ${input.procedure}, 'planned', ${bounds.startedAt ?? input.plannedAt ?? null}, ${bounds.stoppedAt},
             ${ctx.origin}, ${clientId}, ${sql`ARRAY[${sql.join(input.purposes.map((p) => sql`${p}`), sql`, `)}]::text[]`}, ${input.notes ?? null},
-            ${input.staffing ?? "free"}, ${input.bbch ?? null})`);
+            ${input.staffing ?? "free"}, ${input.bbch ?? null}, ${ctx.origin !== "import"}, ${options.periodPrecision ?? "time"})`);
   await writeBody(tx, id, input, articles);
   await writeMaintenance(tx, farmId, ctx, id, body, false, null);
   await writeIrrigation(tx, id, body);
+  await writeSowing(tx, id, body);
   await recordCompliance(tx, ctx, id, body, "plan");
   await audit(tx, farmId, ctx, id, "planned", { procedure: input.procedure });
   await outbox(tx, farmId, buildEvent(ctx, farmId, "intervention.planned", { interventionId: id }));
-  return { intervention: await readIntervention(tx, id), created: true };
+  const warnings = await productionOverlapWarnings(tx, { ...body, plannedAt: input.plannedAt });
+  return { intervention: await readIntervention(tx, id), created: true, warnings };
 }
 
 /** Planifie une intervention. Idempotent sur `id` (UUID client). */
@@ -657,7 +728,7 @@ export async function planIntervention(
   ctx: DomainCtx,
   input: InterventionPlanWrite,
   clientId: string | null = null,
-): Promise<{ intervention: Intervention; created: boolean }> {
+): Promise<{ intervention: Intervention; created: boolean; warnings: string[] }> {
   return withFarm(db, farmId, (tx) => planInTx(tx, farmId, ctx, input, clientId));
 }
 
@@ -783,20 +854,28 @@ async function applyCompletion(
   procedure: string,
   raw: InterventionCompleteWrite,
 ) {
-  const articles = await validate(tx, procedure, raw, "complete");
+  // Intervention importée (même corrigée depuis le web) : sans stock ni destination de récolte exigée.
+  const [stored = { affects_stock: true, origin: ctx.origin }] = await rows<{ affects_stock: boolean; origin: DomainCtx["origin"] }>(
+    tx,
+    sql`SELECT affects_stock, origin FROM interventions WHERE id = ${interventionId}`,
+  );
+  const affectsStock = stored.affects_stock;
+  const articles = await validate(tx, procedure, raw, "complete", stored.origin === "import" ? "import" : ctx.origin);
   const input = flat(raw);
   const { startedAt, stoppedAt } = periodBounds(input.periods);
   await writeBody(tx, interventionId, raw, articles);
   await writeMaintenance(tx, farmId, ctx, interventionId, input, true, stoppedAt);
   await writeIrrigation(tx, interventionId, input);
+  await writeSowing(tx, interventionId, input);
   await recordCompliance(tx, ctx, interventionId, { ...input, procedure }, "done");
   // Contenu (re)écrit : l'IFT sera recalculé (worker, ou à la demande depuis la fiche).
   await tx.execute(sql`UPDATE interventions SET ift = NULL WHERE id = ${interventionId}`);
   const areaHa = await treatedAreaHa(tx, input, stoppedAt!);
 
-  const warnings: string[] = await crewOverlapWarnings(tx, interventionId, input);
+  const warnings: string[] = [...(await crewOverlapWarnings(tx, interventionId, input)), ...(await productionOverlapWarnings(tx, input))];
   const lines: ResolvedStockLine[] = [];
-  for (const i of input.inputs) {
+  // Intervention importée : pas de mouvement de stock (ni lot de récolte).
+  for (const i of affectsStock ? input.inputs : []) {
     const article = articles.get(i.articleId)!;
     const quantity = toStockQuantity({ quantity: i.quantity, unit: storedUnit(i.unit ?? article.unit, i.per), articleUnit: article.unit, areaHa, density: article.density });
     const lots = await availableLots(tx, article.id, stoppedAt!);
@@ -814,7 +893,7 @@ async function applyCompletion(
     }
     lines.push({ role: "input", lotId, placeId, containerId, quantity, unit: article.unit });
   }
-  for (const o of input.outputs) {
+  for (const o of affectsStock ? input.outputs : []) {
     const article = articles.get(o.articleId)!;
     const quantity = toStockQuantity({ quantity: o.quantity, unit: storedUnit(article.unit, o.per), articleUnit: article.unit, areaHa });
     let lotId = o.lotId ?? null;
@@ -924,11 +1003,12 @@ export async function updateIntervention(
     const reason = input.reason || null;
 
     if (current.status === "planned") {
-      const articles = await validate(tx, input.procedure, raw, "plan");
+      const articles = await validate(tx, input.procedure, raw, "plan", before.origin === "import" ? "import" : ctx.origin);
       const bounds = periodBounds(input.periods);
       await writeBody(tx, interventionId, raw, articles);
       await writeMaintenance(tx, farmId, ctx, interventionId, input, false, null);
       await writeIrrigation(tx, interventionId, input);
+      await writeSowing(tx, interventionId, input);
       await recordCompliance(tx, ctx, interventionId, input, "plan");
       await tx.execute(sql`
         UPDATE interventions SET procedure = ${input.procedure},
@@ -937,6 +1017,7 @@ export async function updateIntervention(
           notes = ${input.notes ?? null}, bbch = ${input.bbch === undefined ? sql`bbch` : input.bbch}, updated_at = now()
         WHERE id = ${interventionId}`);
       warnings.push(...(await crewOverlapWarnings(tx, interventionId, input)));
+      warnings.push(...(await productionOverlapWarnings(tx, { ...input, plannedAt: input.plannedAt })));
       await auditAs(tx, farmId, ctx, auditId, interventionId, "updated", { changes, reason, warnings });
       await outbox(tx, farmId, buildEvent(ctx, farmId, "intervention.updated", { interventionId }));
       return { intervention: await readIntervention(tx, interventionId), warnings };

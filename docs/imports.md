@@ -12,14 +12,14 @@ plan : [`claudedocs/workflow_import_onboarding.md`](../claudedocs/workflow_impor
 | Lot | Contenu | État |
 |---|---|---|
 | IM1 Socle | dépôt, reconnaissance, suivi, décisions, abandon, purge ; référentiel AgroEDI | ✅ |
-| IM2 Geofolia | lecture, rapprochement, écriture | à faire |
+| IM2 Geofolia | lecture, rapprochement, écriture | ✅ |
 | IM3 TelePAC | îlots, parcelles PAC, haies et arbres déclarés | à faire |
 | IM4 DAPLOS | lecteur `ekylibre/agroedei-edifact-daplos-reader` 2.0.0 | à faire |
 | IM5 | historique N-1…N-5, plan de fumure, annulation, page Imports | à faire |
 | IM6 | assistant de premier démarrage | à faire |
 
-Après IM1, un fichier est reconnu et suivi, mais aucun format n'est encore
-lu : l'aperçu le dit (avertissement bloquant).
+Depuis IM2, l'export Geofolia s'importe de bout en bout. DAPLOS et TelePAC
+sont reconnus mais pas encore lus : l'aperçu le dit (avertissement bloquant).
 
 ## Parcours (API)
 
@@ -33,6 +33,7 @@ abandon : responsable seulement ; le suivi se lit par tous les membres.
 | `GET /imports/:id` | Un import : état, fichier (nom, taille, sha256, expiration ; jamais le contenu), aperçu, décisions, rapport |
 | `PUT /imports/:id/decisions` | Décisions de l'utilisateur (remplacent les précédentes), aperçu recalculé depuis le fichier. Import qui n'est plus « analysé » : **409** |
 | `POST /imports/:id/discard` | Abandon ; le fichier est supprimé s'il ne sert à aucun autre import |
+| `POST /imports/:id/apply` | Écriture, **202** puis suivi par `GET /imports/:id` : rapprochement recalculé, une transaction pour le fichier, rapport (`report`). Avertissement bloquant, fichier expiré, autre import en cours : **409** |
 
 États : `analyzed` → `running` → `completed` | `failed` ; `analyzed` →
 `discarded` ; `completed` → `reverting` → `reverted` (IM5). La reprise
@@ -40,6 +41,39 @@ Ekylibre garde `running` → `completed` | `failed`.
 
 Contrats : `packages/contracts/src/imports.ts` (`importRunView`,
 `importPreview`, `importDecisions`).
+
+## Geofolia (lot IM2)
+
+Ce que devient l'export « Parcelles et Interventions complet » :
+
+| Geofolia | Fourmy |
+|---|---|
+| Parcelle principale (`PlotKind` 1) | parcelle, version ouverte au premier jour du fichier ; reliée à une parcelle existante si leurs contours se recouvrent à 80 % (IoU) |
+| Parcelle secondaire : couvert d'interculture (CINE, CIE, CIPAN, engrais vert ; usage « biomasse » sans récolte) | couvert de la parcelle (`cover_crops`, contrôles nitrates) : famille d'après les semences semées (radis + trèfle → mélange crucifères-légumineuses…), semis et destruction, exporté ou non, campagne de la culture qui suit. Ni activité ni production |
+| Parcelle secondaire : dérobée (épinard, second maïs…) | production datée de la même parcelle que sa principale (`MainPlotId`) |
+| Culture | production **datée** (semis → récolte) ; activité (une par libellé), production de référence Lexicon : code combiné AgroEDI (avec le jeu réservé), sinon code d'espèce filtré par saison et usage, sinon libellé ; production (`attrs` : variété, dates, rendements, sol, conseils, surfaces épandables) |
+| Produit | article : phyto et adjuvant (n° AMM, rapproché d'E-Phy), semence (GNIS), fertilisant et amendement (composition `article_fertilizers`, origine `imported`) ; l'eau n'est pas un article |
+| Produit récolté | article de récolte (t, q, t MS) |
+| Salarié | personne |
+| Action × parcelle (`RecognitionId`) | intervention : une action, scindée par doses ; une récolte par parcelle ; irrigation en mm ; « Plan de fumure » (`ZK3`) → planifiée |
+
+Interventions importées : origine `import`, **sans mouvement de stock**,
+périodes du jour entier à l'heure de Paris (`period_precision = day` :
+« réalisée le 01/04/2026 (heures non connues) », hors temps de travaux),
+récolte sans destination admise, contrôles phyto et nitrates passés comme à
+la saisie (un feu rouge est enregistré et compté au rapport, sans bloquer).
+Une intervention qu'une règle refuse est laissée de côté et rapportée.
+
+Dédoublonnage (`import_links`) : parcelles par numéro de travail
+(`plot.work_number`), cultures par campagne et numéro (`crop.parcel`),
+activités par libellé (`crop.label`), articles et personnes par identifiant
+Geofolia, interventions par couple (`agri.crop_zone`, le GUID commun avec
+DAPLOS). Un réimport ne crée rien ; une entité déjà importée n'est jamais
+réécrite.
+
+Recette (export réel, 19/11/2026) : 41 parcelles, 43 productions datées,
+20 couverts d'interculture, 13 activités, 133 articles, 414 interventions,
+en 13 s ; 18 traitements en feu rouge (10 pour des produits retirés).
 
 ## Reconnaissance du format
 

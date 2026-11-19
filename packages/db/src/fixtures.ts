@@ -36,12 +36,16 @@ export async function loadFixture(sql: Sql, fixture: FixtureFile): Promise<void>
       // json_populate_recordset ignore les valeurs par défaut : une fixture
       // antérieure aux attelages (0022) déclare ses moyens en mode libre.
       // Fixture antérieure à la fiche personne (0045) : identifiants externes vides.
+      // Fixture antérieure aux imports de fichiers (0062) : interventions saisies
+      // (stock suivi, heures connues), productions non déclarées.
       const rows =
         table === "interventions"
-          ? given.map((r) => ("staffing" in r ? r : { ...r, staffing: "free" }))
+          ? given.map((r) => ({ staffing: "free", affects_stock: true, period_precision: "time", ...r }))
           : table === "people"
             ? given.map((r) => (r.external_ids ? r : { ...r, external_ids: {} }))
-            : given;
+            : table === "productions"
+              ? given.map((r) => ({ declared: false, ...r }))
+              : given;
       if (!/^[a-z_]+$/.test(table)) throw new Error(`table invalide : ${table}`);
       if (rows.length === 0) continue;
       const cols = await tx<{ c: string }[]>`

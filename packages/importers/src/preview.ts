@@ -40,7 +40,7 @@ export function buildPreview(analysis: FileAnalysis, ctx: PreviewContext): Impor
       exportedAt: null,
       campaigns: [],
       farm: { identity: { siret: null, pacage: null, name: null, email: null, address: null }, siretMatches: null },
-      counts: { parcels: 0, areaHa: 0, history: 0, articles: 0, people: 0, workUnits: 0, capIslets: 0, capParcels: 0, landscape: 0 },
+      counts: { parcels: 0, productions: 0, areaHa: 0, history: 0, articles: 0, people: 0, workUnits: 0, capIslets: 0, capParcels: 0, landscape: 0 },
       operations: [],
       notImported: [],
       warnings,
@@ -73,7 +73,9 @@ export function buildPreview(analysis: FileAnalysis, ctx: PreviewContext): Impor
     operations.set(key, row);
   }
 
-  const areaM2 = bundle.parcels.reduce((sum, p) => sum + (p.areaM2 ?? 0), 0);
+  // Surface : celle des terres (cultures principales), pas des cultures secondaires.
+  const lands = bundle.parcels.filter((p) => !p.secondary);
+  const areaM2 = lands.reduce((sum, p) => sum + (p.areaM2 ?? 0), 0);
   return {
     format,
     fileName: ctx.fileName,
@@ -83,7 +85,8 @@ export function buildPreview(analysis: FileAnalysis, ctx: PreviewContext): Impor
     campaigns: [...bundle.campaigns].sort((a, b) => a - b),
     farm: { identity: bundle.farm, siretMatches },
     counts: {
-      parcels: bundle.parcels.length,
+      parcels: new Set(bundle.parcels.map((p) => p.landKey)).size,
+      productions: bundle.parcels.length,
       areaHa: Math.round(areaM2 / 100) / 100,
       history: bundle.history.length,
       articles: bundle.articles.length,

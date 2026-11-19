@@ -37,7 +37,14 @@ Ces constats complètent le §1.1 des besoins et en corrigent un point.
    sont les apports « Plan de fumure ». Geofolia regroupe les couples sous un
    `ActionId` (311 actions sur 1 parcelle, 73 sur 2 à 7) ; **DAPLOS n'a pas
    d'identifiant d'intervention** regroupant plusieurs parcelles.
-2. **Les parcelles n'ont pas d'identifiant commun** : Geofolia change de `Id`
+2. **Parcelles principales et secondaires** (constaté au lot IM2) : les
+   63 cultures Geofolia sont 41 parcelles principales et 22 « parcelles
+   secondaires » (interculture, dérobée) rattachées à une principale par
+   `MainPlotId`. Couverts d'interculture (20 « Mélange CINE ») →
+   `cover_crops` ; dérobées (2) → productions datées de la même parcelle,
+   la culture contrôlée à une date venant de `fourmy_production_at`
+   (migration 0063). Surface réelle : 164,9 ha.
+2bis. **Les parcelles n'ont pas d'identifiant commun** : Geofolia change de `Id`
    chaque campagne (chaîne `NMinus1PlotId`…), DAPLOS n'en a pas. Le seul lien
    stable est le **numéro de travail** (`Code` = `land_parcel_work_number`,
    ex. « 143 »), plus la géométrie.
@@ -617,9 +624,8 @@ ALTER TABLE productions
   ADD COLUMN declared  boolean NOT NULL DEFAULT false,
   ADD COLUMN attrs     jsonb;   -- { yield: {objective, realized, unit}, destination, residues, advice, spreadable }
 
--- Type de sol déclaré (la réserve utile reste celle du modèle de croissance).
-ALTER TABLE parcel_soils ALTER COLUMN taw_mm DROP NOT NULL;
-ALTER TABLE parcel_soils ADD COLUMN soil_label text, ADD COLUMN soil_code text;
+-- Type de sol déclaré : porté par productions.attrs (réalisation IM2), par
+-- campagne comme dans la source ; parcel_soils reste au modèle de croissance.
 
 -- Îlots PAC.
 ALTER TABLE parcel_references DROP CONSTRAINT parcel_references_kind_check;

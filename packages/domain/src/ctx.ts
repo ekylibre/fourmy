@@ -10,6 +10,6 @@ export interface DomainCtx {
   newId: () => string;
   /** Acteur à l'origine du changement (pour l'audit). */
   actor: string;
-  /** Provenance (web, mobile, migration, plugin). */
-  origin: "web" | "mobile" | "migration" | "plugin";
+  /** Provenance (web, mobile, migration, plugin, import de fichier). */
+  origin: "web" | "mobile" | "migration" | "plugin" | "import";
 }

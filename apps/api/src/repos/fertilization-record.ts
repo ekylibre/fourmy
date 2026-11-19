@@ -146,7 +146,8 @@ async function parcelCrops(tx: Tx, farmId: string, parcelIds: string[], day: str
           SELECT a.reference, coalesce(p.cultivation, a.cultivation) AS cultivation, c.year FROM productions p
           JOIN campaigns c ON c.id = p.campaign_id LEFT JOIN activities a ON a.id = p.activity_id
           WHERE p.land_parcel_id = lp.id AND c.year IN (${campaign}, ${Number(day.slice(0, 4))})
-          ORDER BY abs(c.year - ${campaign}) LIMIT 1) pr ON true
+          -- Culture en place le jour de l'apport d'abord (productions datées), puis la campagne visée.
+          ORDER BY (p.id = fourmy_production_at(lp.id, ${day}::date)) DESC, abs(c.year - ${campaign}) LIMIT 1) pr ON true
         LEFT JOIN parcel_soils ps ON ps.land_parcel_id = lp.id
         LEFT JOIN parcel_nitrate_zones z ON z.land_parcel_id = lp.id
         LEFT JOIN fertilization_plans fp ON fp.land_parcel_id = lp.id AND fp.campaign = coalesce(pr.year, ${campaign}) AND fp.kind = 'main'
