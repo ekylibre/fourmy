@@ -277,6 +277,16 @@ références PAC.
 
 ## IM4 — DAPLOS
 
+> ✅ Réalisé le 19/11/2026 (branche `feat/import-im4-daplos`). Écarts :
+> DAPLOS ne relie pas cultures secondaires et principales → terre déduite
+> du recouvrement des contours (63/63 comme Geofolia) ; regroupement
+> DAPLOS **non identique** à celui de Geofolia (pas d'identifiant d'action :
+> 289 groupes identiques sur 353, 388 interventions contre 414 sur la
+> ferme réelle) ; 51 couples du DAPLOS réel sans intrant (fichier
+> incomplet, vérifié ligne à ligne) ; adresse écrite au siège
+> (`farm_sites`), la ferme n'ayant pas de colonne d'adresse ; aucun jeu
+> public du fork dans le paquet publié.
+
 Branche `feat/import-im4-daplos`.
 
 4.1 Dépendance `@osfarm/agroedei-edifact-daplos-reader` par Git, fixée au

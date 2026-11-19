@@ -447,6 +447,9 @@ importers:
       '@fourmy/isoxml':
         specifier: workspace:*
         version: link:../isoxml
+      '@osfarm/agroedei-edifact-daplos-reader':
+        specifier: github:ekylibre/agroedei-edifact-daplos-reader#8eaf6a623e930f2c275fa4fdc10735b0a769f33f
+        version: https://codeload.github.com/ekylibre/agroedei-edifact-daplos-reader/tar.gz/8eaf6a623e930f2c275fa4fdc10735b0a769f33f
       proj4:
         specifier: 2.20.9
         version: 2.20.9
@@ -1435,6 +1438,10 @@ packages:
 
   '@open-draft/until@2.1.0':
     resolution: {integrity: sha512-U69T3ItWHvLwGg5eJ0n3I62nWuE6ilHlmz7zM0npLBRvPRd7e6NYmg54vvRtP5mZG7kZqZCFVdsTWo7BPtBujg==}
+
+  '@osfarm/agroedei-edifact-daplos-reader@https://codeload.github.com/ekylibre/agroedei-edifact-daplos-reader/tar.gz/8eaf6a623e930f2c275fa4fdc10735b0a769f33f':
+    resolution: {tarball: https://codeload.github.com/ekylibre/agroedei-edifact-daplos-reader/tar.gz/8eaf6a623e930f2c275fa4fdc10735b0a769f33f}
+    version: 2.0.0
 
   '@osfarm/itineraire-technique@https://codeload.github.com/ekylibre/itineraire-technique/tar.gz/702ad30c32000f87cd0c651973fb1d6e234c152b':
     resolution: {tarball: https://codeload.github.com/ekylibre/itineraire-technique/tar.gz/702ad30c32000f87cd0c651973fb1d6e234c152b}
@@ -5311,6 +5318,12 @@ snapshots:
       outvariant: 1.4.3
 
   '@open-draft/until@2.1.0': {}
+
+  '@osfarm/agroedei-edifact-daplos-reader@https://codeload.github.com/ekylibre/agroedei-edifact-daplos-reader/tar.gz/8eaf6a623e930f2c275fa4fdc10735b0a769f33f':
+    dependencies:
+      proj4: 2.20.9
+    transitivePeerDependencies:
+      - geotiff
 
   '@osfarm/itineraire-technique@https://codeload.github.com/ekylibre/itineraire-technique/tar.gz/702ad30c32000f87cd0c651973fb1d6e234c152b(echarts@6.0.0)':
     optionalDependencies:

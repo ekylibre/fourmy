@@ -14,13 +14,12 @@ plan : [`claudedocs/workflow_import_onboarding.md`](../claudedocs/workflow_impor
 | IM1 Socle | dépôt, reconnaissance, suivi, décisions, abandon, purge ; référentiel AgroEDI | ✅ |
 | IM2 Geofolia | lecture, rapprochement, écriture | ✅ |
 | IM3 TelePAC | îlots, parcelles PAC, haies et arbres déclarés | ✅ |
-| IM4 DAPLOS | lecteur `ekylibre/agroedei-edifact-daplos-reader` 2.0.0 | à faire |
+| IM4 DAPLOS | lecteur `ekylibre/agroedei-edifact-daplos-reader` 2.0.0, dédoublonnage avec Geofolia | ✅ |
 | IM5 | historique N-1…N-5, plan de fumure, annulation, page Imports | à faire |
 | IM6 | assistant de premier démarrage | à faire |
 
-L'export Geofolia (IM2) et le dossier PAC TelePAC (IM3) s'importent de bout
-en bout. DAPLOS est reconnu mais pas encore lu : l'aperçu le dit
-(avertissement bloquant).
+Les trois formats s'importent de bout en bout : export Geofolia (IM2),
+dossier PAC TelePAC (IM3), EDI DAPLOS (IM4).
 
 ## Parcours (API)
 
@@ -113,6 +112,45 @@ culture doublée) ; 41 références de parcelle et d'îlot ; 355 éléments du
 paysage (135 haies, 143 arbres isolés, 48 alignements, 16 ZDH…) ; 7 écarts
 de surface signalés.
 
+## DAPLOS (lot IM4)
+
+Lu par le lecteur d'OSFarm, dans le fork d'Ekylibre fixé par Git
+(`github:ekylibre/agroedei-edifact-daplos-reader#8eaf6a6`, version 2.0.0 :
+libellés lus dans la table AgroEDI de chaque champ, segment `DP` corrigé).
+Avec une clé Lexicon, les libellés du jeu `agroedi` (`lexicon_agroedi_codes`)
+lui sont passés et l'emportent sur les siens.
+
+| DAPLOS | Fourmy |
+|---|---|
+| Exploitation (`DA` de nature `TF`) | SIRET, PACAGE, raison sociale (champs vides seulement) ; adresse au siège, s'il n'en a pas (siège créé s'il manque) |
+| Culture (`DP`) et contour (`PS`/`SC`, Lambert 93) | parcelle (numéro de travail, comme Geofolia) et production datée ; activité nommée d'après l'espèce, le complément, la saison et l'usage (« Avoine noire d'hiver — grain ») |
+| Culture qui recouvre une autre culture de la campagne | culture secondaire sur la même terre : couvert d'interculture (moutarde, navette, radis, phacélie, usage « biomasse ») ou dérobée |
+| Précédents (`PH`) | historique N-1…N-5 (écrit au lot IM5) |
+| Intervention (`PV`) | couple intervention × parcelle, même GUID que Geofolia (`agri.crop_zone`) ; regroupé par jour, opération et statut, puis par doses |
+| Intrant (`VI`, composition `IC`) | article par nom (sans identifiant dans DAPLOS) ; **dose par hectare du fichier** ; eau d'irrigation en dose (mm) |
+| Récolte (`VR`) | quantité de la parcelle (t), rendement |
+
+DAPLOS ne relie pas une culture secondaire à sa culture principale : deux
+cultures d'une campagne dont l'une recouvre l'autre pour moitié au moins
+(même îlot PAC ou îlot inconnu) occupent la même terre ; la culture
+principale est celle qui n'est pas un couvert, puis celle de plus petit
+numéro de travail. Vérifié sur un export réel comparé à Geofolia : 63
+cultures sur 63 retrouvent la même terre, 20 couverts sur 20.
+
+**Avec Geofolia** (US-IMP-2), dans les deux ordres, la ferme est la même à
+l'arrivée (recette sur les fichiers réels, 19/11/2026 : 41 parcelles,
+43 productions, 20 couverts, 511 couples) :
+
+- Geofolia puis DAPLOS : rien de créé (421 couples déjà importés) ;
+- DAPLOS puis Geofolia : Geofolia ajoute les 90 apports du plan de fumure
+  (absents du DAPLOS) et les 51 couples que le DAPLOS donne sans intrant
+  (semis sans semence, fertilisations sans fertilisant : laissés de côté à
+  l'import du DAPLOS seul, motif au rapport) ;
+- DAPLOS n'ayant pas d'identifiant d'action, des couples que Geofolia
+  sépare (même jour, même opération, mêmes doses) y forment une seule
+  intervention : 388 interventions contre 414 ;
+- les activités gardent le nom du premier fichier importé.
+
 ## Reconnaissance du format
 
 Par le contenu, jamais par l'extension (`packages/importers/src/detect.ts`) :
@@ -182,4 +220,9 @@ En local : `FOURMY_LEXICON_API_KEY=lex_… corepack pnpm --filter @fourmy/lexico
 - `@fourmy/isoxml` : limites de l'`unzip` (bombe, traversée, taille annoncée
   fausse, chiffrement, somme de contrôle).
 - `@fourmy/lexicon` : bundle avec clé, jeu `agroedi`, somme de contrôle.
-- API : `apps/api/test/file-imports.integration.test.ts`.
+- API : `apps/api/test/file-imports*.integration.test.ts` (socle, Geofolia,
+  TelePAC, DAPLOS et dédoublonnage dans les deux ordres).
+- Jeux anonymisés (`packages/importers/test/fixtures`) : tirés des exports
+  réels d'une même ferme par `scripts/anonymize-*.mjs` ; le jeu DAPLOS est
+  calé sur le jeu Geofolia (mêmes parcelles, mêmes GUID anonymisés, même
+  déplacement des géométries).

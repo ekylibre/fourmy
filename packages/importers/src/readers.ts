@@ -9,7 +9,12 @@ import type { ImportBundle, ImportFormat } from "./model.js";
  * Geofolia, IM3 TelePAC, IM4 DAPLOS) ; tant qu'un format n'a pas le sien, le
  * fichier est reconnu mais ne peut pas être importé.
  */
-export type Reader = (bytes: Uint8Array, name: string) => ImportBundle;
+export type Reader = (bytes: Uint8Array, name: string, options?: ReaderOptions) => ImportBundle;
+
+/** Référentiel passé aux lecteurs par l'API (libellés AgroEDI de Lexicon, table → code → libellé). */
+export interface ReaderOptions {
+  dictionary?: Record<string, Record<string, string>>;
+}
 
 const READERS: Partial<Record<ImportFormat, Reader>> = {};
 
@@ -37,12 +42,12 @@ export interface FileAnalysis {
 }
 
 /** Reconnaît le format puis lit le fichier si un lecteur existe. */
-export function analyzeFile(name: string, bytes: Uint8Array): FileAnalysis {
+export function analyzeFile(name: string, bytes: Uint8Array, options: ReaderOptions = {}): FileAnalysis {
   const format = detectFormat(name, bytes);
   const reader = READERS[format];
   if (!reader) return { format, bundle: null };
   try {
-    return { format, bundle: reader(bytes, name) };
+    return { format, bundle: reader(bytes, name, options) };
   } catch (e) {
     if (e instanceof ImportFileError) throw e;
     throw new ImportFileError(

@@ -108,3 +108,41 @@ export function toMultiPolygon(g: Point | Polygon | MultiPolygon): MultiPolygon 
   if (g.type === "Polygon") return { type: "MultiPolygon", coordinates: [g.coordinates] };
   throw new GeometryError("Une parcelle doit être un polygone, pas un point.");
 }
+
+/** Point dans un polygone (règle pair-impair, trous compris). */
+function inPolygon([x, y]: Position, rings: Position[][]): boolean {
+  let inside = false;
+  for (const ring of rings) {
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i]!;
+      const [xj, yj] = ring[j]!;
+      if (yi! > y! !== yj! > y! && x! < ((xj! - xi!) * (y! - yi!)) / (yj! - yi!) + xi!) inside = !inside;
+    }
+  }
+  return inside;
+}
+
+const inMulti = (p: Position, m: MultiPolygon) => m.coordinates.some((poly) => inPolygon(p, poly));
+
+/**
+ * Part de `a` recouverte par `b` (0 à 1), estimée sur une grille de points
+ * de `a` : assez précis pour dire si deux cultures occupent la même terre,
+ * sans bibliothèque géométrique.
+ */
+export function overlapShare(a: MultiPolygon, b: MultiPolygon, steps = 30): number {
+  const pts = a.coordinates.flat(2);
+  const xs = pts.map((p) => p[0]!);
+  const ys = pts.map((p) => p[1]!);
+  const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  let inA = 0;
+  let inBoth = 0;
+  for (let i = 0; i < steps; i++) {
+    for (let j = 0; j < steps; j++) {
+      const p: Position = [minX + ((i + 0.5) * (maxX - minX)) / steps, minY + ((j + 0.5) * (maxY - minY)) / steps];
+      if (!inMulti(p, a)) continue;
+      inA++;
+      if (inMulti(p, b)) inBoth++;
+    }
+  }
+  return inA ? inBoth / inA : 0;
+}
