@@ -18,8 +18,10 @@ const rows = async <T>(tx: Tx, q: ReturnType<typeof sql>) => (await tx.execute(q
 
 export interface ImportReport {
   format: string;
-  counts: Record<"parcels" | "productions" | "covers" | "activities" | "articles" | "people", { created: number; linked: number; skipped: number }> & {
+  counts: Record<"parcels" | "productions" | "covers" | "landscape" | "activities" | "articles" | "people", { created: number; linked: number; skipped: number }> & {
     campaigns: { created: number };
+    /** Références PAC posées sur les parcelles (une par parcelle recouverte). */
+    capRefs: { islets: number; parcels: number };
     interventions: { created: number; failed: number; skipped: number; alreadyImported: number };
   };
   failures: { label: string; on: string; reason: string }[];
@@ -65,10 +67,12 @@ export async function applyPlan(tx: Tx, farmId: string, ctx: DomainCtx, runId: s
       parcels: zero(),
       productions: zero(),
       covers: zero(),
+      landscape: zero(),
       activities: zero(),
       articles: zero(),
       people: zero(),
       campaigns: { created: 0 },
+      capRefs: { islets: 0, parcels: 0 },
       interventions: { created: 0, failed: 0, skipped: 0, alreadyImported: plan.alreadyImported },
     },
     failures: [],
@@ -76,12 +80,17 @@ export async function applyPlan(tx: Tx, farmId: string, ctx: DomainCtx, runId: s
     compliance: { phytoDanger: 0, nitrateDanger: 0 },
     warnings: bundle.warnings.filter((w) => w.level !== "info").map(({ level, message }) => ({ level, message })),
   };
-  const tally = (key: keyof Omit<ImportReport["counts"], "campaigns" | "interventions">, action: string) =>
+  const tally = (key: keyof Omit<ImportReport["counts"], "campaigns" | "interventions" | "capRefs">, action: string) =>
     report.counts[key][action === "create" ? "created" : action === "link" ? "linked" : "skipped"]++;
 
   // Identité : seulement les champs vides (la valeur de Fourmy est gardée).
   if (bundle.farm.siret) await tx.execute(sql`UPDATE farms SET siret = ${bundle.farm.siret} WHERE id = ${farmId} AND siret IS NULL`);
   if (bundle.farm.pacage) await tx.execute(sql`UPDATE farms SET pacage = ${bundle.farm.pacage} WHERE id = ${farmId} AND pacage IS NULL`);
+  // Raison sociale et courriel (dossier PAC) : seulement si la fiche « Ma ferme » ne les a pas.
+  if (bundle.farm.name) await tx.execute(sql`UPDATE farms SET legal_name = ${bundle.farm.name.slice(0, 200)} WHERE id = ${farmId} AND legal_name IS NULL`);
+  if (bundle.farm.email && /^[^\s@]+@[^\s@]+$/.test(bundle.farm.email)) {
+    await tx.execute(sql`UPDATE farms SET email = ${bundle.farm.email.slice(0, 200)} WHERE id = ${farmId} AND email IS NULL`);
+  }
 
   for (const c of plan.campaigns.filter((x) => x.create)) {
     await tx.execute(sql`
@@ -102,7 +111,7 @@ export async function applyPlan(tx: Tx, farmId: string, ctx: DomainCtx, runId: s
         VALUES (${ctx.newId()}, ${l.landParcelId}, ST_Multi(ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(${geo}), 4326))),
                 ST_Area(ST_SetSRID(ST_GeomFromGeoJSON(${geo}), 4326)::geography), ${l.islet}, tstzrange(${plan.validFrom}::timestamptz, NULL))`);
     }
-    await link(tx, farmId, runId, "plot.work_number", l.landKey, "land_parcel", l.landParcelId, l.action === "create");
+    await link(tx, farmId, runId, l.link[0], l.link[1], "land_parcel", l.landParcelId, l.action === "create");
   }
 
   for (const a of plan.activities) {
@@ -142,6 +151,49 @@ export async function applyPlan(tx: Tx, farmId: string, ctx: DomainCtx, runId: s
                 ${c.cover.sownOn}::date, ${c.cover.destroyedOn}::date, ${c.cover.exported}, ${`Importé (${bundle.format}) : ${c.parcel.name}`})`);
     }
     await link(tx, farmId, runId, "crop.parcel", `${c.parcel.campaign}:${c.parcel.key}`, "cover_crop", c.coverId, c.action === "create");
+  }
+
+  // Références PAC : sur chaque parcelle que l'îlot ou la parcelle PAC recouvre (5 % de la
+  // plus petite des deux surfaces au moins), avec la surface commune.
+  for (const c of plan.capRefs) {
+    if (!c.ref.shape) continue;
+    const geo = JSON.stringify(c.ref.shape);
+    const kind = c.ref.kind === "islet" ? "cap_islet" : "cap";
+    const label = c.ref.kind === "islet" ? `Îlot ${c.ref.isletNumber}` : `Îlot ${c.ref.isletNumber} – parcelle ${c.ref.parcelNumber}${c.label ? ` : ${c.label}` : ""}`;
+    const inserted = await rows<{ id: string }>(
+      tx,
+      sql`WITH g AS (SELECT ST_Multi(ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(${geo}), 4326))) AS g),
+               hit AS (
+                 SELECT v.land_parcel_id, ST_Area(ST_Intersection(v.shape, g.g)::geography) AS overlap, v.area_m2::float8 AS parcel_m2,
+                        ST_Area(g.g::geography) AS ref_m2
+                 FROM land_parcel_versions v JOIN land_parcels lp ON lp.id = v.land_parcel_id, g
+                 WHERE lp.farm_id = ${farmId} AND upper(v.valid) IS NULL AND ST_Intersects(v.shape, g.g))
+          INSERT INTO parcel_references (id, farm_id, land_parcel_id, kind, ref, year, label, code, area_m2, overlap_m2, attrs, geom)
+          SELECT gen_random_uuid(), ${farmId}, hit.land_parcel_id, ${kind}, ${c.ref.ref}, ${c.ref.campaign}, ${label}, ${c.ref.capCode},
+                 ${c.ref.admissibleAreaM2 ?? null}::float8, hit.overlap,
+                 ${JSON.stringify({ ...c.ref.attrs, isletNumber: c.ref.isletNumber, parcelNumber: c.ref.parcelNumber, source: "telepac" })}::jsonb, g.g
+          FROM hit, g
+          WHERE hit.overlap >= 0.05 * least(hit.parcel_m2, hit.ref_m2)
+          ON CONFLICT (land_parcel_id, kind, ref, year) DO NOTHING
+          RETURNING id`,
+    );
+    report.counts.capRefs[c.ref.kind === "islet" ? "islets" : "parcels"] += inserted.length;
+  }
+
+  // Éléments du paysage déclarés (SNA, ZDH).
+  for (const l of plan.landscape) {
+    tally("landscape", l.action);
+    const f = l.feature;
+    const campaign = bundle.campaigns[0] ?? null;
+    if (l.action === "create") {
+      const { kind, ...attrs } = f.attrs as { kind?: string };
+      await tx.execute(sql`
+        INSERT INTO farm_landscape_features (id, farm_id, source, campaign, ref, kind, cap_type, width_m, area_m2, geom, attrs)
+        VALUES (${l.id}, ${farmId}, ${f.source.split(".")[0]}, ${campaign}, ${f.ref}, ${kind ?? "other"}, ${f.capType}, ${f.widthM}, ${f.areaM2},
+                ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(${JSON.stringify(f.geometry)}), 4326)), ${JSON.stringify({ ...attrs, category: f.category })}::jsonb)
+        ON CONFLICT (farm_id, source, campaign, ref) DO NOTHING`);
+    }
+    await link(tx, farmId, runId, f.source, `${campaign ?? ""}:${f.ref}`, "landscape_feature", l.id, l.action === "create");
   }
 
   for (const a of plan.articles) {

@@ -88,7 +88,8 @@ function Sheet({ sheet: s }: { sheet: ParcelSheet }) {
   );
   // Parcelles cadastrales recoupées pour plus de 1 % de la parcelle (les autres : bords, imprécisions).
   const significant = s.cadastre.filter((c) => (c.overlapM2 ?? 0) >= s.areaM2 * 0.01);
-  const capByYear = [...new Map(s.cap.map((c) => [c.year, c])).values()];
+  // Une ligne par campagne : le dossier PAC importé l'emporte sur le RPG anonyme (dernier posé).
+  const capByYear = [...new Map([...s.cap].sort((a, b) => (a.source === "telepac" ? 1 : 0) - (b.source === "telepac" ? 1 : 0)).map((c) => [c.year, c])).values()];
 
   return (
     <Stack>
@@ -209,7 +210,15 @@ function Sheet({ sheet: s }: { sheet: ParcelSheet }) {
                     return (
                       <Table.Tr key={year}>
                         <Table.Td className="lv-num">{year}</Table.Td>
-                        <Table.Td>{c ? `${c.cropLabel ?? c.cropCode} (${c.cropCode})` : "—"}</Table.Td>
+                        <Table.Td>
+                          {c ? `${c.cropLabel ?? c.cropCode} (${c.cropCode})` : "—"}
+                          {c?.source === "telepac" && (
+                            <Text span size="xs" c="dimmed">
+                              {" "}
+                              · îlot {c.islet}, parcelle {c.parcelNumber} (dossier PAC)
+                            </Text>
+                          )}
+                        </Table.Td>
                         <Table.Td ta="right" className="lv-num">{c?.areaM2 ? area(c.areaM2) : "—"}</Table.Td>
                         <Table.Td>{p?.activity ? <ActivityBadge activity={p.activity} /> : "—"}</Table.Td>
                       </Table.Tr>

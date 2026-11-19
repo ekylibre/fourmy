@@ -131,7 +131,9 @@ export async function refreshReferences(db: Database, farmId: string, parcelId: 
     caps.push(...batch.flat());
   }
   await withFarm(db, farmId, async (tx) => {
-    await tx.execute(sql`DELETE FROM parcel_references WHERE land_parcel_id = ${parcelId}`);
+    // Seules les références de cette recherche (cadastre, RPG anonyme) sont remplacées : celles
+    // importées d'un dossier PAC (TelePAC) restent.
+    await tx.execute(sql`DELETE FROM parcel_references WHERE land_parcel_id = ${parcelId} AND coalesce(attrs->>'source', '') <> 'telepac'`);
     const shape = geo(parcel.shape);
     for (const c of cadastre) {
       await tx.execute(sql`
@@ -177,9 +179,9 @@ export async function parcelSheet(db: Database, farmId: string, parcelId: string
           LEFT JOIN activities a ON a.id = pr.activity_id LEFT JOIN lexicon_productions lx ON lx.reference_name = a.reference
           WHERE pr.land_parcel_id = ${parcelId} ORDER BY c.year DESC, a.name`,
     );
-    const references = await rows<{ kind: "cadastre" | "cap"; ref: string; year: number; label: string | null; code: string | null; area_m2: number | null; overlap_m2: number | null; fetched_at: string; geometry: GeoJsonGeometry }>(
+    const references = await rows<{ kind: "cadastre" | "cap" | "cap_islet"; ref: string; year: number; label: string | null; code: string | null; area_m2: number | null; overlap_m2: number | null; fetched_at: string; geometry: GeoJsonGeometry; attrs: Record<string, unknown> | null }>(
       tx,
-      sql`SELECT kind, ref, year, label, code, area_m2, overlap_m2, fetched_at::text, ST_AsGeoJSON(geom)::json AS geometry
+      sql`SELECT kind, ref, year, label, code, area_m2, overlap_m2, fetched_at::text, ST_AsGeoJSON(geom)::json AS geometry, attrs
           FROM parcel_references WHERE land_parcel_id = ${parcelId} ORDER BY kind, year DESC, ref`,
     );
     const water = await rows<{ id: string; name: string | null; kind: string; permanent: boolean | null; ditch: boolean; distance_m: number; geometry: GeoJsonGeometry }>(
@@ -206,8 +208,25 @@ export async function parcelSheet(db: Database, farmId: string, parcelId: string
       until: p.until,
       productions: productions.map((r) => ({ year: r.year, activity: r.activity_id ? { id: r.activity_id, name: r.name!, color: r.color, pictureUrl: pictureUrl(r.picture) } : null })),
       cadastre: references.filter((r) => r.kind === "cadastre").map((r) => ({ idu: r.ref, label: r.label, areaM2: r.area_m2, overlapM2: r.overlap_m2, geometry: r.geometry })),
-      cap: references.filter((r) => r.kind === "cap").map((r) => ({ id: r.ref, year: r.year, cropCode: r.code, cropLabel: r.label, areaM2: r.area_m2, overlapM2: r.overlap_m2 })),
-      referencesFetchedAt: references[0]?.fetched_at ?? null,
+      cap: references
+        .filter((r) => r.kind === "cap")
+        .map((r) => {
+          const telepac = r.attrs?.source === "telepac";
+          return {
+            id: r.ref,
+            year: r.year,
+            cropCode: r.code,
+            // Dossier PAC : « Îlot 3 – parcelle 2 : Prairie temporaire » → le libellé de culture seul.
+            cropLabel: telepac ? (r.label?.split(" : ")[1] ?? null) : r.label,
+            areaM2: r.area_m2,
+            overlapM2: r.overlap_m2,
+            source: telepac ? ("telepac" as const) : ("rpg" as const),
+            islet: telepac ? ((r.attrs?.isletNumber as string | undefined) ?? null) : null,
+            parcelNumber: telepac ? ((r.attrs?.parcelNumber as string | undefined) ?? null) : null,
+          };
+        }),
+      islets: references.filter((r) => r.kind === "cap_islet").map((r) => ({ ref: r.ref, number: (r.attrs?.isletNumber as string | undefined) ?? null, year: r.year, overlapM2: r.overlap_m2 })),
+      referencesFetchedAt: references.find((r) => r.attrs?.source !== "telepac")?.fetched_at ?? null,
       water: water.map((w) => ({ id: w.id, name: w.name, kind: w.kind, permanent: w.permanent, ditch: w.ditch, distanceM: Math.round(w.distance_m), geometry: w.geometry })),
       interventions: interventions.map((i) => ({ id: i.id, procedure: i.procedure, status: i.status, at: i.started_at })),
     };

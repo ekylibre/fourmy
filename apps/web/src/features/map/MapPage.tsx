@@ -2,7 +2,7 @@ import { useArea, useMapPrefs } from "../../app/prefs";
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { PencilRuler } from "lucide-react";
-import { Badge, Button, Grid, Group, Paper, SegmentedControl, Select, Stack, Table, Text, Title } from "@mantine/core";
+import { Badge, Button, Grid, Group, Paper, SegmentedControl, Select, Stack, Switch, Table, Text, Title } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import type { FeatureCollection, Geometry } from "geojson";
 import type { TrackCoverage, TrackReplay } from "@fourmy/contracts";
@@ -33,6 +33,13 @@ export function MapPage() {
   const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
   const [equipment, setEquipment] = useState<string | null>(null);
   const [showTrack, setShowTrack] = useState(false);
+  const [showLandscape, setShowLandscape] = useState(true);
+  // Éléments du paysage déclarés à la PAC (import TelePAC) : haies, arbres, mares, ZDH.
+  const landscape = useQuery({
+    queryKey: ["landscape-features", farm.id],
+    queryFn: () => api.get<FeatureCollection>(farmPath(farm.id, "/landscape-features")),
+    staleTime: 5 * 60_000,
+  });
   const [sat, setSat] = useSatelliteLayer();
   const rsStatus = useRemoteSensingStatus(farm.id);
   const rsEnabled = rsStatus.data?.enabled ?? false;
@@ -139,6 +146,7 @@ export function MapPage() {
                 onSelect={setSelected}
                 satellite={satellite}
                 fillOpacity={satellite ? 0 : sat === "parcels" ? 0.75 : 0.4}
+                landscape={showLandscape ? landscape.data : undefined}
               />
             </MapBoundary>
           )}
@@ -159,6 +167,29 @@ export function MapPage() {
               <Text size="sm" c="dimmed" mt="xs">
                 {s.landParcels.length} parcelles · {area(s.landParcels.reduce((a, p) => a + p.version.areaM2, 0))}
               </Text>
+              {!!landscape.data?.features.length && (
+                <Stack gap={4} mt="sm">
+                  <Switch
+                    size="xs"
+                    checked={showLandscape}
+                    onChange={(e) => setShowLandscape(e.currentTarget.checked)}
+                    label={`Éléments déclarés à la PAC (${landscape.data.features.length})`}
+                  />
+                  {showLandscape && (
+                    <Group gap="xs">
+                      <Badge variant="dot" color="#3E7D3A">
+                        Haies, arbres, bosquets
+                      </Badge>
+                      <Badge variant="dot" color="#2B7BB9">
+                        Mares, fossés
+                      </Badge>
+                      <Badge variant="dot" color="#7A746B">
+                        Murs, autres
+                      </Badge>
+                    </Group>
+                  )}
+                </Stack>
+              )}
             </Paper>
             <SatelliteControl farmId={farm.id} enabled={rsEnabled} data={rs.data} layer={sat} onChange={setSat} index={idx} onIndexChange={setIdx} />
             {selected && (

@@ -5,10 +5,17 @@ import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import { listParcelsAt, listParcelNames, createParcel, versionParcel } from "../repos/parcels.js";
 import { parcelItinerary } from "../repos/itinerary.js";
+import { landscapeFeatures } from "../repos/landscape-features.js";
 import { atOrNow, BadRequest, domainCtx, intQuery, problem, uuidParam } from "./helpers.js";
 
 /** Parcellaire versionné (FR-PARC-1/2). Écritures réservées au rôle owner. */
 export const parcelRoutes = new Hono<Env>()
+  // Éléments du paysage déclarés (dossier PAC) : GeoJSON, campagne la plus récente par défaut.
+  .get("/landscape-features", async (c) => {
+    const raw = c.req.query("campaign");
+    const campaign = raw === undefined ? null : intQuery(raw, 0, 2000, 2100, "campaign");
+    return c.json(await landscapeFeatures(db(), c.get("farmId"), campaign));
+  })
   .get("/land-parcels", async (c) => {
     const items = await listParcelsAt(db(), c.get("farmId"), atOrNow(c));
     return c.json({ items, nextCursor: null });

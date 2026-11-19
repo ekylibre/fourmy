@@ -234,6 +234,14 @@ hydrique s'en nourrissent.
 
 ## IM3 — TelePAC
 
+> ✅ Réalisé le 19/11/2026 (branche `feat/import-im3-telepac`). Écarts :
+> analyseur XML d'`@fourmy/isoxml` étendu (texte des éléments, noms
+> d'attributs accentués) plutôt que `fast-xml-parser` ; table des types SNA
+> **déduite** d'un dossier réel (codes absents des notices TelePAC) ; type
+> `woodland` (bois, V5) ajouté ; parcelle PAC sans recouvrement → parcelle
+> créée même après Geofolia ; références TelePAC protégées de « Actualiser
+> PAC et cadastre » ; plan 3D des haies déclarées non fait.
+
 Branche `feat/import-im3-telepac` (en parallèle d'IM2).
 
 3.1 **Migration** : `parcel_references.kind` + `cap_islet` ;

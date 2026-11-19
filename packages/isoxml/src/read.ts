@@ -151,6 +151,8 @@ export interface XmlNode {
   tag: string;
   attrs: Record<string, string>;
   children: XmlNode[];
+  /** Texte de l'élément (hors enfants), décodé et sans espaces de bord ; absent s'il n'y en a pas. */
+  text?: string;
 }
 
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
@@ -159,13 +161,25 @@ const decode = (s: string) =>
     e[0] === "#" ? String.fromCodePoint(e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10)) : ENTITIES[e.toLowerCase()]!,
   );
 
-/** Éléments et attributs d'un document XML (texte, commentaires et instructions ignorés). */
+/**
+ * Éléments, attributs et texte d'un document XML (commentaires, instructions
+ * et DTD ignorés : aucune entité externe n'est jamais résolue). Les noms
+ * d'attributs peuvent être accentués (TelePAC).
+ */
 export function parseXml(text: string): XmlNode {
   const root: XmlNode = { tag: "#document", attrs: {}, children: [] };
   const stack: XmlNode[] = [root];
-  const tag = /<(\/?)([A-Za-z_][\w.:-]*)((?:\s+[\w.:-]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*(\/?)>|<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<!\[CDATA\[[\s\S]*?\]\]>|<![^>]*>/g;
-  const attr = /([\w.:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+  const tag = /<(\/?)([A-Za-z_][\w.:-]*)((?:\s+[^\s=/>"']+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*(\/?)>|<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<!\[CDATA\[[\s\S]*?\]\]>|<![^>]*>/g;
+  const attr = /([^\s=/>"']+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+  let last = 0;
   for (let m = tag.exec(text); m; m = tag.exec(text)) {
+    // Texte entre deux balises : rattaché à l'élément ouvert.
+    const between = text.slice(last, m.index).trim();
+    last = m.index + m[0].length;
+    if (between && stack.length > 1) {
+      const top = stack[stack.length - 1]!;
+      top.text = (top.text ? `${top.text} ` : "") + decode(between);
+    }
     if (!m[2]) continue; // commentaire, déclaration
     const [, closing, name, rawAttrs = "", selfClosing] = m;
     if (closing) {

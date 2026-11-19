@@ -44,6 +44,8 @@ export interface ParcelMapProps {
   fillOpacity?: number;
   /** Point du siège : centre de la carte tant qu'il n'y a rien à cadrer (E10). */
   home?: { lat: number; lon: number } | null;
+  /** Éléments du paysage déclarés (dossier PAC) : haies, arbres, mares, ZDH. */
+  landscape?: FeatureCollection;
 }
 
 function bbox(...fcs: FeatureCollection[]): [[number, number], [number, number]] | null {
@@ -74,6 +76,7 @@ export function ParcelMap({
   satellite = null,
   fillOpacity = 0.4,
   home = null,
+  landscape = EMPTY,
 }: ParcelMapProps) {
   const farmId = useFarmId();
   const clickRef = useRef(onMapClick);
@@ -105,6 +108,7 @@ export function ParcelMap({
           water: { type: "geojson", data: EMPTY },
           buffer: { type: "geojson", data: EMPTY },
           highlight: { type: "geojson", data: EMPTY },
+          landscape: { type: "geojson", data: EMPTY },
         },
         layers: [
           { id: "plan", type: "raster", source: "plan" },
@@ -122,6 +126,23 @@ export function ParcelMap({
           {
             id: "water-ditch", type: "line", source: "water", filter: ["all", ["!=", ["geometry-type"], "Polygon"], ["==", ["get", "ditch"], true]],
             paint: { "line-color": "#2B7BB9", "line-width": 1, "line-dasharray": [2, 2] },
+          },
+          // Éléments déclarés à la PAC : végétation en vert, eau en bleu, murs en gris ; ZDH en tireté.
+          {
+            id: "landscape-fill", type: "fill", source: "landscape",
+            filter: ["all", ["!=", ["geometry-type"], "Point"], ["!=", ["get", "kind"], "hedge_densification"]],
+            paint: {
+              "fill-color": ["match", ["get", "kind"], ["pond", "ditch"], "#2B7BB9", ["stone_wall", "other"], "#7A746B", "#3E7D3A"],
+              "fill-opacity": 0.65,
+            },
+          },
+          {
+            id: "landscape-zdh", type: "line", source: "landscape", filter: ["==", ["get", "kind"], "hedge_densification"],
+            paint: { "line-color": "#3E7D3A", "line-width": 1.5, "line-dasharray": [3, 2] },
+          },
+          {
+            id: "landscape-tree", type: "circle", source: "landscape", filter: ["==", ["geometry-type"], "Point"],
+            paint: { "circle-radius": 4, "circle-color": "#3E7D3A", "circle-stroke-color": "#FFFFFF", "circle-stroke-width": 1 },
           },
           { id: "places-fill", type: "fill", source: "places", paint: { "fill-color": "#3B5A78", "fill-opacity": 0.7 } },
           { id: "zones-fill", type: "fill", source: "zones", paint: { "fill-color": "#E85D04", "fill-opacity": 0.3 } },
@@ -180,6 +201,7 @@ export function ParcelMap({
     (m.getSource("water") as GeoJSONSource).setData(water);
     (m.getSource("buffer") as GeoJSONSource).setData(buffer);
     (m.getSource("highlight") as GeoJSONSource).setData(highlight);
+    (m.getSource("landscape") as GeoJSONSource).setData(landscape);
     if (onMapClick) m.getCanvas().style.cursor = "crosshair";
     // Cadrage sur les parcelles et la bande de ZNT ; refait quand la bande arrive.
     const b = bbox(parcels, buffer);
@@ -192,7 +214,7 @@ export function ParcelMap({
       m.jumpTo({ center: [home.lon, home.lat], zoom: 14 });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parcels, places, zones, water, buffer, highlight, ready, home?.lat, home?.lon]);
+  }, [parcels, places, zones, water, buffer, highlight, landscape, ready, home?.lat, home?.lon]);
 
   useEffect(() => {
     const m = map.current;
