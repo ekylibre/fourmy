@@ -13,13 +13,14 @@ plan : [`claudedocs/workflow_import_onboarding.md`](../claudedocs/workflow_impor
 |---|---|---|
 | IM1 Socle | dépôt, reconnaissance, suivi, décisions, abandon, purge ; référentiel AgroEDI | ✅ |
 | IM2 Geofolia | lecture, rapprochement, écriture | ✅ |
-| IM3 TelePAC | îlots, parcelles PAC, haies et arbres déclarés | à faire |
+| IM3 TelePAC | îlots, parcelles PAC, haies et arbres déclarés | ✅ |
 | IM4 DAPLOS | lecteur `ekylibre/agroedei-edifact-daplos-reader` 2.0.0 | à faire |
 | IM5 | historique N-1…N-5, plan de fumure, annulation, page Imports | à faire |
 | IM6 | assistant de premier démarrage | à faire |
 
-Depuis IM2, l'export Geofolia s'importe de bout en bout. DAPLOS et TelePAC
-sont reconnus mais pas encore lus : l'aperçu le dit (avertissement bloquant).
+L'export Geofolia (IM2) et le dossier PAC TelePAC (IM3) s'importent de bout
+en bout. DAPLOS est reconnu mais pas encore lu : l'aperçu le dit
+(avertissement bloquant).
 
 ## Parcours (API)
 
@@ -74,6 +75,43 @@ réécrite.
 Recette (export réel, 19/11/2026) : 41 parcelles, 43 productions datées,
 20 couverts d'interculture, 13 activités, 133 articles, 414 interventions,
 en 13 s ; 18 traitements en feu rouge (10 pour des produits retirés).
+
+## TelePAC (lot IM3)
+
+Ce que devient le dossier PAC exporté de TelePAC (XML « Echanges-producteur ») :
+
+| TelePAC | Fourmy |
+|---|---|
+| Demandeur | fiche « Ma ferme » : SIRET, n° PACAGE, raison sociale, courriel, seulement s'ils sont vides |
+| Parcelle PAC | reliée à la parcelle de la ferme qui la recouvre (IoU ≥ 0,8), sinon parcelle créée avec une production de la campagne (activité d'après le code culture, table `lexicon_cap_codes`) ; une parcelle qui a déjà une culture pour la campagne n'en reçoit pas d'autre |
+| Îlot, parcelle PAC | références `cap_islet` et `cap` de chaque parcelle recouverte (5 % de la plus petite surface au moins), avec la surface commune, le code culture et la surface admissible |
+| SNA, ZDH | éléments du paysage déclarés (`farm_landscape_features`) : couche « Éléments déclarés à la PAC » de la carte, `GET /landscape-features` |
+| Effectifs animaux | mentionnés au rapport, non importés |
+
+Types de SNA (le code d'origine est gardé ; table **déduite** d'un dossier
+réel 2026 d'après la géométrie et la largeur, les notices TelePAC décrivant
+les types sans publier leurs codes) :
+
+| Code | Élément |
+|---|---|
+| V1 | arbre isolé (point) |
+| V2 | alignement d'arbres |
+| V3 | bosquet |
+| V4 | haie |
+| V5 | bois |
+| B2 | fossé non maçonné |
+| B3 | mare |
+| A2 | mur traditionnel en pierres |
+| autre (A1…) | autre élément, signalé |
+
+Écarts de surface de plus de 5 % entre la parcelle PAC et la parcelle
+reliée : listés à l'aperçu. Surfaces TelePAC en ares.
+
+Recette (fichiers réels, 19/11/2026) : après l'export Geofolia, les
+41 parcelles PAC se relient aux 41 parcelles (aucune création, aucune
+culture doublée) ; 41 références de parcelle et d'îlot ; 355 éléments du
+paysage (135 haies, 143 arbres isolés, 48 alignements, 16 ZDH…) ; 7 écarts
+de surface signalés.
 
 ## Reconnaissance du format
 

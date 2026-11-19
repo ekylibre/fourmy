@@ -50,6 +50,12 @@ describe("readTaskData", () => {
     const doc = parseXml(`<?xml version="1.0"?><!-- c --><A x='1' y="a &amp; b &#233;"><B/></A>`);
     expect(doc.children[0]).toEqual({ tag: "A", attrs: { x: "1", y: "a & b é" }, children: [{ tag: "B", attrs: {}, children: [] }] });
     expect(() => parseXml("<A><B></A>")).toThrow("XML mal formé");
+    // Texte des éléments et attributs accentués (TelePAC).
+    const t = parseXml(`<?xml version="1.0" encoding="ISO-8859-1"?><!DOCTYPE x SYSTEM "http://evil/x.dtd"><r a-récolte="true"><siret> 12345678901234 </siret><n>a &amp; b</n></r>`);
+    const r = t.children[0]!;
+    expect(r.attrs["a-récolte"]).toBe("true");
+    expect(r.children.map((c) => [c.tag, c.text])).toEqual([["siret", "12345678901234"], ["n", "a & b"]]);
+    expect(r.text).toBeUndefined();
     expect(() => readTaskData(zip({ "AUTRE.XML": "<X/>" }))).toThrow("TASKDATA.XML absent");
     expect(() => unzip(new Uint8Array([1, 2, 3]))).toThrow("Archive zip illisible");
   });

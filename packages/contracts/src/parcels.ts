@@ -52,7 +52,20 @@ export interface ParcelSheet {
   until: string | null;
   productions: { year: number; activity: { id: string; name: string; color: string | null; pictureUrl: string | null } | null }[];
   cadastre: { idu: string; label: string | null; areaM2: number | null; overlapM2: number | null; geometry: GeoJsonGeometry }[];
-  cap: { id: string; year: number; cropCode: string | null; cropLabel: string | null; areaM2: number | null; overlapM2: number | null }[];
+  /** Parcelles PAC : RPG anonyme (recherche), ou dossier PAC importé (TelePAC : îlot et n° de parcelle). */
+  cap: {
+    id: string;
+    year: number;
+    cropCode: string | null;
+    cropLabel: string | null;
+    areaM2: number | null;
+    overlapM2: number | null;
+    source?: "rpg" | "telepac";
+    islet?: string | null;
+    parcelNumber?: string | null;
+  }[];
+  /** Îlots PAC du dossier importé qui recouvrent la parcelle. */
+  islets?: { ref: string; number: string | null; year: number; overlapM2: number | null }[];
   referencesFetchedAt: string | null;
   water: { id: string; name: string | null; kind: string; permanent: boolean | null; ditch: boolean; distanceM: number; geometry: GeoJsonGeometry }[];
   interventions: { id: string; procedure: string; status: string; at: string | null }[];

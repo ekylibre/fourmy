@@ -43,6 +43,12 @@ la parcelle recoupe (avec la surface commune), parcelles PAC au même
 endroit pour chaque campagne publiée. Stockées avec leurs géométries :
 disponibles hors connexion.
 
+Les références d'un **dossier PAC importé** (TelePAC, [`imports.md`](imports.md)) :
+parcelle PAC (`cap`, avec îlot, n° de parcelle, code culture et surface
+admissible) et îlot (`cap_islet`), marquées `attrs.source = telepac`. Elles
+restent quand on actualise PAC et cadastre ; sur la fiche, le dossier PAC
+l'emporte sur le RPG anonyme pour sa campagne.
+
 ## Fiche (`/f/:ferme/land-parcels/:id`)
 
 Onglets : **Général** (carte avec l'eau, activités par campagne,

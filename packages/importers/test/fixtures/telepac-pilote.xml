@@ -1,0 +1,4590 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<producteurs xmlns="urn:x-telepac:fr.gouv.agriculture.telepac:echange-producteur" xmlns:gml="http://www.opengis.net/gml">
+<producteur numero-pacage="040000003" campagne="Courante" fichier-xsd="Echanges-producteur-export-2026-V1">
+<demandeur certificat-environnemental="true" dossier-sans-demande-aides="false">
+<identification-societe><exploitation>GAEC PILOTE TEST</exploitation></identification-societe>
+<siret>40000000000003</siret>
+<courriel>pilote@exemple.test</courriel>
+</demandeur>
+<rpg>
+<ilot numero-ilot-reference="375428811708" numero-ilot="9">
+   <commune>00000</commune>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559022.803,6560665.966 559019.672,6560646.987 559015.567,6560635.000 559015.113,6560633.070 559014.532,6560630.599 559013.818,6560627.564 559012.876,6560623.555 559011.732,6560618.688 559010.588,6560613.821 558998.295,6560561.533 558995.908,6560551.222 558999.898,6560546.505 559039.418,6560499.942 559066.148,6560464.691 559081.725,6560423.578 559094.652,6560408.476 559121.073,6560349.301 559128.914,6560328.286 559168.762,6560315.024 559213.029,6560294.730 559217.578,6560292.644 559219.853,6560297.102 559222.126,6560301.556 559242.943,6560342.351 559200.267,6560373.726 559166.458,6560398.651 559131.138,6560427.724 559094.637,6560473.791 559075.825,6560508.251 559052.337,6560497.776 559048.010,6560507.659 559055.593,6560517.784 559081.064,6560545.613 559077.923,6560560.533 559071.314,6560570.626 559070.009,6560572.619 559074.039,6560575.563 559075.684,6560574.252 559110.779,6560546.298 559102.165,6560519.329 559080.450,6560505.559 559096.117,6560475.437 559117.421,6560448.683 559120.202,6560445.191 559133.739,6560428.191 559164.559,6560402.982 559196.351,6560384.749 559243.205,6560349.575 559246.620,6560347.011 559261.775,6560365.636 559318.587,6560458.033 559374.342,6560551.665 559422.518,6560633.622 559548.370,6560846.972 559542.204,6560848.395 559383.265,6560882.907 559376.193,6560884.443 559235.320,6560913.851 559219.469,6560887.146 559203.311,6560871.250 559176.406,6560857.274 559144.027,6560831.779 559083.681,6560788.311 559051.296,6560748.162 559038.582,6560704.865 559022.803,6560665.966</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <parcelles>
+    <parcelle>
+     <descriptif-parcelle numero-parcelle="1">
+      <culture-principale production-semences="false" production-fermiers="false" deshydratation="false" derogation-ukraine="false" culture-secondaire="A00" accident-culture="false" declare-IAE="false">
+       <code-culture>PTR</code-culture>
+       <reconversion-pp>false</reconversion-pp>
+       <retournement-pp>false</retournement-pp>
+       <obligation-reimplantation-pp>false</obligation-reimplantation-pp>
+      </culture-principale>
+     </descriptif-parcelle>
+     <geometrie>
+      
+      <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559390.229,6560881.395 559388.417,6560881.788 559383.265,6560882.907 559376.193,6560884.443 559245.667,6560911.691 559235.320,6560913.851 559219.469,6560887.146 559203.311,6560871.250 559176.406,6560857.274 559144.027,6560831.779 559083.681,6560788.311 559051.296,6560748.162 559038.582,6560704.865 559022.803,6560665.966 559019.672,6560646.987 559015.567,6560635.000 559015.113,6560633.070 559023.636,6560625.632 559073.417,6560582.187 559075.684,6560574.252 559110.779,6560546.298 559102.165,6560519.329 559080.450,6560505.559 559096.117,6560475.437 559117.421,6560448.683 559120.202,6560445.191 559125.812,6560438.146 559128.322,6560434.993 559129.052,6560436.224 559390.229,6560881.395</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+      
+     </geometrie>
+     <surface-admissible>810</surface-admissible>
+    </parcelle>
+    <parcelle>
+     <descriptif-parcelle numero-parcelle="2">
+      <culture-principale production-semences="false" production-fermiers="false" deshydratation="false" derogation-ukraine="false" culture-secondaire="A00" accident-culture="false" declare-IAE="false">
+       <code-culture>PTR</code-culture>
+       <reconversion-pp>false</reconversion-pp>
+       <retournement-pp>false</retournement-pp>
+       <obligation-reimplantation-pp>false</obligation-reimplantation-pp>
+      </culture-principale>
+     </descriptif-parcelle>
+     <geometrie>
+      
+      <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559548.370,6560846.972 559542.204,6560848.395 559469.166,6560864.254 559356.168,6560672.695 559308.072,6560590.873 559252.605,6560497.240 559200.211,6560409.738 559188.136,6560389.460 559196.351,6560384.749 559243.205,6560349.575 559246.620,6560347.011 559261.775,6560365.636 559318.587,6560458.033 559374.342,6560551.665 559422.518,6560633.622 559548.370,6560846.972</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+      
+     </geometrie>
+     <surface-admissible>435</surface-admissible>
+    </parcelle>
+    <parcelle>
+     <descriptif-parcelle numero-parcelle="4">
+      <culture-principale production-semences="false" production-fermiers="false" deshydratation="false" derogation-ukraine="false" date-labour="000" accident-culture="false" declare-IAE="false">
+       <code-culture>PPH</code-culture>
+       <precision>002</precision>
+       <reconversion-pp>false</reconversion-pp>
+       <retournement-pp>false</retournement-pp>
+       <obligation-reimplantation-pp>false</obligation-reimplantation-pp>
+      </culture-principale>
+      <engagements-maec surface-cible="false" />
+     </descriptif-parcelle>
+     <geometrie>
+      
+      <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559242.943,6560342.351 559200.267,6560373.726 559166.458,6560398.651 559131.138,6560427.724 559094.637,6560473.791 559075.825,6560508.251 559053.289,6560498.200 559074.988,6560469.583 559090.458,6560428.754 559103.192,6560413.877 559130.332,6560353.091 559136.611,6560336.264 559172.436,6560324.341 559222.126,6560301.556 559242.943,6560342.351</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+      
+     </geometrie>
+     <surface-admissible>140</surface-admissible>
+    </parcelle>
+    <parcelle>
+     <descriptif-parcelle numero-parcelle="5">
+      <culture-principale production-semences="false" production-fermiers="false" deshydratation="false" derogation-ukraine="false" date-labour="000" accident-culture="false" declare-IAE="false">
+       <code-culture>PPH</code-culture>
+       <precision>002</precision>
+       <reconversion-pp>false</reconversion-pp>
+       <retournement-pp>false</retournement-pp>
+       <obligation-reimplantation-pp>false</obligation-reimplantation-pp>
+      </culture-principale>
+      <engagements-maec surface-cible="false" />
+     </descriptif-parcelle>
+     <geometrie>
+      
+      <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559081.064,6560545.613 559077.923,6560560.533 559071.314,6560570.626 559070.009,6560572.619 559074.039,6560575.563 559075.684,6560574.252 559073.417,6560582.187 559023.636,6560625.632 559015.113,6560633.070 559014.532,6560630.599 559013.818,6560627.564 559012.876,6560623.555 559011.732,6560618.688 559010.588,6560613.821 558998.728,6560563.373 559007.528,6560552.970 559047.220,6560506.203 559050.601,6560501.740 559048.010,6560507.659 559055.593,6560517.784 559081.064,6560545.613</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+      
+     </geometrie>
+     <surface-admissible>57</surface-admissible>
+    </parcelle>
+    <parcelle>
+     <descriptif-parcelle numero-parcelle="7">
+      <culture-principale production-semences="false" production-fermiers="false" deshydratation="false" derogation-ukraine="false" accident-culture="false" declare-IAE="false">
+       <code-culture>BTA</code-culture>
+       <precision>4</precision>
+       <reconversion-pp>false</reconversion-pp>
+       <retournement-pp>false</retournement-pp>
+       <obligation-reimplantation-pp>false</obligation-reimplantation-pp>
+      </culture-principale>
+     </descriptif-parcelle>
+     <geometrie>
+      
+      <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559222.126,6560301.556 559172.436,6560324.341 559136.611,6560336.264 559130.332,6560353.091 559103.192,6560413.877 559090.458,6560428.754 559074.988,6560469.583 559053.289,6560498.200 559052.337,6560497.776 559050.601,6560501.740 559047.220,6560506.203 559007.528,6560552.970 558998.728,6560563.373 558998.295,6560561.533 558995.908,6560551.222 558999.898,6560546.505 559039.418,6560499.942 559066.148,6560464.691 559081.725,6560423.578 559094.652,6560408.476 559121.073,6560349.301 559128.914,6560328.286 559168.762,6560315.024 559213.029,6560294.730 559217.578,6560292.644 559219.853,6560297.102 559222.126,6560301.556</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+      
+     </geometrie>
+    </parcelle>
+    <parcelle>
+     <descriptif-parcelle numero-parcelle="8">
+      <culture-principale production-semences="false" production-fermiers="false" deshydratation="false" derogation-ukraine="false" culture-secondaire="A00" accident-culture="false" declare-IAE="false">
+       <code-culture>MIS</code-culture>
+       <precision>002</precision>
+       <reconversion-pp>false</reconversion-pp>
+       <retournement-pp>false</retournement-pp>
+       <obligation-reimplantation-pp>false</obligation-reimplantation-pp>
+      </culture-principale>
+     </descriptif-parcelle>
+     <geometrie>
+      
+      <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559129.052,6560436.224 559128.322,6560434.993 559133.739,6560428.191 559164.559,6560402.982 559188.136,6560389.460 559200.211,6560409.738 559252.605,6560497.240 559308.072,6560590.873 559356.168,6560672.695 559469.166,6560864.254 559467.665,6560864.580 559390.229,6560881.395 559129.052,6560436.224</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+      
+     </geometrie>
+     <surface-admissible>408</surface-admissible>
+    </parcelle>
+   </parcelles>
+  </ilot>
+<ilot numero-ilot-reference="197704730127" numero-ilot="10">
+   <commune>00000</commune>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559467.032,6561290.724 559362.786,6561692.362 559419.329,6561707.889 559439.383,6561713.396 559410.808,6561771.605 559401.548,6561772.399 559024.407,6561591.030 559018.668,6561588.375 559039.438,6561507.810 559041.158,6561502.915 559051.477,6561465.741 559059.943,6561428.831 559069.733,6561394.965 559071.453,6561386.895 559088.783,6561319.294 559097.911,6561285.824 559106.378,6561252.883 559107.833,6561247.724 559115.770,6561216.834 559117.027,6561211.939 559121.181,6561212.750 559145.462,6561216.893 559163.253,6561222.358 559459.574,6561282.216 559462.693,6561285.723 559467.032,6561290.724</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <parcelles>
+    <parcelle>
+     <descriptif-parcelle numero-parcelle="1">
+      <culture-principale production-semences="false" production-fermiers="false" deshydratation="false" derogation-ukraine="false" culture-secondaire="A00" accident-culture="false" declare-IAE="false">
+       <code-culture>MIS</code-culture>
+       <precision>002</precision>
+       <reconversion-pp>false</reconversion-pp>
+       <retournement-pp>false</retournement-pp>
+       <obligation-reimplantation-pp>false</obligation-reimplantation-pp>
+      </culture-principale>
+     </descriptif-parcelle>
+     <geometrie>
+      
+      <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559467.032,6561290.724 559362.786,6561692.362 559419.329,6561707.889 559436.438,6561712.588 559439.383,6561713.396 559410.808,6561771.605 559401.548,6561772.399 559345.938,6561745.655 559195.556,6561673.336 559303.690,6561258.343 559455.709,6561285.886 559457.137,6561284.784 559459.937,6561282.624 559462.693,6561285.723 559467.032,6561290.724</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+      
+     </geometrie>
+     <surface-admissible>797</surface-admissible>
+    </parcelle>
+    <parcelle>
+     <descriptif-parcelle numero-parcelle="2">
+      <culture-principale production-semences="false" production-fermiers="false" deshydratation="false" derogation-ukraine="false" culture-secondaire="A00" accident-culture="false" declare-IAE="false">
+       <code-culture>MIS</code-culture>
+       <precision>002</precision>
+       <reconversion-pp>false</reconversion-pp>
+       <retournement-pp>false</retournement-pp>
+       <obligation-reimplantation-pp>false</obligation-reimplantation-pp>
+      </culture-principale>
+     </descriptif-parcelle>
+     <geometrie>
+      
+      <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559303.690,6561258.343 559195.556,6561673.336 559024.407,6561591.030 559018.668,6561588.375 559039.438,6561507.810 559041.158,6561502.915 559051.477,6561465.741 559059.943,6561428.831 559069.733,6561394.965 559071.453,6561386.895 559088.783,6561319.294 559097.911,6561285.824 559106.378,6561252.883 559107.833,6561247.724 559115.523,6561217.798 559157.099,6561226.605 559173.852,6561231.576 559299.224,6561257.534 559303.690,6561258.343</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+      
+     </geometrie>
+     <surface-admissible>803</surface-admissible>
+    </parcelle>
+    <parcelle>
+     <descriptif-parcelle numero-parcelle="3">
+      <culture-principale production-semences="false" production-fermiers="false" deshydratation="false" derogation-ukraine="false" accident-culture="false" declare-IAE="false">
+       <code-culture>BTA</code-culture>
+       <precision>2</precision>
+       <reconversion-pp>false</reconversion-pp>
+       <retournement-pp>false</retournement-pp>
+       <obligation-reimplantation-pp>false</obligation-reimplantation-pp>
+      </culture-principale>
+     </descriptif-parcelle>
+     <geometrie>
+      
+      <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559459.937,6561282.624 559457.137,6561284.784 559455.709,6561285.886 559303.690,6561258.343 559299.224,6561257.534 559173.852,6561231.576 559157.099,6561226.605 559115.523,6561217.798 559115.770,6561216.834 559117.027,6561211.939 559121.100,6561212.734 559121.181,6561212.750 559145.462,6561216.893 559163.253,6561222.358 559459.574,6561282.216 559459.937,6561282.624</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+      
+     </geometrie>
+    </parcelle>
+   </parcelles>
+  </ilot>
+<ilot numero-ilot-reference="292694578651" numero-ilot="12">
+   <commune>00000</commune>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559227.113,6560915.429 559224.202,6560918.934 559222.483,6560920.224 559221.193,6560922.010 559221.090,6560922.788 559220.952,6560922.955 559218.874,6560935.893 559216.448,6560997.304 559215.081,6561000.506 559197.497,6561014.071 559189.559,6561024.389 559168.657,6561061.431 559146.564,6561095.298 559137.833,6561111.967 559128.705,6561147.421 559120.106,6561183.008 559107.803,6561182.214 559106.480,6561193.459 559096.558,6561190.151 559063.485,6561183.140 559052.108,6561179.303 559059.744,6561164.088 559018.396,6561140.532 559005.432,6561132.991 558994.451,6561126.641 558948.149,6561101.770 558941.115,6561113.290 558916.112,6561098.076 558904.735,6561087.890 558894.548,6561076.248 558867.873,6561044.767 558874.884,6561038.417 558877.534,6561035.773 558846.442,6560998.201 558833.874,6560985.104 558815.490,6560999.913 558804.593,6560987.503 558800.149,6560980.428 558790.098,6560964.426 558789.494,6560963.465 558788.353,6560961.649 558782.260,6560944.640 558776.451,6560928.886 558773.354,6560921.143 558771.289,6560915.979 558769.162,6560914.412 558767.202,6560912.967 558764.058,6560910.912 558761.608,6560909.310 558750.423,6560906.944 558743.467,6560905.080 558729.556,6560901.351 558661.580,6560885.433 558658.846,6560884.582 558658.843,6560884.581 558657.850,6560884.272 558638.812,6560874.946 558619.677,6560859.075 558676.948,6560818.497 558717.334,6560786.321 558674.124,6560746.219 558694.488,6560725.546 558706.416,6560717.436 558713.271,6560698.489 558712.861,6560689.565 558664.486,6560675.468 558647.274,6560691.931 558614.273,6560730.184 558573.262,6560762.024 558560.038,6560746.966 558569.683,6560737.557 558553.008,6560712.245 558509.348,6560676.283 558553.754,6560623.775 558557.964,6560618.761 558537.126,6560605.633 558503.941,6560585.626 558501.448,6560593.135 558484.319,6560631.834 558439.067,6560606.750 558398.690,6560670.199 558356.088,6560660.569 558353.436,6560660.286 558394.433,6560578.268 558419.964,6560538.104 558444.698,6560526.628 558489.726,6560530.866 558545.269,6560547.170 558587.414,6560578.638 558655.656,6560625.004 558705.524,6560641.815 558761.057,6560639.285 558827.809,6560624.094 558914.856,6560597.563 558995.876,6560551.244 559013.710,6560628.410 559013.515,6560632.735 559013.335,6560636.745 559012.685,6560636.774 559007.922,6560638.494 559006.732,6560643.786 559008.055,6560652.781 559033.587,6560718.001 559048.271,6560757.027 559056.738,6560769.728 559072.481,6560786.793 559128.176,6560832.963 559149.210,6560848.706 559173.155,6560863.787 559194.983,6560878.604 559214.562,6560895.802 559224.731,6560909.310 559227.113,6560915.429</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+  <gml:innerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558831.764,6560768.387 558831.576,6560768.086 558828.515,6560763.197 558810.220,6560733.972 558792.768,6560706.095 558785.131,6560693.895 558742.365,6560714.165 558789.922,6560789.794 558792.505,6560788.473 558796.273,6560786.546 558831.763,6560768.388 558831.764,6560768.387</gml:coordinates>
+    </gml:LinearRing>
+  </gml:innerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <parcelles>
+    <parcelle>
+     <descriptif-parcelle numero-parcelle="1">
+      <culture-principale production-semences="false" production-fermiers="false" deshydratation="false" derogation-ukraine="false" date-labour="000" accident-culture="false" declare-IAE="false">
+       <code-culture>PPH</code-culture>
+       <precision>002</precision>
+       <reconversion-pp>false</reconversion-pp>
+       <retournement-pp>false</retournement-pp>
+       <obligation-reimplantation-pp>false</obligation-reimplantation-pp>
+      </culture-principale>
+      <engagements-maec surface-cible="false" />
+     </descriptif-parcelle>
+     <geometrie>
+      
+      <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559134.174,6561126.179 559128.705,6561147.421 559120.106,6561183.008 559115.720,6561182.724 559112.586,6561182.522 559107.803,6561182.214 559106.480,6561193.459 559096.558,6561190.151 559063.485,6561183.140 559055.977,6561180.608 559052.108,6561179.303 559058.410,6561166.745 559059.744,6561164.088 559018.396,6561140.532 559005.432,6561132.991 558994.451,6561126.641 558948.149,6561101.770 558941.115,6561113.290 558916.112,6561098.076 558904.735,6561087.890 558894.548,6561076.248 558872.212,6561049.888 558867.873,6561044.767 558874.884,6561038.417 558875.749,6561037.554 558877.534,6561035.773 558846.442,6560998.201 558833.874,6560985.104 558815.490,6560999.913 558804.593,6560987.503 558800.149,6560980.428 558790.098,6560964.426 558789.494,6560963.465 558788.353,6560961.649 558782.260,6560944.640 558776.451,6560928.886 558773.354,6560921.143 558771.289,6560915.979 558769.162,6560914.412 558767.202,6560912.967 558764.058,6560910.912 558765.270,6560866.736 558851.163,6560927.143 559027.877,6561051.423 559134.174,6561126.179</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+      
+     </geometrie>
+     <surface-admissible>343</surface-admissible>
+    </parcelle>
+    <parcelle>
+     <descriptif-parcelle numero-parcelle="3">
+      <culture-principale production-semences="false" production-fermiers="false" deshydratation="false" derogation-ukraine="false" date-labour="000" accident-culture="false" declare-IAE="false">
+       <code-culture>PPH</code-culture>
+       <precision>002</precision>
+       <reconversion-pp>false</reconversion-pp>
+       <retournement-pp>false</retournement-pp>
+       <obligation-reimplantation-pp>false</obligation-reimplantation-pp>
+      </culture-principale>
+      <engagements-maec surface-cible="false" />
+     </descriptif-parcelle>
+     <geometrie>
+      
+      <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559013.710,6560628.410 559013.515,6560632.735 559004.073,6560635.319 558996.341,6560637.494 558891.515,6560657.545 558815.123,6560690.447 558792.768,6560706.095 558785.131,6560693.895 558742.365,6560714.165 558789.922,6560789.794 558792.505,6560788.473 558796.273,6560786.546 558794.832,6560787.848 558791.927,6560790.060 558788.452,6560792.542 558724.612,6560838.142 558765.270,6560866.736 558764.058,6560910.912 558761.608,6560909.310 558750.423,6560906.944 558743.467,6560905.080 558729.556,6560901.351 558661.580,6560885.433 558658.846,6560884.582 558658.843,6560884.581 558657.850,6560884.272 558638.812,6560874.946 558619.677,6560859.075 558676.948,6560818.497 558717.334,6560786.321 558674.124,6560746.219 558694.488,6560725.546 558706.416,6560717.436 558713.271,6560698.489 558712.861,6560689.565 558664.486,6560675.468 558647.274,6560691.931 558614.273,6560730.184 558573.262,6560762.024 558560.038,6560746.966 558569.683,6560737.557 558553.008,6560712.245 558509.348,6560676.283 558553.754,6560623.775 558557.964,6560618.761 558537.126,6560605.633 558503.941,6560585.626 558501.448,6560593.135 558484.319,6560631.834 558439.067,6560606.750 558398.690,6560670.199 558363.623,6560662.272 558403.148,6560583.199 558426.831,6560545.942 558446.454,6560536.837 558487.832,6560540.732 558540.727,6560556.259 558581.610,6560586.784 558651.167,6560634.043 558704.106,6560651.890 558762.405,6560649.234 558830.380,6560633.765 558918.845,6560606.801 558998.227,6560561.418 559013.710,6560628.410</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+      
+     </geometrie>
+     <surface-admissible>675</surface-admissible>
+    </parcelle>
+    <parcelle>
+     <descriptif-parcelle numero-parcelle="4">
+      <culture-principale production-semences="false" production-fermiers="false" deshydratation="false" derogation-ukraine="false" accident-culture="false" declare-IAE="false">
+       <code-culture>BTA</code-culture>
+       <precision>3</precision>
+       <reconversion-pp>false</reconversion-pp>
+       <retournement-pp>false</retournement-pp>
+       <obligation-reimplantation-pp>false</obligation-reimplantation-pp>
+      </culture-principale>
+     </descriptif-parcelle>
+     <geometrie>
+      
+      <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558998.227,6560561.418 558918.845,6560606.801 558830.380,6560633.765 558762.405,6560649.234 558704.106,6560651.890 558651.167,6560634.043 558581.610,6560586.784 558540.727,6560556.259 558487.832,6560540.732 558446.454,6560536.837 558426.831,6560545.942 558403.148,6560583.199 558363.623,6560662.272 558356.088,6560660.569 558353.436,6560660.286 558394.433,6560578.268 558419.964,6560538.104 558444.698,6560526.628 558489.726,6560530.866 558545.269,6560547.170 558587.414,6560578.638 558655.656,6560625.004 558705.524,6560641.815 558761.057,6560639.285 558827.809,6560624.094 558914.856,6560597.563 558995.876,6560551.244 558998.227,6560561.418</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+      
+     </geometrie>
+    </parcelle>
+    <parcelle>
+     <descriptif-parcelle numero-parcelle="5">
+      <culture-principale production-semences="false" production-fermiers="false" deshydratation="false" derogation-ukraine="false" culture-secondaire="A00" couvert-forestier="false" accident-culture="false" declare-IAE="false">
+       <code-culture>MIS</code-culture>
+       <precision>002</precision>
+      </culture-principale>
+      <engagements-maec elevage-monogastrique="false" />
+     </descriptif-parcelle>
+     <geometrie>
+      
+      <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559012.685,6560636.774 559007.922,6560638.494 559006.732,6560643.786 559008.055,6560652.781 559033.587,6560718.001 559048.271,6560757.027 559056.738,6560769.728 559072.481,6560786.793 559128.176,6560832.963 559149.210,6560848.706 559173.155,6560863.787 559194.983,6560878.604 559214.562,6560895.802 559224.731,6560909.310 559227.113,6560915.429 559224.202,6560918.934 559222.483,6560920.224 559221.193,6560922.010 559221.090,6560922.788 559220.952,6560922.955 559218.874,6560935.893 559218.618,6560942.368 558891.515,6560657.545 558996.341,6560637.494 559004.073,6560635.319 559013.515,6560632.735 559013.335,6560636.745 559012.685,6560636.774</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+      
+     </geometrie>
+     <surface-admissible>161</surface-admissible>
+    </parcelle>
+    <parcelle>
+     <descriptif-parcelle numero-parcelle="6">
+      <culture-principale production-semences="false" production-fermiers="false" deshydratation="false" derogation-ukraine="false" culture-secondaire="A00" couvert-forestier="false" accident-culture="false" declare-IAE="false">
+       <code-culture>MIS</code-culture>
+       <precision>001</precision>
+      </culture-principale>
+      <engagements-maec elevage-monogastrique="false" />
+     </descriptif-parcelle>
+     <geometrie>
+      
+      <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558765.270,6560866.736 558724.612,6560838.142 558788.452,6560792.542 558791.927,6560790.060 558794.832,6560787.848 558796.273,6560786.546 558831.763,6560768.388 558831.764,6560768.387 558831.576,6560768.086 558828.515,6560763.197 558810.220,6560733.972 558792.768,6560706.095 558815.123,6560690.447 558891.515,6560657.545 559218.618,6560942.368 559218.601,6560942.806 559216.448,6560997.304 559215.081,6561000.506 559197.497,6561014.071 559189.559,6561024.389 559168.657,6561061.431 559146.564,6561095.298 559137.833,6561111.967 559134.174,6561126.179 559027.877,6561051.423 558851.163,6560927.143 558765.270,6560866.736</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+      
+     </geometrie>
+     <surface-admissible>1050</surface-admissible>
+    </parcelle>
+   </parcelles>
+  </ilot>
+<ilot numero-ilot-reference="508601099827" numero-ilot="24">
+   <commune>00000</commune>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559856.075,6562078.249 559854.139,6562080.576 559802.181,6562143.035 559799.798,6562145.872 559768.029,6562183.995 559761.675,6562191.710 559647.873,6562328.431 559545.208,6562454.091 559519.676,6562400.380 559508.299,6562384.373 559493.879,6562366.778 559469.670,6562333.573 559445.989,6562296.664 559706.799,6561983.071 559710.288,6561978.187 559712.262,6561975.817 559724.233,6561986.686 559777.560,6562028.893 559856.075,6562078.249</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <parcelles>
+    <parcelle>
+     <descriptif-parcelle numero-parcelle="3">
+      <culture-principale production-semences="false" production-fermiers="false" deshydratation="false" derogation-ukraine="false" accident-culture="false" declare-IAE="false">
+       <code-culture>BTA</code-culture>
+       <precision>4</precision>
+       <reconversion-pp>false</reconversion-pp>
+       <retournement-pp>false</retournement-pp>
+       <obligation-reimplantation-pp>false</obligation-reimplantation-pp>
+      </culture-principale>
+     </descriptif-parcelle>
+     <geometrie>
+      
+      <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559712.521,6561980.222 559710.288,6561978.187 559712.192,6561975.901 559712.262,6561975.817 559724.233,6561986.686 559777.560,6562028.893 559856.075,6562078.249 559854.139,6562080.576 559775.973,6562031.418 559775.698,6562031.245 559722.301,6561988.980 559712.521,6561980.222</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+      
+     </geometrie>
+    </parcelle>
+    <parcelle>
+     <descriptif-parcelle numero-parcelle="4">
+      <culture-principale production-semences="false" production-fermiers="false" deshydratation="false" derogation-ukraine="false" culture-secondaire="A00" accident-culture="false" declare-IAE="false">
+       <code-culture>CAR</code-culture>
+       <precision>001</precision>
+       <reconversion-pp>false</reconversion-pp>
+       <retournement-pp>false</retournement-pp>
+       <obligation-reimplantation-pp>false</obligation-reimplantation-pp>
+      </culture-principale>
+     </descriptif-parcelle>
+     <geometrie>
+      
+      <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559854.139,6562080.576 559802.181,6562143.035 559799.798,6562145.872 559768.029,6562183.995 559761.675,6562191.710 559647.873,6562328.431 559545.208,6562454.091 559519.676,6562400.380 559508.299,6562384.373 559493.879,6562366.778 559469.670,6562333.573 559465.361,6562326.857 559447.689,6562299.312 559445.989,6562296.664 559706.799,6561983.071 559710.288,6561978.187 559712.521,6561980.222 559722.301,6561988.980 559736.814,6562000.467 559775.698,6562031.245 559854.139,6562080.576</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+      
+     </geometrie>
+     <surface-admissible>785</surface-admissible>
+    </parcelle>
+   </parcelles>
+  </ilot>
+<sna-declaree>
+   <numeroSna>649835897813</numeroSna>
+   <surfaceGraphique>60.85</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>EA</categorieSna>
+   <typeSna>B3</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558586.389,6560777.089 558585.571,6560777.724 558583.659,6560779.066 558582.864,6560779.525 558580.883,6560780.423 558578.847,6560781.189 558578.007,6560781.414 558574.570,6560781.981 558571.954,6560781.981 558568.086,6560781.343 558564.825,6560780.115 558563.849,6560779.634 558562.718,6560778.981 558561.813,6560778.377 558560.126,6560776.991 558558.535,6560775.503 558554.227,6560770.617 558549.756,6560765.546 558545.010,6560760.163 558545.001,6560760.153 558543.790,6560758.462 558542.972,6560757.321 558542.537,6560756.568 558541.639,6560754.586 558540.951,6560752.757 558540.511,6560750.871 558540.209,6560749.577 558540.081,6560745.658 558540.647,6560742.068 558494.341,6560689.503 558494.311,6560689.470 558492.028,6560686.283 558490.590,6560683.110 558490.240,6560682.079 558489.958,6560681.028 558489.391,6560677.591 558489.498,6560674.316 558489.519,6560673.673 558490.310,6560670.279 558490.660,6560669.250 558491.076,6560668.244 558492.719,6560665.172 558495.664,6560661.649 558509.994,6560644.504 558514.626,6560638.964 558527.620,6560623.418 558513.178,6560614.583 558502.590,6560639.882 558500.948,6560642.945 558498.877,6560645.469 558497.449,6560646.806 558495.937,6560648.047 558493.165,6560649.771 558490.109,6560650.922 558488.204,6560651.366 558486.274,6560651.684 558483.011,6560651.791 558480.417,6560651.450 558477.663,6560650.614 558476.665,6560650.312 558472.290,6560647.973 558469.263,6560646.356 558478.274,6560628.483 558484.319,6560631.834 558503.700,6560585.340 558557.879,6560618.483 558509.348,6560676.283 558512.963,6560680.387 558511.780,6560681.237 558532.331,6560704.863 558532.686,6560705.271 558532.783,6560705.199 558534.022,6560704.292 558565.717,6560740.270 558560.038,6560746.966 558586.389,6560777.089</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>806998180683</numeroSna>
+   <surfaceGraphique>0.69</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>AT</categorieSna>
+   <typeSna>A1</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558806.465,6560671.594 558808.399,6560672.948 558809.754,6560675.316 558809.754,6560677.782 558808.448,6560679.861 558805.062,6560681.552 558802.256,6560681.166 558800.757,6560679.522 558800.322,6560676.960 558801.483,6560673.963 558803.659,6560672.561 558806.465,6560671.594</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+     <portee>CPPP</portee>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>260697362347</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>6.4</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559237.620,6561237.990</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>788329482833</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>14.5</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>558609.261,6560655.595</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>590303026750</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>9.5</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>558566.810,6560613.041</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>502864513531</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>8.8</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>558958.084,6560606.451</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>759777393678</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>4.3</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559523.847,6562405.066</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>24</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>24</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>173856216212</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>3.7</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559519.082,6562397.767</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>24</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>24</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>947577125791</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>6.3</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559847.021,6562086.842</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>24</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>24</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>183431723379</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>8.5</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559448.407,6562295.920</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>24</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>24</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>398757024758</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>2.7</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559233.391,6561690.880</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>1</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>145081961666</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>4.9</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559069.796,6561611.791</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>361448567599</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>3.2</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559151.343,6561651.960</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>142098067490</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>2.1</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559142.867,6561646.895</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>872494131859</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>2.6</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559225.635,6561687.186</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>1</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>791528035109</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>2.7</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559083.493,6561618.297</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>618943248723</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>1.3</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559182.958,6561666.634</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>808821968847</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>0.7</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559158.028,6561654.954</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>606456027907</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:52</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:52</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>0.6</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559160.708,6561656.548</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>557859370261</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>1.1</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559163.453,6561657.531</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>324160380420</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>0.8</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559399.357,6561550.997</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>1</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>343246276918</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>3.6</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559206.756,6561232.219</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>616195031706</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>3.6</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559287.273,6561249.550</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>479576232072</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>2.5</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559377.093,6561267.291</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>304442501712</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>2.9</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559382.485,6561267.726</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>855596400358</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>8.5</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>558580.719,6560594.920</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>984331950436</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>4.3</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>558598.510,6560599.312</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>492806667643</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>3.2</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>558616.798,6560725.531</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>009197742231</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>5.3</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>558711.049,6560706.843</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>929814506630</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>13.6</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>558675.428,6560654.277</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>852237239126</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>2.9</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>558609.156,6560732.544</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>710249001755</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>2.1</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>558582.049,6560754.131</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>599037919970</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>2</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>558666.017,6560886.006</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>896871395801</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>1.4</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>558630.684,6560851.313</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>360165444868</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>9.7</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>558736.659,6560722.750</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>863089596697</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>3.9</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>558673.380,6560886.315</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>073830764326</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>13.9</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>558803.583,6560693.944</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>653888863756</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>3.8</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>558809.892,6560680.152</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>202380248052</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>6.7</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>558926.285,6560601.412</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>108630673414</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>9.1</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>558934.045,6560613.447</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>384409939668</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>4.7</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>558947.909,6560616.393</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>845709920715</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>3.6</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>558934.030,6560651.589</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>5</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>837069307052</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:52</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:52</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>3.5</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559012.160,6560634.508</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>5</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>160746792010</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>15.2</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559107.970,6560550.578</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>1</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>144428274114</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>4.4</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559071.253,6560569.920</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>5</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>774116124970</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>2.6</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559170.226,6560389.895</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>993550506768</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>3.5</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559165.792,6560390.649</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>291799397896</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>0.9</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559141.884,6560421.644</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>8</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>560978796689</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>2.1</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559207.598,6560377.532</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>773214990977</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>0.9</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559215.628,6560371.887</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>255086264326</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>4.5</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559084.110,6560483.448</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>486788251339</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>3.3</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559073.612,6560497.813</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>523063847856</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>2.8</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559080.371,6560427.414</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>843382244128</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>2.5</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559142.917,6560326.289</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>160232015194</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>2.6</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559131.259,6560329.834</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>661716182380</numeroSna>
+   <surfaceGraphique>0.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V1</typeSna>
+   <largeur>5.6</largeur>
+   <geometrie>
+    
+    <gml:Point>
+  <gml:coordinates>559690.161,6562274.685</gml:coordinates>
+</gml:Point>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>24</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>24</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>721313677220</numeroSna>
+   <surfaceGraphique>1.86</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558793.882,6560701.425 558793.882,6560702.973 558793.427,6560704.183 558792.606,6560705.183 558792.306,6560705.356 558791.265,6560705.957 558789.730,6560706.159 558788.457,6560705.860 558773.368,6560699.470 558771.583,6560698.715 558770.487,6560697.620 558769.895,6560696.189 558769.895,6560694.640 558770.487,6560693.210 558771.371,6560692.266 558772.512,6560691.656 558773.788,6560691.446 558774.815,6560691.581 558782.863,6560694.970 558786.856,6560696.651 558792.194,6560698.899 558793.290,6560699.994 558793.882,6560701.425</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>21</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>949251867952</numeroSna>
+   <surfaceGraphique>3.14</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558928.270,6560640.537 558927.975,6560642.323 558927.334,6560643.624 558926.097,6560644.945 558924.841,6560645.670 558923.078,6560646.081 558921.277,6560645.903 558919.937,6560645.348 558909.765,6560638.969 558908.310,6560637.646 558903.433,6560630.994 558902.686,6560629.346 558902.497,6560627.908 558902.686,6560626.470 558903.241,6560625.130 558904.124,6560623.980 558905.274,6560623.097 558906.614,6560622.542 558908.052,6560622.353 558909.837,6560622.648 558911.138,6560623.289 558912.459,6560624.526 558916.568,6560630.122 558925.801,6560635.918 558927.122,6560637.156 558927.975,6560638.752 558928.270,6560640.537</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <nombreArbres>2</nombreArbres>
+     <longueur-iae>27.3</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>271275521308</numeroSna>
+   <surfaceGraphique>1.46</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559057.177,6560516.981 559058.145,6560517.141 559059.011,6560517.604 559074.080,6560531.646 559074.600,6560532.701 559074.676,6560533.874 559074.299,6560534.987 559073.676,6560535.746 559072.658,6560536.333 559072.617,6560536.340 559071.689,6560536.493 559070.536,6560536.264 559069.638,6560535.688 559054.787,6560521.828 559054.267,6560520.774 559054.190,6560519.601 559054.568,6560518.487 559055.343,6560517.604 559055.425,6560517.560 559056.209,6560517.141 559057.177,6560516.981</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>5</numeroParcelle>
+     <nombreArbres>5</nombreArbres>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>720840976121</numeroSna>
+   <surfaceGraphique>1.37</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558974.903,6560593.133 558976.061,6560593.247 558990.057,6560599.444 558990.976,6560600.492 558991.386,6560601.581 558991.386,6560602.974 558990.976,6560604.063 558990.057,6560605.111 558989.031,6560605.660 558987.650,6560605.842 558986.451,6560605.549 558972.962,6560599.530 558972.043,6560598.482 558971.595,6560597.163 558971.686,6560595.772 558972.303,6560594.522 558972.962,6560593.863 558973.988,6560593.315 558974.903,6560593.133</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <nombreArbres>2</nombreArbres>
+     <longueur-iae>20.9</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>324560504355</numeroSna>
+   <surfaceGraphique>3.3</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559525.050,6562408.116 559526.495,6562407.403 559526.866,6562407.366 559527.835,6562407.271 559529.392,6562407.688 559530.485,6562408.472 559531.269,6562409.566 559543.549,6562441.851 559543.654,6562443.460 559543.136,6562444.986 559543.134,6562444.988 559542.283,6562446.026 559540.887,6562446.832 559539.289,6562447.043 559537.732,6562446.625 559536.453,6562445.644 559535.698,6562444.389 559523.574,6562412.462 559523.469,6562410.854 559523.987,6562409.328 559525.050,6562408.116</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>24</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>24</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+     <longueur-iae>41.7</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>690053329866</numeroSna>
+   <surfaceGraphique>1.64</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558680.190,6560680.306 558680.322,6560680.077 558680.846,6560679.647 558682.157,6560679.386 558704.370,6560684.291 558712.942,6560687.768 558716.486,6560693.189 558716.765,6560694.229 558716.550,6560695.149 558715.951,6560695.879 558714.957,6560696.291 558714.017,6560696.198 558713.137,6560695.567 558713.036,6560695.495 558710.276,6560691.099 558703.091,6560688.254 558681.217,6560683.417 558680.514,6560683.011 558680.020,6560682.368 558679.811,6560681.584 558679.916,6560680.780 558680.190,6560680.306</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>39.4</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>559522719282</numeroSna>
+   <surfaceGraphique>1.45</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:52</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:52</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559069.505,6560767.953 559069.340,6560769.628 559069.078,6560770.207 559051.951,6560748.306 559046.594,6560731.870 559048.255,6560732.144 559048.457,6560732.244 559049.464,6560732.741 559050.692,6560733.891 559051.346,6560735.011 559057.786,6560750.127 559068.562,6560765.300 559069.123,6560766.315 559069.505,6560767.953</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>1</numeroParcelle>
+     <longueur-iae>42.1</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>834971433196</numeroSna>
+   <surfaceGraphique>0.77</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559116.365,6560338.296 559116.596,6560337.682 559117.114,6560337.091 559117.818,6560336.744 559118.602,6560336.692 559119.346,6560336.945 559119.937,6560337.463 559120.285,6560338.168 559120.347,6560338.851 559119.134,6560353.643 559119.006,6560355.217 559118.705,6560355.943 559118.149,6560356.498 559117.794,6560356.645 559117.423,6560356.799 559116.638,6560356.799 559115.912,6560356.498 559115.433,6560356.050 559115.017,6560354.824 559116.365,6560338.296</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+     <longueur-iae>2.7</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>360341702443</numeroSna>
+   <surfaceGraphique>1.78</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558736.686,6560762.951 558738.255,6560763.054 558739.665,6560763.750 558740.563,6560764.708 558741.164,6560766.161 558741.207,6560767.473 558740.702,6560768.962 558739.723,6560770.099 558726.355,6560780.630 558724.837,6560781.037 558723.278,6560780.832 558721.916,6560780.045 558720.958,6560778.798 558720.577,6560777.541 558720.577,6560776.489 558720.850,6560775.473 558721.543,6560774.358 558735.429,6560763.332 558736.686,6560762.951</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <nombreArbres>2</nombreArbres>
+     <longueur-iae>24</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>001316485491</numeroSna>
+   <surfaceGraphique>7.4</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558591.731,6560672.423 558591.504,6560674.150 558590.606,6560676.131 558573.520,6560698.507 558572.210,6560699.656 558565.806,6560703.923 558564.251,6560704.688 558562.542,6560705.028 558551.946,6560705.168 558550.219,6560704.940 558548.238,6560704.043 558546.651,6560702.556 558545.626,6560700.639 558545.271,6560698.493 558545.499,6560696.765 558546.166,6560695.156 558547.545,6560693.474 558548.994,6560692.506 558550.219,6560692.045 558551.510,6560691.832 558560.048,6560691.718 558563.873,6560689.169 558579.761,6560668.359 558581.348,6560666.872 558582.502,6560666.256 558583.754,6560665.876 558585.056,6560665.747 558586.359,6560665.876 558587.611,6560666.256 558588.765,6560666.872 558589.776,6560667.703 558590.606,6560668.714 558591.504,6560670.695 558591.731,6560672.423</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <nombreArbres>3</nombreArbres>
+     <longueur-iae>58.4</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>766966013638</numeroSna>
+   <surfaceGraphique>1.18</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558541.108,6560701.620 558542.168,6560701.942 558543.217,6560702.745 558551.894,6560712.780 558552.237,6560714.062 558552.064,6560715.377 558551.401,6560716.526 558550.348,6560717.334 558549.507,6560717.619 558548.400,6560717.656 558547.543,6560717.426 558546.602,6560716.841 558537.615,6560706.496 558537.271,6560705.214 558537.380,6560704.111 558537.967,6560702.922 558538.775,6560702.164 558539.784,6560701.707 558541.108,6560701.620</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>10.1</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>139657539120</numeroSna>
+   <surfaceGraphique>0.83</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558891.228,6560631.044 558891.588,6560630.276 558892.372,6560629.492 558893.215,6560629.110 558894.321,6560629.038 558895.207,6560629.306 558895.959,6560629.845 558896.575,6560630.767 558896.785,6560631.668 558896.673,6560632.664 558893.355,6560643.372 558892.571,6560644.156 558891.547,6560644.580 558890.439,6560644.580 558889.415,6560644.156 558888.445,6560643.050 558888.207,6560642.348 558888.177,6560641.423 558891.228,6560631.044</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <nombreArbres>2</nombreArbres>
+     <longueur-iae>16</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>763200682960</numeroSna>
+   <surfaceGraphique>6.66</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559073.887,6560575.452 559076.938,6560562.037 559079.663,6560550.058 559080.191,6560549.071 559080.310,6560548.848 559081.180,6560547.787 559082.241,6560546.917 559083.450,6560546.271 559084.763,6560545.872 559086.128,6560545.738 559088.377,6560546.109 559090.388,6560547.184 559091.389,6560548.122 559092.188,6560549.237 559092.754,6560550.486 559093.066,6560551.822 559092.952,6560554.285 559091.203,6560561.891 559084.368,6560591.625 559083.722,6560592.834 559082.851,6560593.895 559081.791,6560594.765 559080.581,6560595.412 559079.268,6560595.810 559077.903,6560595.944 559076.538,6560595.810 559075.226,6560595.412 559073.290,6560594.208 559071.843,6560592.446 559071.040,6560590.312 559070.921,6560588.489 559073.887,6560575.452</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>5</numeroParcelle>
+     <longueur-iae>20.8</longueur-iae>
+    </intersectionSnaParcelle>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>1</numeroParcelle>
+     <longueur-iae>28.8</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>311630463746</numeroSna>
+   <surfaceGraphique>1.61</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558713.140,6560725.354 558712.830,6560726.680 558712.112,6560727.836 558710.818,6560728.828 558709.516,6560729.223 558707.930,6560729.127 558697.576,6560726.464 558695.396,6560725.903 558694.157,6560725.341 558693.004,6560724.189 558692.380,6560722.683 558692.380,6560721.053 558693.004,6560719.547 558693.723,6560718.727 558694.630,6560718.121 558695.932,6560717.726 558697.023,6560717.726 558704.330,6560719.588 558710.052,6560721.046 558711.292,6560721.608 558712.444,6560722.760 558713.006,6560724.000 558713.140,6560725.354</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>16.7</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>238872009972</numeroSna>
+   <surfaceGraphique>2.22</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558939.842,6560632.498 558941.132,6560631.208 558942.817,6560630.510 558944.035,6560630.430 558945.518,6560630.776 558946.811,6560631.581 558947.616,6560632.498 558955.133,6560648.006 558955.506,6560649.122 558955.556,6560650.644 558954.969,6560652.371 558953.767,6560653.743 558952.424,6560654.461 558950.615,6560654.699 558949.132,6560654.353 558947.615,6560653.340 558946.708,6560652.062 558939.517,6560637.123 558939.144,6560636.007 558939.144,6560634.183 558939.842,6560632.498</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>5</numeroParcelle>
+     <longueur-iae>8.5</longueur-iae>
+    </intersectionSnaParcelle>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>17.2</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>202249650041</numeroSna>
+   <surfaceGraphique>7.17</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559056.788,6560588.109 559058.165,6560588.337 559059.471,6560588.828 559060.657,6560589.565 559062.243,6560591.259 559063.200,6560593.372 559063.428,6560594.749 559063.382,6560596.144 559063.065,6560597.504 559062.489,6560598.775 559060.875,6560600.690 559029.428,6560626.708 559028.156,6560627.284 559026.797,6560627.601 559025.402,6560627.646 559024.025,6560627.419 559022.718,6560626.927 559021.533,6560626.190 559020.514,6560625.236 559019.701,6560624.101 559018.884,6560621.930 559018.808,6560619.611 559019.481,6560617.391 559020.832,6560615.505 559052.761,6560589.048 559054.033,6560588.472 559055.392,6560588.155 559056.788,6560588.109</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>5</numeroParcelle>
+     <longueur-iae>27.8</longueur-iae>
+    </intersectionSnaParcelle>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>1</numeroParcelle>
+     <longueur-iae>26</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>447270576872</numeroSna>
+   <surfaceGraphique>3.27</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559044.722,6560700.681 559044.265,6560703.450 559043.557,6560704.775 559042.942,6560705.925 559015.189,6560639.075 559016.855,6560639.350 559017.086,6560639.437 559018.436,6560639.945 559019.870,6560640.837 559021.103,6560641.991 559022.086,6560643.364 559041.257,6560688.632 559044.428,6560698.452 559044.722,6560700.681</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>1</numeroParcelle>
+     <longueur-iae>69.6</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>188868713052</numeroSna>
+   <surfaceGraphique>19.27</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558822.617,6560679.485 558824.191,6560676.953 558826.496,6560675.062 558890.791,6560646.480 558892.765,6560646.177 558916.379,6560645.160 558918.558,6560645.327 558920.274,6560645.848 558921.856,6560646.693 558924.032,6560648.731 558925.438,6560651.360 558925.923,6560654.302 558925.438,6560657.243 558924.381,6560659.385 558922.343,6560661.561 558920.274,6560662.756 558917.371,6560663.433 558895.293,6560664.386 558833.439,6560691.826 558831.670,6560692.118 558829.877,6560692.059 558828.130,6560691.652 558826.496,6560690.911 558825.038,6560689.866 558823.811,6560688.557 558822.864,6560687.034 558822.232,6560685.355 558821.940,6560682.388 558822.617,6560679.485</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>5</numeroParcelle>
+     <longueur-iae>18.4</longueur-iae>
+    </intersectionSnaParcelle>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>53.5</longueur-iae>
+    </intersectionSnaParcelle>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>6</numeroParcelle>
+     <longueur-iae>41.2</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>975656660392</numeroSna>
+   <surfaceGraphique>0.91</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558785.741,6560796.485 558785.720,6560797.117 558785.498,6560797.709 558784.998,6560798.278 558767.846,6560810.195 558767.129,6560810.438 558766.373,6560810.389 558765.694,6560810.054 558765.262,6560809.592 558764.972,6560808.893 558764.972,6560808.135 558765.262,6560807.436 558765.768,6560806.920 558782.846,6560795.058 558783.563,6560794.814 558784.319,6560794.864 558784.998,6560795.199 558785.498,6560795.768 558785.741,6560796.485</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>6</numeroParcelle>
+     <longueur-iae>12.2</longueur-iae>
+    </intersectionSnaParcelle>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>12.2</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>252637855860</numeroSna>
+   <surfaceGraphique>1.16</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558744.806,6560747.060 558745.920,6560747.243 558747.091,6560747.919 558747.807,6560748.792 558748.224,6560749.958 558750.096,6560761.253 558750.113,6560762.271 558749.678,6560763.551 558748.787,6560764.568 558747.575,6560765.166 558746.226,6560765.254 558745.352,6560765.020 558744.393,6560764.424 558743.397,6560762.933 558741.388,6560751.091 558741.371,6560750.072 558741.699,6560748.992 558742.522,6560747.919 558743.692,6560747.243 558744.806,6560747.060</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <nombreArbres>2</nombreArbres>
+     <longueur-iae>18.2</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>698184906683</numeroSna>
+   <surfaceGraphique>28.69</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V3</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558750.030,6560710.532 558750.612,6560708.208 558755.467,6560707.955 558760.018,6560707.718 558765.558,6560707.321 558768.529,6560715.354 558779.128,6560721.997 558795.113,6560729.362 558800.982,6560729.895 558808.630,6560736.650 558819.375,6560748.596 558822.858,6560752.469 558822.951,6560754.310 558823.570,6560766.511 558820.555,6560774.122 558820.190,6560775.043 558796.358,6560788.374 558796.329,6560786.517 558796.180,6560776.998 558783.698,6560773.489 558775.472,6560756.198 558753.568,6560730.757 558747.770,6560719.566 558750.030,6560710.532</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+     <portee>TA</portee>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>155060956190</numeroSna>
+   <surfaceGraphique>0.08</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>0.9</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559202.516,6561675.123 559210.091,6561678.768 559209.682,6561679.617 559202.128,6561675.929 559202.516,6561675.123</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+     <largeur>0.9</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>1</numeroParcelle>
+     <longueur-iae>8.4</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>380800207819</numeroSna>
+   <surfaceGraphique>0.12</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559710.667,6562248.994 559711.455,6562249.610 559703.871,6562259.399 559703.058,6562258.817 559710.667,6562248.994</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>24</numeroIlot>
+     <largeur>1</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>24</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+     <longueur-iae>12.4</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>651831160528</numeroSna>
+   <surfaceGraphique>0.37</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559667.830,6562303.152 559685.721,6562280.784 559686.504,6562281.406 559668.605,6562303.785 559662.940,6562310.574 559662.172,6562309.934 559667.830,6562303.152</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>24</numeroIlot>
+     <largeur>1</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>24</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+     <longueur-iae>37.5</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>305577139537</numeroSna>
+   <surfaceGraphique>0.05</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>0.8</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559215.778,6561682.593 559215.827,6561682.484 559221.337,6561684.934 559221.201,6561685.241 559221.008,6561685.675 559215.497,6561683.225 559215.778,6561682.593</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+     <largeur>0.8</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>1</numeroParcelle>
+     <longueur-iae>6</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>119289310739</numeroSna>
+   <surfaceGraphique>1.33</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1.8</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558761.247,6560906.993 558760.978,6560908.786 558755.790,6560908.005 558745.734,6560905.626 558744.788,6560905.434 558732.083,6560902.850 558688.897,6560892.850 558689.123,6560891.883 558689.309,6560891.085 558713.607,6560896.757 558732.466,6560901.078 558746.151,6560903.862 558756.171,6560906.232 558761.247,6560906.993</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+     <largeur>1.8</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>73.8</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>150531570438</numeroSna>
+   <surfaceGraphique>1.44</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1.8</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559594.834,6562391.521 559596.281,6562392.664 559583.047,6562409.419 559581.514,6562411.360 559566.948,6562429.264 559566.273,6562430.012 559552.692,6562445.070 559545.922,6562451.436 559544.152,6562453.102 559542.888,6562451.758 559545.145,6562449.638 559551.348,6562443.807 559568.947,6562424.295 559594.834,6562391.521</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>24</numeroIlot>
+     <largeur>1.8</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>24</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+     <longueur-iae>79.2</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>137873135215</numeroSna>
+   <surfaceGraphique>7.48</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>2</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559025.466,6561563.941 559033.971,6561532.062 559061.156,6561428.643 559068.237,6561401.284 559081.521,6561347.893 559088.958,6561320.093 559092.680,6561304.500 559100.556,6561275.277 559106.843,6561249.941 559114.106,6561223.718 559114.756,6561223.898 559116.033,6561224.251 559108.777,6561250.449 559102.493,6561275.779 559094.618,6561304.992 559090.898,6561320.583 559083.458,6561348.391 559070.175,6561401.778 559063.091,6561429.147 559035.905,6561532.572 559027.395,6561564.468 559024.534,6561574.686 559021.377,6561585.965 559019.451,6561585.426 559025.466,6561563.941</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+     <largeur>2</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+     <longueur-iae>373.9</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>213533033502</numeroSna>
+   <surfaceGraphique>0.49</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1.5</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559787.405,6562035.605 559787.701,6562035.149 559814.441,6562052.547 559814.193,6562052.929 559813.601,6562053.838 559786.861,6562036.441 559787.405,6562035.605</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>24</numeroIlot>
+     <largeur>1.5</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>24</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+     <longueur-iae>31.9</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>733699847072</numeroSna>
+   <surfaceGraphique>0.29</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559617.660,6562363.613 559618.477,6562364.191 559613.129,6562371.743 559605.851,6562380.994 559603.927,6562383.783 559603.812,6562383.950 559599.984,6562388.655 559599.968,6562388.644 559599.556,6562388.360 559605.045,6562380.401 559612.328,6562371.144 559617.660,6562363.613</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>24</numeroIlot>
+     <largeur>1</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>24</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+     <longueur-iae>24.5</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>587607058341</numeroSna>
+   <surfaceGraphique>1.52</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>2</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558709.204,6560793.690 558710.586,6560795.136 558690.613,6560814.240 558688.549,6560818.693 558678.951,6560820.569 558674.648,6560824.069 558649.229,6560840.906 558648.520,6560839.833 558658.231,6560832.544 558673.461,6560822.456 558678.077,6560818.702 558687.163,6560816.926 558688.957,6560813.056 558709.204,6560793.690</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+     <largeur>2</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>78.1</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>649005981497</numeroSna>
+   <surfaceGraphique>1.19</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>3.8</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558512.963,6560680.387 558514.921,6560678.981 558535.630,6560703.113 558534.022,6560704.292 558532.686,6560705.271 558511.780,6560681.237 558512.963,6560680.387</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+     <largeur>3.8</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>8.6</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>026794681436</numeroSna>
+   <surfaceGraphique>0.36</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1.1</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559819.399,6562055.517 559847.032,6562071.179 559846.782,6562071.621 559846.469,6562072.174 559818.835,6562056.511 559819.228,6562055.817 559819.399,6562055.517</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>24</numeroIlot>
+     <largeur>1.1</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>24</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+     <longueur-iae>31.1</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>177095018931</numeroSna>
+   <surfaceGraphique>0.22</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559138.608,6560424.564 559132.828,6560430.134 559128.546,6560434.713 559123.439,6560440.173 559122.705,6560439.486 559132.112,6560429.428 559137.911,6560423.839 559138.417,6560424.365 559138.608,6560424.564</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+     <largeur>1</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>8</numeroParcelle>
+     <longueur-iae>14.3</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>096020520559</numeroSna>
+   <surfaceGraphique>1</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558685.090,6560867.219 558707.530,6560850.693 558748.530,6560821.725 558749.109,6560822.541 558708.115,6560851.504 558685.658,6560868.043 558667.256,6560879.887 558666.715,6560879.046 558685.090,6560867.219</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+     <largeur>1</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>71.2</longueur-iae>
+    </intersectionSnaParcelle>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>6</numeroParcelle>
+     <longueur-iae>28.6</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>351574317040</numeroSna>
+   <surfaceGraphique>0.19</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1.8</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558760.036,6560810.961 558761.204,6560812.346 558753.317,6560818.992 558752.149,6560817.607 558760.036,6560810.961</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+     <largeur>1.8</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>5.2</longueur-iae>
+    </intersectionSnaParcelle>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>6</numeroParcelle>
+     <longueur-iae>5.2</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>966264562167</numeroSna>
+   <surfaceGraphique>0.63</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1.6</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559438.524,6561712.775 559439.980,6561713.480 559431.445,6561731.098 559428.246,6561737.323 559421.715,6561749.410 559420.529,6561748.800 559429.989,6561730.393 559438.524,6561712.775</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+     <largeur>1.6</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>1</numeroParcelle>
+     <longueur-iae>40.1</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>021186103995</numeroSna>
+   <surfaceGraphique>1.55</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1.5</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559336.858,6561739.936 559336.270,6561741.235 559334.689,6561740.518 559315.007,6561731.595 559290.145,6561719.552 559239.197,6561694.259 559239.290,6561694.072 559239.829,6561692.982 559264.161,6561705.024 559290.774,6561718.272 559315.612,6561730.304 559336.858,6561739.936</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+     <largeur>1.5</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>1</numeroParcelle>
+     <longueur-iae>107.8</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>601986482490</numeroSna>
+   <surfaceGraphique>0.73</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1.8</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559283.623,6561246.597 559283.211,6561248.197 559280.329,6561247.588 559268.773,6561244.614 559243.099,6561239.460 559243.450,6561237.714 559269.170,6561242.877 559283.623,6561246.597</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+     <largeur>1.8</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+     <longueur-iae>41.1</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>706519311373</numeroSna>
+   <surfaceGraphique>0.72</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1.2</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559313.578,6561254.781 559313.743,6561253.865 559313.811,6561253.643 559364.173,6561263.790 559374.939,6561265.152 559374.794,6561266.304 559365.665,6561265.149 559361.775,6561264.491 559313.578,6561254.781</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+     <largeur>1.2</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+     <longueur-iae>62.3</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>090334920140</numeroSna>
+   <surfaceGraphique>0.78</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1.8</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559025.304,6561590.366 559064.941,6561608.916 559064.571,6561609.707 559064.182,6561610.538 559024.544,6561591.988 559024.923,6561591.179 559025.304,6561590.366</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+     <largeur>1.8</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+     <longueur-iae>43.8</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>704819291386</numeroSna>
+   <surfaceGraphique>0.44</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1.1</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559164.690,6560402.907 559165.356,6560402.630 559166.485,6560401.878 559177.603,6560394.470 559178.100,6560395.216 559178.226,6560395.405 559165.903,6560403.614 559161.839,6560405.305 559154.833,6560410.937 559146.436,6560417.687 559145.732,6560416.811 559161.269,6560404.331 559164.690,6560402.907</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+     <largeur>1.1</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>8</numeroParcelle>
+     <longueur-iae>28.2</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>568812749849</numeroSna>
+   <surfaceGraphique>1.14</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>3.2</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558428.299,6560626.165 558430.405,6560628.596 558425.134,6560633.160 558410.063,6560656.983 558407.713,6560655.496 558407.346,6560655.264 558422.671,6560631.067 558424.388,6560629.572 558428.299,6560626.165</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+     <largeur>3.2</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>31.1</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>872308010231</numeroSna>
+   <surfaceGraphique>0.36</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1.8</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559211.182,6561231.602 559233.066,6561235.619 559232.744,6561237.376 559227.084,6561236.337 559210.939,6561232.926 559211.182,6561231.602</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+     <largeur>1.8</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+     <longueur-iae>22.3</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>259221435199</numeroSna>
+   <surfaceGraphique>0.36</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559386.749,6561266.991 559410.196,6561271.093 559421.274,6561272.648 559421.133,6561273.653 559410.038,6561272.095 559386.574,6561267.990 559386.749,6561266.991</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+     <largeur>1</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+     <longueur-iae>19.5</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>054422830981</numeroSna>
+   <surfaceGraphique>0.3</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1.8</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559121.017,6561636.327 559121.113,6561636.130 559136.093,6561643.412 559135.985,6561643.635 559135.307,6561645.030 559120.326,6561637.748 559121.017,6561636.327</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+     <largeur>1.8</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+     <longueur-iae>16.7</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>906082558058</numeroSna>
+   <surfaceGraphique>0.6</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1.5</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558623.195,6560858.839 558623.171,6560858.857 558623.421,6560859.090 558622.432,6560860.157 558593.318,6560833.354 558594.322,6560832.259 558611.872,6560848.344 558623.195,6560858.839</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+     <largeur>1.5</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>2.5</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>253322420565</numeroSna>
+   <surfaceGraphique>0.19</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1.5</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559008.346,6561582.001 559019.729,6561586.895 559019.133,6561588.279 559007.751,6561583.386 559008.346,6561582.001</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+     <largeur>1.5</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+     <longueur-iae>0.7</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>624696329151</numeroSna>
+   <surfaceGraphique>0.68</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>2.7</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558662.302,6560675.346 558664.471,6560677.000 558660.086,6560682.752 558659.324,6560683.751 558654.637,6560691.142 558653.282,6560698.330 558650.601,6560697.825 558652.111,6560690.052 558653.946,6560687.151 558657.052,6560682.240 558662.302,6560675.346</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+     <largeur>2.7</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>9.4</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>862990934316</numeroSna>
+   <surfaceGraphique>2.7</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>2</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559769.841,6562180.329 559802.318,6562142.187 559843.740,6562093.022 559844.503,6562093.668 559844.566,6562093.721 559845.267,6562094.313 559803.847,6562143.475 559771.373,6562181.616 559758.195,6562197.531 559757.539,6562196.988 559757.425,6562196.893 559756.654,6562196.255 559769.841,6562180.329</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>24</numeroIlot>
+     <largeur>2</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>24</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+     <longueur-iae>67.5</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>332858521220</numeroSna>
+   <surfaceGraphique>1.31</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>3</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559001.523,6560636.028 559002.237,6560638.925 558978.654,6560644.735 558958.939,6560646.948 558958.608,6560643.983 558978.035,6560641.815 559001.523,6560636.028</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+     <largeur>3</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>9.1</longueur-iae>
+    </intersectionSnaParcelle>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>5</numeroParcelle>
+     <longueur-iae>34.8</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>634094404401</numeroSna>
+   <surfaceGraphique>0.53</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559656.582,6562314.975 559657.421,6562315.519 559650.587,6562326.070 559640.652,6562337.296 559633.233,6562347.146 559625.022,6562356.915 559624.256,6562356.272 559632.450,6562346.523 559639.877,6562336.662 559649.789,6562325.463 559656.582,6562314.975</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>24</numeroIlot>
+     <largeur>1</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>24</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+     <longueur-iae>52.6</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>392987568002</numeroSna>
+   <surfaceGraphique>0.27</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1.4</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559733.848,6561993.086 559747.483,6562005.088 559748.416,6562005.909 559747.501,6562006.948 559732.933,6561994.125 559733.220,6561993.799 559733.848,6561993.086</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>24</numeroIlot>
+     <largeur>1.4</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>24</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+     <longueur-iae>19.4</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>174133727710</numeroSna>
+   <surfaceGraphique>24.55</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>3.6</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559550.156,6560848.823 559548.635,6560849.714 559547.069,6560850.631 559528.621,6560819.120 559514.903,6560795.251 559510.883,6560786.957 559494.841,6560759.196 559480.249,6560735.184 559453.870,6560689.626 559427.196,6560646.408 559422.977,6560636.543 559403.214,6560604.465 559395.714,6560591.315 559353.865,6560517.944 559315.981,6560453.120 559275.759,6560385.422 559271.835,6560380.899 559198.436,6560259.626 559201.496,6560257.774 559274.814,6560378.912 559278.751,6560383.453 559319.063,6560451.304 559356.963,6560516.155 559406.291,6560602.641 559426.093,6560634.781 559430.311,6560644.645 559456.966,6560687.834 559483.316,6560733.342 559497.918,6560757.372 559514.013,6560785.224 559518.036,6560793.524 559531.715,6560817.325 559550.156,6560848.823</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+     <largeur>3.6</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+     <longueur-iae>423.9</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>252648846271</numeroSna>
+   <surfaceGraphique>0.48</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1.1</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559746.934,6562209.869 559743.009,6562214.635 559741.486,6562216.279 559726.627,6562232.308 559715.218,6562246.198 559714.446,6562245.563 559725.872,6562231.652 559737.003,6562219.525 559746.469,6562209.433 559746.833,6562209.775 559746.934,6562209.869</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>24</numeroIlot>
+     <largeur>1.1</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>24</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+     <longueur-iae>48.3</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>251179799077</numeroSna>
+   <surfaceGraphique>0.94</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1.2</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559125.907,6561214.067 559165.307,6561222.593 559182.443,6561226.252 559201.242,6561229.291 559201.044,6561230.516 559192.958,6561229.209 559182.245,6561227.478 559139.367,6561218.238 559125.644,6561215.281 559125.907,6561214.067</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+     <largeur>1.2</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+     <longueur-iae>76.9</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>966776958206</numeroSna>
+   <surfaceGraphique>2.74</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>4.1</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558993.373,6560558.476 558998.193,6560575.670 558998.780,6560577.763 558999.578,6560580.610 559010.271,6560622.462 559009.344,6560622.698 559009.078,6560622.766 559006.258,6560623.487 558995.590,6560581.729 558989.385,6560559.594 558993.373,6560558.476</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+     <largeur>4.1</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>66.1</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>115714598237</numeroSna>
+   <surfaceGraphique>3.3</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:44:57</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>3.9</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559083.332,6560501.665 559082.472,6560503.319 559083.750,6560505.517 559097.906,6560516.109 559102.117,6560518.632 559103.432,6560522.261 559107.747,6560536.376 559106.460,6560536.882 559101.531,6560524.333 559096.050,6560518.227 559081.692,6560507.460 559078.420,6560502.548 559084.877,6560491.139 559089.591,6560483.286 559096.021,6560473.628 559109.705,6560454.857 559118.108,6560444.405 559119.824,6560445.665 559120.307,6560445.970 559098.360,6560475.185 559091.930,6560484.843 559087.036,6560493.926 559085.845,6560495.977 559083.332,6560501.665</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+     <largeur>4</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>1</numeroParcelle>
+     <longueur-iae>104.2</longueur-iae>
+    </intersectionSnaParcelle>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+     <longueur-iae>9.5</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>912297572758</numeroSna>
+   <surfaceGraphique>3.01</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>2.9</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559464.647,6562322.404 559493.697,6562361.430 559505.305,6562378.158 559516.787,6562391.126 559514.624,6562393.041 559503.085,6562380.009 559491.351,6562363.117 559462.329,6562324.129 559452.854,6562309.467 559455.037,6562307.482 559464.647,6562322.404</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>24</numeroIlot>
+     <largeur>2.9</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>24</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+     <longueur-iae>104.1</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>097394690453</numeroSna>
+   <surfaceGraphique>4.72</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>2.5</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559088.649,6560785.932 559109.175,6560801.868 559118.807,6560810.077 559134.007,6560823.031 559154.755,6560839.707 559168.597,6560847.359 559191.745,6560860.155 559206.009,6560869.806 559207.130,6560870.565 559218.671,6560878.374 559224.071,6560887.171 559234.990,6560899.463 559243.605,6560917.340 559242.050,6560918.088 559237.888,6560911.131 559232.934,6560900.834 559229.256,6560896.700 559226.744,6560892.712 559223.304,6560888.081 559217.018,6560880.293 559216.932,6560880.151 559216.748,6560880.027 559203.725,6560870.883 559190.507,6560862.280 559153.297,6560841.690 559132.439,6560824.925 559107.623,6560803.776 559087.837,6560787.275 559088.649,6560785.932</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+     <largeur>2.5</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>1</numeroParcelle>
+     <longueur-iae>200.7</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>772236335546</numeroSna>
+   <surfaceGraphique>494.77</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V5</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558969.837,6560422.352 558981.214,6560409.388 558984.918,6560412.298 558982.802,6560424.204 558990.475,6560438.757 559004.630,6560438.227 559037.703,6560457.277 559044.317,6560490.615 559021.034,6560521.836 558998.809,6560531.625 558998.544,6560542.209 558984.521,6560553.850 558975.790,6560566.815 558955.682,6560577.928 558934.250,6560585.336 558915.994,6560595.125 558865.458,6560610.736 558815.452,6560624.759 558792.169,6560627.140 558737.929,6560638.782 558705.650,6560640.898 558658.289,6560623.965 558627.068,6560604.650 558581.560,6560572.900 558555.631,6560555.967 558546.106,6560551.204 558539.226,6560537.711 558551.662,6560530.302 558546.370,6560518.661 558525.071,6560514.427 558527.717,6560505.961 558568.463,6560515.883 558612.252,6560525.011 558652.336,6560532.551 558689.113,6560533.610 558742.692,6560532.022 558787.538,6560522.894 558830.401,6560512.840 558869.956,6560495.642 558924.064,6560462.833 558969.837,6560422.352</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>207765142204</numeroSna>
+   <surfaceGraphique>2.6</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>2</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558871.817,6560609.541 558857.894,6560617.685 558856.884,6560615.959 558870.907,6560607.757 558871.116,6560607.664 558911.333,6560595.229 558911.448,6560595.201 558927.278,6560592.299 558952.549,6560585.191 558978.929,6560572.529 558979.795,6560574.332 558953.336,6560587.032 558953.174,6560587.093 558927.774,6560594.237 558927.684,6560594.258 558911.867,6560597.157 558871.817,6560609.541</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+     <largeur>2</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>77.8</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>531689514464</numeroSna>
+   <surfaceGraphique>0.93</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>2</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558815.796,6560631.822 558770.552,6560641.612 558770.129,6560639.657 558815.373,6560629.867 558815.796,6560631.822</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+     <largeur>2</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>46.3</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>418675298757</numeroSna>
+   <surfaceGraphique>0.62</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1.5</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558745.844,6560643.229 558705.098,6560649.314 558704.877,6560647.831 558745.623,6560641.745 558745.844,6560643.229</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+     <largeur>1.5</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>41.2</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>962581264738</numeroSna>
+   <surfaceGraphique>2.3</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>2</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558652.278,6560626.781 558693.183,6560642.879 558692.451,6560644.740 558651.440,6560628.601 558651.242,6560628.496 558613.672,6560602.831 558613.648,6560602.814 558593.275,6560587.998 558594.451,6560586.380 558614.812,6560601.188 558652.278,6560626.781</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+     <largeur>2</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>114.8</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>069113482316</numeroSna>
+   <surfaceGraphique>2.56</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>3.4</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559164.595,6560307.800 559136.674,6560320.515 559135.265,6560317.421 559163.443,6560304.588 559163.981,6560304.444 559191.999,6560301.694 559203.049,6560296.487 559208.970,6560291.596 559211.135,6560294.217 559205.125,6560298.610 559203.934,6560299.404 559193.814,6560304.299 559192.226,6560304.431 559164.595,6560307.800</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+     <largeur>3.1</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>4</numeroParcelle>
+     <longueur-iae>15.5</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>124948606475</numeroSna>
+   <surfaceGraphique>1.19</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:51</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:51</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>3.8</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558417.506,6560535.277 558414.331,6560531.970 558426.105,6560530.250 558433.646,6560528.398 558446.198,6560523.987 558447.786,6560523.457 558448.328,6560526.645 558435.101,6560531.970 558427.164,6560533.557 558417.506,6560535.277</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+     <largeur>3.8</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>16.8</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>054717676913</numeroSna>
+   <surfaceGraphique>2.55</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:52</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:52</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>4.8</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558802.596,6560988.494 558802.596,6560988.494 558787.250,6560963.094 558787.250,6560963.094 558777.861,6560935.867 558776.608,6560935.867 558776.607,6560935.866 558776.607,6560932.230 558771.375,6560917.056 558771.375,6560917.056 558763.967,6560912.823 558763.967,6560912.822 558764.044,6560912.435 558763.500,6560912.435 558763.499,6560912.434 558763.499,6560908.436 558763.500,6560908.435 558767.498,6560908.435 558767.499,6560908.436 558767.499,6560912.041 558772.168,6560914.940 558772.169,6560914.940 558778.350,6560931.867 558780.606,6560931.867 558780.607,6560931.868 558780.607,6560935.866 558780.606,6560935.867 558779.811,6560935.867 558789.367,6560962.035 558789.367,6560962.036 558805.242,6560987.436 558816.046,6560999.520 558815.490,6560999.913 558814.104,6561001.030 558812.854,6560999.759 558802.596,6560988.494</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+     <largeur>4.8</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>3</numeroParcelle>
+     <longueur-iae>1.1</longueur-iae>
+    </intersectionSnaParcelle>
+    <intersectionSnaParcelle>
+     <numeroIlot>12</numeroIlot>
+     <numeroParcelle>1</numeroParcelle>
+     <longueur-iae>105.5</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>928120275446</numeroSna>
+   <surfaceGraphique>12.51</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:52</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:52</datePrivatisation>
+   <categorieSna>EA</categorieSna>
+   <typeSna>B2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559227.079,6560908.013 559231.841,6560918.597 559229.562,6560919.623 559224.840,6560909.131 559215.701,6560895.291 559205.793,6560885.123 559194.771,6560876.725 559181.993,6560867.635 559157.956,6560853.107 559157.920,6560853.085 559149.189,6560847.396 559149.110,6560847.340 559130.854,6560833.317 559130.840,6560833.307 559101.868,6560810.421 559101.817,6560810.378 559085.160,6560795.704 559072.207,6560784.866 559072.058,6560784.718 559062.160,6560773.105 559055.704,6560766.385 559055.565,6560766.212 559049.215,6560756.687 559049.081,6560756.421 559044.847,6560744.779 559044.846,6560744.777 559036.249,6560720.970 559031.229,6560707.493 559022.241,6560684.628 559008.620,6560651.830 559008.534,6560651.508 559007.476,6560643.174 559007.488,6560642.780 559008.150,6560639.341 559008.303,6560638.937 559008.586,6560638.609 559008.963,6560638.397 559013.714,6560636.728 559020.831,6560632.070 559052.153,6560608.677 559052.199,6560608.645 559072.832,6560594.624 559082.085,6560588.239 559087.042,6560582.392 559092.227,6560572.151 559094.686,6560564.904 559095.707,6560559.803 559095.837,6560552.243 559098.336,6560552.286 559098.204,6560559.959 559098.180,6560560.182 559097.122,6560565.474 559097.080,6560565.630 559094.566,6560573.039 559094.498,6560573.202 559089.206,6560583.653 559089.044,6560583.897 559083.885,6560589.982 559083.641,6560590.202 559074.249,6560596.685 559074.241,6560596.690 559053.627,6560610.697 559022.296,6560634.096 559022.233,6560634.140 559014.957,6560638.903 559014.686,6560639.036 559010.469,6560640.518 559009.981,6560643.057 559010.993,6560651.027 559024.554,6560683.680 559024.564,6560683.702 559033.559,6560706.588 559033.567,6560706.609 559038.594,6560720.103 559038.599,6560720.115 559047.197,6560743.926 559051.379,6560755.425 559057.584,6560764.733 559063.989,6560771.400 559064.039,6560771.455 559073.892,6560783.016 559086.776,6560793.797 559086.800,6560793.817 559103.444,6560808.480 559132.383,6560831.340 559150.594,6560845.328 559159.267,6560850.979 559183.326,6560865.520 559183.404,6560865.571 559196.237,6560874.699 559196.270,6560874.724 559207.382,6560883.190 559207.520,6560883.312 559217.574,6560893.631 559217.722,6560893.815 559226.982,6560907.838 559227.079,6560908.013</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>373260962033</numeroSna>
+   <surfaceGraphique>27.69</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:52</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:52</datePrivatisation>
+   <categorieSna>AT</categorieSna>
+   <typeSna>A2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559011.936,6560637.353 559009.890,6560638.072 559009.000,6560635.213 559009.733,6560629.785 559010.204,6560626.296 559010.692,6560617.121 559007.639,6560606.094 559003.629,6560594.351 559001.429,6560584.951 558998.727,6560569.448 558996.564,6560560.100 558992.622,6560553.051 558992.186,6560552.272 558990.316,6560554.332 558987.370,6560557.578 558981.229,6560566.724 558973.316,6560573.712 558963.162,6560578.798 558952.362,6560583.798 558942.232,6560587.375 558930.603,6560589.881 558924.285,6560591.011 558906.036,6560594.276 558884.685,6560600.234 558875.860,6560604.299 558868.100,6560607.385 558858.424,6560613.467 558853.636,6560616.058 558849.924,6560618.067 558843.414,6560621.254 558832.014,6560624.654 558821.980,6560627.385 558806.880,6560629.885 558800.669,6560630.270 558792.264,6560630.792 558775.712,6560634.779 558750.315,6560639.774 558739.613,6560641.879 558726.577,6560643.497 558715.177,6560644.297 558704.870,6560644.592 558696.310,6560642.261 558689.065,6560639.948 558681.162,6560636.210 558665.496,6560630.023 558656.913,6560625.786 558656.497,6560625.287 558647.380,6560614.350 558640.028,6560609.900 558630.618,6560606.589 558623.310,6560603.027 558614.950,6560598.953 558607.349,6560593.387 558593.696,6560584.187 558584.566,6560580.799 558576.686,6560575.236 558567.169,6560567.108 558547.362,6560556.060 558533.622,6560546.638 558523.419,6560541.090 558520.973,6560540.038 558514.990,6560537.464 558508.748,6560536.450 558505.089,6560535.855 558497.289,6560533.555 558492.959,6560531.815 558489.616,6560530.472 558480.218,6560529.199 558473.009,6560529.083 558464.611,6560525.929 558455.579,6560522.985 558450.185,6560522.512 558446.121,6560523.505 558442.250,6560526.853 558435.145,6560530.006 558429.081,6560532.393 558424.489,6560535.072 558422.895,6560536.744 558418.532,6560541.321 558417.116,6560542.585 558412.126,6560547.038 558407.211,6560553.976 558405.314,6560560.926 558405.037,6560561.587 558401.936,6560568.973 558399.160,6560576.638 558395.439,6560583.272 558388.782,6560594.202 558384.753,6560603.750 558375.425,6560617.535 558373.662,6560620.140 558359.890,6560648.781 558354.497,6560658.073 558351.062,6560667.201 558349.085,6560677.365 558348.144,6560676.736 558347.139,6560675.855 558348.920,6560666.690 558352.471,6560657.213 558357.928,6560647.783 558371.703,6560619.135 558382.093,6560603.760 558382.830,6560602.670 558384.262,6560599.279 558386.860,6560593.128 558388.708,6560590.095 558393.540,6560582.162 558397.196,6560575.642 558398.626,6560571.672 558399.886,6560568.174 558403.258,6560560.141 558405.302,6560552.864 558410.457,6560545.593 558417.034,6560539.709 558423.093,6560533.357 558428.197,6560530.376 558434.297,6560527.976 558441.102,6560524.962 558445.176,6560521.485 558449.839,6560520.332 558456.141,6560520.854 558465.341,6560523.854 558473.409,6560526.903 558480.448,6560527.010 558490.181,6560528.337 558497.962,6560531.460 558505.644,6560533.725 558515.676,6560535.366 558524.335,6560539.089 558532.066,6560543.294 558534.827,6560544.796 558548.479,6560554.164 558568.342,6560565.243 558578.076,6560573.530 558585.715,6560578.917 558590.327,6560580.617 558594.750,6560582.247 558608.615,6560591.588 558616.071,6560597.054 558631.524,6560604.583 558641.060,6560607.953 558648.670,6560612.559 558654.335,6560619.084 558658.113,6560623.925 558666.346,6560627.994 558676.973,6560632.190 558682.004,6560634.177 558689.805,6560637.875 558696.935,6560640.152 558705.132,6560642.396 558715.023,6560642.102 558726.365,6560641.308 558732.002,6560640.609 558739.226,6560639.713 558775.242,6560632.630 558791.909,6560628.617 558806.576,6560627.706 558821.565,6560625.224 558831.410,6560622.539 558842.697,6560619.172 558848.914,6560616.113 558857.345,6560611.550 558867.050,6560605.447 558874.993,6560602.277 558883.995,6560598.143 558905.514,6560592.138 558930.168,6560587.724 558930.224,6560587.713 558941.700,6560585.240 558951.485,6560581.780 558962.238,6560576.802 558972.079,6560571.881 558979.664,6560565.171 558984.874,6560557.355 558985.585,6560556.290 558991.585,6560549.660 558998.156,6560541.794 559004.204,6560533.961 559009.697,6560525.648 559016.747,6560520.290 559023.146,6560513.007 559028.706,6560506.156 559034.272,6560497.409 559039.341,6560490.053 559043.147,6560481.850 559056.516,6560466.341 559061.025,6560459.282 559064.501,6560451.239 559075.062,6560428.325 559081.889,6560417.183 559090.623,6560404.280 559100.384,6560380.379 559106.420,6560369.599 559111.181,6560360.276 559114.425,6560350.349 559115.846,6560340.585 559119.043,6560333.901 559124.954,6560328.345 559139.634,6560319.757 559158.125,6560311.707 559164.906,6560308.073 559175.641,6560306.811 559183.885,6560305.606 559190.920,6560304.866 559193.222,6560304.623 559201.493,6560301.120 559208.381,6560296.860 559208.983,6560296.488 559216.547,6560290.914 559222.696,6560287.576 559232.908,6560279.856 559233.445,6560280.469 559234.216,6560281.623 559223.976,6560289.367 559217.791,6560292.731 559217.668,6560292.821 559210.179,6560298.336 559202.429,6560303.113 559193.775,6560306.765 559184.660,6560307.736 559184.159,6560307.789 559175.925,6560308.993 559165.635,6560310.169 559159.027,6560313.714 559140.709,6560321.678 559130.075,6560327.900 559128.774,6560328.661 559126.159,6560330.191 559120.708,6560335.355 559117.965,6560341.218 559116.546,6560350.942 559113.180,6560361.200 559108.359,6560370.638 559102.391,6560381.281 559092.553,6560405.350 559083.738,6560418.375 559076.972,6560429.419 559066.510,6560452.136 559062.927,6560460.392 559058.233,6560467.719 559045.033,6560483.002 559041.206,6560491.224 559036.106,6560498.624 559030.454,6560507.493 559024.854,6560514.393 559018.326,6560521.826 559011.315,6560527.163 559005.971,6560535.272 558999.871,6560543.172 558993.730,6560550.524 558994.539,6560551.987 558997.129,6560556.665 558997.166,6560556.732 558998.672,6560559.452 559000.884,6560569.011 559003.263,6560582.663 559003.585,6560584.511 559005.759,6560593.796 559006.147,6560594.933 559009.741,6560605.444 559012.860,6560616.707 559012.593,6560622.350 559012.545,6560623.368 559012.398,6560626.458 559012.055,6560628.982 559011.223,6560635.103 559011.936,6560637.353</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+    </intersectionSnaIlot>
+    <intersectionSnaIlot>
+     <numeroIlot>12</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>188380516870</numeroSna>
+   <surfaceGraphique>11.36</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:52</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:52</datePrivatisation>
+   <categorieSna>AT</categorieSna>
+   <typeSna>A2</typeSna>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559050.203,6560752.191 559047.197,6560743.926 559043.157,6560732.737 559042.743,6560731.305 559041.043,6560723.021 559037.966,6560715.476 559036.026,6560704.840 559033.359,6560694.864 559026.813,6560679.887 559022.937,6560672.035 559018.866,6560665.480 559015.342,6560659.241 559012.852,6560651.535 559011.626,6560643.651 559010.633,6560640.461 559012.693,6560639.737 559013.749,6560643.067 559014.974,6560650.947 559017.313,6560658.257 559020.758,6560664.359 559024.886,6560671.013 559028.808,6560678.959 559035.408,6560694.059 559038.163,6560704.316 559040.062,6560714.791 559043.134,6560722.324 559044.869,6560730.737 559047.641,6560740.341 559050.590,6560748.897 559055.280,6560755.638 559062.123,6560764.069 559068.789,6560770.933 559072.625,6560774.604 559075.725,6560777.572 559082.714,6560783.163 559102.321,6560799.969 559112.911,6560809.366 559123.597,6560818.847 559133.201,6560825.952 559142.981,6560834.036 559151.923,6560841.090 559161.859,6560846.953 559168.972,6560852.452 559172.083,6560853.870 559176.796,6560856.019 559194.341,6560865.006 559202.341,6560870.746 559204.033,6560871.960 559212.041,6560877.706 559219.816,6560884.365 559226.753,6560893.850 559230.804,6560903.849 559236.286,6560914.912 559236.296,6560915.278 559236.601,6560925.679 559237.700,6560943.510 559237.608,6560953.592 559237.600,6560954.410 559236.998,6560965.162 559235.679,6560975.912 559233.690,6560985.948 559231.186,6560998.579 559229.691,6561010.141 559228.662,6561015.420 559228.080,6561018.411 559224.958,6561024.899 559224.390,6561026.081 559217.112,6561042.832 559213.895,6561049.668 559209.484,6561055.156 559206.830,6561059.428 559205.510,6561061.017 559204.117,6561058.917 559207.746,6561053.807 559211.962,6561048.611 559215.104,6561041.931 559222.394,6561025.155 559225.948,6561017.848 559227.514,6561009.824 559229.021,6560998.184 559233.513,6560975.527 559234.804,6560965.002 559235.401,6560954.338 559235.500,6560943.524 559234.403,6560925.778 559234.205,6560915.668 559228.814,6560904.788 559226.294,6560898.556 559224.831,6560894.938 559220.906,6560889.549 559218.367,6560886.061 559218.286,6560885.952 559218.040,6560885.741 559210.720,6560879.466 559193.124,6560866.840 559175.844,6560858.001 559167.850,6560854.353 559160.681,6560848.812 559150.741,6560842.947 559141.599,6560835.748 559131.845,6560827.685 559122.246,6560820.584 559100.879,6560801.631 559094.070,6560795.794 559081.313,6560784.859 559080.140,6560783.921 559074.313,6560779.259 559067.239,6560772.495 559060.446,6560765.493 559053.546,6560756.993 559050.203,6560752.191</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSna>829246959106</numeroSna>
+   <surfaceGraphique>0.12</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:26:52</dateMiseAjour>
+   <datePrivatisation>2026/04/17 10:26:52</datePrivatisation>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1.2</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559301.437,6561251.007 559301.270,6561252.177 559290.435,6561249.777 559290.653,6561248.743 559301.437,6561251.007</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>10</numeroIlot>
+     <largeur>1.2</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>10</numeroIlot>
+     <numeroParcelle>2</numeroParcelle>
+     <longueur-iae>11.1</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<sna-declaree>
+   <numeroSnacreationTas>1</numeroSnacreationTas>
+   <surfaceGraphique>5.08</surfaceGraphique>
+   <dateMiseAjour>2026/04/17 10:51:56</dateMiseAjour>
+   <categorieSna>VG</categorieSna>
+   <typeSna>V4</typeSna>
+   <largeur-calculee>1</largeur-calculee>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559387.267,6560876.609 559129.827,6560438.458 559130.689,6560437.951 559388.129,6560876.102 559387.267,6560876.609</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+   <intersectionsSnaIlots>
+    <intersectionSnaIlot>
+     <numeroIlot>9</numeroIlot>
+     <largeur>1</largeur>
+    </intersectionSnaIlot>
+   </intersectionsSnaIlots>
+   <intersectionsSnaParcelles>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>1</numeroParcelle>
+     <longueur-iae>254.1</longueur-iae>
+    </intersectionSnaParcelle>
+    <intersectionSnaParcelle>
+     <numeroIlot>9</numeroIlot>
+     <numeroParcelle>8</numeroParcelle>
+     <longueur-iae>254.1</longueur-iae>
+    </intersectionSnaParcelle>
+   </intersectionsSnaParcelles>
+  </sna-declaree>
+<zdh-declaree>
+   <numeroZdh>655972987073</numeroZdh>
+   <densiteVegetation>MOINS_10</densiteVegetation>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559219.853,6560297.102 559222.126,6560301.556 559242.943,6560342.351 559200.267,6560373.726 559166.458,6560398.651 559131.138,6560427.724 559094.637,6560473.791 559075.825,6560508.251 559052.337,6560497.776 559048.010,6560507.659 559055.593,6560517.784 559081.064,6560545.613 559077.923,6560560.533 559071.314,6560570.626 559070.009,6560572.619 559074.039,6560575.563 559075.684,6560574.252 559073.417,6560582.187 559015.113,6560633.070 559014.532,6560630.599 559013.818,6560627.564 559012.876,6560623.555 559011.732,6560618.688 559010.588,6560613.821 558998.295,6560561.533 558995.908,6560551.222 558999.898,6560546.505 559039.418,6560499.942 559066.148,6560464.691 559081.725,6560423.578 559094.652,6560408.476 559121.073,6560349.301 559128.914,6560328.286 559168.762,6560315.024 559213.029,6560294.730 559217.578,6560292.644 559219.853,6560297.102</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+  </zdh-declaree>
+<zdh-declaree>
+   <numeroZdh>934878820647</numeroZdh>
+   <densiteVegetation>MOINS_10</densiteVegetation>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559128.705,6561147.421 559120.106,6561183.008 559107.803,6561182.214 559106.480,6561193.459 559096.558,6561190.151 559081.577,6561186.975 559052.108,6561179.303 559059.744,6561164.088 559018.396,6561140.532 559005.432,6561132.991 558994.451,6561126.641 558948.149,6561101.770 558941.115,6561113.290 558916.112,6561098.076 558904.735,6561087.890 558867.873,6561044.767 558874.884,6561038.417 558877.534,6561035.773 558846.442,6560998.201 558833.874,6560985.104 558815.490,6560999.913 558804.593,6560987.503 558800.149,6560980.428 558790.098,6560964.426 558789.494,6560963.465 558788.353,6560961.649 558782.260,6560944.640 558776.451,6560928.886 558773.354,6560921.143 558771.289,6560915.979 558767.202,6560912.967 558779.678,6560876.869 559134.174,6561126.179 559128.705,6561147.421</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+  </zdh-declaree>
+<zdh-declaree>
+   <numeroZdh>528781953581</numeroZdh>
+   <densiteVegetation>MOINS_10</densiteVegetation>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558661.580,6560885.433 558658.843,6560884.581 558664.500,6560881.079 558724.612,6560838.142 558727.696,6560835.834 558780.877,6560872.743 558779.686,6560876.844 558767.202,6560912.967 558764.058,6560910.912 558761.608,6560909.310 558750.423,6560906.944 558729.556,6560901.351 558661.580,6560885.433</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+  </zdh-declaree>
+<zdh-declaree>
+   <numeroZdh>719310448248</numeroZdh>
+   <densiteVegetation>MOINS_10</densiteVegetation>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559457.732,6561284.325 559457.138,6561284.784 559457.138,6561284.784 559457.137,6561284.784 559457.135,6561284.784 559457.135,6561284.785 559455.710,6561285.885 559299.224,6561257.534 559173.852,6561231.576 559157.099,6561226.605 559115.524,6561217.797 559115.523,6561217.796 559115.770,6561216.834 559117.027,6561211.940 559117.028,6561211.939 559121.100,6561212.734 559121.100,6561212.735 559121.099,6561212.736 559121.181,6561212.750 559145.462,6561216.893 559163.253,6561222.358 559459.574,6561282.216 559459.936,6561282.623 559459.936,6561282.624 559457.652,6561284.387 559457.732,6561284.325</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+  </zdh-declaree>
+<zdh-declaree>
+   <numeroZdh>214098038541</numeroZdh>
+   <densiteVegetation>MOINS_10</densiteVegetation>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>559417.575,6561774.451 559424.755,6561780.994 559501.395,6561817.388 559590.576,6561862.836 559590.886,6561863.018 559648.184,6561901.481 559648.483,6561901.710 559727.978,6561971.000 559779.665,6562012.202 559777.282,6562016.102 559777.333,6562014.824 559726.048,6561973.297 559646.512,6561903.972 559589.214,6561865.509 559500.071,6561820.080 559422.659,6561783.320 559417.433,6561774.740 559417.575,6561774.451</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+  </zdh-declaree>
+<zdh-declaree>
+   <numeroZdh>651333359771</numeroZdh>
+   <densiteVegetation>MOINS_10</densiteVegetation>
+   <geometrie>
+    
+    <gml:Polygon>
+  <gml:outerBoundaryIs>
+    <gml:LinearRing>
+      <gml:coordinates>558796.272,6560786.546 558794.832,6560787.848 558791.927,6560790.060 558796.295,6560786.940 558664.500,6560881.079 558658.843,6560884.581 558657.850,6560884.272 558638.812,6560874.946 558619.677,6560859.075 558676.948,6560818.497 558717.334,6560786.321 558674.124,6560746.219 558694.488,6560725.546 558706.416,6560717.436 558713.271,6560698.489 558712.861,6560689.565 558664.486,6560675.468 558647.274,6560691.931 558614.273,6560730.184 558573.262,6560762.024 558560.038,6560746.966 558569.683,6560737.557 558553.008,6560712.245 558509.348,6560676.283 558553.754,6560623.775 558557.964,6560618.761 558537.126,6560605.633 558503.941,6560585.626 558501.448,6560593.135 558484.319,6560631.834 558439.067,6560606.750 558398.690,6560670.199 558356.088,6560660.569 558353.436,6560660.286 558394.433,6560578.268 558419.964,6560538.104 558444.698,6560526.628 558489.726,6560530.866 558545.269,6560547.170 558587.414,6560578.638 558655.656,6560625.004 558705.524,6560641.815 558761.057,6560639.285 558827.809,6560624.094 558914.856,6560597.563 558995.876,6560551.244 559013.710,6560628.410 559013.515,6560632.735 559004.073,6560635.319 558996.341,6560637.494 558891.515,6560657.545 558815.123,6560690.447 558792.768,6560706.095 558785.131,6560693.895 558742.365,6560714.165 558789.922,6560789.794 558792.505,6560788.473 558796.272,6560786.546 558796.272,6560786.546</gml:coordinates>
+    </gml:LinearRing>
+  </gml:outerBoundaryIs>
+</gml:Polygon>
+
+    
+   </geometrie>
+  </zdh-declaree>
+</rpg>
+<effectifs-animaux><effectif-animal><effectif-present><type-animal-2>AV</type-animal-2><nb-animaux-2>1000</nb-animaux-2></effectif-present></effectif-animal></effectifs-animaux>
+<demandes-aides-pilier1-et-AR autorisation-transmission-assureurs-récolte="true"/>
+</producteur>
+</producteurs>

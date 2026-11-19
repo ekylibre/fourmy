@@ -19,6 +19,8 @@ import {
   stableId,
   type CoverInfo,
   type BundleArticle,
+  type BundleCapRef,
+  type BundleLandscapeFeature,
   type BundleParcel,
   type BundlePerson,
   type ImportBundle,
@@ -46,6 +48,8 @@ type Action = "create" | "link" | "skip";
 
 export interface LandItem {
   landKey: string;
+  /** Lien de provenance de la parcelle (espace, clé). */
+  link: [string, string];
   name: string;
   shape: BundleParcel["shape"];
   islet: string | null;
@@ -95,6 +99,18 @@ export interface CoverItem {
   reason?: string;
 }
 
+export interface CapRefItem {
+  ref: BundleCapRef;
+  /** Libellé du code culture PAC (Lexicon), pour la fiche de la parcelle. */
+  label: string | null;
+}
+
+export interface LandscapeItem {
+  feature: BundleLandscapeFeature;
+  action: "create" | "link";
+  id: string;
+}
+
 export interface ArticleItem {
   article: BundleArticle;
   kind: ArticleKind;
@@ -131,6 +147,8 @@ export interface ReconcilePlan {
   activities: ActivityItem[];
   productions: ProductionItem[];
   covers: CoverItem[];
+  capRefs: CapRefItem[];
+  landscape: LandscapeItem[];
   articles: ArticleItem[];
   people: PersonItem[];
   interventions: InterventionItem[];
@@ -148,6 +166,15 @@ async function loadLinks(tx: Tx): Promise<Map<string, string>> {
 }
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+
+/**
+ * Clé de lien d'une parcelle : numéro de travail (Geofolia, DAPLOS), parcelle
+ * PAC (îlot/parcelle et campagne) pour un dossier TelePAC.
+ */
+export function landLinkOf(bundle: ImportBundle, p: BundleParcel): [string, string] {
+  if (bundle.format === "telepac") return ["telepac.parcel", p.sourceIds["telepac.parcel"] ?? `${p.campaign}:${p.landKey}`];
+  return ["plot.work_number", p.landKey];
+}
 
 /** Article Fourmy d'après la nature d'un article importé. */
 export function articleKindOf(a: BundleArticle): ArticleKind {
@@ -199,7 +226,7 @@ interface ReferenceRow {
 async function resolveReference(
   tx: Tx,
   p: BundleParcel,
-): Promise<{ ref: ReferenceRow; via: "agroedi_crop" | "agroedi_species" | "label" } | null> {
+): Promise<{ ref: ReferenceRow; via: "agroedi_crop" | "agroedi_species" | "cap_code" | "label" } | null> {
   const c = p.crop;
   if (c.aeeCode) {
     // Codes combinés du dictionnaire AgroEDI (jeu Lexicon réservé, avec une clé).
@@ -233,6 +260,16 @@ async function resolveReference(
     const byLabel = list.find((r) => norm(p.crop.label).includes(norm(r.label)));
     if (byLabel ?? list[0]) return { ref: (byLabel ?? list[0])!, via: "agroedi_species" };
   }
+  // Code culture PAC (TelePAC) : production de référence de la campagne la plus récente.
+  if (c.capCode) {
+    const [byCap] = await rows<ReferenceRow>(
+      tx,
+      sql`SELECT p.reference_name, p.label, p.family, p.specie, p.usage, p.season
+          FROM lexicon_cap_codes k JOIN lexicon_productions p ON p.reference_name = k.production
+          WHERE k.cap_code = ${c.capCode} ORDER BY k.year DESC, k.is_seed, p.reference_name LIMIT 1`,
+    );
+    if (byCap) return { ref: byCap, via: "cap_code" };
+  }
   const [byName] = await rows<ReferenceRow>(
     tx,
     sql`SELECT reference_name, label, family, specie, usage, season FROM lexicon_productions WHERE lower(label) = lower(${c.label}) LIMIT 1`,
@@ -258,8 +295,9 @@ export async function reconcile(tx: Tx, farmId: string, bundle: ImportBundle, de
   // --- Parcelles (terres) --------------------------------------------------------
   const lands: LandItem[] = [];
   for (const p of bundle.parcels.filter((x) => !x.secondary)) {
-    const item: LandItem = { landKey: p.landKey, name: p.name, shape: p.shape, islet: p.islet, action: "skip", landParcelId: null };
-    const known = linked("plot.work_number", p.landKey, "land_parcel");
+    const [landNs, landKey] = landLinkOf(bundle, p);
+    const item: LandItem = { landKey: p.landKey, link: [landNs, landKey], name: p.name, shape: p.shape, islet: p.islet, action: "skip", landParcelId: null };
+    const known = linked(landNs, landKey, "land_parcel");
     const [still] = known ? await rows<{ id: string }>(tx, sql`SELECT id FROM land_parcels WHERE id = ${known}`) : [];
     if (still) Object.assign(item, { action: "link", landParcelId: still.id });
     else if (p.shape) {
@@ -287,6 +325,20 @@ export async function reconcile(tx: Tx, farmId: string, bundle: ImportBundle, de
     campaigns.push(c ? { year, id: c.id, create: false } : { year, id: randomUUID(), create: true });
   }
   const campaignOf = new Map(campaigns.map((c) => [c.year, c.id]));
+
+  // Dossier PAC : le libellé du code culture (Lexicon) nomme l'activité (« Prairie temporaire »).
+  const capLabels = new Map<string, string>();
+  const capCodes = [...new Set(bundle.parcels.map((p) => p.crop.capCode).filter((c): c is string => !!c))];
+  if (capCodes.length) {
+    for (const r of await rows<{ cap_code: string; cap_label: string }>(
+      tx,
+      sql`SELECT DISTINCT ON (cap_code) cap_code, cap_label FROM lexicon_cap_codes
+          WHERE cap_code IN (${sql.join(capCodes.map((c) => sql`${c}`), sql`, `)}) ORDER BY cap_code, year DESC`,
+    )) capLabels.set(r.cap_code, r.cap_label);
+  }
+  if (bundle.format === "telepac") {
+    for (const p of bundle.parcels) if (p.crop.capCode && capLabels.has(p.crop.capCode)) p.crop.label = capLabels.get(p.crop.capCode)!;
+  }
 
   // Couverts d'interculture : couverts de la parcelle (cover_crops), ni activité ni production.
   const coverInfo = new Map(bundle.parcels.map((p) => [p.key, coverOf(bundle, p)] as const).filter((x): x is readonly [string, CoverInfo] => !!x[1]));
@@ -343,12 +395,15 @@ export async function reconcile(tx: Tx, farmId: string, bundle: ImportBundle, de
     const known = linked("crop.parcel", `${p.campaign}:${p.key}`, "production");
     const [existing] = known
       ? await rows<{ id: string }>(tx, sql`SELECT id FROM productions WHERE id = ${known}`)
-      : activity.action === "link"
-        ? await rows<{ id: string }>(
-            tx,
-            sql`SELECT id FROM productions WHERE land_parcel_id = ${landParcelId} AND campaign_id = ${campaignId} AND activity_id = ${activity.activityId} LIMIT 1`,
-          )
-        : [];
+      : bundle.format === "telepac"
+        ? // Dossier PAC : la culture déclarée ne double pas une culture déjà connue de la parcelle pour la campagne.
+          await rows<{ id: string }>(tx, sql`SELECT id FROM productions WHERE land_parcel_id = ${landParcelId} AND campaign_id = ${campaignId} AND NOT declared ORDER BY started_on NULLS LAST LIMIT 1`)
+        : activity.action === "link"
+          ? await rows<{ id: string }>(
+              tx,
+              sql`SELECT id FROM productions WHERE land_parcel_id = ${landParcelId} AND campaign_id = ${campaignId} AND activity_id = ${activity.activityId} LIMIT 1`,
+            )
+          : [];
     productions.push({
       parcel: p,
       landParcelId,
@@ -378,6 +433,40 @@ export async function reconcile(tx: Tx, farmId: string, bundle: ImportBundle, de
       Object.assign(item, existing ? { action: "link", coverId: existing.id } : { action: "create" });
     }
     covers.push(item);
+  }
+
+  // Activité à créer sans production créée (cultures PAC déjà connues de la ferme) : pas créée.
+  for (const a of activities.filter((x) => x.action === "create" && !productions.some((p) => p.activityKey === x.key && p.action === "create"))) {
+    activities.splice(activities.indexOf(a), 1);
+  }
+
+  // --- Références PAC (rattachées aux parcelles par recouvrement, à l'écriture) ------
+  const capRefs: CapRefItem[] = bundle.capRefs.map((ref) => ({ ref, label: ref.capCode ? (capLabels.get(ref.capCode) ?? null) : null }));
+  // Écarts de surface entre la parcelle PAC (admissible) et la parcelle Fourmy reliée.
+  const areaGaps: { name: string; gapPct: number }[] = [];
+  if (bundle.format === "telepac") {
+    for (const l of lands.filter((x) => x.action === "link" && x.landParcelId)) {
+      const pac = bundle.parcels.find((p) => p.landKey === l.landKey);
+      if (!pac?.areaM2) continue;
+      const [v] = await rows<{ area: number; name: string }>(
+        tx,
+        sql`SELECT v.area_m2::float8 AS area, lp.name FROM land_parcel_versions v JOIN land_parcels lp ON lp.id = v.land_parcel_id
+            WHERE v.land_parcel_id = ${l.landParcelId} AND upper(v.valid) IS NULL`,
+      );
+      const gap = v?.area ? Math.round(((pac.areaM2 - v.area) / v.area) * 1000) / 10 : null;
+      if (gap !== null && Math.abs(gap) > 5) areaGaps.push({ name: v!.name, gapPct: gap });
+    }
+  }
+
+  // --- Éléments du paysage déclarés ------------------------------------------------
+  const landscape: LandscapeItem[] = [];
+  for (const f of bundle.landscape) {
+    const source = f.source.split(".")[0]!;
+    const knownId = linked(f.source, `${bundle.campaigns[0] ?? ""}:${f.ref}`, "landscape_feature");
+    const [existing] = knownId
+      ? await rows<{ id: string }>(tx, sql`SELECT id FROM farm_landscape_features WHERE id = ${knownId}`)
+      : await rows<{ id: string }>(tx, sql`SELECT id FROM farm_landscape_features WHERE source = ${source} AND campaign = ${bundle.campaigns[0] ?? null} AND ref = ${f.ref}`);
+    landscape.push({ feature: f, action: existing ? "link" : "create", id: existing?.id ?? randomUUID() });
   }
 
   // --- Articles -------------------------------------------------------------------
@@ -531,6 +620,18 @@ export async function reconcile(tx: Tx, farmId: string, bundle: ImportBundle, de
     parcels: { create: count(lands, "create"), link: count(lands, "link"), skip: count(lands, "skip") },
     productions: { create: count(productions, "create"), link: count(productions, "link") },
     covers: { create: count(covers, "create"), link: count(covers, "link"), skip: count(covers, "skip") },
+    capRefs: {
+      islets: bundle.capRefs.filter((r) => r.kind === "islet").length,
+      parcels: bundle.capRefs.filter((r) => r.kind === "parcel").length,
+      areaGaps,
+    },
+    landscape: {
+      create: count(landscape, "create"),
+      link: count(landscape, "link"),
+      byKind: Object.entries(
+        bundle.landscape.reduce<Record<string, number>>((acc, f) => ((acc[String(f.attrs.kind ?? "other")] = (acc[String(f.attrs.kind ?? "other")] ?? 0) + 1), acc), {}),
+      ).map(([kind, n]) => ({ kind, count: n })),
+    },
     campaigns: campaigns.filter((c) => c.create).map((c) => c.year),
     activities: activities.map((a) => ({
       key: a.key,
@@ -553,5 +654,5 @@ export async function reconcile(tx: Tx, farmId: string, bundle: ImportBundle, de
       byProcedure: [...byProcedure.values()].sort((a, b) => b.done + b.planned - (a.done + a.planned)),
     },
   };
-  return { validFrom, lands, campaigns, activities, productions, covers, articles, people, interventions, alreadyImported: importedGuids.size, summary };
+  return { validFrom, lands, campaigns, activities, productions, covers, capRefs, landscape, articles, people, interventions, alreadyImported: importedGuids.size, summary };
 }

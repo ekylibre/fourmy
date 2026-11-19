@@ -57,6 +57,18 @@ export const importReconciliation = z.object({
   productions: z.object({ create: z.number().int(), link: z.number().int() }),
   /** Couverts d'interculture (CINE, CIE…) : couverts de la parcelle, pas des productions. */
   covers: z.object({ create: z.number().int(), link: z.number().int(), skip: z.number().int() }),
+  /** Îlots et parcelles PAC (TelePAC) ; écarts de surface de plus de 5 % avec la parcelle reliée. */
+  capRefs: z.object({
+    islets: z.number().int(),
+    parcels: z.number().int(),
+    areaGaps: z.array(z.object({ name: z.string(), gapPct: z.number() })),
+  }),
+  /** Éléments du paysage déclarés (SNA, ZDH). */
+  landscape: z.object({
+    create: z.number().int(),
+    link: z.number().int(),
+    byKind: z.array(z.object({ kind: z.string(), count: z.number().int() })),
+  }),
   campaigns: z.array(z.number().int()),
   activities: z.array(
     z.object({
@@ -66,7 +78,7 @@ export const importReconciliation = z.object({
       reference: z.string().nullable(),
       referenceLabel: z.string().nullable(),
       /** Comment la référence a été trouvée : code combiné AgroEDI, code d'espèce, libellé. */
-      via: z.enum(["agroedi_crop", "agroedi_species", "label", "existing", "decision"]).nullable(),
+      via: z.enum(["agroedi_crop", "agroedi_species", "cap_code", "label", "existing", "decision"]).nullable(),
       productions: z.number().int(),
     }),
   ),
