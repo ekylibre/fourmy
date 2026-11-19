@@ -12,6 +12,17 @@ ferme à n'importe quelle date, en 2D comme en 3D.
 
 Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 
+## Aperçu
+
+[![Rejeu 3D d'une pulvérisation : trace GPS du pulvérisateur sur le relief et la photo IGN, avec la dose, la météo, l'IFT et la surface travaillée en incrustation](apps/site/src/assets/captures/accueil-3d.png)](https://fourmy.org/videos/accueil-pulverisation.mp4)
+
+*Rejeu 3D d'une pulvérisation (cliquer pour lancer la vidéo, 19 s). Une [seconde vidéo](https://fourmy.org/videos/accueil-broyage.mp4) montre un broyage. Les captures viennent d'une ferme de grandes cultures pilote, avec l'accord de l'exploitant.*
+
+| Contrôle réglementaire | Parcellaire | Interopérabilité |
+|---|---|---|
+| [![Fiche d'un traitement : pictogrammes, ZNT, contrôle des doses et des usages](apps/site/src/assets/captures/accueil-reglementaire.png)](apps/site/src/assets/captures/accueil-reglementaire.png) | [![Fiche d'une parcelle : culture, PAC, cadastre et photo IGN](apps/site/src/assets/captures/accueil-parcellaire.png)](apps/site/src/assets/captures/accueil-parcellaire.png) | [![Intervention tirée du GPS : attelage, parcours et trace sur la photo IGN](apps/site/src/assets/captures/accueil-interoperabilite.png)](apps/site/src/assets/captures/accueil-interoperabilite.png) |
+| Doses, usages, ZNT et pictogrammes vérifiés à chaque traitement | Culture, îlot PAC, cadastre et photo IGN de chaque parcelle | Attelage et parcours tirés du GPS du tracteur |
+
 ## Documentation
 
 | Document | Contenu |
