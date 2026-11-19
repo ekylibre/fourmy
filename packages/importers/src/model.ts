@@ -107,6 +107,10 @@ export interface BundleHistoryCrop {
   /** Campagne passée. */
   campaign: number;
   aeeCode: string | null;
+  /** Complément, période de semis, usage final (DAPLOS). */
+  aeeComplement?: string | null;
+  aeeSowingPeriod?: string | null;
+  aeeUsage?: string | null;
   label: string;
 }
 

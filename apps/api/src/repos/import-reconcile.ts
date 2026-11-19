@@ -89,6 +89,19 @@ export interface ProductionItem {
   stoppedOn: string | null;
 }
 
+/** Culture d'une campagne passée (N-1…N-5) : production déclarée, sans intervention. */
+export interface HistoryItem {
+  landParcelId: string;
+  campaign: number;
+  campaignId: string;
+  activityKey: string;
+  /** Clé de lien `crop.history` : campagne et terre. */
+  linkKey: string;
+  label: string;
+  action: Exclude<Action, "skip">;
+  productionId: string;
+}
+
 export interface CoverItem {
   parcel: BundleParcel;
   cover: CoverInfo;
@@ -146,6 +159,7 @@ export interface ReconcilePlan {
   campaigns: CampaignItem[];
   activities: ActivityItem[];
   productions: ProductionItem[];
+  history: HistoryItem[];
   covers: CoverItem[];
   capRefs: CapRefItem[];
   landscape: LandscapeItem[];
@@ -282,6 +296,15 @@ function natureOf(p: BundleParcel, ref: ReferenceRow | null): "field_crop" | "gr
   return /prairie|bande enherb/i.test(p.crop.label) ? "grassland" : "field_crop";
 }
 
+/** Logiciel d'origine d'un import, pour les notes (« Prévu dans Geofolia »). */
+const SOURCE_NAMES: Record<string, string> = { geofolia: "Geofolia", daplos: "le fichier DAPLOS", telepac: "le dossier PAC" };
+
+/** Note d'une intervention importée : un apport prévu (plan de fumure) le dit, avant la note d'origine. */
+function notesOf(bundle: ImportBundle, draft: { status: string; notes: string | null }): string | null {
+  const planned = draft.status === "planned" ? `Prévu dans ${SOURCE_NAMES[bundle.format] ?? bundle.format}` : null;
+  return [planned, draft.notes].filter(Boolean).join(" — ").slice(0, 2000) || null;
+}
+
 // --- Plan ------------------------------------------------------------------------
 
 export async function reconcile(tx: Tx, farmId: string, bundle: ImportBundle, decisions: ImportDecisions): Promise<ReconcilePlan> {
@@ -320,7 +343,7 @@ export async function reconcile(tx: Tx, farmId: string, bundle: ImportBundle, de
 
   // --- Campagnes -------------------------------------------------------------------
   const campaigns: CampaignItem[] = [];
-  for (const year of [...new Set(bundle.parcels.map((p) => p.campaign))].sort()) {
+  for (const year of [...new Set([...bundle.parcels.map((p) => p.campaign), ...bundle.history.map((h) => h.campaign)])].sort()) {
     const [c] = await rows<{ id: string }>(tx, sql`SELECT id FROM campaigns WHERE year = ${year} LIMIT 1`);
     campaigns.push(c ? { year, id: c.id, create: false } : { year, id: randomUUID(), create: true });
   }
@@ -347,9 +370,9 @@ export async function reconcile(tx: Tx, farmId: string, bundle: ImportBundle, de
   // --- Activités (une par culture) ------------------------------------------------
   const activities: ActivityItem[] = [];
   const activityOf = new Map<string, ActivityItem>();
-  for (const p of crops) {
+  const activityFor = async (p: BundleParcel): Promise<ActivityItem> => {
     const key = norm(p.crop.label);
-    if (activityOf.has(key)) continue;
+    if (activityOf.has(key)) return activityOf.get(key)!;
     const decided = decisions.activities?.[key];
     const name = (decided?.name ?? p.crop.label).trim().slice(0, 120);
     const knownId = linked("crop.label", key, "activity");
@@ -383,7 +406,9 @@ export async function reconcile(tx: Tx, farmId: string, bundle: ImportBundle, de
     };
     activities.push(item);
     activityOf.set(key, item);
-  }
+    return item;
+  };
+  for (const p of crops) await activityFor(p);
 
   // --- Productions (une par culture et par campagne) ------------------------------
   const productions: ProductionItem[] = [];
@@ -415,6 +440,45 @@ export async function reconcile(tx: Tx, farmId: string, bundle: ImportBundle, de
     });
   }
 
+  // --- Historique N-1…N-5 : productions déclarées (une par terre et par campagne) ----
+  const history: HistoryItem[] = [];
+  const historySlots = new Set<string>();
+  const mainOf = new Map(bundle.parcels.map((p) => [p.key, p]));
+  for (const h of bundle.history) {
+    const main = mainOf.get(h.parcelKey);
+    const landParcelId = main ? landOf.get(main.landKey) : undefined;
+    if (!main || !landParcelId || historySlots.has(`${landParcelId}|${h.campaign}`)) continue;
+    historySlots.add(`${landParcelId}|${h.campaign}`);
+    const campaignId = campaignOf.get(h.campaign)!;
+    const linkKey = `${h.campaign}:${main.landKey}`;
+    const known = linked("crop.history", linkKey, "production");
+    // Une culture déjà connue de la parcelle pour la campagne (déclarée ou non) n'est pas doublée.
+    const [existing] = known
+      ? await rows<{ id: string }>(tx, sql`SELECT id FROM productions WHERE id = ${known}`)
+      : await rows<{ id: string }>(tx, sql`SELECT id FROM productions WHERE land_parcel_id = ${landParcelId} AND campaign_id = ${campaignId} ORDER BY declared, created_at LIMIT 1`);
+    if (existing && !known) continue;
+    const pseudo: BundleParcel = {
+      ...main,
+      key: `history:${linkKey}`,
+      campaign: h.campaign,
+      secondary: false,
+      crop: {
+        aeeCode: h.aeeCode,
+        aeeComplement: h.aeeComplement ?? null,
+        aeeSowingPeriod: h.aeeSowingPeriod ?? null,
+        aeeUsage: h.aeeUsage ?? null,
+        capCode: null,
+        label: h.label,
+        variety: null,
+        sownOn: null,
+        harvestedOn: null,
+        destination: null,
+      },
+    };
+    const activity = await activityFor(pseudo);
+    history.push({ landParcelId, campaign: h.campaign, campaignId, activityKey: activity.key, linkKey, label: h.label, action: existing ? "link" : "create", productionId: existing?.id ?? randomUUID() });
+  }
+
   // --- Couverts d'interculture (un par parcelle et par campagne) -------------------
   const covers: CoverItem[] = [];
   const coverSlots = new Set<string>();
@@ -436,8 +500,13 @@ export async function reconcile(tx: Tx, farmId: string, bundle: ImportBundle, de
   }
 
   // Activité à créer sans production créée (cultures PAC déjà connues de la ferme) : pas créée.
-  for (const a of activities.filter((x) => x.action === "create" && !productions.some((p) => p.activityKey === x.key && p.action === "create"))) {
+  const used = (key: string) => productions.some((p) => p.activityKey === key && p.action === "create") || history.some((h) => h.activityKey === key && h.action === "create");
+  for (const a of activities.filter((x) => x.action === "create" && !used(x.key))) {
     activities.splice(activities.indexOf(a), 1);
+  }
+  // Campagne passée sans culture créée : pas créée.
+  for (const c of campaigns.filter((x) => x.create && !bundle.parcels.some((p) => p.campaign === x.year) && !history.some((h) => h.campaign === x.year && h.action === "create"))) {
+    campaigns.splice(campaigns.indexOf(c), 1);
   }
 
   // --- Références PAC (rattachées aux parcelles par recouvrement, à l'écriture) ------
@@ -581,7 +650,7 @@ export async function reconcile(tx: Tx, farmId: string, bundle: ImportBundle, de
       outputs,
       doers: draft.doerKeys.map((k) => personOf.get(k)).filter((x): x is string => !!x).map((personId) => ({ personId })),
       purposes: draft.purposes,
-      ...(draft.notes ? { notes: draft.notes } : {}),
+      ...(notesOf(bundle, draft) ? { notes: notesOf(bundle, draft)! } : {}),
       ...(draft.depthMm !== null ? { irrigation: { depthMm: draft.depthMm } } : {}),
       ...(draft.sowing && getProcedure(draft.procedure).shape === "sowing" ? { sowing: { technique: draft.sowing } } : {}),
     };
@@ -619,6 +688,7 @@ export async function reconcile(tx: Tx, farmId: string, bundle: ImportBundle, de
   const summary: ImportReconciliation = {
     parcels: { create: count(lands, "create"), link: count(lands, "link"), skip: count(lands, "skip") },
     productions: { create: count(productions, "create"), link: count(productions, "link") },
+    history: { create: count(history, "create"), link: count(history, "link") },
     covers: { create: count(covers, "create"), link: count(covers, "link"), skip: count(covers, "skip") },
     capRefs: {
       islets: bundle.capRefs.filter((r) => r.kind === "islet").length,
@@ -654,5 +724,5 @@ export async function reconcile(tx: Tx, farmId: string, bundle: ImportBundle, de
       byProcedure: [...byProcedure.values()].sort((a, b) => b.done + b.planned - (a.done + a.planned)),
     },
   };
-  return { validFrom, lands, campaigns, activities, productions, covers, capRefs, landscape, articles, people, interventions, alreadyImported: importedGuids.size, summary };
+  return { validFrom, lands, campaigns, activities, productions, history, covers, capRefs, landscape, articles, people, interventions, alreadyImported: importedGuids.size, summary };
 }

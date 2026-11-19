@@ -208,7 +208,7 @@ export async function activityItinerary(db: Database, farmId: string, activityId
     const parcelRows = await rows<{ id: string }>(
       tx,
       sql`SELECT DISTINCT p.land_parcel_id AS id FROM productions p JOIN campaigns c ON c.id = p.campaign_id
-          WHERE p.activity_id = ${activityId} AND c.year = ${year}`,
+          WHERE p.activity_id = ${activityId} AND c.year = ${year} AND NOT p.declared`,
     );
     const parcelIds = parcelRows.map((r) => r.id);
     const bounds = isoBounds([w!]);

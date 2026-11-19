@@ -125,7 +125,7 @@ export async function plan3dAt(
   const natures = (await withFarm(db, farmId, (tx) =>
     tx.execute(sql`
       SELECT p.land_parcel_id AS id, p.nature FROM productions p JOIN campaigns c ON c.id = p.campaign_id
-      WHERE c.year = extract(year FROM ${at}::timestamptz)::int`),
+      WHERE c.year = extract(year FROM ${at}::timestamptz)::int AND NOT p.declared`),
   )) as unknown as { id: string; nature: string }[];
   const natureOf = new Map(natures.map((n) => [n.id, n.nature]));
 

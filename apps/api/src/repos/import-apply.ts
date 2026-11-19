@@ -18,7 +18,7 @@ const rows = async <T>(tx: Tx, q: ReturnType<typeof sql>) => (await tx.execute(q
 
 export interface ImportReport {
   format: string;
-  counts: Record<"parcels" | "productions" | "covers" | "landscape" | "activities" | "articles" | "people", { created: number; linked: number; skipped: number }> & {
+  counts: Record<"parcels" | "productions" | "history" | "covers" | "landscape" | "activities" | "articles" | "people", { created: number; linked: number; skipped: number }> & {
     campaigns: { created: number };
     /** Références PAC posées sur les parcelles (une par parcelle recouverte). */
     capRefs: { islets: number; parcels: number };
@@ -66,6 +66,7 @@ export async function applyPlan(tx: Tx, farmId: string, ctx: DomainCtx, runId: s
     counts: {
       parcels: zero(),
       productions: zero(),
+      history: zero(),
       covers: zero(),
       landscape: zero(),
       activities: zero(),
@@ -115,6 +116,7 @@ export async function applyPlan(tx: Tx, farmId: string, ctx: DomainCtx, runId: s
     await tx.execute(sql`
       INSERT INTO campaigns (id, farm_id, year, starts_on, stops_on)
       VALUES (${c.id}, ${farmId}, ${c.year}, make_date(${c.year}, 1, 1), make_date(${c.year}, 12, 31))`);
+    await link(tx, farmId, runId, "campaign.year", String(c.year), "campaign", c.id, true);
     report.counts.campaigns.created++;
   }
 
@@ -156,6 +158,20 @@ export async function applyPlan(tx: Tx, farmId: string, ctx: DomainCtx, runId: s
     await link(tx, farmId, runId, "crop.parcel", `${p.parcel.campaign}:${p.parcel.key}`, "production", p.productionId, p.action === "create");
   }
 
+  // Historique (N-1…N-5) : productions déclarées, hors carte et sans intervention ; elles
+  // donnent le précédent cultural et la rotation de la fiche parcelle.
+  for (const h of plan.history) {
+    tally("history", h.action);
+    if (h.action === "create") {
+      const a = activityOf.get(h.activityKey)!;
+      await tx.execute(sql`
+        INSERT INTO productions (id, farm_id, campaign_id, land_parcel_id, nature, cultivation, activity_id, declared, attrs)
+        VALUES (${h.productionId}, ${farmId}, ${h.campaignId}, ${h.landParcelId}, ${a.nature}, ${a.cultivation}, ${a.activityId}, true,
+                ${JSON.stringify({ source: bundle.format, label: h.label })}::jsonb)`);
+    }
+    await link(tx, farmId, runId, "crop.history", h.linkKey, "production", h.productionId, h.action === "create");
+  }
+
   // Couverts d'interculture : couverts de la parcelle (contrôles nitrates), campagne de la culture qui suit.
   for (const c of plan.covers) {
     tally("covers", c.action);
@@ -190,7 +206,7 @@ export async function applyPlan(tx: Tx, farmId: string, ctx: DomainCtx, runId: s
           INSERT INTO parcel_references (id, farm_id, land_parcel_id, kind, ref, year, label, code, area_m2, overlap_m2, attrs, geom)
           SELECT gen_random_uuid(), ${farmId}, hit.land_parcel_id, ${kind}, ${c.ref.ref}, ${c.ref.campaign}, ${label}, ${c.ref.capCode},
                  ${c.ref.admissibleAreaM2 ?? null}::float8, hit.overlap,
-                 ${JSON.stringify({ ...c.ref.attrs, isletNumber: c.ref.isletNumber, parcelNumber: c.ref.parcelNumber, source: "telepac" })}::jsonb, g.g
+                 ${JSON.stringify({ ...c.ref.attrs, isletNumber: c.ref.isletNumber, parcelNumber: c.ref.parcelNumber, source: "telepac", runId })}::jsonb, g.g
           FROM hit, g
           WHERE hit.overlap >= 0.05 * least(hit.parcel_m2, hit.ref_m2)
           ON CONFLICT (land_parcel_id, kind, ref, year) DO NOTHING

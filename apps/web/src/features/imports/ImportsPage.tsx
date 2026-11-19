@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { EquipmentBundleImport } from "./EquipmentBundleImport";
+import { FileImports } from "./FileImports";
 
 type Run = {
   id: string;
@@ -20,7 +21,10 @@ type Run = {
   } | null;
 };
 
-/** Import Ekylibre (owner) : lancement, suivi, rapport (FR-MIG-1/3). */
+/**
+ * Imports (responsable) : fichiers Geofolia, TelePAC, DAPLOS (lot IM5), reprise
+ * Ekylibre (FR-MIG-1/3), parc matériel.
+ */
 export function ImportsPage() {
   const farm = useFarm();
   const queryClient = useQueryClient();
@@ -56,7 +60,11 @@ export function ImportsPage() {
 
   return (
     <Stack maw={900}>
-      <Title order={1}>Import depuis Ekylibre</Title>
+      <Title order={1}>Imports</Title>
+      <FileImports farmId={farm.id} />
+      <Title order={2} mt="lg">
+        Reprise depuis Ekylibre
+      </Title>
       <Text c="dimmed">
         L'export Ekylibre est d'abord restauré, en lecture seule, dans une base source (<code>restore-source.sh</code>). Indiquez ici le nom de
         cette base : l'instance Ekylibre n'est jamais touchée, et l'import peut être rejoué sans doublon.

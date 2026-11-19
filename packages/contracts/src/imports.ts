@@ -55,6 +55,8 @@ const action = z.enum(["create", "link", "skip"]);
 export const importReconciliation = z.object({
   parcels: z.object({ create: z.number().int(), link: z.number().int(), skip: z.number().int() }),
   productions: z.object({ create: z.number().int(), link: z.number().int() }),
+  /** Cultures des campagnes passées (N-1…N-5) : productions déclarées, sans intervention. */
+  history: z.object({ create: z.number().int(), link: z.number().int() }),
   /** Couverts d'interculture (CINE, CIE…) : couverts de la parcelle, pas des productions. */
   covers: z.object({ create: z.number().int(), link: z.number().int(), skip: z.number().int() }),
   /** Îlots et parcelles PAC (TelePAC) ; écarts de surface de plus de 5 % avec la parcelle reliée. */

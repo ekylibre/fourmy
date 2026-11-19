@@ -15,7 +15,7 @@ plan : [`claudedocs/workflow_import_onboarding.md`](../claudedocs/workflow_impor
 | IM2 Geofolia | lecture, rapprochement, écriture | ✅ |
 | IM3 TelePAC | îlots, parcelles PAC, haies et arbres déclarés | ✅ |
 | IM4 DAPLOS | lecteur `ekylibre/agroedei-edifact-daplos-reader` 2.0.0, dédoublonnage avec Geofolia | ✅ |
-| IM5 | historique N-1…N-5, plan de fumure, annulation, page Imports | à faire |
+| IM5 | historique N-1…N-5, apports prévus, annulation, page Imports | ✅ |
 | IM6 | assistant de premier démarrage | à faire |
 
 Les trois formats s'importent de bout en bout : export Geofolia (IM2),
@@ -34,9 +34,10 @@ abandon : responsable seulement ; le suivi se lit par tous les membres.
 | `PUT /imports/:id/decisions` | Décisions de l'utilisateur (remplacent les précédentes), aperçu recalculé depuis le fichier. Import qui n'est plus « analysé » : **409** |
 | `POST /imports/:id/discard` | Abandon ; le fichier est supprimé s'il ne sert à aucun autre import |
 | `POST /imports/:id/apply` | Écriture, **202** puis suivi par `GET /imports/:id` : rapprochement recalculé, une transaction pour le fichier, rapport (`report`). Avertissement bloquant, fichier expiré, autre import en cours : **409** |
+| `POST /imports/:id/revert` | Annulation d'un import de fichier terminé (voir plus bas) : `{ run, revert }`, rapport d'annulation aussi dans `report.revert`. Import non terminé, reprise Ekylibre, déjà annulé : **409** |
 
 États : `analyzed` → `running` → `completed` | `failed` ; `analyzed` →
-`discarded` ; `completed` → `reverting` → `reverted` (IM5). La reprise
+`discarded` ; `completed` → `reverted` (IM5, en une transaction). La reprise
 Ekylibre garde `running` → `completed` | `failed`.
 
 Contrats : `packages/contracts/src/imports.ts` (`importRunView`,
@@ -125,7 +126,7 @@ lui sont passés et l'emportent sur les siens.
 | Exploitation (`DA` de nature `TF`) | SIRET, PACAGE, raison sociale (champs vides seulement) ; adresse au siège, s'il n'en a pas (siège créé s'il manque) |
 | Culture (`DP`) et contour (`PS`/`SC`, Lambert 93) | parcelle (numéro de travail, comme Geofolia) et production datée ; activité nommée d'après l'espèce, le complément, la saison et l'usage (« Avoine noire d'hiver — grain ») |
 | Culture qui recouvre une autre culture de la campagne | culture secondaire sur la même terre : couvert d'interculture (moutarde, navette, radis, phacélie, usage « biomasse ») ou dérobée |
-| Précédents (`PH`) | historique N-1…N-5 (écrit au lot IM5) |
+| Précédents (`PH`) | historique N-1…N-5 (productions déclarées) |
 | Intervention (`PV`) | couple intervention × parcelle, même GUID que Geofolia (`agri.crop_zone`) ; regroupé par jour, opération et statut, puis par doses |
 | Intrant (`VI`, composition `IC`) | article par nom (sans identifiant dans DAPLOS) ; **dose par hectare du fichier** ; eau d'irrigation en dose (mm) |
 | Récolte (`VR`) | quantité de la parcelle (t), rendement |
@@ -150,6 +151,46 @@ l'arrivée (recette sur les fichiers réels, 19/11/2026 : 41 parcelles,
   sépare (même jour, même opération, mêmes doses) y forment une seule
   intervention : 388 interventions contre 414 ;
 - les activités gardent le nom du premier fichier importé.
+
+## Historique, apports prévus, annulation (lot IM5)
+
+**Historique N-1…N-5** (Geofolia `NMinus1Crop`…, DAPLOS `PH`) : une
+production **déclarée** (`productions.declared`) par terre et par campagne
+passée, campagnes créées au besoin, activité trouvée comme pour les cultures
+de la campagne. Une parcelle qui a déjà une culture pour cette campagne n'en
+reçoit pas ; un second fichier (DAPLOS après Geofolia) relie au lieu de
+doubler (lien `crop.history`). Aucune intervention, aucune version de
+parcelle antidatée. Lue par : la fiche parcelle (onglet Cultures, « historique
+importé »), le précédent de la fertilisation (`previousOf` prend la première
+forme connue de la parcelle quand aucune ne couvre la campagne passée), la
+liste des activités d'une campagne passée. Ignorée par : la carte et le plan
+3D, le modèle de culture, la télédétection, les temps de travail, les
+itinéraires d'une activité, et (déjà) la culture contrôlée à une date
+(`fourmy_production_at`). Recette sur les fichiers réels : 41 parcelles ×
+5 campagnes, précédent 2026 trouvé pour les 41 parcelles.
+
+**Apports prévus** (plan de fumure Geofolia, statut `ZK1`/`ZK3`) :
+interventions planifiées, notées « Prévu dans Geofolia ». Le PPF de Fourmy
+n'en est pas modifié.
+
+**Annulation** (`POST /imports/:id/revert`) : ce que l'import a créé (liens
+`created`) est supprimé, dans l'ordre inverse des dépendances
+(interventions, éléments du paysage, couverts, cultures, parcelles,
+activités, articles, personnes, campagnes), avec les références PAC posées
+par l'import. Est **gardé et signalé** ce qui a été modifié dans Fourmy depuis
+(journal d'audit, origine autre que l'import) ou que des données saisies
+depuis utilisent (intervention réalisée avec mouvement de stock, culture qui
+porte un plan de fumure, parcelle ciblée par une autre intervention, avec un
+sol, une analyse, une seconde version…, article en stock ou employé…). Ce
+qui était seulement relié n'est jamais touché, pas plus que l'identité de la
+ferme ni l'adresse du siège. Les liens des entités gardées restent : un
+réimport les retrouve.
+
+**Page Imports** (`/f/:ferme/imports`, responsable) : dépôt d'un fichier,
+aperçu (parcelles, cultures, campagnes passées, couverts, interventions par
+procédure, activités, laissés de côté, avertissements, SIRET à confirmer),
+import, rapport, annulation ; liste des imports de la ferme. Composants
+`FileImport`, `ImportPreview`, `ImportReport` repris par l'assistant (IM6).
 
 ## Reconnaissance du format
 
@@ -221,7 +262,11 @@ En local : `FOURMY_LEXICON_API_KEY=lex_… corepack pnpm --filter @fourmy/lexico
   fausse, chiffrement, somme de contrôle).
 - `@fourmy/lexicon` : bundle avec clé, jeu `agroedi`, somme de contrôle.
 - API : `apps/api/test/file-imports*.integration.test.ts` (socle, Geofolia,
-  TelePAC, DAPLOS et dédoublonnage dans les deux ordres).
+  TelePAC, DAPLOS et dédoublonnage dans les deux ordres, historique,
+  annulation complète et partielle).
+- Web : `apps/web/test/file-imports.test.tsx` ; e2e
+  `apps/web/e2e/file-imports.spec.ts` (dépôt → aperçu → import → rapport →
+  annulation, sur une ferme créée pour l'occasion).
 - Jeux anonymisés (`packages/importers/test/fixtures`) : tirés des exports
   réels d'une même ferme par `scripts/anonymize-*.mjs` ; le jeu DAPLOS est
   calé sur le jeu Geofolia (mêmes parcelles, mêmes GUID anonymisés, même

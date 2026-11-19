@@ -7,6 +7,7 @@ import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import { startImport, ImportsNotConfigured } from "../repos/imports.js";
 import { analyzeUpload, applyRun, discardRun, getRun, listRuns, saveDecisions } from "../repos/file-imports.js";
+import { revertRun } from "../repos/import-revert.js";
 import { BadRequest, problem, uuidParam } from "./helpers.js";
 
 const importWrite = z.object({ sourceDatabase: z.string() });
@@ -58,6 +59,12 @@ export const importRoutes = new Hono<Env>()
     return c.json(await saveDecisions(db(), c.get("farmId"), uuidParam(c, "id"), parsed.data));
   })
   .post("/imports/:id/discard", requireOwner, async (c) => c.json(await discardRun(db(), c.get("farmId"), uuidParam(c, "id"))))
+  // Annulation d'un import de fichier terminé : ce qu'il a créé et que personne n'a touché depuis.
+  .post("/imports/:id/revert", requireOwner, async (c) => {
+    const id = uuidParam(c, "id");
+    const revert = await revertRun(db(), c.get("farmId"), id);
+    return c.json({ run: await getRun(db(), c.get("farmId"), id), revert });
+  })
   // Écriture en tâche de fond : 202, puis suivi par GET /imports/:id.
   .post("/imports/:id/apply", requireOwner, async (c) => {
     const run = await applyRun(db(), c.get("farmId"), c.get("userId"), uuidParam(c, "id"), (p) => {

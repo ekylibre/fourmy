@@ -170,14 +170,14 @@ export async function parcelSheet(db: Database, farmId: string, parcelId: string
           WHERE lp.id = ${parcelId} ORDER BY upper(v.valid) DESC NULLS FIRST LIMIT 1`,
     );
     if (!p) throw new NotFound("Parcelle introuvable");
-    const productions = await rows<{ year: number; activity_id: string | null; name: string | null; color: string | null; picture: string | null }>(
+    const productions = await rows<{ year: number; activity_id: string | null; name: string | null; color: string | null; picture: string | null; declared: boolean }>(
       tx,
-      sql`SELECT c.year, a.id AS activity_id, a.name,
+      sql`SELECT c.year, a.id AS activity_id, a.name, pr.declared,
                  coalesce(a.color, fourmy_variety_color(coalesce(a.cultivation, lx.specie)), lx.color) AS color,
                  fourmy_activity_picture(coalesce(a.cultivation, lx.specie), a.family) AS picture
           FROM productions pr JOIN campaigns c ON c.id = pr.campaign_id
           LEFT JOIN activities a ON a.id = pr.activity_id LEFT JOIN lexicon_productions lx ON lx.reference_name = a.reference
-          WHERE pr.land_parcel_id = ${parcelId} ORDER BY c.year DESC, a.name`,
+          WHERE pr.land_parcel_id = ${parcelId} ORDER BY c.year DESC, pr.declared, a.name`,
     );
     const references = await rows<{ kind: "cadastre" | "cap" | "cap_islet"; ref: string; year: number; label: string | null; code: string | null; area_m2: number | null; overlap_m2: number | null; fetched_at: string; geometry: GeoJsonGeometry; attrs: Record<string, unknown> | null }>(
       tx,
@@ -206,7 +206,7 @@ export async function parcelSheet(db: Database, farmId: string, parcelId: string
       pacIslet: p.pac_islet,
       since: p.since,
       until: p.until,
-      productions: productions.map((r) => ({ year: r.year, activity: r.activity_id ? { id: r.activity_id, name: r.name!, color: r.color, pictureUrl: pictureUrl(r.picture) } : null })),
+      productions: productions.map((r) => ({ year: r.year, declared: r.declared, activity: r.activity_id ? { id: r.activity_id, name: r.name!, color: r.color, pictureUrl: pictureUrl(r.picture) } : null })),
       cadastre: references.filter((r) => r.kind === "cadastre").map((r) => ({ idu: r.ref, label: r.label, areaM2: r.area_m2, overlapM2: r.overlap_m2, geometry: r.geometry })),
       cap: references
         .filter((r) => r.kind === "cap")
