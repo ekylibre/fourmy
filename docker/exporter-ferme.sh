@@ -17,8 +17,11 @@
 #     de compte (people.user_id) ;
 #   - intégrations : leurs accès sont chiffrés avec FOURMY_SECRETS_KEY de la
 #     source, illisibles ailleurs ; à ressaisir dans « Intégrations » ;
-#   - journal d'audit, événements sortants, imports, invitations, files
-#     agrirouter et préchargement IGN : propres à l'instance source.
+#   - journal d'audit, événements sortants, invitations, files agrirouter et
+#     préchargement IGN : propres à l'instance source ;
+#   - fichiers déposés pour un import (import_files) : les imports et leur
+#     provenance (import_runs, import_links) sont copiés, pour qu'un fichier
+#     réimporté sur la cible ne crée pas de doublons, mais sans leur fichier.
 # Le fichier contient des données personnelles : ne pas le committer, le
 # supprimer après chargement.
 set -euo pipefail
@@ -30,7 +33,7 @@ DB="${2:-${DATABASE_URL:-postgres://fourmy:fourmy@localhost:5434/fourmy}}"
 q() { psql "$DB" -X -At -v ON_ERROR_STOP=1 -c "$1"; }
 
 # Tables propres à l'instance, jamais copiées.
-EXCLUDED="memberships integrations audit_log outbox_events import_runs person_invitations agrirouter_inbox agrirouter_outbox ign_cache_jobs"
+EXCLUDED="memberships integrations audit_log outbox_events import_files person_invitations agrirouter_inbox agrirouter_outbox ign_cache_jobs"
 
 # Tables sans farm_id, rattachées à une table de la ferme.
 declare -A CHILD=(
@@ -77,6 +80,9 @@ for t in $(q "select c.relname from pg_class c join pg_attribute a on a.attrelid
   if [[ $t == people ]]; then
     # Sans lien de compte : les comptes n'existent pas sur la cible.
     copy people "farm_id = '$FARM'" "$(cols people | sed 's/\buser_id\b/null::uuid as user_id/')"
+  elif [[ $t == import_runs ]]; then
+    # Les fichiers ne sont pas copiés.
+    copy import_runs "farm_id = '$FARM'" "$(cols import_runs | sed 's/\bfile_id\b/null::uuid as file_id/')"
   else
     copy "$t" "farm_id = '$FARM'"
   fi

@@ -1,16 +1,20 @@
-import { Readable } from "node:stream";
+import { createHash } from "node:crypto";
+import { PassThrough, Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { createGunzip } from "node:zlib";
 import type { Sql, TransactionSql } from "postgres";
-import { fetchIndex, fetchManifest, fetchStructure, packageUrl, parseStructure, type PackageManifest } from "./packages.js";
+import { fetchIndex, fetchManifest, fetchStructure, packageUrl, parseStructure, withApiKey, type PackageManifest } from "./packages.js";
 
 /**
  * Copie des paquets Lexicon dans les tables de référence de Fourmy
  * (migrations 0009, 0011) : `phytosanitary` (produits, usages, ensembles de
  * cultures, cibles PFI), `taxonomy` (parenté des espèces), `productions`
- * (activités de référence, culture IFT) et `agricultural_pictures` (images). Une version
- * déjà chargée n'est pas retéléchargée ; une nouvelle version remplace
- * l'ancienne d'un bloc, dans une transaction (tout ou rien).
+ * (activités de référence, culture IFT) et `agricultural_pictures` (images) ;
+ * `agroedi` (dictionnaire AgroEDI, réservé aux adhérents : seulement avec une
+ * clé, ignoré s'il manque à l'index). Une version déjà chargée n'est pas
+ * retéléchargée ; une nouvelle version remplace l'ancienne d'un bloc, dans
+ * une transaction (tout ou rien). Chaque fichier est vérifié par son sha256
+ * quand le manifeste le donne.
  */
 
 /** Colonnes indispensables, par table Lexicon : sinon, structure inattendue → refus. */
@@ -23,18 +27,22 @@ const REQUIRED: Record<string, string[]> = {
   registered_phytosanitary_symbols: ["id", "symbol_name"],
   master_taxonomy: ["reference_name", "parent", "taxonomic_rank", "translation_id"],
   taxonomy__translations: ["id", "fra"],
-  master_productions: ["reference_name", "activity_family", "specie", "usage", "life_duration", "support_unit", "color", "translation_id"],
+  master_productions: ["reference_name", "activity_family", "specie", "usage", "life_duration", "support_unit", "color", "translation_id", "agroedi_crop_code", "season"],
   productions__translations: ["id", "fra", "eng"],
   master_crop_production_tfi_codes: ["tfi_code", "tfi_label", "production", "tfi_crop_group", "campaign"],
   master_agricultural_pictures: ["domain", "name", "extension", "picture"],
   master_crop_production_cap_codes: ["cap_code", "cap_label", "production", "is_seed", "year"],
+  registered_agroedi_codes: ["repository_id", "reference_id", "reference_code", "reference_label", "ekylibre_scope", "ekylibre_value"],
+  registered_agroedi_crops: ["agroedi_code", "agroedi_name", "production"],
 };
 
-const PACKAGES: { name: string; tables: string[] }[] = [
+/** `optional` : jeu réservé, absent du dépôt public (sans clé) → ignoré. */
+const PACKAGES: { name: string; tables: string[]; optional?: true }[] = [
   { name: "phytosanitary", tables: ["registered_phytosanitary_products", "registered_phytosanitary_usages", "registered_phytosanitary_cropsets", "registered_phytosanitary_target_name_to_pfi_targets", "registered_phytosanitary_risks", "registered_phytosanitary_symbols"] },
   { name: "taxonomy", tables: ["master_taxonomy", "taxonomy__translations"] },
   { name: "productions", tables: ["master_productions", "productions__translations", "master_crop_production_tfi_codes", "master_crop_production_cap_codes"] },
   { name: "agricultural_pictures", tables: ["master_agricultural_pictures"] },
+  { name: "agroedi", tables: ["registered_agroedi_codes", "registered_agroedi_crops"], optional: true },
 ];
 
 /** Passage des tables temporaires (texte) aux tables de Fourmy, typées. */
@@ -87,10 +95,11 @@ const TRANSFORMS: Record<string, string[]> = {
   // Productions de référence (activités) et leur culture IFT (migration 0011).
   productions: [
     `TRUNCATE lexicon_productions, lexicon_production_ift, lexicon_cap_codes`,
-    `INSERT INTO lexicon_productions (reference_name, family, specie, usage, label, label_en, color, life_years, support_unit)
+    `INSERT INTO lexicon_productions (reference_name, family, specie, usage, label, label_en, color, life_years, support_unit, agroedi_crop_code, season)
      SELECT p.reference_name, p.activity_family, nullif(p.specie, ''), nullif(p.usage, ''),
             coalesce(tr.fra, p.reference_name), tr.eng, nullif(p.color, ''),
-            round((extract(epoch FROM nullif(p.life_duration, '')::interval) / 31557600)::numeric, 1), p.support_unit
+            round((extract(epoch FROM nullif(p.life_duration, '')::interval) / 31557600)::numeric, 1), p.support_unit,
+            nullif(btrim(p.agroedi_crop_code), ''), nullif(btrim(p.season), '')
      FROM lx_master_productions p LEFT JOIN lx_productions__translations tr ON tr.id = p.translation_id`,
     `INSERT INTO lexicon_production_ift (production, ift_culture, ift_label, crop_group, campaign)
      SELECT production, tfi_code, tfi_label, tfi_crop_group, campaign::int
@@ -107,18 +116,36 @@ const TRANSFORMS: Record<string, string[]> = {
      FROM lx_master_agricultural_pictures WHERE left(picture, 2) = '\\x'
      ORDER BY domain, name, (extension = 'png') DESC`,
   ],
+  // Dictionnaire AgroEDI : libellés par table (codes et libellés nettoyés de
+  // leurs espaces : « ZKM » est publié « ZKM »), cultures → production.
+  agroedi: [
+    `TRUNCATE lexicon_agroedi_codes, lexicon_agroedi_crops`,
+    `INSERT INTO lexicon_agroedi_codes (table_id, reference_id, code, label, ekylibre_scope, ekylibre_value)
+     SELECT repository_id::int, reference_id::int, btrim(reference_code), btrim(reference_label),
+            nullif(btrim(ekylibre_scope), ''), nullif(btrim(ekylibre_value), '')
+     FROM lx_registered_agroedi_codes
+     WHERE coalesce(btrim(reference_code), '') <> '' AND coalesce(btrim(reference_label), '') <> ''
+     ON CONFLICT DO NOTHING`,
+    `INSERT INTO lexicon_agroedi_crops (code, label, production)
+     SELECT btrim(agroedi_code), btrim(agroedi_name), nullif(btrim(production), '')
+     FROM lx_registered_agroedi_crops WHERE coalesce(btrim(agroedi_code), '') <> ''
+     ON CONFLICT (code) DO NOTHING`,
+  ],
 };
 
 export interface PackageReport {
   name: string;
   version: string;
-  status: "loaded" | "up-to-date";
+  /** `absent` : jeu facultatif que la source ne publie pas (dépôt public sans `agroedi`). */
+  status: "loaded" | "up-to-date" | "absent";
   rows: number;
 }
 
 export interface SyncOptions {
   /** Adresse du serveur de paquets (ex. http://127.0.0.1:8889). */
   base: string;
+  /** Clé d'adhérent du bundle (voir `lexiconSourceFromEnv`). */
+  apiKey?: string;
   /** Recharger même si la version est déjà en base. */
   force?: boolean;
   fetchImpl?: typeof fetch;
@@ -130,11 +157,16 @@ export async function syncLexicon(sql: Sql, opts: SyncOptions): Promise<PackageR
 }
 
 /** Même chose, dans une transaction fournie (tests : annulée à la fin). */
-export async function syncLexiconIn(tx: TransactionSql, { base, force = false, fetchImpl = fetch }: SyncOptions): Promise<PackageReport[]> {
+export async function syncLexiconIn(tx: TransactionSql, { base, apiKey, force = false, fetchImpl: rawFetch = fetch }: SyncOptions): Promise<PackageReport[]> {
+  const fetchImpl = withApiKey(rawFetch, { base, apiKey });
   const index = await fetchIndex(base, fetchImpl);
   const reports: PackageReport[] = [];
   for (const pkg of PACKAGES) {
     const version = index.datasources[pkg.name]?.current;
+    if (!version && pkg.optional) {
+      reports.push({ name: pkg.name, version: "", status: "absent", rows: 0 });
+      continue;
+    }
     if (!version) throw new Error(`Lexicon : paquet « ${pkg.name} » absent de l'index`);
     const [loaded] = await tx<{ version: string; rows: number }[]>`SELECT version, rows FROM lexicon_packages WHERE name = ${pkg.name}`;
     if (!force && loaded?.version === version) {
@@ -175,7 +207,14 @@ async function stage(
     const res = await fetchImpl(packageUrl(base, manifest.name, manifest.version, file.path), { signal: AbortSignal.timeout(300_000) });
     if (!res.ok || !res.body) throw new Error(`Lexicon : ${file.path} → HTTP ${res.status}`);
     const writable = await tx.unsafe(`COPY ${staging} FROM STDIN WITH (FORMAT csv)`).writable();
-    await pipeline(Readable.fromWeb(res.body as never), createGunzip(), writable);
+    // Somme du fichier tel que publié (gzip), calculée au passage.
+    const hash = createHash("sha256");
+    const tap = new PassThrough();
+    tap.on("data", (chunk: Buffer) => hash.update(chunk));
+    await pipeline(Readable.fromWeb(res.body as never), tap, createGunzip(), writable);
+    if (file.sha256 && hash.digest("hex") !== file.sha256.toLowerCase()) {
+      throw new Error(`Lexicon : ${manifest.name} ${manifest.version} — somme de contrôle fausse pour ${file.path}`);
+    }
   }
   const [{ n }] = (await tx.unsafe(`SELECT count(*)::int AS n FROM ${staging}`)) as unknown as [{ n: number }];
   if (n !== entry.rows) throw new Error(`Lexicon : ${table} — ${n} lignes lues pour ${entry.rows} annoncées`);

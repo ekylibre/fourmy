@@ -2,9 +2,11 @@ import { sql } from "drizzle-orm";
 import postgres from "postgres";
 import { withFarm, type Database } from "@fourmy/db";
 import { migrate } from "@fourmy/migrator-ekylibre";
-import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
+import { BadRequest, Conflict } from "../routes/helpers.js";
 import { configureIntegration, listIntegrations } from "../integrations/repo.js";
 import { placeHeadquartersFromAddress } from "./farm-profile.js";
+import { readRun } from "./file-imports.js";
+import type { ImportRunView } from "@fourmy/contracts";
 
 /**
  * Imports Ekylibre depuis l'API (FR-MIG-1/3). Sécurité : le client ne fournit
@@ -17,15 +19,6 @@ import { placeHeadquartersFromAddress } from "./farm-profile.js";
 const SOURCE_DB = /^ekylibre_src_[a-z0-9_]{1,50}$/;
 
 export class ImportsNotConfigured extends Error {}
-
-export interface ImportRunView {
-  id: string;
-  source: string;
-  status: "running" | "completed" | "failed";
-  startedAt: string;
-  finishedAt: string | null;
-  report: unknown;
-}
 
 function sourceUrl(database: string): string {
   const base = process.env.EKYLIBRE_SOURCES_URL;
@@ -56,11 +49,10 @@ export async function startImport(
     const running = (await tx.execute(sql`
       SELECT id FROM import_runs WHERE status = 'running' AND started_at > now() - interval '6 hours'`)) as unknown[];
     if (running.length > 0) throw new Conflict("Un import est déjà en cours pour cette ferme.");
-    const [row] = (await tx.execute(sql`
+    await tx.execute(sql`
       INSERT INTO import_runs (id, farm_id, source, status)
-      VALUES (${runId}, ${farmId}, ${`ekylibre:${input.sourceDatabase}`}, 'running')
-      RETURNING id, source, status, started_at, finished_at, report`)) as unknown as Record<string, unknown>[];
-    return toView(row!);
+      VALUES (${runId}, ${farmId}, ${`ekylibre:${input.sourceDatabase}`}, 'running')`);
+    return readRun(tx, runId);
   });
 
   const job = migrate({ sourceUrl: src, targetUrl, farmId, runId })
@@ -126,25 +118,4 @@ async function geocodeImportedHeadquarters(db: Database, farmId: string, runId: 
         coalesce(report->'warnings', '[]') || ${JSON.stringify([{ entity: "farm_identity", id: "headquarters", message }])}::jsonb)
       WHERE id = ${runId}`),
   );
-}
-
-function toView(r: Record<string, unknown>): ImportRunView {
-  const iso = (v: unknown) => (v ? new Date(v as string).toISOString() : null);
-  return {
-    id: r.id as string,
-    source: r.source as string,
-    status: r.status as ImportRunView["status"],
-    startedAt: iso(r.started_at)!,
-    finishedAt: iso(r.finished_at),
-    report: r.report ?? null,
-  };
-}
-
-export async function getImport(db: Database, farmId: string, id: string): Promise<ImportRunView> {
-  return withFarm(db, farmId, async (tx) => {
-    const [row] = (await tx.execute(sql`
-      SELECT id, source, status, started_at, finished_at, report FROM import_runs WHERE id = ${id}`)) as unknown as Record<string, unknown>[];
-    if (!row) throw new NotFound(`Import ${id} introuvable.`);
-    return toView(row);
-  });
 }

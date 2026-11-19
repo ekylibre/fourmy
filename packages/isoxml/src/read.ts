@@ -1,4 +1,5 @@
 import { inflateRawSync } from "node:zlib";
+import { crc32 } from "./zip.js";
 
 /**
  * Lecture d'un TaskData ISO 11783-10 reçu d'une console (agrirouter, lot
@@ -10,9 +11,46 @@ import { inflateRawSync } from "node:zlib";
 
 // --- Archive zip -----------------------------------------------------------------
 
-/** Fichiers d'une archive zip (stockés ou deflate), par chemin. */
-export function unzip(bytes: Uint8Array): Map<string, Uint8Array> {
+/** Entrée du répertoire central d'une archive zip. */
+export interface ZipEntry {
+  name: string;
+  method: number;
+  /** Taille compressée et taille annoncée une fois décompressée (octets). */
+  compressedSize: number;
+  size: number;
+  crc: number;
+  encrypted: boolean;
+  /** Position de l'en-tête local. */
+  local: number;
+}
+
+/**
+ * Limites de décompression : une archive déposée par un utilisateur peut
+ * être une « bombe » (quelques Ko qui en font des Go) ou mentir sur ses
+ * tailles. Défauts larges (TaskData agrirouter) ; les imports de fichiers
+ * passent des limites strictes (claudedocs/conception_import_onboarding.md §10).
+ */
+export interface UnzipOptions {
+  /** Ne décompresser que ces entrées (les autres sont ignorées). */
+  only?: (name: string) => boolean;
+  /** Taille maximale d'une entrée décompressée. */
+  maxEntryBytes?: number;
+  /** Taille maximale de l'ensemble décompressé (entrées retenues). */
+  maxTotalBytes?: number;
+  /** Rapport maximal taille décompressée / compressée d'une entrée. */
+  maxRatio?: number;
+}
+
+const UNZIP_DEFAULTS: Required<Omit<UnzipOptions, "only">> = {
+  maxEntryBytes: 512 * 1024 * 1024,
+  maxTotalBytes: 1024 * 1024 * 1024,
+  maxRatio: 1_000,
+};
+
+/** Liste des entrées (répertoire central), sans rien décompresser. */
+export function zipEntries(bytes: Uint8Array): ZipEntry[] {
   const buf = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (buf.length < 22) throw new IsoxmlReadError("Archive zip illisible (trop courte).");
   // Fin du répertoire central : cherchée depuis la fin (commentaire éventuel).
   let end = -1;
   for (let i = buf.length - 22; i >= Math.max(0, buf.length - 22 - 65_535); i--) {
@@ -24,23 +62,78 @@ export function unzip(bytes: Uint8Array): Map<string, Uint8Array> {
   if (end < 0) throw new IsoxmlReadError("Archive zip illisible (répertoire central absent).");
   const count = buf.readUInt16LE(end + 10);
   let at = buf.readUInt32LE(end + 16);
-  const files = new Map<string, Uint8Array>();
+  if (count === 0xffff || at === 0xffffffff) throw new IsoxmlReadError("Archive zip64 non prise en charge.");
+  const entries: ZipEntry[] = [];
   for (let n = 0; n < count; n++) {
-    if (buf.readUInt32LE(at) !== 0x02014b50) throw new IsoxmlReadError("Archive zip illisible (entrée du répertoire central).");
-    const method = buf.readUInt16LE(at + 10);
-    const size = buf.readUInt32LE(at + 20);
+    if (at + 46 > buf.length || buf.readUInt32LE(at) !== 0x02014b50) {
+      throw new IsoxmlReadError("Archive zip illisible (entrée du répertoire central).");
+    }
+    const flags = buf.readUInt16LE(at + 8);
+    const compressedSize = buf.readUInt32LE(at + 20);
+    const size = buf.readUInt32LE(at + 24);
+    if (compressedSize === 0xffffffff || size === 0xffffffff) throw new IsoxmlReadError("Archive zip64 non prise en charge.");
     const nameLength = buf.readUInt16LE(at + 28);
     const extraLength = buf.readUInt16LE(at + 30);
     const commentLength = buf.readUInt16LE(at + 32);
-    const local = buf.readUInt32LE(at + 42);
-    const name = buf.toString("utf8", at + 46, at + 46 + nameLength);
+    entries.push({
+      name: buf.toString("utf8", at + 46, at + 46 + nameLength),
+      method: buf.readUInt16LE(at + 10),
+      compressedSize,
+      size,
+      crc: buf.readUInt32LE(at + 16),
+      encrypted: (flags & 0x1) !== 0,
+      local: buf.readUInt32LE(at + 42),
+    });
     at += 46 + nameLength + extraLength + commentLength;
+  }
+  return entries;
+}
+
+/** Chemin sûr : relatif, sans remontée (`..`), sans lecteur ni racine. */
+function safeName(name: string): boolean {
+  if (!name || name.startsWith("/") || name.startsWith("\\") || /^[A-Za-z]:/.test(name)) return false;
+  return !name.split(/[\\/]/).some((part) => part === "..");
+}
+
+/** Fichiers d'une archive zip (stockés ou deflate), par chemin. */
+export function unzip(bytes: Uint8Array, options: UnzipOptions = {}): Map<string, Uint8Array> {
+  const { maxEntryBytes, maxTotalBytes, maxRatio } = { ...UNZIP_DEFAULTS, ...options };
+  const buf = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const files = new Map<string, Uint8Array>();
+  let total = 0;
+  for (const entry of zipEntries(bytes)) {
+    const { name } = entry;
     if (name.endsWith("/")) continue;
+    if (!safeName(name)) throw new IsoxmlReadError(`Archive zip : chemin refusé (${name}).`);
+    if (options.only && !options.only(name)) continue;
+    if (entry.encrypted) throw new IsoxmlReadError(`Archive zip : entrée chiffrée (${name}).`);
+    if (entry.size > maxEntryBytes) throw new IsoxmlReadError(`Archive zip : ${name} dépasse la taille autorisée une fois décompressé.`);
+    total += entry.size;
+    if (total > maxTotalBytes) throw new IsoxmlReadError("Archive zip : contenu décompressé trop volumineux.");
+    if (entry.compressedSize > 0 && entry.size / entry.compressedSize > maxRatio) {
+      throw new IsoxmlReadError(`Archive zip : taux de compression suspect pour ${name}.`);
+    }
+    const local = entry.local;
+    if (local + 30 > buf.length || buf.readUInt32LE(local) !== 0x04034b50) {
+      throw new IsoxmlReadError(`Archive zip illisible (en-tête local de ${name}).`);
+    }
     const dataAt = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
-    const raw = buf.subarray(dataAt, dataAt + size);
-    if (method === 0) files.set(name, new Uint8Array(raw));
-    else if (method === 8) files.set(name, new Uint8Array(inflateRawSync(raw)));
-    else throw new IsoxmlReadError(`Archive zip : méthode de compression ${method} non prise en charge.`);
+    if (dataAt + entry.compressedSize > buf.length) throw new IsoxmlReadError(`Archive zip tronquée (${name}).`);
+    const raw = buf.subarray(dataAt, dataAt + entry.compressedSize);
+    let data: Uint8Array;
+    if (entry.method === 0) data = new Uint8Array(raw);
+    else if (entry.method === 8) {
+      try {
+        // La taille annoncée borne la sortie : une archive qui ment ne dépasse pas la limite.
+        data = new Uint8Array(inflateRawSync(raw, { maxOutputLength: Math.max(1, entry.size) }));
+      } catch {
+        throw new IsoxmlReadError(`Archive zip : ${name} ne se décompresse pas à la taille annoncée.`);
+      }
+    } else throw new IsoxmlReadError(`Archive zip : méthode de compression ${entry.method} non prise en charge.`);
+    if (data.length !== entry.size || crc32(data) !== entry.crc) {
+      throw new IsoxmlReadError(`Archive zip : ${name} est corrompu (taille ou somme de contrôle).`);
+    }
+    files.set(name, data);
   }
   return files;
 }

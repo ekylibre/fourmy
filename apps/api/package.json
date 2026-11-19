@@ -25,6 +25,7 @@
     "@fourmy/geo-ign": "workspace:*",
     "@fourmy/lexicon": "workspace:*",
     "@fourmy/migrator-ekylibre": "workspace:*",
+    "@fourmy/importers": "workspace:*",
     "@fourmy/isoxml": "workspace:*",
     "@fourmy/sentinel": "workspace:*",
     "@fourmy/weather": "workspace:*",

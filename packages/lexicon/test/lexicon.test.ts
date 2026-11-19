@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { gzipSync } from "node:zlib";
 import postgres from "postgres";
-import { parseStructure, packageUrl, syncLexiconIn } from "../src/index.js";
+import { createHash } from "node:crypto";
+import { lexiconSourceFromEnv, LEXICON_BUNDLE_URL, LEXICON_PACKAGES_URL, parseStructure, packageUrl, syncLexiconIn, withApiKey } from "../src/index.js";
 
 describe("structure des paquets", () => {
   it("lit les noms de colonnes sans rien exécuter", () => {
@@ -27,15 +28,48 @@ describe("structure des paquets", () => {
   });
 });
 
+describe("source des paquets", () => {
+  it("dépôt public sans clé, bundle « fourmy » avec, rien si off", () => {
+    expect(lexiconSourceFromEnv({})).toEqual({ base: LEXICON_PACKAGES_URL, apiKey: undefined });
+    expect(lexiconSourceFromEnv({ FOURMY_LEXICON_API_KEY: " lex_abc " })).toEqual({ base: LEXICON_BUNDLE_URL, apiKey: "lex_abc" });
+    expect(lexiconSourceFromEnv({ FOURMY_LEXICON_PACKAGES_URL: "http://127.0.0.1:8889", FOURMY_LEXICON_API_KEY: "lex_abc" })).toEqual({ base: "http://127.0.0.1:8889", apiKey: "lex_abc" });
+    expect(lexiconSourceFromEnv({ FOURMY_LEXICON_PACKAGES_URL: "off", FOURMY_LEXICON_API_KEY: "lex_abc" })).toBeNull();
+  });
+
+  it("la clé part vers la source seulement, sans suivre de redirection", async () => {
+    const seen: { url: string; auth: string | null; redirect?: RequestRedirect }[] = [];
+    const spy = (async (input: string | URL, init?: RequestInit) => {
+      seen.push({ url: String(input), auth: new Headers(init?.headers).get("authorization"), redirect: init?.redirect });
+      return new Response("{}");
+    }) as typeof fetch;
+    const f = withApiKey(spy, { base: "https://lexicon.osfarm.org/bundles/fourmy", apiKey: "lex_abc" });
+    await f("https://lexicon.osfarm.org/bundles/fourmy/index.json");
+    await f("https://ailleurs.example/x");
+    expect(seen).toEqual([
+      { url: "https://lexicon.osfarm.org/bundles/fourmy/index.json", auth: "Bearer lex_abc", redirect: "error" },
+      { url: "https://ailleurs.example/x", auth: null, redirect: undefined },
+    ]);
+    expect(withApiKey(spy, { base: "http://x" })).toBe(spy);
+  });
+});
+
 // --- Chargement réel (base de test), dans une transaction annulée -------------
 
 const url = process.env.DATABASE_URL;
 
 /** Faux serveur de paquets : deux versions, de petits CSV gzip. */
-function fakeServer(phytoVersion: string) {
+function fakeServer(phytoVersion: string, { agroedi = false, apiKey }: { agroedi?: boolean; apiKey?: string } = {}) {
   const csv = (lines: string[]) => gzipSync(lines.join("\n") + "\n");
   const files: Record<string, string | Buffer> = {
-    "index.json": JSON.stringify({ datasources: { phytosanitary: { current: phytoVersion, versions: [phytoVersion] }, taxonomy: { current: "t1", versions: ["t1"] }, productions: { current: "pr1", versions: ["pr1"] }, agricultural_pictures: { current: "pi1", versions: ["pi1"] } } }),
+    "index.json": JSON.stringify({
+      datasources: {
+        phytosanitary: { current: phytoVersion, versions: [phytoVersion] },
+        taxonomy: { current: "t1", versions: ["t1"] },
+        productions: { current: "pr1", versions: ["pr1"] },
+        agricultural_pictures: { current: "pi1", versions: ["pi1"] },
+        ...(agroedi ? { agroedi: { current: "a1", versions: ["a1"] } } : {}),
+      },
+    }),
     [`phytosanitary/${phytoVersion}/manifest.json`]: JSON.stringify({
       name: "phytosanitary",
       version: phytoVersion,
@@ -126,11 +160,34 @@ function fakeServer(phytoVersion: string) {
     "agricultural_pictures/pi1/structure.sql": `
       CREATE TABLE master_agricultural_pictures (id integer, domain character varying, name character varying, extension character varying, picture bytea);`,
     "agricultural_pictures/pi1/data/pic_0.csv.gz": csv([`1,varieties,zea,jpg,\\xffd8ff`, `2,activity_families,plant_farming,png,\\x89504e47`]),
+    "agroedi/a1/structure.sql": `
+      CREATE TABLE registered_agroedi_codes (repository_id integer NOT NULL, reference_id integer NOT NULL, reference_code character varying,
+        reference_label character varying, ekylibre_scope character varying, ekylibre_value character varying);
+      CREATE TABLE registered_agroedi_crops (agroedi_code character varying NOT NULL, agroedi_name character varying NOT NULL, production character varying);`,
+    "agroedi/a1/data/codes_0.csv.gz": csv([
+      `14,1993,ZKE,Semis de précision,Procedo,sowing_without_plant_output`,
+      `5,1100,ZKE,Amendements calco-magnésiens,ProductNatureVariant,mineral_fertilizer`,
+      `36,433,ZKM ,Dose / ha,Unit,unity_per_hectare`,
+      `2,19907,,sans code,,`,
+    ]),
+    "agroedi/a1/data/crops_0.csv.gz": csv([`ZCSZLF,Maïs fourrage,silage_corn`, `ZDA,Moutarde blanche,`]),
   };
+  const codes = files["agroedi/a1/data/codes_0.csv.gz"] as Buffer;
+  const sha = (b: Buffer) => createHash("sha256").update(b).digest("hex");
+  files["agroedi/a1/manifest.json"] = JSON.stringify({
+    name: "agroedi",
+    version: "a1",
+    scope: "members",
+    tables: [
+      { name: "registered_agroedi_codes", rows: 4, files: [{ path: "data/codes_0.csv.gz", sha256: sha(codes) }] },
+      { name: "registered_agroedi_crops", rows: 2, files: [{ path: "data/crops_0.csv.gz", sha256: sha(files["agroedi/a1/data/crops_0.csv.gz"] as Buffer) }] },
+    ],
+  });
   const requested: string[] = [];
-  const fetchImpl = (async (input: string | URL) => {
+  const fetchImpl = (async (input: string | URL, init?: RequestInit) => {
     const path = String(input).replace("http://lexicon.test/", "");
     requested.push(path);
+    if (apiKey && new Headers(init?.headers).get("authorization") !== `Bearer ${apiKey}`) return new Response("clé requise", { status: 401 });
     const body = files[path];
     if (body === undefined) return new Response("absent", { status: 404 });
     return new Response(body);
@@ -153,6 +210,11 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", () => {
           { name: "taxonomy", version: "t1", status: "loaded", rows: 4 },
           { name: "productions", version: "pr1", status: "loaded", rows: 6 },
           { name: "agricultural_pictures", version: "pi1", status: "loaded", rows: 2 },
+          { name: "agroedi", version: "", status: "absent", rows: 0 },
+        ]);
+        expect(await tx`SELECT reference_name, agroedi_crop_code FROM lexicon_productions ORDER BY 1`).toEqual([
+          { reference_name: "grain_corn", agroedi_crop_code: "ZMA" },
+          { reference_name: "vine", agroedi_crop_code: "ZMO" },
         ]);
         expect(await tx`SELECT reference_name, family, specie, label, color, life_years::float8 AS life FROM lexicon_productions ORDER BY 1`).toEqual([
           { reference_name: "grain_corn", family: "plant_farming", specie: "zea_mays", label: "Maïs grain", color: "#F5D33D", life: null },
@@ -186,8 +248,46 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", () => {
         // Même version : rien n'est retéléchargé.
         const again = fakeServer("v1");
         const second = await syncLexiconIn(tx, { base: "http://lexicon.test", fetchImpl: again.fetchImpl });
-        expect(second.map((r) => r.status)).toEqual(["up-to-date", "up-to-date", "up-to-date", "up-to-date"]);
+        expect(second.map((r) => r.status)).toEqual(["up-to-date", "up-to-date", "up-to-date", "up-to-date", "absent"]);
         expect(again.requested).toEqual(["index.json"]);
+        throw new Rollback();
+      })
+      .catch((e) => {
+        if (!(e instanceof Rollback)) throw e;
+      });
+  });
+
+  it("avec une clé : bundle, jeu agroedi chargé (codes nettoyés, lignes sans code ignorées)", async () => {
+    await sql
+      .begin(async (tx) => {
+        const server = fakeServer("v1", { agroedi: true, apiKey: "lex_test" });
+        const reports = await syncLexiconIn(tx, { base: "http://lexicon.test", apiKey: "lex_test", fetchImpl: server.fetchImpl, force: true });
+        expect(reports.find((r) => r.name === "agroedi")).toEqual({ name: "agroedi", version: "a1", status: "loaded", rows: 6 });
+        expect(await tx`SELECT table_id, code, label, ekylibre_value FROM lexicon_agroedi_codes ORDER BY table_id`).toEqual([
+          { table_id: 5, code: "ZKE", label: "Amendements calco-magnésiens", ekylibre_value: "mineral_fertilizer" },
+          { table_id: 14, code: "ZKE", label: "Semis de précision", ekylibre_value: "sowing_without_plant_output" },
+          { table_id: 36, code: "ZKM", label: "Dose / ha", ekylibre_value: "unity_per_hectare" },
+        ]);
+        expect(await tx`SELECT code, label, production FROM lexicon_agroedi_crops ORDER BY code`).toEqual([
+          { code: "ZCSZLF", label: "Maïs fourrage", production: "silage_corn" },
+          { code: "ZDA", label: "Moutarde blanche", production: null },
+        ]);
+        throw new Rollback();
+      })
+      .catch((e) => {
+        if (!(e instanceof Rollback)) throw e;
+      });
+  });
+
+  it("refuse un fichier dont la somme de contrôle est fausse", async () => {
+    await sql
+      .begin(async (tx) => {
+        const server = fakeServer("v1", { agroedi: true });
+        const tampered = (async (input: string | URL, init?: RequestInit) => {
+          if (String(input).endsWith("agroedi/a1/data/crops_0.csv.gz")) return new Response(gzipSync("ZXX,Autre,\n"));
+          return server.fetchImpl(input, init);
+        }) as typeof fetch;
+        await expect(syncLexiconIn(tx, { base: "http://lexicon.test", fetchImpl: tampered, force: true })).rejects.toThrow(/somme de contrôle fausse/);
         throw new Rollback();
       })
       .catch((e) => {

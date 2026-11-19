@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import postgres from "postgres";
 import { sql } from "drizzle-orm";
-import { LEXICON_PACKAGES_URL, syncLexicon } from "@fourmy/lexicon";
+import { lexiconSourceFromEnv, syncLexicon } from "@fourmy/lexicon";
 import { db } from "./db.js";
 import { dueIntegrations, syncIntegration } from "./integrations/repo.js";
 import { syncFarmWater } from "./repos/phyto.js";
@@ -18,6 +18,7 @@ import { agrirouterClient, agrirouterConfig } from "./integrations/agrirouter.js
 import { confirmAgrirouterInbox, runAgrirouterListener } from "./integrations/agrirouter-events.js";
 import { drainAgrirouterOutbox } from "./integrations/agrirouter-outbox.js";
 import { readAgrirouterInbox } from "./integrations/agrirouter-read.js";
+import { purgeExpiredImportFiles } from "./repos/file-imports.js";
 
 /**
  * Worker : synchronise les intégrations actives de toutes les fermes
@@ -30,18 +31,19 @@ let stopping = false;
 
 // --- Réglementation phyto (lot 2) ---------------------------------------------
 
-// Serveur public par défaut ; « off » pour ne pas synchroniser (tests, hors ligne).
-const LEXICON_URL = process.env.FOURMY_LEXICON_PACKAGES_URL === "off" ? null : process.env.FOURMY_LEXICON_PACKAGES_URL || LEXICON_PACKAGES_URL;
+// Dépôt public par défaut, bundle « fourmy » avec FOURMY_LEXICON_API_KEY ;
+// FOURMY_LEXICON_PACKAGES_URL=off pour ne pas synchroniser (tests, hors ligne).
+const LEXICON_SOURCE = lexiconSourceFromEnv();
 const LEXICON_EVERY_MS = 24 * 3_600_000;
 let lexiconCheckedAt = 0;
 
 /** Référentiel Lexicon : vérifié chaque jour, rechargé seulement si une version est publiée. */
 async function lexiconTick(): Promise<void> {
-  if (!LEXICON_URL || Date.now() - lexiconCheckedAt < LEXICON_EVERY_MS) return;
+  if (!LEXICON_SOURCE || Date.now() - lexiconCheckedAt < LEXICON_EVERY_MS) return;
   lexiconCheckedAt = Date.now();
   const client = postgres(process.env.DATABASE_URL!, { max: 1, onnotice: () => {} });
   try {
-    for (const r of await syncLexicon(client, { base: LEXICON_URL })) {
+    for (const r of await syncLexicon(client, LEXICON_SOURCE)) {
       if (r.status === "loaded") console.log(`[worker] Lexicon ${r.name} ${r.version} chargé (${r.rows} lignes)`);
     }
   } finally {
@@ -167,6 +169,16 @@ async function agrirouterTick(): Promise<void> {
   if (r.confirmed || r.failed) console.log(`[worker] agrirouter : ${r.confirmed} fichier(s) confirmé(s)${r.failed ? `, ${r.failed} en échec` : ""}`);
 }
 
+const IMPORT_PURGE_EVERY_MS = 24 * 3_600_000;
+let importPurgedAt = 0;
+/** Fichiers déposés pour un import : supprimés à expiration (30 jours), une fois par jour. */
+async function importFilesTick(): Promise<void> {
+  if (Date.now() - importPurgedAt < IMPORT_PURGE_EVERY_MS) return;
+  importPurgedAt = Date.now();
+  const r = await purgeExpiredImportFiles(db());
+  if (r.files || r.runs) console.log(`[worker] imports : ${r.files} fichier(s) expiré(s) supprimé(s), ${r.runs} analyse(s) abandonnée(s)`);
+}
+
 async function tick(): Promise<void> {
   for (const [name, job] of [
     ["lexicon", lexiconTick],
@@ -179,6 +191,7 @@ async function tick(): Promise<void> {
     ["cache IGN", ignCacheTick],
     ["quota IGN", ignPurgeTick],
     ["agrirouter", agrirouterTick],
+    ["fichiers d'import", importFilesTick],
   ] as const) {
     if (stopping) return;
     await job().catch((e) => console.warn(`[worker] ${name} : ${e instanceof Error ? e.message : e}`));
