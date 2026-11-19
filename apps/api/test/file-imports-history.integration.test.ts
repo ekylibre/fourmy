@@ -126,9 +126,11 @@ describe.skipIf(!url)("historique, apports prévus et annulation d'un import (in
   it("annulation partielle : une intervention modifiée depuis est gardée, avec sa parcelle, et signalée", { timeout: 180_000 }, async () => {
     const farm = farms[2]!;
     const { id } = await importFile(farm, geofolia, "export.zip");
-    const [touched] = await sql`SELECT i.id, t.ref_id AS parcel FROM interventions i
+    // Intervention prévue sur une seule parcelle (choix stable : une seule parcelle gardée).
+    const [touched] = await sql`SELECT i.id, min(t.ref_id::text) AS parcel FROM interventions i
                                 JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target'
-                                WHERE i.farm_id = ${farm.farmId} AND i.status = 'planned' LIMIT 1`;
+                                WHERE i.farm_id = ${farm.farmId} AND i.status = 'planned'
+                                GROUP BY i.id HAVING count(*) = 1 ORDER BY i.id LIMIT 1`;
     const cancel = await app.request(`/api/v1/farms/${farm.farmId}/interventions/${touched!.id}/cancel`, {
       method: "POST",
       headers: farm.headers,
