@@ -54,6 +54,8 @@ export interface Slot {
   stoppedAt: string | null;
   /** Mode attelages : l'attelage de la période. */
   crew?: string;
+  /** Journée entière : seule la date est connue (intervention importée). */
+  allDay?: boolean;
 }
 
 /**
@@ -71,11 +73,15 @@ export function slots(i: Intervention): Slot[] {
     const at = i.startedAt ?? i.stoppedAt ?? i.createdAt;
     return [{ day: localDay(new Date(at)), startedAt: at, stoppedAt: null }];
   }
+  // Dates seules (intervention importée) : la période finit au minuit suivant, qui n'est pas un jour de plus.
+  const allDay = i.periodPrecision === "day";
   return periods.flatMap((p) => {
     const first = localDay(new Date(p.startedAt));
-    const last = localDay(new Date(p.stoppedAt));
+    const last = localDay(new Date(new Date(p.stoppedAt).getTime() - (allDay ? 1 : 0)));
     const out: Slot[] = [];
-    for (let day = first; day <= last; day = addDays(day, 1)) out.push({ day, startedAt: p.startedAt, stoppedAt: p.stoppedAt, ...(p.crew ? { crew: p.crew } : {}) });
+    for (let day = first; day <= last; day = addDays(day, 1)) {
+      out.push({ day, startedAt: p.startedAt, stoppedAt: p.stoppedAt, ...(p.crew ? { crew: p.crew } : {}), ...(allDay ? { allDay } : {}) });
+    }
     return out;
   });
 }

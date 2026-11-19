@@ -153,6 +153,8 @@ async function parcelContext(
     cultivation: string | null;
     activity: string | null;
     reference: string | null;
+    in_place: boolean | null;
+    cover: string | null;
     organic: boolean;
     water_name: string | null;
     water_m: number | null;
@@ -167,7 +169,12 @@ async function parcelContext(
         SELECT lp.name,
                (SELECT area_m2::float8 FROM v) AS area,
                (SELECT ST_Area(g::geography) FROM z) AS zone_area,
-               prod.cultivation, prod.activity, prod.reference,
+               prod.cultivation, prod.activity, prod.reference, prod.in_place,
+               -- Couvert d'interculture en place ce jour-là (du semis à la destruction comprise).
+               (SELECT cc.species FROM cover_crops cc
+                 WHERE cc.land_parcel_id = lp.id
+                   AND (${at}::timestamptz AT TIME ZONE 'Europe/Paris')::date BETWEEN cc.sown_on AND coalesce(cc.destroyed_on, 'infinity'::date)
+                 ORDER BY cc.sown_on DESC LIMIT 1) AS cover,
                EXISTS (SELECT 1 FROM parcel_certifications pc WHERE pc.land_parcel_id = lp.id AND pc.kind = 'organic'
                          AND pc.started_on <= ${at}::timestamptz::date AND (pc.stopped_on IS NULL OR pc.stopped_on >= ${at}::timestamptz::date)) AS organic,
                (SELECT name FROM w ORDER BY d LIMIT 1) AS water_name,
@@ -182,15 +189,20 @@ async function parcelContext(
         -- (variété cultivée, sinon celle de sa production de référence), sinon de la production.
         LEFT JOIN LATERAL (
           SELECT coalesce(a.cultivation, lx.specie, p.cultivation, CASE p.nature WHEN 'vine' THEN 'vitis' END) AS cultivation,
-                 a.name AS activity, a.reference
-          FROM productions p JOIN campaigns c ON c.id = p.campaign_id
+                 a.name AS activity, a.reference,
+                 (p.started_on IS NOT NULL AND (${at}::timestamptz AT TIME ZONE 'Europe/Paris')::date
+                    BETWEEN p.started_on AND coalesce(p.stopped_on, 'infinity'::date)) AS in_place
+          FROM productions p
           LEFT JOIN activities a ON a.id = p.activity_id
           LEFT JOIN lexicon_productions lx ON lx.reference_name = a.reference
-          WHERE p.land_parcel_id = lp.id AND ${at}::timestamptz::date BETWEEN c.starts_on AND c.stops_on
-          ORDER BY (a.id IS NULL), 1 NULLS LAST LIMIT 1) prod ON true
+          -- Culture en place ce jour-là (productions datées, sinon celle de la campagne).
+          WHERE p.id = fourmy_production_at(lp.id, (${at}::timestamptz AT TIME ZONE 'Europe/Paris')::date)) prod ON true
         WHERE lp.id = ${target.id}`,
   );
-  const fallow = isFallow(r?.reference ?? null, r?.activity ?? null);
+  // Couvert d'interculture en place et aucune culture datée en place : la culture du jour est le
+  // couvert, contrôlé comme une jachère (usages « Jachères et cultures intermédiaires »).
+  const intercrop = !!r?.cover && !r?.in_place;
+  const fallow = intercrop || isFallow(r?.reference ?? null, r?.activity ?? null);
   // Jachère : espèce générique « plant », usages E-Phy des jachères (et traitements généraux).
   const cultivation = fallow ? "plant" : (r?.cultivation ?? null);
   const lin = cultivation && (fallow || cultivation !== "plant") ? await lineage(tx, cultivation) : null;
@@ -200,7 +212,7 @@ async function parcelContext(
     name: r?.name ?? "parcelle inconnue",
     treatedHa: treatedM2 / 10_000,
     lineage: lin?.names ?? null,
-    cultivationLabel: fallow ? (r?.activity ?? "Jachère") : (lin?.label ?? null),
+    cultivationLabel: intercrop ? `Couvert d'interculture (${r!.cover})` : fallow ? (r?.activity ?? "Jachère") : (lin?.label ?? null),
     cropLabels: fallow ? FALLOW_CROP_LABELS : null,
     organic: r?.organic ?? false,
     cultivation,

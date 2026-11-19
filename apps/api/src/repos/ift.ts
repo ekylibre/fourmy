@@ -84,11 +84,11 @@ export async function computeInterventionIft(db: Database, farmId: string, inter
           -- Production de la campagne : culture et production de référence de son activité.
           LEFT JOIN LATERAL (
             SELECT coalesce(a.cultivation, lx.specie, p.cultivation, CASE p.nature WHEN 'vine' THEN 'vitis' END) AS cultivation, a.reference
-            FROM productions p JOIN campaigns c ON c.id = p.campaign_id
+            FROM productions p
             LEFT JOIN activities a ON a.id = p.activity_id
             LEFT JOIN lexicon_productions lx ON lx.reference_name = a.reference
-            WHERE p.land_parcel_id = t.ref_id AND ${i.stopped_at}::timestamptz::date BETWEEN c.starts_on AND c.stops_on
-            ORDER BY (a.id IS NULL), 1 NULLS LAST LIMIT 1) prod ON true
+            -- Culture en place ce jour-là (productions datées, sinon celle de la campagne).
+            WHERE p.id = fourmy_production_at(t.ref_id, (${i.stopped_at}::timestamptz AT TIME ZONE 'Europe/Paris')::date)) prod ON true
           WHERE t.intervention_id = ${interventionId} AND t.role = 'target' AND t.ref_type = 'land_parcel'`,
     );
     // Usage retenu de chaque produit (choisi à la saisie, ou le seul possible) :

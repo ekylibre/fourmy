@@ -15,6 +15,18 @@ process.env.FOURMY_IGN_CACHE_DIR = ignCacheDir;
  * processus par cœur et dépasse les 100 connexions de PostgreSQL
  * (« sorry, too many clients already ») sur une machine à 32 cœurs.
  */
+/**
+ * Délais : en CI, les tests web (jsdom) tournent en même temps que ceux-ci,
+ * et l'import d'un fichier Geofolia écrit plusieurs centaines d'interventions
+ * dans une transaction ; les délais par défaut (5 s par test, 10 s par
+ * préparation) faisaient échouer des tests sans rapport, par simple lenteur.
+ */
 export default defineConfig({
-  test: { maxWorkers: 4, env: { FOURMY_IGN_CACHE_DIR: ignCacheDir }, globalSetup: ["./test/global-setup.ts"] },
+  test: {
+    maxWorkers: 4,
+    testTimeout: 30_000,
+    hookTimeout: 60_000,
+    env: { FOURMY_IGN_CACHE_DIR: ignCacheDir },
+    globalSetup: ["./test/global-setup.ts"],
+  },
 });

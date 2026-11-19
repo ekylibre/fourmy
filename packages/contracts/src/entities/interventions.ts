@@ -20,7 +20,7 @@ export type InterventionStatus = z.infer<typeof interventionStatus>;
 export const interventionDisplayStatus = z.enum(["planned", "in_progress", "done", "cancelled"]);
 export type InterventionDisplayStatus = z.infer<typeof interventionDisplayStatus>;
 
-export const interventionOrigin = z.enum(["web", "mobile", "migration", "plugin"]);
+export const interventionOrigin = z.enum(["web", "mobile", "migration", "plugin", "import"]);
 
 /** Rôle d'une ligne de paramètre en base (stockage) ; l'API expose la forme structurée. */
 export const parameterRole = z.enum(["target", "input", "output", "tool", "doer"]);
@@ -169,6 +169,26 @@ export const irrigationBlock = z.object({
 });
 export type IrrigationBlock = z.infer<typeof irrigationBlock>;
 
+/** Technique de semis (forme `sowing`) : semis direct, de précision, classique, plantation, à la volée. */
+export const sowingTechnique = z.enum(["direct", "precision", "conventional", "planting", "broadcast"]);
+export type SowingTechnique = z.infer<typeof sowingTechnique>;
+export const SOWING_TECHNIQUE_LABELS: Record<SowingTechnique, string> = {
+  direct: "Semis direct",
+  precision: "Semis de précision",
+  conventional: "Semis classique",
+  planting: "Plantation",
+  broadcast: "Semis à la volée",
+};
+export const sowingBlock = z.object({ technique: sowingTechnique });
+
+/**
+ * Précision des périodes : `day` quand seule la date est connue (intervention
+ * importée d'un autre logiciel) — la période couvre le jour, ses durées ne
+ * comptent ni dans les temps de travaux ni dans les heures des matériels.
+ */
+export const periodPrecision = z.enum(["time", "day"]);
+export type PeriodPrecision = z.infer<typeof periodPrecision>;
+
 /** Corps commun de saisie (planification ou réalisation). */
 const interventionBody = z.object({
   procedure: z.string().min(1),
@@ -194,6 +214,8 @@ const interventionBody = z.object({
   maintenance: maintenanceBlock.optional(),
   /** Procédures d'irrigation : dose d'eau (obligatoire à la réalisation) et matériel. */
   irrigation: irrigationBlock.optional(),
+  /** Semis : technique (facultative). */
+  sowing: sowingBlock.optional(),
   /**
    * Parcours GPS à rattacher à l'enregistrement (FR-GPS-23), en plus de ceux
    * déjà rattachés : absent ou vide, les rattachements existants restent.
@@ -292,6 +314,12 @@ export const intervention = z
     maintenance: maintenanceRead.nullable().optional(),
     /** Irrigation : dose d'eau et matériel. */
     irrigation: z.object({ depthMm: z.number(), method: irrigationMethod.nullable() }).nullable().optional(),
+    /** Semis : technique. */
+    sowing: sowingBlock.nullable().optional(),
+    /** `day` : seule la date est connue (intervention importée). */
+    periodPrecision: periodPrecision.optional(),
+    /** false : intervention importée, sans mouvement de stock. */
+    affectsStock: z.boolean().optional(),
   })
   .merge(auditFields);
 export type Intervention = z.infer<typeof intervention>;

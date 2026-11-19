@@ -186,6 +186,7 @@ export function ListView({ items, names, actions, now }: { items: Intervention[]
               <Badge color={STATUS[displayStatus(i, now)].color}>{STATUS[displayStatus(i, now)].label}</Badge>
               {i.origin === "mobile" && <Badge color="ardoise">Mobile</Badge>}
               {i.origin === "migration" && <Badge color="gray">Ekylibre</Badge>}
+              {i.origin === "import" && <Badge color="gray">Importée</Badge>}
             </Group>
           ),
         },
@@ -292,8 +293,8 @@ export function KanbanView({
 /** Semaine en colonnes (lundi → dimanche) ; chaque période à son jour et son heure. */
 export function CalendarView({ items, week, names, actions, now }: { items: Intervention[]; week: Week; names: Names; actions: ViewActions; now: string }) {
   const today = new Date().toISOString().slice(0, 10);
-  const byDay = new Map(week.days.map((d) => [d, [] as { i: Intervention; startedAt: string; stoppedAt: string | null; crew?: string }[]]));
-  for (const i of items) for (const s of slots(i)) byDay.get(s.day)?.push({ i, startedAt: s.startedAt, stoppedAt: s.stoppedAt, crew: s.crew });
+  const byDay = new Map(week.days.map((d) => [d, [] as { i: Intervention; startedAt: string; stoppedAt: string | null; crew?: string; allDay?: boolean }[]]));
+  for (const i of items) for (const s of slots(i)) byDay.get(s.day)?.push({ i, startedAt: s.startedAt, stoppedAt: s.stoppedAt, crew: s.crew, allDay: s.allDay });
   return (
     <SimpleGrid cols={{ base: 1, sm: 4, lg: 7 }} spacing={6}>
       {week.days.map((day) => {
@@ -306,14 +307,14 @@ export function CalendarView({ items, week, names, actions, now }: { items: Inte
               {label}
             </Text>
             <Stack gap={6} mih={80}>
-              {entries.map(({ i, startedAt, stoppedAt, crew }, k) => (
+              {entries.map(({ i, startedAt, stoppedAt, crew, allDay }, k) => (
                 <SlotCard
                   key={`${i.id}-${k}`}
                   i={i}
                   names={names}
                   actions={actions}
                   now={now}
-                  when={`${stoppedAt ? `${time(startedAt)}–${time(stoppedAt)}` : `prévue ${time(startedAt)}`}${crew ? ` · ${crew}` : ""}`}
+                  when={`${allDay ? "journée" : stoppedAt ? `${time(startedAt)}–${time(stoppedAt)}` : `prévue ${time(startedAt)}`}${crew ? ` · ${crew}` : ""}`}
                 />
               ))}
             </Stack>

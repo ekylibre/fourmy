@@ -43,8 +43,9 @@ export const interventionRoutes = new Hono<Env>()
   .post("/interventions", async (c) => {
     const parsed = interventionPlanWrite.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.message);
-    const { intervention, created } = await planIntervention(db(), c.get("farmId"), domainCtx(c), parsed.data);
-    return c.json(intervention, created ? 201 : 200);
+    const { intervention, created, warnings } = await planIntervention(db(), c.get("farmId"), domainCtx(c), parsed.data);
+    // Alertes non bloquantes (cultures qui se recoupent…) à côté de l'intervention.
+    return c.json({ ...intervention, warnings }, created ? 201 : 200);
   })
   .get("/interventions/:id", async (c) => c.json(await readInterventionDetail(db(), c.get("farmId"), uuidParam(c, "id"))))
   .put("/interventions/:id", async (c) => {

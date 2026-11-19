@@ -36,7 +36,7 @@ const REQUIRED: Record<string, string[]> = {
   registered_agroedi_crops: ["agroedi_code", "agroedi_name", "production"],
 };
 
-/** `optional` : jeu réservé, absent du dépôt public (sans clé) → ignoré. */
+/** `optional` : jeu réservé aux adhérents, chargé seulement avec une clé (sinon « absent »). */
 const PACKAGES: { name: string; tables: string[]; optional?: true }[] = [
   { name: "phytosanitary", tables: ["registered_phytosanitary_products", "registered_phytosanitary_usages", "registered_phytosanitary_cropsets", "registered_phytosanitary_target_name_to_pfi_targets", "registered_phytosanitary_risks", "registered_phytosanitary_symbols"] },
   { name: "taxonomy", tables: ["master_taxonomy", "taxonomy__translations"] },
@@ -163,7 +163,8 @@ export async function syncLexiconIn(tx: TransactionSql, { base, apiKey, force = 
   const reports: PackageReport[] = [];
   for (const pkg of PACKAGES) {
     const version = index.datasources[pkg.name]?.current;
-    if (!version && pkg.optional) {
+    // Jeu réservé : le dépôt public en publie le nom, pas les fichiers (403) ; il faut une clé.
+    if (pkg.optional && (!version || !apiKey)) {
       reports.push({ name: pkg.name, version: "", status: "absent", rows: 0 });
       continue;
     }

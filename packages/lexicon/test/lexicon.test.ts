@@ -279,15 +279,30 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", () => {
       });
   });
 
-  it("refuse un fichier dont la somme de contrôle est fausse", async () => {
+  it("sans clé, un jeu réservé listé dans l'index (fichiers en 403) est « absent », sans erreur", async () => {
     await sql
       .begin(async (tx) => {
         const server = fakeServer("v1", { agroedi: true });
+        const forbidden = (async (input: string | URL, init?: RequestInit) =>
+          String(input).includes("/agroedi/") ? new Response("réservé", { status: 403 }) : server.fetchImpl(input, init)) as typeof fetch;
+        const reports = await syncLexiconIn(tx, { base: "http://lexicon.test", fetchImpl: forbidden, force: true });
+        expect(reports.find((r) => r.name === "agroedi")).toEqual({ name: "agroedi", version: "", status: "absent", rows: 0 });
+        throw new Rollback();
+      })
+      .catch((e) => {
+        if (!(e instanceof Rollback)) throw e;
+      });
+  });
+
+  it("refuse un fichier dont la somme de contrôle est fausse", async () => {
+    await sql
+      .begin(async (tx) => {
+        const server = fakeServer("v1", { agroedi: true, apiKey: "lex_test" });
         const tampered = (async (input: string | URL, init?: RequestInit) => {
           if (String(input).endsWith("agroedi/a1/data/crops_0.csv.gz")) return new Response(gzipSync("ZXX,Autre,\n"));
           return server.fetchImpl(input, init);
         }) as typeof fetch;
-        await expect(syncLexiconIn(tx, { base: "http://lexicon.test", fetchImpl: tampered, force: true })).rejects.toThrow(/somme de contrôle fausse/);
+        await expect(syncLexiconIn(tx, { base: "http://lexicon.test", apiKey: "lex_test", fetchImpl: tampered, force: true })).rejects.toThrow(/somme de contrôle fausse/);
         throw new Rollback();
       })
       .catch((e) => {

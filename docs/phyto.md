@@ -97,6 +97,15 @@ La culture contrôlée vient de l'**activité** de la parcelle (docs/activites.m
 jachère → usages des jachères ; usage retenu d'office s'il est le seul
 possible ; culture IFT de la production de référence.
 
+## Culture contrôlée à la date
+
+La culture contrôlée est celle qui est en place le jour du traitement
+(`fourmy_production_at`, voir [`activites.md`](activites.md)). Si un couvert
+d'interculture est en place (du semis à la destruction comprise) et
+qu'aucune culture datée ne l'est, le traitement est contrôlé comme sur une
+jachère : usages « Jachères et cultures intermédiaires » et « Traitements
+généraux », culture affichée « Couvert d'interculture (espèces) ».
+
 ## Saisie, fiche, registre
 
 - **Formulaire** : contrôle en direct (`POST /phyto/check`) affiché sous

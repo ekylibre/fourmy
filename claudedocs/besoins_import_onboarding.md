@@ -22,8 +22,8 @@ Dossier local hors dépôt (`ressources_fourmy/`, données personnelles).
 
 | Fichier | Format | Contenu constaté |
 |---|---|---|
-| `<SIRET>_<horodatage>.dap` | EDI DAPLOS, texte à largeur fixe, Windows-1252, 536 Ko | Émetteur Geofolia, destinataire l'organisme de conseil. Campagne **2026** seule : 63 parcelles (`DP`) avec leurs contours (`SC`), 421 interventions × parcelle (`PV`), 425 intrants (`VI`), 71 récoltes (`VR`), 126 historiques de cultures (`PH`) |
-| `<organisme>_Parcelles et Interventions complet (ZIP)_<horodatage>.zip` | Geofolia JSON (`Field.Json`, `Action.Json`, `IdentificationCodes.json`), Lambert 93, 140 Ko | **63 parcelles** de la récolte 2026 (298,2 ha) : contour, culture, variété, semis, récolte, sol, rendement objectif et réalisé, îlot, cultures N-1 à N-5, conseils P/K, surfaces épandables. **384 actions** (336 réalisées, 48 « plan de fumure ») du 27/05/2025 au 02/10/2026. **120 produits** (phytos avec n° AMM, semences avec code GNIS, engrais avec composition). 1 salarié, 15 produits récoltés |
+| `<SIRET>_<horodatage>.dap` | EDI DAPLOS, texte à largeur fixe, Windows-1252, 536 Ko | Émetteur Geofolia, destinataire l'organisme de conseil. Campagne **2026** seule : 63 cultures (`DP`) avec leurs contours (`SC`), 421 interventions × parcelle (`PV`), 425 intrants (`VI`), 71 récoltes (`VR`), 126 historiques de cultures (`PH`) |
+| `<organisme>_Parcelles et Interventions complet (ZIP)_<horodatage>.zip` | Geofolia JSON (`Field.Json`, `Action.Json`, `IdentificationCodes.json`), Lambert 93, 140 Ko | **63 cultures** de la récolte 2026 sur **41 parcelles** (164,9 ha ; les 22 « parcelles secondaires » sont des intercultures et dérobées sur la terre d'une parcelle principale) : contour, culture, variété, semis, récolte, sol, rendement objectif et réalisé, îlot, cultures N-1 à N-5, conseils P/K, surfaces épandables. **384 actions** (336 réalisées, 48 « plan de fumure ») du 27/05/2025 au 02/10/2026. **120 produits** (phytos avec n° AMM, semences avec code GNIS, engrais avec composition). 1 salarié, 15 produits récoltés |
 | `Dossier-PAC-2026_dossier_<PACAGE>_<horodatage>.xml` | TelePAC XML, 520 Ko | Demandeur (SIRET, PACAGE, raison sociale, courriel). **19 îlots, 41 parcelles PAC** (code culture, surface admissible). **340 SNA** (haies, arbres, mares… : V1 143, V4 136, V2 48…) et **16 ZDH**. Effectif animal : 13 200 volailles (AV). Demandes d'aides (écorégime, ICHN, légumineuses, assurance récolte) |
 
 Opérations de la campagne 2026 (Geofolia) :
@@ -282,9 +282,15 @@ d'opération AEE rencontré doit avoir une cible déclarée.
 
 **US-IMP-1** — En tant que responsable venant de Geofolia, je dépose mon ZIP
 et je retrouve ma campagne.
-- Avec le ZIP du GAEC pilote : **63 parcelles**, **298,2 ha** (±0,1 ha), une
-  activité par culture rapprochée (14 cultures), **384 interventions**
-  dont 336 réalisées et 48 planifiées, chacune sur ses parcelles.
+- Avec le ZIP du GAEC pilote : **41 parcelles** (164,9 ha ± 0,1),
+  **43 productions datées** (dont 2 dérobées) et **20 couverts
+  d'interculture** (les « Mélange CINE », dans `cover_crops`), une activité
+  par culture (13), les **384 actions**
+  (336 réalisées, 48 planifiées) devenues **414 interventions** (récoltes
+  séparées par parcelle, doses différentes séparées), chacune sur ses
+  parcelles. *Constaté le 19/11/2026 (lot IM2) ; les premiers chiffres
+  (« 63 parcelles, 298,2 ha ») comptaient les cultures secondaires comme des
+  parcelles.*
 - Les 51 produits à n° AMM (phytos et adjuvants) sont rapprochés d'E-Phy et le
   registre phyto 2026 de la ferme liste les **62 traitements**.
 - Les 77 irrigations alimentent le bilan hydrique des parcelles concernées.

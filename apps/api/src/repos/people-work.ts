@@ -31,6 +31,8 @@ async function entriesOf(tx: Tx, people: readonly string[], from: number, to: nu
     sql`SELECT me.ref_id AS person_id, i.id AS intervention_id, i.procedure, w.started_at, w.stopped_at
         FROM intervention_parameters me
         JOIN interventions i ON i.id = me.intervention_id AND i.status = 'done'
+          -- Dates seules (intervention importée) : pas de durée de travail connue.
+          AND i.period_precision = 'time'
         JOIN intervention_periods w ON w.intervention_id = i.id AND (i.staffing = 'free' OR w.crew_id = me.crew_id)
         WHERE me.role = 'doer' AND me.ref_type = 'person' AND me.ref_id IN (${list(people)})
           AND w.stopped_at > ${new Date(from).toISOString()}::timestamptz AND w.started_at < ${new Date(to).toISOString()}::timestamptz`,

@@ -113,10 +113,10 @@ export async function officialPhytoRegister(db: Database, farmId: string, year: 
       JOIN total ON total.intervention_id = d.id
       LEFT JOIN span ON span.intervention_id = d.id
       LEFT JOIN ref_bbch_stages st ON st.code = d.bbch
+      -- Culture en place le jour du traitement (productions datées, sinon celle de la campagne).
       LEFT JOIN LATERAL (
-        SELECT p.activity_id FROM productions p JOIN campaigns c ON c.id = p.campaign_id
-        WHERE p.land_parcel_id = tgt.parcel_id AND c.year = extract(year FROM d.stopped_at)::int
-        ORDER BY p.activity_id IS NULL, p.id LIMIT 1
+        SELECT p.activity_id FROM productions p
+        WHERE p.id = fourmy_production_at(tgt.parcel_id, (coalesce(span.started_at, d.stopped_at) AT TIME ZONE 'Europe/Paris')::date)
       ) prod ON true
       LEFT JOIN ref_phyto_crops crop ON crop.code = fourmy_activity_crop(prod.activity_id)
       ORDER BY coalesce(span.started_at, d.started_at), d.id, a.name, tgt.parcel_id`)) as unknown as {

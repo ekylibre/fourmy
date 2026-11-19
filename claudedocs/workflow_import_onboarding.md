@@ -137,14 +137,31 @@ tests verts.
 
 ## IM2 — Geofolia
 
+> ✅ Réalisé le 19/11/2026 (branche `feat/import-im2-geofolia`). Écarts :
+> parcelles « secondaires » de Geofolia (interculture, dérobée) = productions
+> de la parcelle principale (`landKey`) ; regroupement en interventions dans
+> `@fourmy/importers` (`draftInterventions`, sans base) ; rapprochement
+> `apps/api/src/repos/import-reconcile.ts`, écriture `import-apply.ts`
+> (chaque intervention dans un point de reprise : une intervention refusée
+> est rapportée sans annuler l'import) ; sol dans `productions.attrs` ;
+> liens de parcelles d'abord, géométrie ensuite (IoU ≥ 0,8), sans nouvelle
+> version d'une parcelle reliée (aucune réécriture) ; jeu `agroedi` chargé
+> seulement avec une clé (le dépôt public en liste le nom, fichiers en 403).
+> Ajouts décidés le 19/11/2026 : couverts d'interculture → `cover_crops` ;
+> productions datées et `fourmy_production_at` (migration 0063) pour la
+> culture contrôlée à une date ; alerte de saisie quand deux productions
+> datées d'une parcelle se recoupent ; couvert en place contrôlé comme une
+> jachère.
+
 Branche `feat/import-im2-geofolia`. Le premier import complet de bout en
 bout ; il pose toute la mécanique de rapprochement et d'écriture réutilisée
 par IM3 et IM4.
 
 2.1 **Migration** (reste de §6.2) : `interventions.origin` + `import`,
 `affects_stock`, `period_precision`, `sowing` ; `productions.declared`,
-`productions.attrs` ; `parcel_soils.soil_label`, `soil_code`, `taw_mm`
-facultatif.
+`productions.attrs` (le sol y est porté, par campagne : `parcel_soils`
+reste au modèle de croissance) ; origine `imported` des compositions de
+fertilisants.
 
 2.2 **Contrats et domaine** :
 - `interventionOrigin` + `import` ; bloc `sowing` (technique) ;
@@ -169,6 +186,9 @@ N-1…N-5 (dans `history`, écrits en IM5) ; produits (nature par
 GAEC pilote, valeur inconnue → `other` signalé) ; salariés ; actions → unités de
 travail par `RecognitionId`. Tests sur le jeu anonymisé : 63 parcelles,
 511 unités de travail, 120 articles.
+*Réalisé : jeu anonymisé de 6 parcelles, 13 cultures, 215 couples
+(`packages/importers/test/fixtures/geofolia-pilote.zip`, généré par
+`scripts/anonymize-geofolia.mjs`).*
 
 2.5 **Rapprochement** (`repos/farm-imports/reconcile.ts`, lecture seule) :
 - parcelles (§5.1 : lien, IoU ≥ 0,95 même version / nouvelle version, IoU
@@ -201,6 +221,12 @@ gardée et conflit au rapport.
 regroupement et scission : nombre à consigner), 51 articles à AMM rapprochés,
 registre phyto 2026 avec ses 62 traitements, irrigations dans le bilan
 hydrique. Écarts consignés dans `docs/imports.md`.
+*Constaté le 19/11/2026 : 41 parcelles (164,9 ha), 63 productions,
+14 activités (13 avec leur production de référence ; « Mélange CINE » sans
+le jeu AgroEDI), 133 articles, 414 interventions (aucune refusée), en 13 s
+(analyse : 0,25 s) ; 18 traitements en feu rouge (produits retirés, usages
+absents, nombre d'applications ; deux dépassements de dose de 1 à 3 % dus
+au recalcul de la dose depuis la quantité totale).*
 
 **Fini quand** : le ZIP du GAEC pilote s'importe par l'API, se rejoue sans
 doublon, et le registre phyto, le cahier de fertilisation et le bilan
@@ -353,9 +379,9 @@ besoins :
 
 | Contrôle | Attendu |
 |---|---|
-| Parcelles, surface | 63, 298,2 ha ± 0,1 |
+| Parcelles, surface | 41 parcelles (164,9 ha ± 0,1), 63 productions |
 | Activités | une par culture, « Mélange CINE » en couvert d'interculture |
-| Interventions 2026 | 336 réalisées + 48 planifiées (avant regroupement), sans doublon après DAPLOS |
+| Interventions 2026 | 384 actions (336 réalisées, 48 planifiées) → 414 interventions, sans doublon après DAPLOS |
 | Registre phyto 2026 | 62 traitements, AMM rapprochés, feux réglementaires lisibles |
 | Irrigations | 77, dans le bilan hydrique |
 | PAC | 19 îlots, 41 parcelles rattachées, écarts listés |
