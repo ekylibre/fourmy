@@ -79,7 +79,9 @@ describe("agrirouter : connexion défaite dans agrirouter", () => {
       ]),
     );
     renderApp(`/f/${FARM}/integrations`);
-    const card = await screen.findByTestId("integration-agrirouter");
+    expect(within(await screen.findByTestId("tile-agrirouter")).getByRole("img", { name: "Déconnectée" })).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: /^Configurer agrirouter/i }));
+    const card = within(await screen.findByRole("dialog")).getByTestId("integration-agrirouter");
     expect(within(card).getByText("Déconnectée le 16/11/2026")).toBeInTheDocument();
     expect(within(card).getByText(/L'autorisation de Fourmy a été retirée dans agrirouter\./)).toBeInTheDocument();
     expect(within(card).getByRole("button", { name: "Reconnecter" })).toBeInTheDocument();

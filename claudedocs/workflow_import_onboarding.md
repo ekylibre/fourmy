@@ -351,6 +351,19 @@ le précédent cultural 2026 est rempli, et un import s'annule.
 
 ## IM6 — Assistant de premier démarrage
 
+> ✅ Réalisé le 19/11/2026 (branche `feat/import-im6-assistant`). Écarts :
+> aperçu sans carte (chiffres et tables par fichier ; les parcelles se voient
+> sur la carte après l'import) ; rapprochements limités aux noms
+> d'activités et aux personnes (références, fusion et choix d'articles
+> restent à la page Activités et aux stocks) ; paramétrage par liens vers
+> les écrans existants ; import dans l'ordre Geofolia → DAPLOS → TelePAC
+> (affichage TelePAC → Geofolia → DAPLOS) ; reprise Ekylibre non branchée
+> sur `createFarm` (point ouvert) ; siège créé par le déclencheur existant
+> et complété. Ajout demandé en cours de lot : **reprise d'Ekylibre par
+> dépôt de la sauvegarde** (zip ≤ 2 Go) dans « Mes fichiers » et la page
+> Imports, restaurée puis migrée par le worker (base jetable, rôle
+> restreint, liste blanche).
+
 Branche `feat/import-im6-assistant`.
 
 6.1 **Migration** : `users.farm_creation_quota`, `farm_settings.onboarding`.

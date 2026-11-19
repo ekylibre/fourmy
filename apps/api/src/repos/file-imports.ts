@@ -158,12 +158,12 @@ export async function analyzeUpload(
 }
 
 /** Import encore modifiable (analysé) et son fichier, sinon erreur explicite. */
-async function pendingRun(tx: Tx, id: string): Promise<{ status: string; file_id: string | null }> {
+async function pendingRun(tx: Tx, id: string, allowEkylibre = false): Promise<{ status: string; file_id: string | null }> {
   const [run] = await rows<{ status: string; file_id: string | null; source: string }>(
     tx,
     sql`SELECT status, file_id, source FROM import_runs WHERE id = ${id} FOR UPDATE`,
   );
-  if (!run || !run.source.startsWith("file:")) throw new NotFound(`Import ${id} introuvable.`);
+  if (!run || !(run.source.startsWith("file:") || (allowEkylibre && run.source.startsWith("ekylibre-file:")))) throw new NotFound(`Import ${id} introuvable.`);
   if (run.status !== "analyzed") throw new Conflict(`Cet import n'est plus modifiable (état : ${run.status}).`);
   return run;
 }
@@ -190,7 +190,8 @@ export async function saveDecisions(db: Database, farmId: string, id: string, de
 /** Abandon d'un import analysé ; son fichier est supprimé s'il ne sert à aucun autre import. */
 export async function discardRun(db: Database, farmId: string, id: string): Promise<ImportRunView> {
   return withFarm(db, farmId, async (tx) => {
-    const run = await pendingRun(tx, id);
+    // Sauvegarde Ekylibre restaurée : abandonnée ici, sa base et son fichier supprimés par le worker.
+    const run = await pendingRun(tx, id, true);
     await tx.execute(sql`UPDATE import_runs SET status = 'discarded', finished_at = now() WHERE id = ${id}`);
     if (run.file_id) {
       await tx.execute(sql`

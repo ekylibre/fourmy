@@ -231,7 +231,8 @@ describe("agrirouter dans les intégrations", () => {
   it("non configuré sur le serveur : bouton inactif et explication", async () => {
     server.use(http.get("*/integrations", () => HttpResponse.json({ providers: [{ ...agrirouter, available: false }], items: [] })));
     renderApp(`/f/${FARM}/integrations`);
-    const card = await screen.findByTestId("integration-agrirouter");
+    await userEvent.setup().click(await screen.findByRole("button", { name: /^Configurer agrirouter/i }));
+    const card = within(await screen.findByRole("dialog")).getByTestId("integration-agrirouter");
     expect(within(card).getByRole("button", { name: "Connecter à agrirouter" })).toBeDisabled();
     expect(within(card).getByText(/pas encore configuré sur ce serveur/)).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Échanges avec les machines" })).toContainElement(card);
@@ -253,7 +254,8 @@ describe("agrirouter dans les intégrations", () => {
     };
     server.use(http.get("*/integrations", () => HttpResponse.json({ providers: [{ ...agrirouter, available: true }], items: [integ] })));
     renderApp(`/f/${FARM}/integrations`);
-    const card = await screen.findByTestId("integration-agrirouter");
+    await userEvent.setup().click(await screen.findByRole("button", { name: /^Configurer agrirouter/i }));
+    const card = within(await screen.findByRole("dialog")).getByTestId("integration-agrirouter");
     expect(within(card).getByText("Connectée")).toBeInTheDocument();
     expect(within(card).getByText("EARL Essai")).toBeInTheDocument();
     expect(within(card).getByText("Fendt 724 terminal (machine) : ISO-XML, Shapefile")).toBeInTheDocument();

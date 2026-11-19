@@ -1,7 +1,7 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { demoInterventions } from "@fourmy/mocks";
+import { demoActivities, demoInterventions } from "@fourmy/mocks";
 import { server } from "./setup";
 import { FARM, renderApp } from "./render";
 
@@ -14,6 +14,25 @@ describe("activités", () => {
     const card = screen.getByLabelText("Activité Vignes AOP");
     expect(within(card).getByText(/Référence : Vigne · culture : Vigne/)).toBeInTheDocument();
     expect(within(card).getByText(/^1 parcelle\(s\) · 1,2/)).toBeInTheDocument();
+  });
+
+  it("« Actives uniquement » : seules les activités avec des parcelles pour la campagne", async () => {
+    const user = userEvent.setup();
+    // Une activité sans parcelle cette campagne, à côté de celles de la démonstration.
+    const idle = { ...demoActivities[0]!, id: "00000000-0000-7000-8000-0000000ac710", name: "Colza (sans parcelle)", parcelIds: [], areaM2: 0 };
+    server.use(http.get("*/activities", () => HttpResponse.json({ items: [...demoActivities, idle] })));
+    const { router } = renderApp(`/f/${FARM}/activities?at=2026-06-10`);
+    await screen.findByRole("heading", { name: "Activités 2026" });
+    const before = screen.getAllByLabelText(/^Activité /);
+    const empty = before.filter((c) => within(c).queryByText(/^0 parcelle\(s\)/));
+    expect(empty.length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("switch", { name: "Actives uniquement" }));
+    const after = screen.getAllByLabelText(/^Activité /);
+    expect(after).toHaveLength(before.length - empty.length);
+    expect(after.every((c) => !within(c).queryByText(/^0 parcelle\(s\)/))).toBe(true);
+    expect(screen.queryByLabelText("Activité Colza (sans parcelle)")).toBeNull();
+    expect(screen.getByRole("switch", { name: /Actives uniquement \(\d+ sur \d+\)/ })).toBeChecked();
+    expect(router.state.location.search).toContain("actives=1");
   });
 
   it("crée une activité depuis une production de référence Lexicon", async () => {

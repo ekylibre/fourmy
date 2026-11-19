@@ -3,7 +3,7 @@ import { Alert, Button, Center, Paper, PasswordInput, Stack, Text, TextInput, Ti
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router";
 import { Wordmark } from "@fourmy/ui-lyvre";
-import { DEV_EMAIL, signIn } from "../../app/session";
+import { DEV_EMAIL, sessionQuery, signIn } from "../../app/session";
 
 /**
  * Connexion par compte local (better-auth). Les comptes sont créés par
@@ -39,7 +39,9 @@ export function LoginPage() {
               const failure = await signIn(email, password);
               setPending(false);
               if (failure) return setError(failure);
-              await queryClient.invalidateQueries({ queryKey: ["session"] });
+              // Session relue AVANT de naviguer : la page visée ne doit pas trouver l'ancienne réponse
+              // « non connecté » en cache (sinon retour ici, et second clic nécessaire).
+              await queryClient.fetchQuery({ ...sessionQuery, staleTime: 0 });
               navigate(target);
             }}
           >

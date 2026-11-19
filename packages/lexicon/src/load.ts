@@ -151,6 +151,31 @@ export interface SyncOptions {
   fetchImpl?: typeof fetch;
 }
 
+/** Tables du référentiel vidées puis rechargées (TRUNCATE des TRANSFORMS). */
+const REFERENTIAL_TABLES = [
+  "phyto_products", "phyto_usages", "phyto_cropsets", "phyto_target_pfi", "phyto_risks", "phyto_hazard_symbols", "taxonomy",
+  "lexicon_productions", "lexicon_production_ift", "lexicon_cap_codes", "lexicon_pictures", "lexicon_agroedi_codes", "lexicon_agroedi_crops",
+];
+
+/**
+ * Verrous de tout le référentiel, pris d'un coup et sans attendre (NOWAIT) :
+ * si une table est lue (import, contrôle phyto…), on relâche tout et on
+ * réessaie. Le chargement n'attend donc jamais en tenant un verrou — plus
+ * d'interblocage avec une transaction qui lit ces tables dans un autre
+ * ordre ; elle attend seulement la fin du chargement. Deux minutes au plus.
+ */
+async function lockReferential(tx: TransactionSql): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await tx.savepoint((sp) => sp.unsafe(`LOCK TABLE ${REFERENTIAL_TABLES.join(", ")} IN ACCESS EXCLUSIVE MODE NOWAIT`));
+      return;
+    } catch (e) {
+      if ((e as { code?: string }).code !== "55P03" || attempt >= 240) throw e;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+}
+
 /** Synchronise le référentiel dans une transaction (tout ou rien). */
 export async function syncLexicon(sql: Sql, opts: SyncOptions): Promise<PackageReport[]> {
   return sql.begin((tx) => syncLexiconIn(tx, opts)) as Promise<PackageReport[]>;
@@ -161,6 +186,7 @@ export async function syncLexiconIn(tx: TransactionSql, { base, apiKey, force = 
   const fetchImpl = withApiKey(rawFetch, { base, apiKey });
   const index = await fetchIndex(base, fetchImpl);
   const reports: PackageReport[] = [];
+  let locked = false;
   for (const pkg of PACKAGES) {
     const version = index.datasources[pkg.name]?.current;
     // Jeu réservé : le dépôt public en publie le nom, pas les fichiers (403) ; il faut une clé.
@@ -178,6 +204,10 @@ export async function syncLexiconIn(tx: TransactionSql, { base, apiKey, force = 
     const columns = parseStructure(await fetchStructure(base, pkg.name, version, fetchImpl));
     let rows = 0;
     for (const table of pkg.tables) rows += await stage(tx, base, manifest, table, columns.get(table), fetchImpl);
+    if (!locked) {
+      await lockReferential(tx);
+      locked = true;
+    }
     for (const statement of TRANSFORMS[pkg.name]!) await tx.unsafe(statement);
     await tx`
       INSERT INTO lexicon_packages (name, version, source, rows, loaded_at)

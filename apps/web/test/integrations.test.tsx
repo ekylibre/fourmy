@@ -8,14 +8,24 @@ import { FARM, renderApp } from "./render";
 /** Page Intégrations : thèmes (lot S), stations Weenat et Sencrop (lot W). */
 describe("intégrations", () => {
   it("groupées par thème ; Weenat et Sencrop en Météo, avec leurs champs ; stations de la ferme", async () => {
+    const user = userEvent.setup();
     renderApp(`/f/${FARM}/integrations`);
     const weather = await screen.findByRole("region", { name: "Météo" });
     expect(within(weather).getByRole("heading", { name: "Weenat — stations météo" })).toBeInTheDocument();
     expect(within(weather).getByRole("heading", { name: "Sencrop — stations météo" })).toBeInTheDocument();
-    const weenat = within(weather).getByTestId("integration-weenat");
+    // Une tuile par service ; sa configuration s'ouvre dans une fenêtre.
+    // Feu éteint (non configurée), logo officiel du service.
+    const tile = within(within(weather).getByTestId("tile-weenat"));
+    expect(tile.getByRole("img", { name: "Non configurée" })).toBeInTheDocument();
+    expect(tile.getByRole("img", { name: "Logo Weenat" })).toHaveAttribute("src", "/integrations/weenat.webp");
+    expect(within(within(weather).getByTestId("tile-open-meteo")).getByRole("img", { name: "Actif par défaut" })).toBeInTheDocument();
+    await user.click(within(weather).getByRole("button", { name: "Configurer Weenat" }));
+    const weenat = within(await screen.findByRole("dialog")).getByTestId("integration-weenat");
     expect(within(weenat).getByLabelText(/E-mail du compte Weenat/)).toBeInTheDocument();
     expect(within(weenat).getByLabelText(/Mot de passe Weenat/)).toBeInTheDocument();
-    const sencrop = within(weather).getByTestId("integration-sencrop");
+    await user.keyboard("{Escape}");
+    await user.click(within(weather).getByRole("button", { name: "Configurer Sencrop" }));
+    const sencrop = within(await screen.findByRole("dialog")).getByTestId("integration-sencrop");
     expect(within(sencrop).getByLabelText(/Identifiant d'application/)).toBeInTheDocument();
     expect(within(sencrop).getByLabelText(/Secret d'application/)).toBeInTheDocument();
     const stations = await within(weather).findByRole("table", { name: "Stations météo" });
@@ -49,7 +59,8 @@ describe("intégrations", () => {
     );
     const user = userEvent.setup();
     renderApp(`/f/${FARM}/integrations`);
-    const card = await screen.findByTestId("integration-copernicus");
+    await user.click(await screen.findByRole("button", { name: /^Configurer Copernicus/ }));
+    const card = within(await screen.findByRole("dialog")).getByTestId("integration-copernicus");
     expect(within(card).getByText(/Enregistré \(…TdMy\) — laisser vide pour le conserver/)).toBeInTheDocument();
     await user.click(within(card).getByRole("button", { name: "Tester et enregistrer" }));
     expect(await within(card).findByText(/14 acquisition\(s\) Sentinel-2 au-dessus de la ferme sur les 30 derniers jours, la dernière le 10\/11\/2026/)).toBeInTheDocument();

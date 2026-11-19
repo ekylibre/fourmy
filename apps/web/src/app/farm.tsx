@@ -8,12 +8,17 @@ export interface MyFarm {
   id: string;
   name: string;
   role: Role;
+  /** Assistant de premier démarrage (lot IM6) : étape en cours, ou fini ; null hors assistant. */
+  onboarding?: { step?: string; completedAt?: string | null } | null;
 }
+
+/** Ferme dont l'assistant de premier démarrage n'est pas fini (à reprendre). */
+export const onboardingPending = (f: MyFarm) => f.role === "owner" && !!f.onboarding && !f.onboarding.completedAt;
 
 export function useMyFarms() {
   return useQuery({
     queryKey: ["me", "farms"],
-    queryFn: () => api.get<{ userId: string; items: MyFarm[] }>("/me/farms"),
+    queryFn: () => api.get<{ userId: string; canCreateFarm?: boolean; items: MyFarm[] }>("/me/farms"),
   });
 }
 

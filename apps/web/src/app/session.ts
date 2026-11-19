@@ -18,15 +18,18 @@ export const DEV_EMAIL = import.meta.env.DEV ? (import.meta.env.VITE_DEV_EMAIL ?
 
 export type SessionUser = { id: string; email: string; name: string | null };
 
+/** Lecture de la session (clé `session`), partagée par `useSession` et la connexion. */
+export const sessionQuery = {
+  queryKey: ["session"],
+  queryFn: async (): Promise<SessionUser | null> => {
+    const { data } = await authClient.getSession();
+    return data ? { id: data.user.id, email: data.user.email, name: data.user.name || null } : null;
+  },
+  staleTime: 5 * 60_000,
+} as const;
+
 export function useSession() {
-  return useQuery({
-    queryKey: ["session"],
-    queryFn: async (): Promise<SessionUser | null> => {
-      const { data } = await authClient.getSession();
-      return data ? { id: data.user.id, email: data.user.email, name: data.user.name || null } : null;
-    },
-    staleTime: 5 * 60_000,
-  });
+  return useQuery(sessionQuery);
 }
 
 /** Connexion ; renvoie un message d'erreur lisible, ou null si réussie. */

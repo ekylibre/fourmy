@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
-import { Badge, Group, Paper, Stack, Table, Text, Title, UnstyledButton } from "@mantine/core";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Alert, Badge, Button, Group, Paper, Stack, Table, Text, Title, UnstyledButton } from "@mantine/core";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ImportRunView } from "@fourmy/contracts";
-import { api, farmPath } from "../../app/api";
+import { api, ApiError, farmPath } from "../../app/api";
 import { formatDate } from "../../app/labels";
 import { FileImport } from "./FileImport";
 import { ImportPreview } from "./ImportPreview";
 import { ImportReport } from "./ImportReport";
-import { RUN_STATUS_LABELS, sourceLabel } from "./fileImport";
+import { ekylibrePhase, isEkylibreBackup, RUN_STATUS_LABELS, sourceLabel } from "./fileImport";
+import { EkylibreBackupUpload } from "./EkylibreBackupUpload";
 
 /** Un import et son déroulé : aperçu à valider, écriture en cours, rapport. */
 export function ImportRun({ farmId, id, onChange }: { farmId: string; id: string; onChange?: (run: ImportRunView) => void }) {
@@ -39,12 +40,34 @@ export function ImportRun({ farmId, id, onChange }: { farmId: string; id: string
       </Group>
       {run.status === "running" && (
         <Text size="sm" c="dimmed">
-          Écriture en cours…
+          {ekylibrePhase(run) ?? "Écriture en cours…"}
         </Text>
       )}
       {run.preview && run.status === "analyzed" && <ImportPreview farmId={farmId} run={run} onChange={set} />}
+      {isEkylibreBackup(run) && run.status === "analyzed" && <EkylibreRunActions farmId={farmId} run={run} onChange={set} />}
       {["completed", "failed", "reverted"].includes(run.status) && <ImportReport farmId={farmId} run={run} onChange={set} />}
     </Paper>
+  );
+}
+
+/** Sauvegarde Ekylibre restaurée : importer (migration par le worker) ou abandonner. */
+function EkylibreRunActions({ farmId, run, onChange }: { farmId: string; run: ImportRunView; onChange: (run: ImportRunView) => void }) {
+  const apply = useMutation({ mutationFn: () => api.post<ImportRunView>(farmPath(farmId, `/imports/${run.id}/apply`), {}), onSuccess: onChange });
+  const discard = useMutation({ mutationFn: () => api.post<ImportRunView>(farmPath(farmId, `/imports/${run.id}/discard`), {}), onSuccess: onChange });
+  const error = apply.error ?? discard.error;
+  return (
+    <Stack gap="xs">
+      <Text size="sm">Sauvegarde restaurée : l'import reprend la ferme Ekylibre (parcelles, activités, interventions, matériels, stocks).</Text>
+      <Group>
+        <Button onClick={() => apply.mutate()} loading={apply.isPending}>
+          Importer
+        </Button>
+        <Button variant="subtle" color="gray" onClick={() => discard.mutate()} loading={discard.isPending}>
+          Abandonner
+        </Button>
+      </Group>
+      {error && <Alert color="brique">{error instanceof ApiError ? (error.detail ?? error.title) : String(error)}</Alert>}
+    </Stack>
   );
 }
 
@@ -62,6 +85,9 @@ export function FileImports({ farmId }: { farmId: string }) {
   return (
     <Stack>
       <FileImport farmId={farmId} onAnalyzed={(run) => setSelected(run.id)} />
+      <Paper p="md">
+        <EkylibreBackupUpload farmId={farmId} onUploaded={(run) => setSelected(run.id)} />
+      </Paper>
       {selected && <ImportRun key={selected} farmId={farmId} id={selected} />}
       {items.length > 0 && (
         <Paper p="md">
@@ -89,7 +115,7 @@ export function FileImports({ farmId }: { farmId: string }) {
                   <Table.Td>{r.file?.name ?? r.preview?.fileName ?? "—"}</Table.Td>
                   <Table.Td>
                     <Badge size="sm" color={RUN_STATUS_LABELS[r.status].color} variant="light">
-                      {RUN_STATUS_LABELS[r.status].label}
+                      {ekylibrePhase(r) ?? RUN_STATUS_LABELS[r.status].label}
                     </Badge>
                   </Table.Td>
                 </Table.Tr>
