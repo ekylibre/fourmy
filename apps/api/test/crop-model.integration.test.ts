@@ -143,7 +143,7 @@ describe.skipIf(!url)("modèle de croissance (intégration)", () => {
       expect(done.status).toBe(200);
     }
     const read = await get<{ irrigation: unknown; history: { action: string }[] }>(`/interventions/${ids[0]}`);
-    expect(read.irrigation).toEqual({ depthMm: 30, method: "reel" });
+    expect(read.irrigation).toEqual({ depthMm: 30, method: "reel", origin: null, trigger: null, mobile: null });
     // Dose sur une autre procédure : refusée.
     expect((await send("POST", "/interventions", { procedure: "plowing", targets: [{ kind: "land_parcel", id: maize }], irrigation: { depthMm: 10 } })).status).toBe(422);
 

@@ -47,6 +47,8 @@ export function section(
   points?: { min: number; max?: number },
 ): ControlSection {
   if (!points) return { id, label, level: worstControlLevel(findings.map((f) => f.level)), findings };
+  // Indicateur sans objet (exploitation non irrigante) : validé d'office, sans points.
+  if (findings.every((f) => f.level === "na")) return { id, label, level: "na", findings };
   const got = Math.round(findings.reduce((sum, f) => sum + (f.points?.got ?? 0), 0) * 100) / 100;
   const levels = findings.map((f) => f.level);
   let level: ControlLevel;

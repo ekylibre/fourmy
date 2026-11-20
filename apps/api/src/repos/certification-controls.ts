@@ -24,7 +24,7 @@ import {
 } from "@fourmy/domain";
 import type { CheckableBody } from "./phyto.js";
 import { abApplications, abDraftApplications, abParcelInputs, abProductions } from "./certification-ab.js";
-import { loadHveFertilization, loadHvePhyto } from "./certification-hve.js";
+import { loadHveFertilization, loadHveIrrigation, loadHvePhyto } from "./certification-hve.js";
 import { abStatuses, type AbParcelStatus } from "@fourmy/domain";
 
 /**
@@ -117,9 +117,23 @@ export async function loadCertificationContext(tx: Tx, kind: ControlKind, campai
   }
   if (kind === "hve") {
     const phyto = await loadHvePhyto(tx, campaign, period, settings);
-    ctx.hve = { phyto, fertilization: await loadHveFertilization(tx, campaign, period, settings, phyto.years[0]?.parcels ?? []) };
+    ctx.hve = {
+      phyto,
+      fertilization: await loadHveFertilization(tx, campaign, period, settings, phyto.years[0]?.parcels ?? []),
+      irrigation: await loadHveIrrigation(tx, campaign, period),
+    };
   }
   return ctx;
+}
+
+/** Parcelles irriguées d'une campagne HVE et leurs données d'irrigation (onglet Irrigation). */
+export async function hveIrrigatedParcels(db: Database, farmId: string, campaign: number) {
+  return withFarm(db, farmId, async (tx) => {
+    const settings = await settingsOf(tx);
+    const period = controlPeriod("hve", campaign, settings);
+    const ctx = await loadHveIrrigation(tx, campaign, period);
+    return { campaign, period, items: ctx.parcels, irrigations: ctx.irrigations.length };
+  });
 }
 
 /** Statut de conversion des parcelles AB d'une campagne (onglet Parcelles). */
@@ -304,16 +318,18 @@ export async function putArticleCopper(db: Database, farmId: string, articleId: 
 /** Cycle, date de plantation et mode de culture d'une production. */
 export async function putProductionCertification(db: Database, farmId: string, productionId: string, w: ProductionCertificationWrite) {
   return withFarm(db, farmId, async (tx) => {
-    const [p] = await rows<{ id: string; cycle: string | null; planted_on: string | null; cultivation_mode: string }>(
+    const [p] = await rows<{ id: string; cycle: string | null; planted_on: string | null; cultivation_mode: string; drought_tolerant: boolean | null; water_saving: string | null }>(
       tx,
       sql`UPDATE productions SET
             cycle = ${w.cycle === undefined ? sql`cycle` : w.cycle},
             planted_on = ${w.plantedOn === undefined ? sql`planted_on` : sql`${w.plantedOn}::date`},
             cultivation_mode = ${w.cultivationMode === undefined ? sql`cultivation_mode` : w.cultivationMode},
+            drought_tolerant = ${w.droughtTolerant === undefined ? sql`drought_tolerant` : w.droughtTolerant},
+            water_saving = ${w.waterSaving === undefined ? sql`water_saving` : w.waterSaving || null},
             updated_at = now()
-          WHERE id = ${productionId} RETURNING id, cycle, planted_on::text, cultivation_mode`,
+          WHERE id = ${productionId} RETURNING id, cycle, planted_on::text, cultivation_mode, drought_tolerant, water_saving`,
     );
     if (!p) throw new NotFound("Production introuvable.");
-    return { id: p.id, cycle: p.cycle, plantedOn: p.planted_on, cultivationMode: p.cultivation_mode };
+    return { id: p.id, cycle: p.cycle, plantedOn: p.planted_on, cultivationMode: p.cultivation_mode, droughtTolerant: p.drought_tolerant, waterSaving: p.water_saving };
   });
 }

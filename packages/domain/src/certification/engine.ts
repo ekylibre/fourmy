@@ -13,6 +13,7 @@ import {
 } from "./ab.js";
 import { cmrInterventionFindings, hvePhytoFindings, type HvePhytoContext } from "./hve/phyto.js";
 import { hveFertilizationFindings, type HveFertilizationContext } from "./hve/fertilization.js";
+import { hveIrrigationFindings, type HveIrrigationContext } from "./hve/irrigation.js";
 import { HVE_INDICATOR_MIN } from "@fourmy/certification-refs";
 
 /**
@@ -53,7 +54,7 @@ export interface CertificationContext {
    */
   ab?: { parcels: AbParcelInput[]; productions: AbProduction[]; applications: AbApplication[] };
   /** HVE : SAU, traitements et IFT de la période (et des deux précédentes pour la moyenne), références. */
-  hve?: { phyto: HvePhytoContext; fertilization?: HveFertilizationContext };
+  hve?: { phyto: HvePhytoContext; fertilization?: HveFertilizationContext; irrigation?: HveIrrigationContext };
 }
 
 export type CampaignRule = (ctx: CertificationContext) => ControlFinding[];
@@ -113,6 +114,12 @@ export const CAMPAIGN_SECTIONS: Record<ControlKind, RuleSection[]> = {
       label: "Gestion de la fertilisation",
       points: { min: HVE_INDICATOR_MIN },
       rules: [(ctx) => (ctx.hve?.fertilization ? hveFertilizationFindings(ctx.hve.fertilization) : [])],
+    },
+    {
+      id: "irrigation",
+      label: "Gestion de l'irrigation",
+      points: { min: HVE_INDICATOR_MIN },
+      rules: [(ctx) => (ctx.hve?.irrigation ? hveIrrigationFindings(ctx.hve.irrigation) : [])],
     },
   ],
   ab: [

@@ -9,6 +9,7 @@ import { useFarm } from "../../app/farm";
 import { ErrorAlert, Loading } from "../../components/states";
 import { ControlLight, FindingList, useControlReport } from "./controls";
 import { AbParcels } from "./AbParcels";
+import { HveIrrigated } from "./HveIrrigated";
 
 /**
  * Tableau de bord d'un contrôle HVE ou AB pour une campagne (lot CT1) :
@@ -43,18 +44,17 @@ export function ControlPage() {
       </Group>
       {settings && <ControlSettingsModal onClose={() => setSettings(false)} />}
       <Text c="dimmed">{CONTROL_KIND_LABELS[kind]} : contrôle calculé à partir de vos saisies, pour préparer l'audit. Il ne remplace pas la décision de l'organisme certificateur.</Text>
-      {kind === "ab" && (
-        <Tabs value={tab} onChange={(v) => v && setTab(v)}>
-          <Tabs.List>
-            <Tabs.Tab value="rules">Règles</Tabs.Tab>
-            <Tabs.Tab value="parcels">Parcelles</Tabs.Tab>
-          </Tabs.List>
-        </Tabs>
-      )}
+      <Tabs value={tab} onChange={(v) => v && setTab(v)}>
+        <Tabs.List>
+          <Tabs.Tab value="rules">{kind === "ab" ? "Règles" : "Indicateurs"}</Tabs.Tab>
+          {kind === "ab" ? <Tabs.Tab value="parcels">Parcelles</Tabs.Tab> : <Tabs.Tab value="irrigation">Parcelles irriguées</Tabs.Tab>}
+        </Tabs.List>
+      </Tabs>
       {kind === "ab" && tab === "parcels" && <AbParcels campaign={campaign} />}
-      {(kind !== "ab" || tab === "rules") && report.isLoading && <Loading />}
-      {(kind !== "ab" || tab === "rules") && report.error && <ErrorAlert error={report.error} />}
-      {(kind !== "ab" || tab === "rules") && report.data && (
+      {kind === "hve" && tab === "irrigation" && <HveIrrigated campaign={campaign} />}
+      {tab === "rules" && report.isLoading && <Loading />}
+      {tab === "rules" && report.error && <ErrorAlert error={report.error} />}
+      {tab === "rules" && report.data && (
         <>
           <Paper withBorder p="md" aria-label="Verdict">
             <Group justify="space-between">

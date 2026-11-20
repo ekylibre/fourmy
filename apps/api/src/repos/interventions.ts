@@ -36,6 +36,8 @@ import {
   type InterventionUpdateWrite,
   type InterventionPlanWrite,
   type IrrigationMethod,
+  type IrrigationOrigin,
+  type IrrigationTrigger,
   interventionUpdateWrite,
   type StockMovement,
   type TargetKind,
@@ -171,7 +173,12 @@ function toIntervention(r: Record<string, unknown>): Intervention {
     justification: (r.justification as string | null) ?? null,
     ift: (r.ift as Intervention["ift"]) ?? null,
     weather: (r.weather as Intervention["weather"]) ?? null,
-    irrigation: r.irrigation ? { depthMm: Number((r.irrigation as { depthMm: number }).depthMm), method: (r.irrigation as { method?: IrrigationMethod | null }).method ?? null } : null,
+    irrigation: r.irrigation
+      ? (() => {
+          const v = r.irrigation as { depthMm: number; method?: IrrigationMethod | null; origin?: IrrigationOrigin | null; trigger?: IrrigationTrigger | null; mobile?: boolean | null };
+          return { depthMm: Number(v.depthMm), method: v.method ?? null, origin: v.origin ?? null, trigger: v.trigger ?? null, mobile: v.mobile ?? null };
+        })()
+      : null,
     sowing: (r.sowing as Intervention["sowing"]) ?? null,
     periodPrecision: (r.period_precision as Intervention["periodPrecision"]) ?? "time",
     affectsStock: r.affects_stock === undefined ? true : Boolean(r.affects_stock),
@@ -485,7 +492,9 @@ async function writeSowing(tx: Tx, interventionId: string, body: Pick<Body, "sow
 async function writeIrrigation(tx: Tx, interventionId: string, body: Pick<Body, "irrigation">) {
   const v = body.irrigation;
   await tx.execute(sql`
-    UPDATE interventions SET irrigation = ${v ? JSON.stringify({ depthMm: v.depthMm, method: v.method ?? null }) : null}::jsonb WHERE id = ${interventionId}`);
+    UPDATE interventions SET irrigation = ${
+      v ? JSON.stringify({ depthMm: v.depthMm, method: v.method ?? null, origin: v.origin ?? null, trigger: v.trigger ?? null, mobile: v.mobile ?? null }) : null
+    }::jsonb WHERE id = ${interventionId}`);
 }
 
 /**

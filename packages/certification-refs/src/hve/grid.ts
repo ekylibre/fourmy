@@ -89,3 +89,19 @@ export function legumePoints(sharePercent: number): number {
 
 /** 6.1 et 6.4 : correction des cultures mineures à partir de 5 % de la SAU. */
 export const MINOR_CROPS_THRESHOLD = 5;
+
+/** 7.1 : part des données d'irrigation manquantes R (%) : < 10 : 6 ; [10,20[ : 4 ; [20,30[ : 2 ; ≥ 30 : 0. (Grille!M51.) */
+export function irrigationRecordPoints(missingPercent: number): number {
+  const r = Math.round(missingPercent * 1e6) / 1e6;
+  return r < 10 ? 6 : r < 20 ? 4 : r < 30 ? 2 : 0;
+}
+
+/**
+ * 7.6 : part des prélèvements faits en étiage (juin, juillet, août) dans le
+ * milieu (%) : ≥ 90 : 0 ; [80,90[ : 1 ; [60,80[ : 2 ; [40,60[ : 3 ; [20,40[ : 4 ;
+ * < 20 : 5. (PdC4 §7.6 ; Grille!AC190.)
+ */
+export function lowWaterPoints(sharePercent: number): number {
+  const s = Math.round(sharePercent * 1e6) / 1e6;
+  return s >= 90 ? 0 : s >= 80 ? 1 : s >= 60 ? 2 : s >= 40 ? 3 : s >= 20 ? 4 : 5;
+}

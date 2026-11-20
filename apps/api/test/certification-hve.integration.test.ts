@@ -18,6 +18,7 @@ const spraying = crypto.randomUUID();
 const urea = crypto.randomUUID();
 const grain = crypto.randomUUID();
 const activity = crypto.randomUUID();
+const productions: Record<string, string> = {};
 
 describe.skipIf(!url)("contrôle HVE phyto (intégration)", () => {
   const sql = postgres(url!, { max: 1, onnotice: () => {} });
@@ -39,7 +40,8 @@ describe.skipIf(!url)("contrôle HVE phyto (intégration)", () => {
       await sql`INSERT INTO land_parcels (id, farm_id, name) VALUES (${id}, ${farmId}, ${name})`;
       await sql`INSERT INTO land_parcel_versions (id, land_parcel_id, shape, area_m2, valid)
         VALUES (${crypto.randomUUID()}, ${id}, ST_GeomFromText('MULTIPOLYGON(((7.5 48.5,7.51 48.5,7.51 48.509,7.5 48.509,7.5 48.5)))', 4326), 100000, tstzrange('2020-01-01', NULL))`;
-      await sql`INSERT INTO productions (id, farm_id, campaign_id, land_parcel_id, nature, activity_id) VALUES (${crypto.randomUUID()}, ${farmId}, ${campaignId}, ${id}, 'field_crop', ${activity})`;
+      productions[id] = crypto.randomUUID();
+      await sql`INSERT INTO productions (id, farm_id, campaign_id, land_parcel_id, nature, activity_id, started_on) VALUES (${productions[id]!}, ${farmId}, ${campaignId}, ${id}, 'field_crop', ${activity}, '2025-10-15')`;
       await sql`INSERT INTO parcel_certifications (id, farm_id, land_parcel_id, kind, level, started_on) VALUES (${crypto.randomUUID()}, ${farmId}, ${id}, 'hve', '3', '2025-01-01')`;
     }
     await sql`INSERT INTO articles (id, farm_id, name, kind, unit, amm) VALUES (${herbicide}, ${farmId}, 'SULTAN', 'phyto', 'Litre', '2000003')`;
@@ -98,6 +100,25 @@ describe.skipIf(!url)("contrôle HVE phyto (intégration)", () => {
     await json("PUT", "/settings/certification", { hveLivestock: false });
     const after = (await json("GET", "/control/hve?campaign=2026")).sections.find((s: { id: string }) => s.id === "fertilization");
     expect(after.findings.find((f: { ruleId: string }) => f.ruleId === "hve.6.1").level).toBe("ok");
+  });
+
+  it("irrigation : sans apport, sans objet ; avec un apport de juillet, 7.1 et 7.6", async () => {
+    const section = async () => (await json("GET", "/control/hve?campaign=2026")).sections.find((s: { id: string }) => s.id === "irrigation");
+    expect((await section()).level).toBe("na");
+    // 30 mm sur la parcelle traitée (10 ha) le 10 juillet, depuis la nappe ; facteur déclenchant non saisi.
+    const water = crypto.randomUUID();
+    await sql`INSERT INTO interventions (id, farm_id, procedure, status, origin, started_at, stopped_at, irrigation) VALUES
+      (${water}, ${farmId}, 'watering', 'done', 'web', '2026-07-10T06:00:00Z', '2026-07-10T12:00:00Z', ${sql.json({ depthMm: 30, method: "reel", origin: "groundwater", trigger: null, mobile: true })})`;
+    await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id) VALUES (${crypto.randomUUID()}, ${water}, 'target', 'land_parcel', ${treated})`;
+    let irrigation = await section();
+    const item = (s: { findings: { ruleId: string }[] }, id: string) => s.findings.find((f) => f.ruleId === id);
+    // Manquent : facteur déclenchant ; variété tolérante, pratiques économes : 3 sur 12 = 25 % → 2 points.
+    expect(item(irrigation, "hve.7.1")).toMatchObject({ value: 25, points: { got: 2, max: 6 } });
+    // Tout le volume (3 000 m³) prélevé dans la nappe en juillet : 100 % en étiage → 0 point.
+    expect(item(irrigation, "hve.7.6")).toMatchObject({ value: 100, points: { got: 0, max: 5 } });
+    await json("PUT", `/productions/${productions[treated]}/certification`, { droughtTolerant: false, waterSaving: "non-labour" });
+    irrigation = await section();
+    expect(item(irrigation, "hve.7.1")).toMatchObject({ value: 8.3, points: { got: 6 } });
   });
 
   it("réglage : notation IFT « ancienne » ; saisie : herbicide CMR2 en orange", async () => {

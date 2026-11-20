@@ -163,9 +163,39 @@ export const IRRIGATION_METHOD_LABELS: Record<IrrigationMethod, string> = {
   other: "Autre",
 };
 export const IRRIGATION_DEPTH_MAX_MM = 100;
+
+/**
+ * Origine de l'eau (HVE 7.1 et 7.6) : prélèvement direct dans le milieu
+ * (cours d'eau, nappe), réseau collectif, ou retenue (eau stockée, comptée au
+ * remplissage).
+ */
+export const irrigationOrigin = z.enum(["surface", "groundwater", "network", "reservoir"]);
+export type IrrigationOrigin = z.infer<typeof irrigationOrigin>;
+export const IRRIGATION_ORIGIN_LABELS: Record<IrrigationOrigin, string> = {
+  surface: "Cours d'eau ou plan d'eau",
+  groundwater: "Nappe (puits, forage)",
+  network: "Réseau collectif",
+  reservoir: "Retenue (eau stockée)",
+};
+/** Facteur déclenchant de l'apport (HVE 7.1). */
+export const irrigationTrigger = z.enum(["probe", "model", "weather", "advice", "observation", "schedule"]);
+export type IrrigationTrigger = z.infer<typeof irrigationTrigger>;
+export const IRRIGATION_TRIGGER_LABELS: Record<IrrigationTrigger, string> = {
+  probe: "Sonde ou tensiomètre",
+  model: "Outil de pilotage (bilan hydrique)",
+  weather: "Météo (ETP, pluviométrie)",
+  advice: "Bulletin ou conseil",
+  observation: "Observation de la culture ou du sol",
+  schedule: "Tour d'eau ou calendrier",
+};
+
 export const irrigationBlock = z.object({
   depthMm: z.number().positive("La dose d'eau doit être positive.").max(IRRIGATION_DEPTH_MAX_MM, `Dose d'eau de ${IRRIGATION_DEPTH_MAX_MM} mm au plus.`),
   method: irrigationMethod.nullable().optional(),
+  origin: irrigationOrigin.nullable().optional(),
+  trigger: irrigationTrigger.nullable().optional(),
+  /** Matériel mobile (enrouleur déplacé, rampe) plutôt que fixe. */
+  mobile: z.boolean().nullable().optional(),
 });
 export type IrrigationBlock = z.infer<typeof irrigationBlock>;
 
@@ -318,7 +348,16 @@ export const intervention = z
     /** Entretien : nature, problème, atelier, opérations réalisées (libellés compris). */
     maintenance: maintenanceRead.nullable().optional(),
     /** Irrigation : dose d'eau et matériel. */
-    irrigation: z.object({ depthMm: z.number(), method: irrigationMethod.nullable() }).nullable().optional(),
+    irrigation: z
+      .object({
+        depthMm: z.number(),
+        method: irrigationMethod.nullable(),
+        origin: irrigationOrigin.nullable().optional(),
+        trigger: irrigationTrigger.nullable().optional(),
+        mobile: z.boolean().nullable().optional(),
+      })
+      .nullable()
+      .optional(),
     /** Semis : technique. */
     sowing: sowingBlock.nullable().optional(),
     /** `day` : seule la date est connue (intervention importée). */

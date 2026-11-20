@@ -6,6 +6,7 @@ import { db } from "../db.js";
 import {
   abParcelStatuses,
   checkInterventionCertificationFor,
+  hveIrrigatedParcels,
   controlAvailability,
   controlReport,
   getCertificationSettings,
@@ -54,6 +55,8 @@ export const certificationControlRoutes = new Hono<Env>()
     if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.issues[0]?.message);
     return c.json(await putProductionCertification(db(), c.get("farmId"), uuidParam(c, "id"), parsed.data));
   })
+  // Parcelles irriguées de la campagne HVE (onglet Irrigation).
+  .get("/control/hve/irrigated", async (c) => c.json(await hveIrrigatedParcels(db(), c.get("farmId"), campaignOf(c.req.query("campaign")))))
   // Statut de conversion des parcelles AB (onglet Parcelles).
   .get("/control/ab/parcels", async (c) => c.json(await abParcelStatuses(db(), c.get("farmId"), campaignOf(c.req.query("campaign")))))
   // Rapport d'une campagne : `hve` ou `ab`.
