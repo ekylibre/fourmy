@@ -176,3 +176,13 @@ Repris de la conception §11 : performance sur 300 parcelles (mesurée dès AS1b
 repères agronomiques sans source structurée, extraction de la fiche BCAE 7,
 codes PAC manquants dans l'historique, interventions sur une parcelle
 d'origine après la date d'effet, mobile hors ligne après une découpe.
+
+## AS5 — Reconduction du parcellaire (fermes reprises d'Ekylibre)
+
+Lot ajouté le 20/11/2026, avant l'essai sur la ferme de l'exploitant testeur : sa ferme, reprise d'Ekylibre, a une parcelle par culture et par campagne (close au 30/12) ; l'assolement 2027 ne proposait qu'une parcelle sur 12, et l'historique s'arrêtait à un an.
+
+- Contexte : parcelles de l'an passé closes en décembre et non remplacées, proposées à la reconduction (nom sans culture ni année, numéroté en cas de doublon ; recouvrement de 90 % : la plus grande).
+- Brouillon : `excluded` (« Ne pas reconduire »).
+- Validation : changement `parcel.carry` ; nouvelle parcelle à la suite de l'ancienne, filiation `carry` (migration 0073), certifications reprises ; découpe ou fusion d'une parcelle à reconduire refusée.
+- Historique par recoupement géographique (au moins 50 % de la parcelle) pour les années sans culture connue, après l'historique propre et la filiation.
+- Vérifié sur la ferme de l'exploitant testeur en local : 12 parcelles proposées pour 2027, 5 ans d'historique.

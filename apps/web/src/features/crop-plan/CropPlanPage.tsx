@@ -204,6 +204,13 @@ function Editor({ farmId, year, plan, context, owner, nav }: { farmId: string; y
         </Alert>
       )}
       {editor.saveError && <Alert color="brique">{editor.saveError}</Alert>}
+      {plan.status === "draft" && context.parcels.some((p) => p.carryOver) && (
+        <Alert color="ardoise" variant="light" title={`Parcellaire ${year - 1} repris`}>
+          {context.parcels.filter((p) => p.carryOver).length} parcelle(s) de {year - 1} s'arrêtent à la fin de la campagne (une parcelle par culture et par an, comme dans
+          Ekylibre). L'assolement les reprend sous un nom sans culture ni année ; la validation crée les parcelles {year}. Écartez celles qui ne sont plus cultivées par
+          « Ne pas reconduire ».
+        </Alert>
+      )}
       {reopen.error && <ErrorAlert error={reopen.error} />}
 
       <Grid gap="sm">

@@ -90,6 +90,8 @@ export const cropPlanDraft = z.object({
   covers: z.array(cropPlanCover),
   /** Parcelles volontairement sans culture (jachère, gel, SNE), avec leur code PAC. */
   fallow: z.array(z.object({ key: cropPlanParcelKey, capCode: z.string().optional() })),
+  /** Parcelles de la campagne précédente proposées à la reconduction et écartées (lot AS5). */
+  excluded: z.array(cropPlanParcelKey).default([]),
 });
 export type CropPlanDraft = z.infer<typeof cropPlanDraft>;
 
@@ -130,6 +132,7 @@ export const cropPlanChange = z.discriminatedUnion("kind", [
     result: z.object({ key: z.string(), name: z.string(), areaM2: z.number() }),
     effectiveOn: isoDate,
   }),
+  z.object({ kind: z.literal("parcel.carry"), key: cropPlanParcelKey, name: z.string(), sourceName: z.string() }),
   z.object({ kind: z.literal("production.create"), assignmentId: z.string(), key: cropPlanParcelKey, after: cropPlanProductionFields }),
   z.object({
     kind: z.literal("production.update"),
@@ -214,7 +217,21 @@ export interface CropPlanContext {
    * courante, dernière fin de production avant la campagne (date d'effet
    * d'une découpe, lot AS3).
    */
-  parcels: { id: string; name: string; areaM2: number; shape: unknown; validFrom: string; lastStoppedOn: string | null }[];
+  parcels: {
+    id: string;
+    name: string;
+    areaM2: number;
+    shape: unknown;
+    validFrom: string;
+    lastStoppedOn: string | null;
+    /**
+     * Parcelle de la campagne précédente, close avant celle-ci, proposée à la
+     * reconduction (lot AS5) : `name` est le nom nettoyé (sans culture ni
+     * année), `sourceName` celui d'origine.
+     */
+    carryOver?: boolean;
+    sourceName?: string;
+  }[];
   activities: {
     id: string;
     name: string;

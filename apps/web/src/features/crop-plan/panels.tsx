@@ -65,6 +65,11 @@ export function AssignPanel({ editor, context, selected, onSelect, editable }: {
   const dates = { startedOn: startedOn || null, stoppedOn: stoppedOn || null };
   const findings = editor.sections.flatMap((s) => s.findings).filter((f) => f.level !== "ok" && f.level !== "na" && touches(f, sel));
   const toggle = (key: CropPlanParcelKey) => onSelect(sel.has(key) ? selected.filter((k) => k !== key) : [...selected, key]);
+  // Reconduction (lot AS5) : parcelles de l'an passé proposées pour la campagne.
+  const carried = new Map(context.parcels.filter((p) => p.carryOver).map((p) => [`p:${p.id}`, p.sourceName ?? p.name]));
+  const selectedCarried = selected.filter((k) => carried.has(k));
+  const excluded = editor.draft.excluded ?? [];
+  const excludedNames = excluded.map((k) => context.parcels.find((p) => `p:${p.id}` === k)?.name ?? k);
 
   return (
     <Stack gap="sm">
@@ -87,6 +92,20 @@ export function AssignPanel({ editor, context, selected, onSelect, editable }: {
           </Button>
         </Group>
       </Group>
+      {excluded.length > 0 && (
+        <Paper withBorder p="xs" aria-label="Parcelles non reconduites">
+          <Group justify="space-between" gap="xs">
+            <Text size="sm">
+              Non reconduites de {context.year - 1} : {excludedNames.join(", ")}
+            </Text>
+            {editable && (
+              <Button size="compact-xs" variant="subtle" onClick={() => editor.apply((d) => ({ ...d, excluded: [] }))}>
+                Les reconduire
+              </Button>
+            )}
+          </Group>
+        </Paper>
+      )}
       <ScrollArea.Autosize mah={260}>
         <Table striped highlightOnHover aria-label="Parcelles de l'assolement">
           <Table.Thead>
@@ -104,7 +123,14 @@ export function AssignPanel({ editor, context, selected, onSelect, editable }: {
                 <Table.Td>
                   <Checkbox size="xs" aria-label={`Choisir ${p.name}`} checked={sel.has(p.key)} onChange={() => toggle(p.key)} />
                 </Table.Td>
-                <Table.Td>{p.name}</Table.Td>
+                <Table.Td>
+                  {p.name}
+                  {carried.get(p.key) && (
+                    <Badge ml={6} size="xs" variant="light" color="ardoise" title={`Parcelle ${context.year - 1} : ${carried.get(p.key)}`}>
+                      reprise de {context.year - 1}
+                    </Badge>
+                  )}
+                </Table.Td>
                 <Table.Td className="lv-num">{area(p.areaM2)}</Table.Td>
                 <Table.Td>{p.origins.length === 1 ? previousLabel(context, p.origins[0]!.parcelId) : "plusieurs"}</Table.Td>
                 <Table.Td>{plannedLabel(editor, p.key)}</Table.Td>
@@ -135,6 +161,19 @@ export function AssignPanel({ editor, context, selected, onSelect, editable }: {
               <Button size="xs" variant="subtle" color="brique" leftSection={<Eraser size={14} />} disabled={!selected.length} onClick={() => editor.apply((d) => clearParcels(d, selected))}>
                 Retirer
               </Button>
+              {selectedCarried.length > 0 && (
+                <Button
+                  size="xs"
+                  variant="subtle"
+                  color="brique"
+                  onClick={() => {
+                    editor.apply((d) => ({ ...clearParcels(d, selectedCarried), excluded: [...new Set([...(d.excluded ?? []), ...selectedCarried])] }));
+                    onSelect(selected.filter((k) => !carried.has(k)));
+                  }}
+                >
+                  Ne pas reconduire
+                </Button>
+              )}
             </Group>
             <Group gap="xs" align="flex-end">
               <Select size="xs" label="Culture dérobée" placeholder="Après la principale" data={options} value={secondaryId} onChange={setSecondaryId} searchable style={{ flex: 1 }} />
@@ -287,7 +326,8 @@ export function ChecksPanel({ sections, onSelect }: { sections: ControlSection[]
                   <Text size="sm">{f.message}</Text>
                   {f.missing?.length ? (
                     <Text size="xs" c="dimmed">
-                      À compléter : {f.missing.map((m) => m.what).join(", ")}
+                      À compléter : {f.missing.slice(0, 5).map((m) => m.what).join(", ")}
+                      {f.missing.length > 5 ? ` et ${f.missing.length - 5} autre(s)` : ""}
                     </Text>
                   ) : null}
                   <Text size="xs" c="dimmed">
@@ -321,6 +361,8 @@ function changeLabel(c: CropPlanChange, names: (key: string) => string, activity
         : `${names(c.key)} : ${activity(c.before.activityId)} → ${activity(c.after.activityId)}`;
     case "production.delete":
       return `${names(c.key)} : ${activity(c.before.activityId)} retiré(e)`;
+    case "parcel.carry":
+      return `${c.sourceName} reconduite sous le nom « ${c.name} »`;
     case "parcel.split":
       return `${names(c.source)} découpée en ${c.pieces.map((p) => p.name).join(", ")}`;
     case "parcel.merge":

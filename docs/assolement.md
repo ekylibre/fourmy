@@ -17,6 +17,17 @@ Lecture de la fiche de conditionnalité BCAE 7 : [`docs/pac/rapport_pac.md`](pac
 - Page `/f/:ferme/crop-plan/:année` ; flèches vers les années voisines.
 - Le responsable prépare et valide ; les autres membres consultent.
 
+## Parcellaire repris de l'an passé
+
+Les fermes reprises d'Ekylibre ont une parcelle par culture et par campagne (« Braquet Maïs 2026 »), close à la fin de l'année. Quand une parcelle de l'an passé se termine en décembre et que rien ne la remplace, l'assolement la **reprend** :
+
+- sous un nom sans culture ni année (« Braquet » ; « Cazala 2 » si deux parcelles reprises donnent le même nom) ;
+- deux parcelles de l'an passé qui se recouvrent à 90 % : la plus grande seule ;
+- « Ne pas reconduire » écarte une parcelle qui n'est plus cultivée ; « Les reconduire » la reprend ;
+- la validation crée la parcelle de la campagne, à la suite de l'ancienne (filiation, certifications reprises) ; une découpe ou une fusion attend que la reprise soit validée.
+
+L'historique d'une parcelle se retrouve aussi par **recoupement géographique** : pour une année sans culture connue, la culture de la parcelle qui en recouvre au moins la moitié cette année-là.
+
 ## Préparer
 
 1. **Préparer l'assolement** : le brouillon part des cultures déjà saisies ou importées pour l'année. Rien ne change dans les productions avant la validation.

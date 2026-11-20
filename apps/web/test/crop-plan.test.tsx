@@ -30,7 +30,7 @@ const context: CropPlanContext = {
 };
 
 /** Serveur de l'assolement en mémoire : création, sauvegarde, aperçu et validation (calculés par le domaine). */
-function cropPlanServer() {
+function cropPlanServer(ctx: CropPlanContext = context) {
   let plan: CropPlanView | null = null;
   const saves: CropPlanDraft[] = [];
   const validations: { dryRun: boolean; body: unknown }[] = [];
@@ -46,7 +46,7 @@ function cropPlanServer() {
       plan = { year: 2027, status: "draft", revision: 0, draft: emptyDraft(2027), currentVersion: null, versions: [], updatedAt: "2026-11-20T10:00:00Z" };
       return HttpResponse.json(plan, { status: 201 });
     }),
-    http.get("*/crop-plans/2027/context", () => HttpResponse.json(context)),
+    http.get("*/crop-plans/2027/context", () => HttpResponse.json(ctx)),
     http.put("*/crop-plans/2027/draft", async ({ request }) => {
       const body = (await request.json()) as { revision: number; draft: CropPlanDraft };
       if (!plan || body.revision !== plan.revision) return HttpResponse.json({ title: "Conflit" }, { status: 409 });
@@ -129,6 +129,27 @@ describe("assolement", () => {
     await user.type(screen.getByRole("spinbutton", { name: "Délai de retour : Blé" }), "3");
     await user.click(screen.getByRole("button", { name: "Enregistrer les réglages" }));
     await vi.waitFor(() => expect(settingsSaved).toEqual([{ bcae7Preferred: "rotation", alsaceRhinePlain: false, returnIntervals: { ble: 3 } }]));
+  });
+
+  it("parcelle de l'an passé reprise : repère, « Ne pas reconduire », « Les reconduire »", async () => {
+    const user = userEvent.setup();
+    const carried: CropPlanContext = {
+      ...context,
+      parcels: context.parcels.map((p) => (p.id === G!.id ? { ...p, name: "Grande", carryOver: true, sourceName: "Grande Maïs 2026" } : p)),
+    };
+    const { saves } = cropPlanServer(carried);
+    renderApp(`/f/${FARM}/crop-plan/2027`);
+    await user.click(await screen.findByRole("button", { name: "Préparer l'assolement 2027" }));
+    expect(await screen.findByText("Parcellaire 2026 repris")).toBeInTheDocument();
+    const table = await screen.findByRole("table", { name: "Parcelles de l'assolement" });
+    expect(within(table).getByText("reprise de 2026").closest("[title]")).toHaveAttribute("title", "Parcelle 2026 : Grande Maïs 2026");
+    await user.click(within(table).getByRole("checkbox", { name: "Choisir Grande" }));
+    await user.click(screen.getByRole("button", { name: "Ne pas reconduire" }));
+    expect(within(table).queryByRole("checkbox", { name: "Choisir Grande" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Parcelles non reconduites")).toHaveTextContent("Non reconduites de 2026 : Grande");
+    await vi.waitFor(() => expect(saves.at(-1)?.excluded).toEqual([`p:${G!.id}`]), { timeout: 3000 });
+    await user.click(screen.getByRole("button", { name: "Les reconduire" }));
+    expect(within(table).getByRole("checkbox", { name: "Choisir Grande" })).toBeInTheDocument();
   });
 
   it("préparer 2027, affecter, voir les contrôles, valider", async () => {

@@ -34,6 +34,11 @@ export function operationBlockers(draft: CropPlanDraft, resolved: ResolvedPlan, 
     const sources = op.kind === "split" ? [op.source] : op.sources;
     const pieces = op.kind === "split" ? op.pieces : [op.result];
     const names = pieces.map((p) => p.name).join(", ");
+    const carried = sources.map((k) => base.get(k)).filter((p) => p?.carryOver);
+    if (carried.length) {
+      out.push({ code: "operation", message: `${carried.map((p) => p!.name).join(", ")} : parcelle reprise de l'an passé ; validez d'abord sa reconduction, puis découpez ou fusionnez.`, keys: sources });
+      continue;
+    }
     if (op.effectiveOn < from || op.effectiveOn > to) {
       out.push({ code: "effective-date", message: `${names} : date d'effet hors de la campagne (du ${from} au ${to}).`, keys: pieces.map((p) => p.key) });
     }

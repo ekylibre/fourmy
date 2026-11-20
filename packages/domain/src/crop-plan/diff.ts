@@ -45,13 +45,22 @@ export function diffCropPlan(
   draft: CropPlanDraft,
   resolved: ResolvedPlan,
   existing: ExistingProduction[],
-  opts: { campaignExists: boolean },
+  opts: {
+    campaignExists: boolean;
+    /** Parcelles de la campagne précédente à reconduire (lot AS5) : id → nom nettoyé, nom d'origine. */
+    carryOver?: ReadonlyMap<string, { name: string; sourceName: string }>;
+  },
   existingCovers: ExistingCover[] = [],
 ): CropPlanDiff {
   const changes: CropPlanChange[] = [];
   const blockers: CropPlanBlocker[] = [];
 
   if (!opts.campaignExists) changes.push({ kind: "campaign.create", year: draft.year });
+  // Reconduction : les parcelles reprises de l'an passé et gardées dans le parcellaire.
+  for (const [id, names] of opts.carryOver ?? []) {
+    const key = parcelKeyOf(id);
+    if (resolved.byKey.get(key)?.existing) changes.push({ kind: "parcel.carry", key, name: names.name, sourceName: names.sourceName });
+  }
 
   for (const issue of resolved.issues) {
     blockers.push({ code: "operation", message: `Découpe ou fusion n° ${issue.operation + 1} : ${issue.message}`, keys: [] });
