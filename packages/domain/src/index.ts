@@ -35,3 +35,4 @@ export * from "./landscape3d.js";
 export * from "./spraying-conditions.js";
 export * from "./certification/index.js";
 export * from "./crop-plan/index.js";
+export * from "./seeds/index.js";
