@@ -24,7 +24,7 @@ import {
 } from "@fourmy/domain";
 import type { CheckableBody } from "./phyto.js";
 import { abApplications, abDraftApplications, abParcelInputs, abProductions } from "./certification-ab.js";
-import { loadHvePhyto } from "./certification-hve.js";
+import { loadHveFertilization, loadHvePhyto } from "./certification-hve.js";
 import { abStatuses, type AbParcelStatus } from "@fourmy/domain";
 
 /**
@@ -115,7 +115,10 @@ export async function loadCertificationContext(tx: Tx, kind: ControlKind, campai
     const since = [`${campaign - 7}-01-01`, ...abParcels.map((p) => p.startedOn)].sort()[0]!;
     ctx.ab = { parcels: abParcels, productions: await abProductions(tx, ids, period.from, period.to), applications: await abApplications(tx, ids, since, period.to) };
   }
-  if (kind === "hve") ctx.hve = { phyto: await loadHvePhyto(tx, campaign, period, settings) };
+  if (kind === "hve") {
+    const phyto = await loadHvePhyto(tx, campaign, period, settings);
+    ctx.hve = { phyto, fertilization: await loadHveFertilization(tx, campaign, period, settings, phyto.years[0]?.parcels ?? []) };
+  }
   return ctx;
 }
 

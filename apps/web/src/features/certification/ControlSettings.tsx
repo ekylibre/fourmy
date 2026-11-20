@@ -64,6 +64,18 @@ function SettingsForm({ initial, onClose }: { initial: CertificationSettings; on
         allowDeselect={false}
       />
       <Select
+        label="Élevage sur l'exploitation"
+        description="Bilan azoté : rejets des animaux et pâturage, déclarés dans le questionnaire HVE"
+        data={[
+          { value: "", label: "Non déclaré" },
+          { value: "yes", label: "Oui" },
+          { value: "no", label: "Non, aucun animal" },
+        ]}
+        value={s.hveLivestock === null ? "" : s.hveLivestock ? "yes" : "no"}
+        onChange={(v) => setS({ ...s, hveLivestock: v === "yes" ? true : v === "no" ? false : null })}
+        allowDeselect={false}
+      />
+      <Select
         label="Vigne dans le Rhône ou la Saône-et-Loire"
         description="Siège dans le périmètre de l'AOC Beaujolais (bassin viticole des références IFT)"
         data={[

@@ -15,6 +15,9 @@ const treated = crypto.randomUUID();
 const untreated = crypto.randomUUID();
 const herbicide = crypto.randomUUID();
 const spraying = crypto.randomUUID();
+const urea = crypto.randomUUID();
+const grain = crypto.randomUUID();
+const activity = crypto.randomUUID();
 
 describe.skipIf(!url)("contrôle HVE phyto (intégration)", () => {
   const sql = postgres(url!, { max: 1, onnotice: () => {} });
@@ -31,11 +34,12 @@ describe.skipIf(!url)("contrôle HVE phyto (intégration)", () => {
     const [c] = await sql`INSERT INTO campaigns (id, farm_id, year, starts_on, stops_on) VALUES (${crypto.randomUUID()}, ${farmId}, 2026, '2026-01-01', '2026-12-31')
       ON CONFLICT DO NOTHING RETURNING id`;
     const campaignId = c?.id ?? (await sql`SELECT id FROM campaigns WHERE farm_id = ${farmId} AND year = 2026`)[0]!.id;
+    await sql`INSERT INTO activities (id, farm_id, name, family, reference, cultivation) VALUES (${activity}, ${farmId}, 'Blé tendre', 'plant_farming', 'winter_common_wheat', 'triticum_aestivum')`;
     for (const [id, name] of [[treated, "Champ traité"], [untreated, "Champ sans traitement"]] as const) {
       await sql`INSERT INTO land_parcels (id, farm_id, name) VALUES (${id}, ${farmId}, ${name})`;
       await sql`INSERT INTO land_parcel_versions (id, land_parcel_id, shape, area_m2, valid)
         VALUES (${crypto.randomUUID()}, ${id}, ST_GeomFromText('MULTIPOLYGON(((7.5 48.5,7.51 48.5,7.51 48.509,7.5 48.509,7.5 48.5)))', 4326), 100000, tstzrange('2020-01-01', NULL))`;
-      await sql`INSERT INTO productions (id, farm_id, campaign_id, land_parcel_id, nature) VALUES (${crypto.randomUUID()}, ${farmId}, ${campaignId}, ${id}, 'field_crop')`;
+      await sql`INSERT INTO productions (id, farm_id, campaign_id, land_parcel_id, nature, activity_id) VALUES (${crypto.randomUUID()}, ${farmId}, ${campaignId}, ${id}, 'field_crop', ${activity})`;
       await sql`INSERT INTO parcel_certifications (id, farm_id, land_parcel_id, kind, level, started_on) VALUES (${crypto.randomUUID()}, ${farmId}, ${id}, 'hve', '3', '2025-01-01')`;
     }
     await sql`INSERT INTO articles (id, farm_id, name, kind, unit, amm) VALUES (${herbicide}, ${farmId}, 'SULTAN', 'phyto', 'Litre', '2000003')`;
@@ -44,6 +48,19 @@ describe.skipIf(!url)("contrôle HVE phyto (intégration)", () => {
       ${sql.json({ status: "ok", total: 2, computedAt: "2026-04-10T12:00:00Z", error: null, lines: [{ articleId: herbicide, parcelId: treated, ift: 2, segment: "Herbicides", segmentCode: "S3", doseReference: 1, warning: null, certifiedId: "x", signature: "jwt" }] })})`;
     await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id) VALUES (${crypto.randomUUID()}, ${spraying}, 'target', 'land_parcel', ${treated})`;
     await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id, quantity, unit) VALUES (${crypto.randomUUID()}, ${spraying}, 'input', 'article', ${herbicide}, 1.5, 'Litre_per_hectare')`;
+    // Fertilisation : 200 kg/ha d'urée (92 kg N/ha) sur la parcelle traitée ; récolte de 80 q/ha de blé.
+    await sql`INSERT INTO articles (id, farm_id, name, kind, unit) VALUES (${urea}, ${farmId}, 'Urée 46', 'fertilizer', 'Kilogramme'), (${grain}, ${farmId}, 'Blé grain', 'harvest', 'Tonne')`;
+    await sql`INSERT INTO article_fertilizers (article_id, farm_id, basis, n_total, n_mineral_share, nitrate_type, foliar, origin) VALUES (${urea}, ${farmId}, 'mass_percent', 46, 1, 'III', false, 'confirmed')`;
+    const fert = crypto.randomUUID();
+    const harvest = crypto.randomUUID();
+    await sql`INSERT INTO interventions (id, farm_id, procedure, status, origin, started_at, stopped_at) VALUES
+      (${fert}, ${farmId}, 'fertilizing', 'done', 'web', '2026-03-10T08:00:00Z', '2026-03-10T10:00:00Z'),
+      (${harvest}, ${farmId}, 'harvesting', 'done', 'web', '2026-07-15T08:00:00Z', '2026-07-15T18:00:00Z')`;
+    await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id, quantity, unit) VALUES
+      (${crypto.randomUUID()}, ${fert}, 'target', 'land_parcel', ${treated}, NULL, NULL),
+      (${crypto.randomUUID()}, ${fert}, 'input', 'article', ${urea}, 200, 'Kilogramme_per_hectare'),
+      (${crypto.randomUUID()}, ${harvest}, 'target', 'land_parcel', ${treated}, NULL, NULL),
+      (${crypto.randomUUID()}, ${harvest}, 'output', 'article', ${grain}, 80, 'quintal_per_hectare')`;
   });
   afterAll(async () => {
     await teardown(sql, farmId, users);
@@ -69,8 +86,22 @@ describe.skipIf(!url)("contrôle HVE phyto (intégration)", () => {
     expect(phyto).toMatchObject({ level: "warning", points: { got: 16, min: 10 } });
   });
 
+  it("fertilisation : BGA en azote total, SAU non fertilisée ; élevage à déclarer", async () => {
+    const report = await json("GET", "/control/hve?campaign=2026");
+    const fert = report.sections.find((s: { id: string }) => s.id === "fertilization");
+    const item = (id: string) => fert.findings.find((f: { ruleId: string }) => f.ruleId === id);
+    // 92 kg N × 10 ha apportés − 80 t × 18 kg N/t exportés = −520 kg sur 20 ha : −26 kg/ha → 8 points ; élevage non déclaré.
+    expect(item("hve.6.1")).toMatchObject({ level: "missing", value: -26, points: { got: 8, max: 8 } });
+    expect(item("hve.6.1.harvests")).toMatchObject({ level: "warning" });
+    expect(item("hve.6.3")).toMatchObject({ value: 0, points: { got: 0 } });
+    expect(item("hve.6.5")).toMatchObject({ value: 50, points: { got: 5 } });
+    await json("PUT", "/settings/certification", { hveLivestock: false });
+    const after = (await json("GET", "/control/hve?campaign=2026")).sections.find((s: { id: string }) => s.id === "fertilization");
+    expect(after.findings.find((f: { ruleId: string }) => f.ruleId === "hve.6.1").level).toBe("ok");
+  });
+
   it("réglage : notation IFT « ancienne » ; saisie : herbicide CMR2 en orange", async () => {
-    await json("PUT", "/settings/certification", { hveIftScale: "old" });
+    await json("PUT", "/settings/certification", { hveIftScale: "old", hveLivestock: false });
     const phyto = (await json("GET", "/control/hve?campaign=2026")).sections.find((s: { id: string }) => s.id === "phyto");
     expect(phyto.findings.find((f: { ruleId: string }) => f.ruleId === "hve.5.3").message).toMatch(/plafond 1,67/);
     const r = await json("POST", "/control/check", {

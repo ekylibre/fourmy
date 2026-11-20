@@ -12,7 +12,9 @@ import {
   type HveFamily,
   type IftReference,
 } from "@fourmy/certification-refs";
-import type { HveParcel, HvePhytoContext, HveYear } from "@fourmy/domain";
+import { splitUnit, unitScale, type HveFertilizationContext, type HveFertParcel, type HveParcel, type HvePhytoContext, type HveYear } from "@fourmy/domain";
+import { nitrogenExportsOf } from "@fourmy/certification-refs";
+import { abApplications } from "./certification-ab.js";
 
 /**
  * Données HVE d'une période (lot CT3) : SAU par famille de cultures,
@@ -182,5 +184,95 @@ export async function loadHvePhyto(tx: Tx, campaign: number, period: { from: str
     references,
     referenceIssues,
     treatedSeeds: treatedSeeds.map((s) => ({ interventionId: s.intervention_id, articleId: s.article_id, product: s.product })),
+  };
+}
+
+// --- Fertilisation (lot CT3b) -----------------------------------------------------------
+
+const uuidList = (ids: string[]) => sql`ARRAY[${sql.join(ids.map((id) => sql`${id}`), sql`, `)}]::uuid[]`;
+
+/** Données de l'indicateur fertilisation de la période (SAU de la campagne contrôlée). */
+export async function loadHveFertilization(
+  tx: Tx,
+  campaign: number,
+  period: { from: string; to: string },
+  settings: CertificationSettings,
+  parcels: HveParcel[],
+): Promise<HveFertilizationContext> {
+  const ids = parcels.map((p) => p.id);
+  if (!ids.length) return { parcels: [], inputs: [], harvests: [], livestock: settings.hveLivestock, planParcelIds: [], rshParcelIds: [], steeringParcelIds: [] };
+  // Production de référence et ancêtres de l'espèce (table des exportations, légumineuses).
+  const lineage = await rows<{ id: string; reference: string | null; ancestors: string[] | null }>(
+    tx,
+    sql`SELECT lp.id, a.reference,
+               (WITH RECURSIVE l AS (
+                  SELECT reference_name, parent, 0 AS depth FROM taxonomy WHERE reference_name = coalesce(a.cultivation, lx.specie, pr.cultivation)
+                  UNION ALL SELECT x.reference_name, x.parent, l.depth + 1 FROM taxonomy x JOIN l ON x.reference_name = l.parent WHERE l.depth < 30)
+                SELECT array_agg(reference_name ORDER BY depth) FROM l WHERE depth > 0) AS ancestors
+        FROM land_parcels lp
+        LEFT JOIN LATERAL (SELECT p.* FROM productions p JOIN campaigns c ON c.id = p.campaign_id
+                           WHERE p.land_parcel_id = lp.id AND c.year = ${campaign} ORDER BY p.created_at LIMIT 1) pr ON true
+        LEFT JOIN activities a ON a.id = pr.activity_id
+        LEFT JOIN lexicon_productions lx ON lx.reference_name = a.reference
+        WHERE lp.id = ANY(${uuidList(ids)})`,
+  );
+  const lin = new Map(lineage.map((l) => [l.id, l]));
+  const fertParcels: HveFertParcel[] = parcels.map((p) => {
+    const l = lin.get(p.id);
+    const ancestors = l?.ancestors ?? [];
+    const exports = nitrogenExportsOf(p.species, ancestors, l?.reference ?? null);
+    // Légumineuses (6.6) : fabacées en grandes cultures ou fourrages, hors légumes récoltés en vert et prairies permanentes.
+    const legume = (p.family === "field_crops") && [p.species, ...ancestors].includes("fabaceae");
+    return { ...p, exports, legume };
+  });
+  const applications = (await abApplications(tx, ids, period.from, period.to)).filter((a) => a.kind === "fertilizer");
+  const areaOf = new Map(parcels.map((p) => [p.id, p.areaM2]));
+  const outputs = await rows<{ intervention_id: string; parcel_id: string; product: string; quantity: string | null; unit: string | null; total_m2: number | null }>(
+    tx,
+    sql`SELECT i.id AS intervention_id, t.ref_id AS parcel_id, a.name AS product, o.quantity::text, o.unit,
+               (SELECT sum(coalesce((t2.attrs->>'workedAreaM2')::numeric, v.area_m2))::float8
+                FROM intervention_parameters t2 JOIN land_parcel_versions v ON v.land_parcel_id = t2.ref_id AND v.valid @> i.started_at
+                WHERE t2.intervention_id = i.id AND t2.role = 'target' AND t2.ref_type = 'land_parcel') AS total_m2
+        FROM interventions i
+        JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_type = 'land_parcel' AND t.ref_id = ANY(${uuidList(ids)})
+        JOIN intervention_parameters o ON o.intervention_id = i.id AND o.role = 'output' AND o.ref_type = 'article'
+        JOIN articles a ON a.id = o.ref_id
+        WHERE i.status = 'done' AND i.started_at >= ${period.from}::date AND i.started_at < ${period.to}::date + 1`,
+  );
+  const harvests = outputs.map((o) => {
+    const { unit, per } = splitUnit(o.unit);
+    const scale = unitScale(unit);
+    const q = o.quantity === null ? null : Number(o.quantity);
+    const parcelHa = (areaOf.get(o.parcel_id) ?? 0) / 10_000;
+    let tonnes: number | null = null;
+    if (q !== null && scale?.dim === "mass") {
+      const kg = q * scale.factor;
+      // Dose par ha × surface de la parcelle ; quantité totale répartie au prorata des surfaces.
+      tonnes = (per === "hectare" ? kg * parcelHa : o.total_m2 ? (kg * (areaOf.get(o.parcel_id) ?? 0)) / o.total_m2 : null) as number | null;
+      if (tonnes !== null) tonnes = Math.round(tonnes) / 1000;
+    }
+    return { interventionId: o.intervention_id, parcelId: o.parcel_id, product: o.product, tonnes, straw: /paille/i.test(o.product) };
+  });
+  const plans = await rows<{ land_parcel_id: string }>(
+    tx,
+    sql`SELECT DISTINCT land_parcel_id FROM fertilization_plans WHERE campaign = ${campaign} AND current_version IS NOT NULL AND land_parcel_id = ANY(${uuidList(ids)})`,
+  );
+  const rsh = await rows<{ land_parcel_id: string }>(
+    tx,
+    sql`SELECT DISTINCT land_parcel_id FROM soil_analyses WHERE kind = 'rsh' AND sampled_on >= ${period.from}::date - 120 AND sampled_on <= ${period.to}::date AND land_parcel_id = ANY(${uuidList(ids)})`,
+  );
+  const steering = await rows<{ land_parcel_id: string }>(
+    tx,
+    sql`SELECT DISTINCT fp.land_parcel_id FROM steering_measurements m JOIN fertilization_plans fp ON fp.id = m.plan_id
+        WHERE fp.campaign = ${campaign} AND fp.land_parcel_id = ANY(${uuidList(ids)})`,
+  );
+  return {
+    parcels: fertParcels,
+    inputs: applications.map((a) => ({ interventionId: a.interventionId, parcelId: a.parcelId, articleId: a.articleId, product: a.product, nTotalKgHa: a.nTotalKgHa ?? null, organic: !a.syntheticNitrogen })),
+    harvests,
+    livestock: settings.hveLivestock,
+    planParcelIds: plans.map((p) => p.land_parcel_id),
+    rshParcelIds: rsh.map((p) => p.land_parcel_id),
+    steeringParcelIds: steering.map((p) => p.land_parcel_id),
   };
 }
