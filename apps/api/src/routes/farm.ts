@@ -26,6 +26,7 @@ import { remoteSensingRoutes } from "./remote-sensing.js";
 import { cropModelRoutes } from "./crop-model.js";
 import { prescriptionRoutes } from "./prescriptions.js";
 import { fertilizerRoutes } from "./fertilizers.js";
+import { seedRoutes } from "./seeds.js";
 import { fertilizationRoutes } from "./fertilization.js";
 import { farmProfileRoutes } from "./farm-profile.js";
 import { ignRoutes } from "./ign.js";
@@ -57,6 +58,7 @@ export const farmRoutes = new Hono<Env>()
   .route("/", cropModelRoutes)
   .route("/", prescriptionRoutes)
   .route("/", fertilizerRoutes)
+  .route("/", seedRoutes)
   .route("/", fertilizationRoutes)
   .route("/", peopleRoutes)
   .route("/", memberRoutes)

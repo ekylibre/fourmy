@@ -16,6 +16,7 @@ import { InterventionsPage } from "../features/interventions/InterventionsPage";
 import { InterventionCompletePage, InterventionEditPage, InterventionNewPage } from "../features/interventions/InterventionEditPage";
 import { PhytoProductsPage } from "../features/phyto/PhytoProductsPage";
 import { FertilizersPage } from "../features/fertilization/FertilizersPage";
+import { SeedsPage } from "../features/seeds/SeedsPage";
 import { FertilizationPage } from "../features/fertilization/FertilizationPage";
 import { ActivitiesPage } from "../features/activities/ActivitiesPage";
 import { CropPlanPage } from "../features/crop-plan/CropPlanPage";
@@ -193,6 +194,7 @@ const pages = [
       { path: "cellar", element: <CellarPage /> },
       { path: "register", element: <RegisterPage /> },
       { path: "control/:kind", element: <Suspense fallback={<Loading />}><ControlPage /></Suspense> },
+      { path: "seeds", element: <SeedsPage /> },
       { path: "phyto", element: <PhytoProductsPage /> },
       { path: "fertilizers", element: <FertilizersPage /> },
       { path: "fertilization", element: <FertilizationPage /> },

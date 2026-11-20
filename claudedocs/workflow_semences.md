@@ -234,3 +234,19 @@ flowchart LR
 - Sans repère publié sur ces deux sites : avoine, triticale, seigle, épeautre, tournesol, espèces de couverts. Leur PMG se saisit.
 - Tests : chargement du catalogue (fixtures, accents), légumineuses et recherche (intégration), repères (sources, plages, alias) ; turbo : 82 tâches vertes.
 
+### SE3 — Page Semences et fiche (20/11/2026)
+
+- API (`routes/seeds.ts`, `repos/seeds.ts`) :
+  - `GET /seeds` : unité reconnue, fiche, espèce (taxonomie, sinon catalogue), espèce et code GNIS importés, repère de PMG avec sa source, PMG retenu, repères, mélange probable, stock à la date, interventions par campagne ;
+  - `GET /articles/:id/seed` : en plus, espèces du mélange, lots (stock, PMG), semis avec grains/m² et kg/ha (PMG du lot, sinon de la fiche, sinon repère : « estimée ») ;
+  - `PUT /articles/:id/seed` : fiche ; l'unité de stock ne change que sans mouvement, ou vers une unité équivalente ;
+  - `PUT` et `DELETE /lots/:id/seed` : PMG d'un lot ;
+  - `GET /seeds/species` : espèces du catalogue et de la taxonomie, légumineuse, repère.
+- Campagne d'un semis : celle de la culture en place sur sa première parcelle (`fourmy_production_at`), sinon l'année de début.
+- Le statut bio et le traitement passent par la route existante `PUT /articles/:id/organic` (contrôle AB).
+- Contrat : `seedSheetSave`, `SeedListItem`, `SeedDetail`, `SeedLotView`, `SeedInterventionUse`, `SeedSpeciesOption` ; libellés d'unités grains, doses, grains/m².
+- Web : entrée « Semences » (Stocks), route `seeds`, `SeedsPage` (colonnes choisies, recherche, espèce, campagne, filtres « Semées en », « Sans PMG », « Mélanges », « Non bio », badges et « Compléter »), `SeedSheet` (tiroir : identité, conditionnement, PMG et repère avec sa source, « Reprendre le repère », écart signalé, bio, lots, semis par campagne) ; lecture seule hors responsable.
+- Ferme de test des imports : 42 semences, espèce importée affichée, 2 mélanges probables.
+- Tests : API 7 (`seeds-page.integration.test.ts` : liste, fiche, PMG de lot, repère estimé, unité, mélange, autre ferme), web 2 (`test/seeds.test.tsx`), e2e 1 (`e2e/seeds.spec.ts`) ; turbo : 82 tâches vertes.
+- Reporté : rattachement de l'espèce importée en un geste (SE4) ; le tiroir n'a pas de nom accessible (Drawer Mantine), à reprendre avec SE4.
+

@@ -18,6 +18,13 @@ const UNITS: Record<string, string> = {
   cubic_meter_per_hectare: "m³/ha",
   thousand_per_hectare: "milliers/ha",
   unity_per_hectare: "u/ha",
+  // Semences (lot SE3) : grains, doses, millions de grains, grains/m².
+  grain: "grains",
+  dose: "doses",
+  million: "millions de grains",
+  grain_per_hectare: "grains/ha",
+  dose_per_hectare: "doses/ha",
+  grain_per_square_meter: "grains/m²",
 };
 
 export function unitLabel(unit: string | null | undefined): string {
