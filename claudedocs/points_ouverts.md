@@ -1,6 +1,6 @@
 # Points ouverts de Fourmy
 
-*Recensés le 2026-11-12 dans toute la documentation (`docs/`, `claudedocs/`, README, historique Git) et dans le journal de recette. Revus le 2026-11-16 (déploiement, TIKA, projet GitHub, agrirouter). Mis à jour le 2026-11-13 après les lots « Équipe et personnes » (P1 à P5), « Ma ferme » (F1 à F5) et « Itinéraires techniques » (T0 à T3). Cette liste alimente la roadmap du projet GitHub [Fourmy — Roadmap](https://github.com/orgs/ekylibre/projects/2) : les points P1 et P2 y sont les issues n° 1 à 37 du dépôt, dans l'ordre de cette liste (jalons « Envoi ferme pilote » et « Fin 2026 ») ; les points P3 y sont des brouillons. Le suivi se fait désormais dans le projet GitHub.*
+*Recensés le 2026-11-12 dans toute la documentation (`docs/`, `claudedocs/`, README, historique Git) et dans le journal de recette. Revus le 2026-11-16 (déploiement, TIKA, projet GitHub, agrirouter) et le 2026-11-20 (imports, contrôles HVE et AB). Mis à jour le 2026-11-13 après les lots « Équipe et personnes » (P1 à P5), « Ma ferme » (F1 à F5) et « Itinéraires techniques » (T0 à T3). Cette liste alimente la roadmap du projet GitHub [Fourmy — Roadmap](https://github.com/orgs/ekylibre/projects/2) : les points P1 et P2 y sont les issues n° 1 à 37 du dépôt, dans l'ordre de cette liste (jalons « Envoi ferme pilote » et « Fin 2026 ») ; les points P3 y sont des brouillons. Le suivi se fait désormais dans le projet GitHub.*
 
 Chaque point se lit ainsi : **titre** : description. *nature · priorité · source*.
 
@@ -12,6 +12,17 @@ Chaque point se lit ainsi : **titre** : description. *nature · priorité · sou
 **Natures :** bug, évolution, donnée, décision, externe, juridique, doc, exploitation, dette.
 
 **Numérotation :** les points 1 à 94 gardent leur numéro du 12/11. Les points nouveaux commencent à 95 et sont rangés dans leur thème.
+
+## Mise à jour du 2026-11-20
+
+Du 17 au 20/11 : imports et assistant de premier démarrage, puis contrôles HVE et Agriculture biologique.
+
+- **Imports (IM1 à IM6, PR #81 à #86)** : DAPLOS, Geofolia et TelePAC importés de bout en bout, historique N-1 à N-5, annulation d'un import, assistant de premier démarrage avec reprise d'une sauvegarde Ekylibre (`docs/imports.md`). Reste la recette avec l'exploitant testeur (IM7, point 121).
+- **Contrôles HVE et AB (CT1 à CT6a, PR #87 à #96 ; puis #98 et #99)** : menu « Contrôle HVE » / « Contrôle AB » sous Réglementaire dès qu'une parcelle est certifiée ; quatre indicateurs HVE (biodiversité avec IAE, stratégie phytosanitaire avec CMR et IFT certifié, fertilisation avec bilan azoté et couverture des sols calculée, irrigation), questionnaire annuel ; contrôle AB des règles R1 à R34 (conversion déduite, phyto, cuivre, fertilisants de l'annexe II, 170 N, semences et dérogations, mixité, matériel, rotation ; règles hors contrôle dites « non contrôlé ») ; feux à la saisie ; registre AB et liasse HVE exportés (`docs/controles-hve-ab.md`).
+- **Prérequis traités** : version consolidée du règlement 2021/1165 au 01/01/2026 lue (PR #99, `docs/ab/rapport_ab.md` §8.6).
+- **Restent** (thème 16) : export de la grille HVE officielle remplie (118), grille de référence remplie à la main (119), confirmations d'un organisme certificateur (120), recette des imports (121).
+- **Qualité** : le test `lexicon`, instable en CI (délai de 5 s face au verrou du référentiel), est corrigé (PR #97).
+- **Projet GitHub** : nouvelles issues #100 (point 118), #101 (119), #102 (120), #103 (121), jalon « Fin 2026 ».
 
 ## Mise à jour du 2026-11-16
 
@@ -93,7 +104,8 @@ Besoins : `claudedocs/besoins_agrirouter.md` ; conception et lots : `claudedocs/
 | 13. Dette technique et qualité | 0 | 3 | 6 | 9 |
 | 14. Nouveaux domaines | 0 | 0 | 7 | 7 |
 | 15. Itinéraires techniques | 0 | 1 | 5 | 6 |
-| **Total** | **10** | **34** | **70** | **114** |
+| 16. Imports, contrôles HVE et AB | 0 | 4 | 0 | 4 |
+| **Total** | **10** | **38** | **70** | **118** |
 
 Plus trois points faits (17, 104 et 57, ce dernier en PR à fusionner), hors du total.
 
@@ -290,3 +302,13 @@ Plus trois points faits (17, 104 et 57, ce dernier en PR à fusionner), hors du 
 108. **Comparaison prévu / réalisé** (vue « avant / après » de TIKA, cassée chez OSFarm). *évolution · P3 · besoins_itineraires_techniques §8*
 109. **Éditeur TIKA branché sur Fourmy**. *évolution · P3 · besoins_itineraires_techniques §8*
 110. **Export vers Triple Performance et diagramme climatique** (normales du point météo de la ferme). *évolution · P3 · besoins_itineraires_techniques §8*
+
+## 16. Imports, contrôles HVE et AB
+
+Besoins, conception et plans : `claudedocs/besoins_import_onboarding.md`, `claudedocs/workflow_import_onboarding.md` ; `claudedocs/besoins_controle_hve_ab.md`, `claudedocs/conception_controle_hve_ab.md`, `claudedocs/workflow_controle_hve_ab.md`. Mode d'emploi : `docs/imports.md`, `docs/controles-hve-ab.md`.
+
+118. **Export de la grille HVE officielle v1.15 remplie (CT6b)** : classeur du ministère embarqué dans le dépôt (choix du 20/11), écriture des seules cellules de saisie (environ 250 libellés sur 8 onglets, en zones de texte), recalcul à l'ouverture ; test de recalcul par LibreOffice comparé au tableau de bord. Attend la grille de référence (119). *évolution · P2 · workflow_controle_hve_ab CT6* — issue #100
+119. **Grille HVE de référence remplie à la main** pour la ferme de test, dans `docs/hve/grille-audit-hvev4-v1.15 - libreoffice.xlsx` (version lisible sous LibreOffice, hors dépôt) : sert à vérifier les points de Fourmy item par item et la correspondance de l'export (118). *donnée · P2 · workflow_controle_hve_ab, prérequis P2* — issue #101
+120. **Confirmations d'un organisme certificateur bio** : plafond de 170 kg N/ha par année civile ou par campagne (réglage existant) ; dépassement du cuivre rattaché au manquement n° 328 (marqué « à confirmer »). *externe · P2 · workflow_controle_hve_ab, prérequis P3* — issue #102
+121. **Recette des imports et de l'assistant avec l'exploitant testeur (IM7)** : fichiers DAPLOS, Geofolia et TelePAC réels, parcours de l'assistant, écarts à corriger. *donnée · P2 · workflow_import_onboarding IM7* — issue #103
+

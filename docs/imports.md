@@ -17,6 +17,7 @@ plan : [`claudedocs/workflow_import_onboarding.md`](../claudedocs/workflow_impor
 | IM4 DAPLOS | lecteur `ekylibre/agroedei-edifact-daplos-reader` 2.0.0, dédoublonnage avec Geofolia | ✅ |
 | IM5 | historique N-1…N-5, apports prévus, annulation, page Imports | ✅ |
 | IM6 | assistant de premier démarrage | ✅ |
+| IM7 | recette avec l'exploitant testeur (fichiers réels, assistant) | ⏳ à planifier (point 121 de `claudedocs/points_ouverts.md`) |
 
 Les trois formats s'importent de bout en bout : export Geofolia (IM2),
 dossier PAC TelePAC (IM3), EDI DAPLOS (IM4).
