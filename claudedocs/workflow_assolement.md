@@ -68,6 +68,15 @@ Branche `feat/crop-plan-as2a-api`. Dépend d'AS1b.
 4. **`routes/crop-plans.ts`** : routes de la conception §5 (sauf `geometry`), droits (responsable en écriture, membres en lecture), schémas zod.
 5. **Tests API** : création et campagne ; 409 ; validation crée, modifie et supprime des productions ; production avec interventions réalisées refusée ; réouverture et deuxième version ; droits ; RLS entre fermes.
 
+*Réalisé le 20/11/2026* :
+- Réouverture : le brouillon repart de l'état actuel des productions (pas de l'instantané de la dernière version), pour tenir compte des saisies faites entre-temps ; un assolement validé s'affiche de la même façon.
+- Productions sans activité (imports anciens) : jamais touchées par la validation.
+- Rôle d'une production : `attrs.cropPlan.role`, sinon `attrs.secondary` des imports.
+- Code PAC d'une activité : colonne `activities.cap_code`, sinon la production de référence Lexicon (`lexicon_cap_codes`).
+- Culture secondaire de l'historique : dérobée de la campagne, ou couvert de la campagne suivante dans les dates de la BCAE 7 (`cover_crops.campaign` est la campagne de la culture qui suit).
+- Découpes et fusions dans le brouillon : bloquant à la validation jusqu'au lot AS3 ; couverts gardés dans le brouillon, appliqués au lot AS4.
+- Pas d'événement dans `outbox_events` : la version figée sert d'historique.
+
 ## AS2b — Écran d'assolement
 
 Branche `feat/crop-plan-as2b-web`. Dépend d'AS2a.
