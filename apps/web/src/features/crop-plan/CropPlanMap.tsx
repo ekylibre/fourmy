@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Paper } from "@mantine/core";
 import { Map as MlMap, NavigationControl, ScaleControl, type GeoJSONSource, type LngLatBoundsLike, type MapMouseEvent } from "maplibre-gl";
-import type { FeatureCollection, Geometry } from "geojson";
+import type { Feature, FeatureCollection, Geometry, Polygon } from "geojson";
+import { polygons } from "@fourmy/carto";
+import { CartoEditor } from "../../carto/editor";
 import { useFarmId } from "../../app/farm";
 import { whenStyleLoaded } from "../../carto/when-style-loaded";
 import { ignSource } from "../map/ParcelMap"; // règle aussi le worker de MapLibre
@@ -36,13 +38,31 @@ function bounds(parcels: ParcelShape[]): LngLatBoundsLike | null {
  * ajouter ou retirer une parcelle de la sélection, Maj + glisser pour en
  * prendre plusieurs.
  */
-export function CropPlanMap({ parcels, selected, onSelect, height = 520 }: { parcels: CropPlanMapParcel[]; selected: string[]; onSelect: (keys: string[]) => void; height?: number }) {
+export function CropPlanMap({
+  parcels,
+  selected,
+  onSelect,
+  cutting = null,
+  onCut,
+  onError,
+  height = 520,
+}: {
+  parcels: CropPlanMapParcel[];
+  selected: string[];
+  onSelect: (keys: string[]) => void;
+  /** Parcelle en cours de découpe (outil carto « Découper »), ou null. */
+  cutting?: string | null;
+  onCut?: (key: string, pieces: Polygon[]) => void;
+  onError?: (message: string) => void;
+  height?: number;
+}) {
   const farmId = useFarmId();
   const container = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MlMap | null>(null);
   const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
-  const latest = useRef({ parcels, selected, onSelect });
-  latest.current = { parcels, selected, onSelect };
+  const editor = useRef<CartoEditor | null>(null);
+  const latest = useRef({ parcels, selected, onSelect, cutting, onCut, onError });
+  latest.current = { parcels, selected, onSelect, cutting, onCut, onError };
 
   useEffect(() => {
     if (!container.current) return;
@@ -76,8 +96,21 @@ export function CropPlanMap({ parcels, selected, onSelect, height = 520 }: { par
     });
     m.addControl(new NavigationControl({ showCompass: false }), "top-right");
     m.addControl(new ScaleControl({ unit: "metric" }), "bottom-left");
-    whenStyleLoaded(m, () => setMap(m));
+    whenStyleLoaded(m, () => {
+      // Outils carto communs : la découpe (ligne tracée) seulement.
+      editor.current = new CartoEditor(m, {
+        onChange: (features: Feature<Polygon>[]) => {
+          const key = latest.current.cutting;
+          if (!key || features.length < 2) return;
+          latest.current.onCut?.(key, features.map((f) => f.geometry));
+        },
+        onError: (message) => latest.current.onError?.(message),
+      });
+      editor.current.setTool("none");
+      setMap(m);
+    });
     m.on("click", "parcels-fill", (e) => {
+      if (latest.current.cutting) return;
       const key = e.features?.[0]?.properties?.key as string | undefined;
       if (!key) return;
       const { selected: current, onSelect: select } = latest.current;
@@ -115,10 +148,29 @@ export function CropPlanMap({ parcels, selected, onSelect, height = 520 }: { par
     m.on("mousemove", move);
     m.on("mouseup", up);
     return () => {
+      editor.current?.destroy();
+      editor.current = null;
       setMap(null);
       m.remove();
     };
   }, [farmId]);
+
+  // Découpe : la parcelle seule dans l'éditeur, outil « cut » ; sinon rien.
+  useEffect(() => {
+    const ed = editor.current;
+    if (!map || !ed) return;
+    const p = cutting ? parcels.find((x) => x.key === cutting) : undefined;
+    const parts = p ? polygons(p.shape) : [];
+    if (p && parts.length === 1) {
+      ed.load([{ type: "Feature", id: p.key, properties: { key: p.key }, geometry: parts[0]! }]);
+      ed.select([p.key]);
+      ed.setTool("cut");
+    } else {
+      ed.load([]);
+      ed.setTool("none");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargé quand la parcelle à découper change, pas à chaque rendu
+  }, [map, cutting]);
 
   const fitted = useRef(false);
   useEffect(() => {

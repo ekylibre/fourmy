@@ -14,6 +14,7 @@ import { MapBoundary } from "../../components/MapBoundary";
 import { ControlLight } from "../certification/controls";
 import { CropPlanMap, type CropPlanMapParcel } from "./CropPlanMap";
 import { AssignPanel, ChecksPanel, HistoryPanel, SummaryPanel, ValidateModal } from "./panels";
+import { draftShapes, ParcelTools, PendingOperations, splitOperation } from "./operations";
 import { cropPlanKeys, useCropPlan, useCropPlanContext } from "./queries";
 import { useCropPlanEditor, type SaveState } from "./useCropPlanEditor";
 
@@ -98,9 +99,11 @@ function Editor({ farmId, year, plan, context, owner, nav }: { farmId: string; y
   const [tab, setTab] = useState<string | null>("assign");
   const [validating, setValidating] = useState<{ revision: number } | null>(null);
   const [discarding, setDiscarding] = useState(false);
+  const [cutting, setCutting] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const colors = useMemo(() => new Map(context.activities.map((a, i) => [a.id, a.color ?? PALETTE[i % PALETTE.length]!])), [context]);
-  const shapes = useMemo(() => new Map(context.parcels.map((p) => [`p:${p.id}`, p.shape])), [context]);
+  const shapes = useMemo(() => draftShapes(context, editor.draft), [context, editor.draft]);
   const mapParcels: CropPlanMapParcel[] = editor.plan.parcels
     .filter((p) => shapes.has(p.key))
     .map((p) => {
@@ -205,9 +208,37 @@ function Editor({ farmId, year, plan, context, owner, nav }: { farmId: string; y
 
       <Grid gap="sm">
         <Grid.Col span={{ base: 12, md: 7 }}>
-          <MapBoundary what="la carte de l'assolement">
-            <CropPlanMap parcels={mapParcels} selected={selected} onSelect={(k) => setSelected(k as CropPlanParcelKey[])} />
-          </MapBoundary>
+          <Stack gap="xs">
+            {editable && (
+              <ParcelTools
+                editor={editor}
+                context={context}
+                selected={selected}
+                shapes={shapes}
+                cutting={cutting}
+                onCutting={setCutting}
+                onSelect={setSelected}
+                notice={notice}
+                onNotice={setNotice}
+              />
+            )}
+            <MapBoundary what="la carte de l'assolement">
+              <CropPlanMap
+                parcels={mapParcels}
+                selected={selected}
+                onSelect={(k) => setSelected(k as CropPlanParcelKey[])}
+                cutting={cutting}
+                onCut={(key, pieces) => {
+                  const op = splitOperation(editor, context, key, pieces);
+                  editor.apply((d) => ({ ...d, operations: [...d.operations, op] }));
+                  setCutting(null);
+                  if (op.kind === "split") setSelected(op.pieces.map((p) => p.key));
+                }}
+                onError={setNotice}
+              />
+            </MapBoundary>
+            <PendingOperations editor={editor} context={context} editable={editable} />
+          </Stack>
         </Grid.Col>
         <Grid.Col span={{ base: 12, md: 5 }}>
           <Tabs value={tab} onChange={setTab}>

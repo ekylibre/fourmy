@@ -133,7 +133,7 @@ export type CropPlanChange = z.infer<typeof cropPlanChange>;
 
 /** Ce qui empêche la validation (incohérence de données, conception §6). */
 export const cropPlanBlocker = z.object({
-  code: z.enum(["unassigned", "unknown-parcel", "operation", "done-interventions", "duplicate-production"]),
+  code: z.enum(["unassigned", "unknown-parcel", "operation", "done-interventions", "duplicate-production", "effective-date", "geometry", "certification", "planned-interventions"]),
   message: z.string(),
   keys: z.array(z.string()).default([]),
 });
@@ -195,8 +195,12 @@ export interface CropPlanYearCrop {
 /** Contexte des contrôles de l'assolement (conception §4.1), chargé une fois par l'écran. */
 export interface CropPlanContext {
   year: number;
-  /** Parcellaire de départ, valide pendant la campagne. */
-  parcels: { id: string; name: string; areaM2: number; shape: unknown }[];
+  /**
+   * Parcellaire de départ, valide pendant la campagne : début de la version
+   * courante, dernière fin de production avant la campagne (date d'effet
+   * d'une découpe, lot AS3).
+   */
+  parcels: { id: string; name: string; areaM2: number; shape: unknown; validFrom: string; lastStoppedOn: string | null }[];
   activities: {
     id: string;
     name: string;

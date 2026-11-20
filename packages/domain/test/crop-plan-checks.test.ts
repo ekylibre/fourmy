@@ -5,6 +5,8 @@ import {
   agronomyFindings,
   checkCropPlan,
   cropPlanCheckInput,
+  defaultEffectiveOn,
+  operationBlockers,
   emptyDraft,
   hvePlanFindings,
   resolveParcels,
@@ -179,7 +181,7 @@ describe("cropPlanCheckInput", () => {
     const input = cropPlanCheckInput(
       {
         year: 2027,
-        parcels: [{ id: "a", name: "Le Champ", areaM2: 12 * HA, shape: null }],
+        parcels: [{ id: "a", name: "Le Champ", areaM2: 12 * HA, shape: null, validFrom: "2020-01-01", lastStoppedOn: null }],
         activities: [{ id: uuid(1), name: "Blé tendre", family: "plant_farming", color: null, capCode: "BTH", species: "triticum_aestivum", cycle: "annual", legume: false, vegetable: false }],
         history: { a: { "2026": { main: "CZH", secondary: false } } },
         previousByActivity: {},
@@ -193,5 +195,43 @@ describe("cropPlanCheckInput", () => {
     expect(input.history.get("a")![2026]).toEqual({ main: "CZH", secondary: false });
     expect(input.activities.get(uuid(1))!.capCode).toBe("BTH");
     expect(input.certification.abParcels.get("a")).toEqual({ conversionStart: "2020-01-01" });
+  });
+});
+
+describe("découpes et fusions : date d'effet", () => {
+  const ctx = {
+    year: 2027,
+    parcels: [
+      { id: "a", name: "Le Champ", areaM2: 12 * HA, shape: null, validFrom: "2020-01-01", lastStoppedOn: "2026-07-15" },
+      { id: "b", name: "La Côte", areaM2: 8 * HA, shape: null, validFrom: "2026-03-01", lastStoppedOn: null },
+    ],
+  };
+  const square = { type: "Polygon", coordinates: [] };
+  const split = (source: string, effectiveOn: string): CropPlanDraft["operations"][number] => ({
+    kind: "split",
+    source: source as `p:${string}`,
+    effectiveOn,
+    pieces: [
+      { key: "n:x1", name: "Ouest", shape: square, areaM2: 6 * HA },
+      { key: "n:x2", name: "Est", shape: square, areaM2: 6 * HA },
+    ],
+  });
+
+  it("proposée : lendemain de la dernière récolte, sinon 1er janvier de la campagne", () => {
+    expect(defaultEffectiveOn(ctx, ["a"])).toBe("2026-07-16");
+    expect(defaultEffectiveOn(ctx, ["b"])).toBe("2027-01-01");
+    expect(defaultEffectiveOn(ctx, ["a", "b"])).toBe("2026-07-16");
+    // Récolte trop ancienne (avant la campagne précédente) : 1er janvier.
+    expect(defaultEffectiveOn({ ...ctx, parcels: [{ ...ctx.parcels[0]!, lastStoppedOn: "2024-07-15" }] }, ["a"])).toBe("2027-01-01");
+  });
+
+  it("bloquants : avant la fin de la culture en place, hors campagne, culture d'un morceau qui commence avant", () => {
+    const base = [{ id: "a", name: "Le Champ", areaM2: 12 * HA }];
+    const check = (draft: CropPlanDraft) => operationBlockers(draft, resolveParcels(base, draft), ctx).map((b) => b.message);
+    expect(check({ ...emptyDraft(2027), operations: [split("p:a", "2026-08-01")] })).toEqual([]);
+    expect(check({ ...emptyDraft(2027), operations: [split("p:a", "2026-07-10")] })[0]).toContain("en place jusqu'au 2026-07-15");
+    expect(check({ ...emptyDraft(2027), operations: [split("p:a", "2025-12-01")] }).join(" ")).toContain("hors de la campagne");
+    const early = { ...emptyDraft(2027), operations: [split("p:a", "2026-09-01")], assignments: [assign("n:x1", 1, { startedOn: "2026-08-25" })] };
+    expect(check(early)[0]).toContain("Ouest : culture prévue à partir du 2026-08-25, avant la date d'effet (2026-09-01)");
   });
 });
