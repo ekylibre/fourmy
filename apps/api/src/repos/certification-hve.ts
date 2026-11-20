@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import type { Tx } from "@fourmy/db";
-import { PROCEDURES, type CertificationSettings } from "@fourmy/contracts";
+import { PROCEDURES, type CertificationSettings, type FertilizationRecord } from "@fourmy/contracts";
 import {
   departmentOf,
   fieldCropsReference,
@@ -18,6 +18,7 @@ import {
   type HveBiodiversityContext,
   type HveFertilizationContext,
   type HveFertParcel,
+  type HveSoilCoverParcel,
   type HveIrrigation,
   type HveIrrigationContext,
   type HveParcel,
@@ -209,6 +210,7 @@ export async function loadHveFertilization(
   period: { from: string; to: string },
   settings: CertificationSettings,
   parcels: HveParcel[],
+  record?: FertilizationRecord,
 ): Promise<HveFertilizationContext> {
   const ids = parcels.map((p) => p.id);
   if (!ids.length) return { parcels: [], inputs: [], harvests: [], livestock: settings.hveLivestock, planParcelIds: [], rshParcelIds: [], steeringParcelIds: [] };
@@ -277,7 +279,47 @@ export async function loadHveFertilization(
     sql`SELECT DISTINCT fp.land_parcel_id FROM steering_measurements m JOIN fertilization_plans fp ON fp.id = m.plan_id
         WHERE fp.campaign = ${campaign} AND fp.land_parcel_id = ANY(${uuidList(ids)})`,
   );
+  // 6.7 : interculture des terres arables d'après le cahier de fertilisation de la campagne.
+  let soilCover: HveSoilCoverParcel[] | undefined;
+  if (record) {
+    const refs = await rows<{ id: string; reference: string | null }>(
+      tx,
+      sql`SELECT lp.id, a.reference FROM land_parcels lp
+          LEFT JOIN LATERAL (SELECT p.* FROM productions p JOIN campaigns c ON c.id = p.campaign_id
+                             WHERE p.land_parcel_id = lp.id AND c.year = ${campaign} ORDER BY p.created_at LIMIT 1) pr ON true
+          LEFT JOIN activities a ON a.id = pr.activity_id
+          WHERE lp.id = ANY(${uuidList(ids)})`,
+    );
+    const refOf = new Map(refs.map((r) => [r.id, r.reference ?? ""]));
+    const byId = new Map(record.parcels.map((r) => [r.parcelId, r]));
+    soilCover = fertParcels
+      .filter((p) => p.family === "field_crops" || p.family === "vegetables" || p.family === "permanent_grassland")
+      .map((p) => {
+        const r = byId.get(p.id);
+        const reference = refOf.get(p.id) ?? "";
+        const sownOn = r?.sownOn ?? null;
+        // Culture d'hiver : semée avant le 1er décembre de l'année précédente.
+        const winter = !!sownOn && sownOn < `${campaign - 1}-12-01` && sownOn >= `${campaign - 1}-07-01`;
+        const cover = r?.cover ? { kind: r.cover.kind, sownOn: r.cover.sownOn, destroyedOn: r.cover.destroyedOn ?? null, destructionMode: r.cover.destructionMode ?? null } : null;
+        const end = cover ? (cover.destroyedOn ?? sownOn) : null;
+        const vulnerable = r?.zone === "in" ? true : r?.zone === "out" ? false : null;
+        return {
+          id: p.id,
+          name: p.name,
+          areaM2: p.areaM2,
+          vulnerable,
+          alwaysCovered: p.family === "permanent_grassland" || PT_REFERENCES.includes(reference) || /fallow/.test(reference) || winter,
+          previousHarvest: r?.soilCover?.harvestedOn ?? null,
+          sownOn,
+          cover,
+          mineralDuringCover: !!cover && (r?.applications ?? []).some((a) => a.nitrateType === "III" && a.date >= cover.sownOn && (!end || a.date <= end)),
+          canesWorked: (r?.soilCover?.messages ?? []).some((m) => m.startsWith("Cannes broyées")),
+          regulatoryOk: vulnerable ? (r?.soilCover ? r.soilCover.level === "ok" : null) : null,
+        };
+      });
+  }
   return {
+    soilCover,
     parcels: fertParcels,
     inputs: applications.map((a) => ({ interventionId: a.interventionId, parcelId: a.parcelId, articleId: a.articleId, product: a.product, nTotalKgHa: a.nTotalKgHa ?? null, organic: !a.syntheticNitrogen })),
     harvests,

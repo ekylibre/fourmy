@@ -124,7 +124,13 @@ export function HveQuestionnaireForm({ campaign }: { campaign: number }) {
           <Num label="6.4 Blé sous OPI : part des grandes cultures" suffix=" %" max={100} value={a.fertilization.opiWheatPercent} onChange={set("fertilization", "opiWheatPercent")} disabled={off} />
           <Num label="6.4 Cultures mineures sous PPF ajusté ou pilotage" suffix=" %" max={100} value={a.fertilization.minorOadPercent} onChange={set("fertilization", "minorOadPercent")} disabled={off} />
           <YesNo label="6.4 Cultures mineures : PPF sur plus de 50 %" value={a.fertilization.minorPpf} onChange={set("fertilization", "minorPpf")} disabled={off} />
-          <YesNo label="6.7 Durée réglementaire de couverture respectée partout" value={a.fertilization.coverRegulatory} onChange={set("fertilization", "coverRegulatory")} disabled={off} />
+          <YesNo
+            label="6.7 Durée réglementaire de couverture respectée partout"
+            description="Calculé d'après le cahier de fertilisation (couverts, récoltes, semis) ; ces réponses ne servent que s'il ne permet pas le calcul"
+            value={a.fertilization.coverRegulatory}
+            onChange={set("fertilization", "coverRegulatory")}
+            disabled={off}
+          />
           <Num label="6.7 Semaines de couvert" max={52} value={a.fertilization.coverWeeks} onChange={set("fertilization", "coverWeeks")} disabled={off} />
           <Num label="6.7 Part de la surface couverte" suffix=" %" max={100} value={a.fertilization.coverPercent} onChange={set("fertilization", "coverPercent")} disabled={off} />
           <YesNo label="6.7 Zone vulnérable" value={a.fertilization.vulnerableZone} onChange={set("fertilization", "vulnerableZone")} disabled={off} />

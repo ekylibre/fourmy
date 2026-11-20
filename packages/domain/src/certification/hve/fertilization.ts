@@ -67,6 +67,81 @@ export interface HveFertilizationContext {
   steeringParcelIds: string[];
   /** Réponses du questionnaire annuel : azote des animaux, OPI, OAD des cultures mineures, couverture des sols. */
   answers?: HveAnswers["fertilization"];
+  /** 6.7 calculé : couverture des sols des terres arables d'après le cahier de fertilisation. */
+  soilCover?: HveSoilCoverParcel[];
+}
+
+/** Interculture d'une parcelle de terres arables (cahier de fertilisation de la campagne). */
+export interface HveSoilCoverParcel {
+  id: string;
+  name: string;
+  areaM2: number;
+  /** En zone vulnérable (null : zonage inconnu, compté hors zone). */
+  vulnerable: boolean | null;
+  /** Prairie, jachère non détruite ou culture d'hiver : couvert continu. */
+  alwaysCovered: boolean;
+  /** Récolte du précédent et semis de la culture (bornes de l'interculture). */
+  previousHarvest: string | null;
+  sownOn: string | null;
+  cover: { kind: "sown" | "regrowth_cereal" | "regrowth_rapeseed"; sownOn: string; destroyedOn: string | null; destructionMode: string | null } | null;
+  /** Engrais minéral apporté pendant le couvert : ce n'est plus un couvert (FAQ Q238-239). */
+  mineralDuringCover: boolean;
+  /** Cannes de maïs ou de sorgho broyées et enfouies (couvert admis). */
+  canesWorked: boolean;
+  /** Zone vulnérable : couverture conforme au programme d'actions nitrates (null : non vérifiable). */
+  regulatoryOk: boolean | null;
+}
+
+const WEEK = 7 * 86_400_000;
+const weeksBetween = (from: string, to: string) => Math.max(0, Math.floor((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / WEEK));
+
+/** Semaines entières de couvert continu dans l'interculture ; Infinity : couvert permanent ; null : non calculable. */
+export function coverWeeks(p: HveSoilCoverParcel): number | null {
+  if (p.alwaysCovered) return Number.POSITIVE_INFINITY;
+  if (!p.previousHarvest) return null;
+  const c = p.cover;
+  if (c && c.destructionMode !== "chemical" && !p.mineralDuringCover) {
+    const end = c.destroyedOn ?? p.sownOn;
+    if (!end) return null;
+    const weeks = weeksBetween(c.sownOn, end);
+    // Repousses de céréales : 20 % de l'interculture longue au plus (plan V4.4 §6.7).
+    if (c.kind === "regrowth_cereal") return p.sownOn ? Math.min(weeks, Math.floor(0.2 * weeksBetween(p.previousHarvest, p.sownOn))) : null;
+    return weeks;
+  }
+  if (p.canesWorked) return p.sownOn ? weeksBetween(p.previousHarvest, p.sownOn) : Number.POSITIVE_INFINITY;
+  return 0;
+}
+
+/**
+ * 6.7 terres arables, calculé : socle vérifié par zone (hors zone
+ * vulnérable : 6 semaines, BCAE 6 ; en zone vulnérable : programme d'actions
+ * nitrates), puis la durée qui maximise les points avec la surface limitante
+ * (C = 100 % ou ≥ 75 %, FAQ Q237), points par zone pondérés par la surface.
+ */
+export function computedSoilCover(parcels: HveSoilCoverParcel[]): { points: number | null; detail: string; lacks: ReturnType<typeof missing>[] } {
+  const lacks: ReturnType<typeof missing>[] = [];
+  const zoneResult = (zone: HveSoilCoverParcel[], vulnerable: boolean) => {
+    const weeks = zone.map((p) => ({ p, w: coverWeeks(p) }));
+    for (const x of weeks.filter((x) => x.w === null)) lacks.push(missing(`couverture de ${x.p.name} (récolte du précédent, dates du couvert)`, "parcel", x.p.id));
+    for (const x of zone.filter((p) => vulnerable && p.regulatoryOk === null && !p.alwaysCovered)) lacks.push(missing(`conformité au programme d'actions nitrates (${x.name})`, "parcel", x.id));
+    if (lacks.length) return null;
+    const socle = weeks.every((x) => (vulnerable ? x.p.alwaysCovered || x.p.regulatoryOk === true : x.w! >= 6));
+    if (!socle) return { points: 0, text: `${vulnerable ? "zone vulnérable" : "hors zone vulnérable"} : durée réglementaire non respectée partout, 0 point` };
+    const area = zone.reduce((s, p) => s + p.areaM2, 0);
+    let best = { points: 0, w: 0, share: 100 };
+    for (const w of [...new Set(weeks.map((x) => Math.min(x.w!, 52)))]) {
+      const share = (weeks.filter((x) => x.w! >= w).reduce((s, x) => s + x.p.areaM2, 0) / area) * 100;
+      const pts = soilCoverPoints(true, w, share, vulnerable);
+      if (pts > best.points) best = { points: pts, w, share };
+    }
+    return { points: best.points, text: `${vulnerable ? "zone vulnérable" : "hors zone vulnérable"} : ${best.points ? `${pct(best.share)} couverts ${best.w} semaines` : "durée minimale seulement"}, ${n1(best.points)} pt` };
+  };
+  const total = parcels.reduce((s, p) => s + p.areaM2, 0);
+  const zones = [true, false].map((v) => ({ v, ps: parcels.filter((p) => !!p.vulnerable === v) })).filter((z) => z.ps.length);
+  const results = zones.map((z) => ({ z, r: zoneResult(z.ps, z.v) }));
+  if (lacks.length || !total) return { points: null, detail: "", lacks };
+  const points = results.reduce((s, x) => s + x.r!.points * (x.z.ps.reduce((a, p) => a + p.areaM2, 0) / total), 0);
+  return { points: round(points), detail: results.map((x) => x.r!.text).join(" ; "), lacks };
 }
 
 /** Azote des animaux déclaré (kg N) ; null : non déclaré alors qu'il y a de l'élevage (ou que ce n'est pas dit). */
@@ -309,10 +384,13 @@ export function declarativeFertilizationFindings(ctx: HveFertilizationContext, i
   const perennial = total ? sau(ctx.parcels.filter((p) => p.family === "vine" || p.family === "orchard")) / total : 0;
   const arable = 1 - perennial;
   const a = ctx.answers ?? {};
-  const arableAnswered = arable === 0 || (given(a.coverRegulatory) && given(a.coverWeeks) && given(a.coverPercent));
+  // Terres arables : calculé d'après le cahier de fertilisation ; à défaut, la déclaration du questionnaire.
+  const computed = arable && ctx.soilCover?.length ? computedSoilCover(ctx.soilCover) : null;
+  const declared = given(a.coverRegulatory) && given(a.coverWeeks) && given(a.coverPercent);
+  const arableAnswered = arable === 0 || (computed ? computed.points !== null : declared);
   const perennialAnswered = perennial === 0 || given(interRowCoverPercent);
   const max = round(4 * arable + 3 * perennial);
-  const arablePts = arable && arableAnswered ? soilCoverPoints(!!a.coverRegulatory, a.coverWeeks!, a.coverPercent!, !!a.vulnerableZone) * arable : 0;
+  const arablePts = !arable || !arableAnswered ? 0 : computed ? computed.points! * arable : soilCoverPoints(!!a.coverRegulatory, a.coverWeeks!, a.coverPercent!, !!a.vulnerableZone) * arable;
   const perennialPts = perennial && perennialAnswered ? interRowPoints(interRowCoverPercent!) * perennial : 0;
   const out = [
     declaredItem(
@@ -323,7 +401,11 @@ export function declarativeFertilizationFindings(ctx: HveFertilizationContext, i
         ? {
             points: arablePts + perennialPts,
             detail: [
-              arable ? `terres arables : ${a.coverRegulatory ? "durée réglementaire respectée" : "durée réglementaire non respectée"}, ${a.coverWeeks} semaines sur ${pct(a.coverPercent ?? 0)}${a.vulnerableZone ? " en zone vulnérable" : ""}` : "",
+              arable
+                ? computed
+                  ? `terres arables (cahier de fertilisation) : ${computed.detail}`
+                  : `terres arables (déclaré) : ${a.coverRegulatory ? "durée réglementaire respectée" : "durée réglementaire non respectée"}, ${a.coverWeeks} semaines sur ${pct(a.coverPercent ?? 0)}${a.vulnerableZone ? " en zone vulnérable" : ""}`
+                : "",
               perennial ? `inter-rang couvert ${pct(interRowCoverPercent ?? 0)}` : "",
             ]
               .filter(Boolean)
@@ -333,6 +415,7 @@ export function declarativeFertilizationFindings(ctx: HveFertilizationContext, i
       "onglet Fertilisation, AI288:AJ289, Q300",
     ),
   ];
+  if (computed && computed.points === null && out[0]) out[0] = { ...out[0], missing: [...(out[0].missing ?? []), ...computed.lacks] };
   if (!ctx.parcels.some((p) => p.family === "horticulture")) return out;
   const items: [string, string, number][] = [
     ["hve.6.2", "6.2 Quantité d'azote (horticulture)", 5],
