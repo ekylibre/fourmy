@@ -34,7 +34,7 @@ import { NitrateCheckSection } from "../fertilization/FertilizationChecks";
 import { CertificationCheckSection } from "../certification/controls";
 import { SprayingConditions, WeatherLine } from "../weather/Weather";
 import { irrigationVolumeM3 } from "./IrrigationFields";
-import { IRRIGATION_METHOD_LABELS, SOWING_TECHNIQUE_LABELS } from "@fourmy/contracts";
+import { IRRIGATION_METHOD_LABELS, IRRIGATION_ORIGIN_LABELS, IRRIGATION_TRIGGER_LABELS, SOWING_TECHNIQUE_LABELS } from "@fourmy/contracts";
 
 const EMPTY_FC: FeatureCollection = { type: "FeatureCollection", features: [] };
 const ORIGINS: Record<string, string> = { web: "Web", mobile: "Mobile", migration: "Reprise d'Ekylibre", plugin: "Extension", import: "Import de fichier" };
@@ -489,6 +489,9 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
         </Text>
         {treatedM2 > 0 && ` soit ${Math.round(irrigationVolumeM3(i.irrigation.depthMm, treatedM2)).toLocaleString("fr-FR")} m³ sur ${area(treatedM2)}`}
         {i.irrigation.method && ` · ${IRRIGATION_METHOD_LABELS[i.irrigation.method]}`}
+        {i.irrigation.mobile && " (mobile)"}
+        {i.irrigation.origin && ` · eau : ${IRRIGATION_ORIGIN_LABELS[i.irrigation.origin].toLowerCase()}`}
+        {i.irrigation.trigger && ` · déclenché par : ${IRRIGATION_TRIGGER_LABELS[i.irrigation.trigger].toLowerCase()}`}
       </Text>
     </Paper>
   );

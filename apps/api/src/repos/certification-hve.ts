@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import type { Tx } from "@fourmy/db";
-import type { CertificationSettings } from "@fourmy/contracts";
+import { PROCEDURES, type CertificationSettings } from "@fourmy/contracts";
 import {
   departmentOf,
   fieldCropsReference,
@@ -12,7 +12,17 @@ import {
   type HveFamily,
   type IftReference,
 } from "@fourmy/certification-refs";
-import { splitUnit, unitScale, type HveFertilizationContext, type HveFertParcel, type HveParcel, type HvePhytoContext, type HveYear } from "@fourmy/domain";
+import {
+  splitUnit,
+  unitScale,
+  type HveFertilizationContext,
+  type HveFertParcel,
+  type HveIrrigation,
+  type HveIrrigationContext,
+  type HveParcel,
+  type HvePhytoContext,
+  type HveYear,
+} from "@fourmy/domain";
 import { nitrogenExportsOf } from "@fourmy/certification-refs";
 import { abApplications } from "./certification-ab.js";
 
@@ -274,5 +284,84 @@ export async function loadHveFertilization(
     planParcelIds: plans.map((p) => p.land_parcel_id),
     rshParcelIds: rsh.map((p) => p.land_parcel_id),
     steeringParcelIds: steering.map((p) => p.land_parcel_id),
+  };
+}
+
+// --- Irrigation (lot CT3c) ---------------------------------------------------------------
+
+/** Procédures de semis et de plantation (date de semis d'une parcelle irriguée). */
+const SOWING = PROCEDURES.filter((p) => p.shape === "sowing").map((p) => p.code);
+
+/** Apports d'irrigation de la période, parcelles irriguées et matériel d'irrigation au parc. */
+export async function loadHveIrrigation(tx: Tx, campaign: number, period: { from: string; to: string }): Promise<HveIrrigationContext> {
+  const list = await rows<{
+    id: string;
+    day: string;
+    irrigation: { depthMm?: number; method?: string | null; origin?: HveIrrigation["origin"]; trigger?: string | null; mobile?: boolean | null };
+    parcel_ids: string[];
+    area_m2: number | null;
+    equipment: boolean;
+  }>(
+    tx,
+    sql`SELECT i.id, (i.started_at AT TIME ZONE 'Europe/Paris')::date::text AS day, i.irrigation,
+               array_agg(t.ref_id) AS parcel_ids,
+               sum(coalesce((t.attrs->>'workedAreaM2')::numeric, v.area_m2))::float8 AS area_m2,
+               EXISTS (SELECT 1 FROM intervention_parameters e WHERE e.intervention_id = i.id AND e.role = 'tool') AS equipment
+        FROM interventions i
+        JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_type = 'land_parcel'
+        LEFT JOIN land_parcel_versions v ON v.land_parcel_id = t.ref_id AND v.valid @> i.started_at
+        WHERE i.status = 'done' AND i.irrigation IS NOT NULL AND i.started_at >= ${period.from}::date AND i.started_at < ${period.to}::date + 1
+        GROUP BY i.id, i.started_at, i.irrigation
+        ORDER BY i.started_at`,
+  );
+  const irrigations: HveIrrigation[] = list.map((r) => ({
+    interventionId: r.id,
+    day: r.day,
+    parcelIds: r.parcel_ids,
+    depthMm: typeof r.irrigation.depthMm === "number" ? r.irrigation.depthMm : null,
+    areaM2: r.area_m2 ?? 0,
+    method: r.irrigation.method ?? null,
+    origin: r.irrigation.origin ?? null,
+    trigger: r.irrigation.trigger ?? null,
+    mobile: r.irrigation.mobile ?? null,
+    equipment: r.equipment,
+  }));
+  const ids = [...new Set(irrigations.flatMap((i) => i.parcelIds))];
+  const parcels = ids.length
+    ? await rows<{ id: string; name: string; production_id: string | null; crop: string | null; drought_tolerant: boolean | null; sown_on: string | null; water_saving: string | null; harvested: boolean }>(
+        tx,
+        sql`SELECT lp.id, lp.name, pr.id AS production_id, coalesce(a.name, pr.species, pr.nature) AS crop, pr.drought_tolerant, pr.water_saving,
+                   coalesce(pr.planted_on, pr.started_on,
+                     (SELECT min(i.started_at)::date FROM interventions i JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_id = lp.id
+                      WHERE i.status = 'done' AND i.procedure = ANY(${`{${SOWING.join(",")}}`}::text[])
+                        AND i.started_at >= ${period.from}::date - 365 AND i.started_at < ${period.to}::date + 1))::text AS sown_on,
+                   EXISTS (SELECT 1 FROM interventions i JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_id = lp.id
+                           JOIN intervention_parameters o ON o.intervention_id = i.id AND o.role = 'output'
+                           WHERE i.status = 'done' AND i.started_at >= ${period.from}::date AND i.started_at < ${period.to}::date + 1) AS harvested
+            FROM land_parcels lp
+            LEFT JOIN LATERAL (SELECT p.* FROM productions p JOIN campaigns c ON c.id = p.campaign_id
+                               WHERE p.land_parcel_id = lp.id AND c.year = ${campaign} ORDER BY p.created_at LIMIT 1) pr ON true
+            LEFT JOIN activities a ON a.id = pr.activity_id
+            WHERE lp.id = ANY(${uuidList(ids)})
+            ORDER BY lp.name`,
+      )
+    : [];
+  const equipment = await rows<{ name: string }>(
+    tx,
+    sql`SELECT name FROM equipments WHERE name ~* '(enrouleur|pivot|rampe d.arrosage|irrigat|asperseur|goutte|arros)' ORDER BY name LIMIT 5`,
+  );
+  return {
+    irrigations,
+    parcels: parcels.map((p) => ({
+      id: p.id,
+      name: p.name,
+      productionId: p.production_id,
+      crop: p.crop,
+      droughtTolerant: p.drought_tolerant,
+      sownOn: p.sown_on,
+      waterSaving: p.water_saving,
+      harvested: p.harvested,
+    })),
+    irrigationEquipment: equipment.map((e) => e.name),
   };
 }

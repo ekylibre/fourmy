@@ -348,6 +348,17 @@ export const handlers = [
   http.get(`*${base}/settings/certification`, () =>
     HttpResponse.json({ hveCampaignStartMd: "01-01", hveMethod: "campaign", hveIftScale: "current", hveBeaujolais: null, hveLivestock: null, rotationYears: 5, rotationSameSpeciesMax: 2, organicNitrogenPeriod: "calendar", abNotifiedOn: null, abCommittedOn: null }),
   ),
+  http.get(`*${base}/control/hve/irrigated`, ({ request }) => {
+    const campaign = Number(new URL(request.url).searchParams.get("campaign"));
+    return HttpResponse.json({
+      campaign,
+      period: { from: `${campaign}-01-01`, to: `${campaign}-12-31` },
+      irrigations: 2,
+      items: [
+        { id: "00000000-0000-7000-8000-0000000000a0", name: "Les Rouffiats", productionId: "00000000-0000-7000-8000-0000000000b0", crop: "Maïs", droughtTolerant: null, sownOn: `${campaign}-04-20`, waterSaving: null, harvested: true },
+      ],
+    });
+  }),
   http.get(`*${base}/control/ab/parcels`, ({ request }) => {
     const campaign = Number(new URL(request.url).searchParams.get("campaign"));
     return HttpResponse.json({

@@ -50,6 +50,17 @@ describe("menu principal", () => {
     expect(await screen.findByRole("textbox", { name: /Début de la période/ })).toHaveValue("01/01");
   });
 
+  it("contrôle HVE : onglet Parcelles irriguées, données à renseigner", async () => {
+    const user = userEvent.setup();
+    renderApp(`/f/${FARM}/control/hve`);
+    await user.click(await screen.findByRole("tab", { name: "Parcelles irriguées" }));
+    const table = await screen.findByRole("table", { name: "Parcelles irriguées" });
+    expect(within(table).getByText("Les Rouffiats")).toBeInTheDocument();
+    expect(within(table).getAllByText("À renseigner")).toHaveLength(2);
+    await user.click(within(table).getByRole("button", { name: "Modifier Les Rouffiats" }));
+    expect(await screen.findByRole("textbox", { name: /Autres pratiques économes en eau/ })).toBeInTheDocument();
+  });
+
   it("entrée active par segment de chemin", () => {
     expect(isActivePath("", "")).toBe(true);
     expect(isActivePath("/map", "")).toBe(false);

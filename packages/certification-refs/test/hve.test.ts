@@ -17,6 +17,8 @@ import {
   nitrogenBalancePoints,
   organicNitrogenPoints,
   legumePoints,
+  irrigationRecordPoints,
+  lowWaterPoints,
 } from "../src/index.js";
 
 describe("grille HVE v1.15 : barèmes aux bornes", () => {
@@ -128,5 +130,12 @@ describe("grille HVE : fertilisation, barèmes aux bornes", () => {
   it("6.3 azote organique et 6.6 légumineuses", () => {
     expect([24.99, 25, 35, 45, 55].map(organicNitrogenPoints)).toEqual([0, 1, 2, 3, 4]);
     expect([4.99, 5, 10, 15].map(legumePoints)).toEqual([0, 2, 3, 4]);
+  });
+});
+
+describe("grille HVE : irrigation, barèmes aux bornes", () => {
+  it("7.1 enregistrement et 7.6 étiage", () => {
+    expect([9.99, 10, 20, 30].map(irrigationRecordPoints)).toEqual([6, 4, 2, 0]);
+    expect([90, 89.99, 80, 79.99, 60, 40, 20, 19.99].map(lowWaterPoints)).toEqual([0, 1, 1, 2, 2, 3, 4, 5]);
   });
 });

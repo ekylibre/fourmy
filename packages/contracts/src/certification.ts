@@ -160,6 +160,9 @@ export const productionCertificationWrite = z
     cycle: cropCycle.nullable().optional(),
     plantedOn: z.string().date().nullable().optional(),
     cultivationMode: cultivationMode.optional(),
+    /** HVE 7.1 : variété tolérante à la sécheresse, autres pratiques économes en eau. */
+    droughtTolerant: z.boolean().nullable().optional(),
+    waterSaving: z.string().trim().max(200).nullable().optional(),
   })
   .strict();
 export type ProductionCertificationWrite = z.infer<typeof productionCertificationWrite>;
