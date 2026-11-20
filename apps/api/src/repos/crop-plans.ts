@@ -17,6 +17,7 @@ import {
   type CropPlanView,
   type CropPlanYearCrop,
 } from "@fourmy/contracts";
+import { legumeOf } from "./taxonomy.js";
 import { checkCropPlan, cropPlanCheckInput, diffCropPlan, emptyDraft, operationBlockers, parcelKeyOf, resolveParcels, type ExistingCover, type ExistingProduction } from "@fourmy/domain";
 import { Conflict, NotFound } from "../routes/helpers.js";
 import { natureOf, pictureUrl } from "./activities.js";
@@ -41,11 +42,6 @@ const activityCapCode = (year: SQL | number) => sql`coalesce(a.cap_code, (
   SELECT c.cap_code FROM lexicon_cap_codes c WHERE c.production = a.reference AND c.year <= ${year}
   ORDER BY c.year DESC, c.is_seed, c.cap_code LIMIT 1))`;
 
-/** L'espèce descend-elle des Fabacées (taxonomie Lexicon) ? */
-const legumeOf = (species: SQL) => sql`EXISTS (WITH RECURSIVE l AS (
-  SELECT reference_name, parent, 0 AS depth FROM taxonomy WHERE reference_name = ${species}
-  UNION ALL SELECT x.reference_name, x.parent, l.depth + 1 FROM taxonomy x JOIN l ON x.reference_name = l.parent WHERE l.depth < 30)
-  SELECT 1 FROM l WHERE reference_name = 'fabaceae')`;
 
 // --- Réglages -------------------------------------------------------------
 

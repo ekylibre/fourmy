@@ -13,7 +13,8 @@ import { fetchIndex, fetchManifest, fetchStructure, packageUrl, parseStructure, 
  * `agroedi` (dictionnaire AgroEDI, réservé aux adhérents : seulement avec une
  * clé, ignoré s'il manque à l'index) ; `protected_water_zones` et
  * `protected_natural_zones` (aires de captage, Natura 2000 : assolement,
- * ignorés s'ils manquent à l'index). Une version déjà chargée n'est pas
+ * ignorés s'ils manquent à l'index) ; `seed_varieties` (catalogue des
+ * variétés SEMAE : semences, ignoré s'il manque à l'index). Une version déjà chargée n'est pas
  * retéléchargée ; une nouvelle version remplace l'ancienne d'un bloc, dans
  * une transaction (tout ou rien). Chaque fichier est vérifié par son sha256
  * quand le manifeste le donne.
@@ -38,6 +39,7 @@ const REQUIRED: Record<string, string[]> = {
   registered_agroedi_crops: ["agroedi_code", "agroedi_name", "production"],
   registered_protected_water_zones: ["id", "administrative_zone", "name", "updated_on", "shape"],
   registered_natural_zones: ["id", "name", "nature", "shape"],
+  registered_seed_varieties: ["id", "id_specie", "specie_name_fra", "variety_name", "registration_date"],
 };
 
 /**
@@ -52,6 +54,7 @@ const PACKAGES: { name: string; tables: string[]; optional?: true; ifPublished?:
   { name: "agroedi", tables: ["registered_agroedi_codes", "registered_agroedi_crops"], optional: true },
   { name: "protected_water_zones", tables: ["registered_protected_water_zones"], ifPublished: true },
   { name: "protected_natural_zones", tables: ["registered_natural_zones"], ifPublished: true },
+  { name: "seed_varieties", tables: ["registered_seed_varieties"], ifPublished: true },
 ];
 
 /** Passage des tables temporaires (texte) aux tables de Fourmy, typées. */
@@ -142,6 +145,17 @@ const TRANSFORMS: Record<string, string[]> = {
      SELECT id, nullif(btrim(name), ''), nature, ST_Multi(shape::geometry)
      FROM lx_registered_natural_zones WHERE coalesce(shape, '') <> ''
      ON CONFLICT (id) DO NOTHING`,
+  ],
+  // Clé de recherche : minuscules, sans accents (pas d'extension unaccent).
+  seed_varieties: [
+    `TRUNCATE lexicon_seed_varieties`,
+    `INSERT INTO lexicon_seed_varieties (gnis_code, species, species_label, variety_name, registered_on, search)
+     SELECT btrim(id), btrim(id_specie), nullif(btrim(specie_name_fra), ''), btrim(variety_name), nullif(registration_date, '')::date,
+            lower(translate(btrim(variety_name) || ' ' || coalesce(specie_name_fra, ''),
+                            'ÀÂÄÉÈÊËÎÏÔÖÙÛÜÇàâäéèêëîïôöùûüç', 'AAAEEEEIIOOUUUCaaaeeeeiioouuuc'))
+     FROM lx_registered_seed_varieties
+     WHERE coalesce(btrim(id), '') <> '' AND coalesce(btrim(id_specie), '') <> '' AND coalesce(btrim(variety_name), '') <> ''
+     ON CONFLICT (gnis_code) DO NOTHING`,
   ],
   agroedi: [
     `INSERT INTO lexicon_agroedi_codes (table_id, reference_id, code, label, ekylibre_scope, ekylibre_value)

@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import postgres from "postgres";
+import { sql as sqlTag } from "drizzle-orm";
+import { withFarm } from "@fourmy/db";
+import { db } from "../src/db.js";
+import { legumeSpecies } from "../src/repos/taxonomy.js";
 import { setupFarm, teardown } from "./helpers.js";
 
 /**
@@ -88,5 +92,23 @@ describe.skipIf(!url)("semences : données (intégration)", () => {
           VALUES (${crypto.randomUUID()}, ${a!.farmId}, ${parcel}, 2027, 'graminees_seigle_avoine', 'Avoine', '2026-08-20', 'sown', ${components}::text::jsonb)`;
     await expect(cover('{"label": "Avoine"}')).rejects.toThrow(/check constraint/);
     await cover('[{"label": "Avoine", "species": "avena_sativa", "kgHa": 8}]');
+  });
+
+  it("légumineuses d'après la taxonomie Lexicon, ou le genre d'une espèce absente", async () => {
+    const [a] = farms;
+    const taxa = await sql`SELECT count(*)::int AS n FROM taxonomy WHERE reference_name IN ('fabaceae', 'trifolium', 'vicia')`;
+    if (taxa[0]!.n < 3) return; // référentiel non chargé (CI sans Lexicon)
+    const found = await withFarm(db(), a!.farmId, (tx) =>
+      legumeSpecies(tx, ["trifolium_incarnatum", "vicia_faba", "avena_sativa", "zea_mays", "vicia_inconnue_du_referentiel", "phacelia_tanacetifolia"]),
+    );
+    expect([...found].sort()).toEqual(["trifolium_incarnatum", "vicia_faba", "vicia_inconnue_du_referentiel"]);
+    expect(await withFarm(db(), a!.farmId, (tx) => legumeSpecies(tx, []))).toEqual(new Set());
+  });
+
+  it("catalogue des variétés : recherche sans accents par la clé `search`", async () => {
+    const [n] = await sql`SELECT count(*)::int AS n FROM lexicon_seed_varieties`;
+    if (!n!.n) return; // catalogue non chargé
+    const rows = await withFarm(db(), farms[0]!.farmId, (tx) => tx.execute(sqlTag`SELECT gnis_code FROM lexicon_seed_varieties WHERE search LIKE '%thermidor%'`));
+    expect((rows as unknown as { gnis_code: string }[]).map((r) => r.gnis_code)).toContain("512E492");
   });
 });

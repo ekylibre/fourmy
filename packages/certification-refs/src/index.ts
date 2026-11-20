@@ -21,6 +21,7 @@ export * from "./hve/nitrogen-exports-2026.js";
 export * from "./hve/iae.js";
 export * from "./pac/bcae7-2026.js";
 export * from "./agronomy/return-intervals.js";
+export * from "./agronomy/thousand-grain-weight.js";
 
 /** Version des référentiels, gardée avec chaque calcul de contrôle. */
-export const REFS_VERSION = "2026-11-20.11";
+export const REFS_VERSION = "2026-11-20.12";
