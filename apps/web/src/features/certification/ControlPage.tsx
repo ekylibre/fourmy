@@ -10,6 +10,7 @@ import { ErrorAlert, Loading } from "../../components/states";
 import { ControlLight, FindingList, useControlReport } from "./controls";
 import { AbParcels } from "./AbParcels";
 import { HveIrrigated } from "./HveIrrigated";
+import { HveIae } from "./HveIae";
 
 /**
  * Tableau de bord d'un contrôle HVE ou AB pour une campagne (lot CT1) :
@@ -47,11 +48,19 @@ export function ControlPage() {
       <Tabs value={tab} onChange={(v) => v && setTab(v)}>
         <Tabs.List>
           <Tabs.Tab value="rules">{kind === "ab" ? "Règles" : "Indicateurs"}</Tabs.Tab>
-          {kind === "ab" ? <Tabs.Tab value="parcels">Parcelles</Tabs.Tab> : <Tabs.Tab value="irrigation">Parcelles irriguées</Tabs.Tab>}
+          {kind === "ab" ? (
+            <Tabs.Tab value="parcels">Parcelles</Tabs.Tab>
+          ) : (
+            <>
+              <Tabs.Tab value="iae">IAE</Tabs.Tab>
+              <Tabs.Tab value="irrigation">Parcelles irriguées</Tabs.Tab>
+            </>
+          )}
         </Tabs.List>
       </Tabs>
       {kind === "ab" && tab === "parcels" && <AbParcels campaign={campaign} />}
       {kind === "hve" && tab === "irrigation" && <HveIrrigated campaign={campaign} />}
+      {kind === "hve" && tab === "iae" && <HveIae campaign={campaign} />}
       {tab === "rules" && report.isLoading && <Loading />}
       {tab === "rules" && report.error && <ErrorAlert error={report.error} />}
       {tab === "rules" && report.data && (

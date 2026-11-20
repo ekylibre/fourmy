@@ -105,3 +105,31 @@ export function lowWaterPoints(sharePercent: number): number {
   const s = Math.round(sharePercent * 1e6) / 1e6;
   return s >= 90 ? 0 : s >= 80 ? 1 : s >= 60 ? 2 : s >= 40 ? 3 : s >= 20 ? 4 : 5;
 }
+
+/** 4.1 : socle (IAE sur terres arables) ≥ 4 % ; dispense sous 10 ha de terres arables ou si l'herbe domine. */
+export const IAE_BASE_MIN = 4;
+/** 4.1 poids des IAE (% de la surface totale) : < 4 : 0 ; [4,5[ : 1 … [9,10[ : 6 ; ≥ 10 : 7 (Grille!W53). */
+export function iaeWeightPoints(sharePercent: number): number {
+  const s = Math.round(sharePercent * 1e6) / 1e6;
+  return s < 4 ? 0 : Math.min(Math.floor(s - 4) + 1, 7);
+}
+/** 4.1 diversité : 3 familles d'IAE au moins (aquatique, herbager, ligneux, rocheux) = 2 points (Grille!W56). */
+export const IAE_DIVERSITY_POINTS = 2;
+
+/** 4.2 taille des parcelles (% de SAU : PP et parcelles de moins de 6 ha) : < 40 : 0 ; [40,50[ : 1 … ≥ 80 : 5 (Grille!S85). */
+export function smallPlotsPoints(sharePercent: number): number {
+  const s = Math.round(sharePercent * 1e6) / 1e6;
+  return s < 40 ? 0 : Math.min(Math.floor((s - 40) / 10) + 1, 5);
+}
+export const SMALL_PLOT_M2 = 60_000;
+
+/** 4.3 culture principale (% de SAU hors PP) : ≥ 60 : 0 ; [50,60[ : 1 ; [40,50[ : 2 ; [30,40[ : 3 ; [20,30[ : 4 ; < 20 : 5 (Grille!Q112). */
+export function mainCropPoints(sharePercent: number): number {
+  const s = Math.round(sharePercent * 1e6) / 1e6;
+  return s >= 60 ? 0 : s >= 50 ? 1 : s >= 40 ? 2 : s >= 30 ? 3 : s >= 20 ? 4 : 5;
+}
+
+/** 4.4 nombre d'espèces : culture principale ≥ 60 % : min(max(n−5,0),5) ; sinon min(max(n−4,0),6) (Grille!O154). */
+export function speciesCountPoints(n: number, mainCropAtLeast60: boolean): number {
+  return mainCropAtLeast60 ? Math.min(Math.max(n - 5, 0), 5) : Math.min(Math.max(n - 4, 0), 6);
+}

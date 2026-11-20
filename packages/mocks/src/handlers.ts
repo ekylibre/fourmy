@@ -348,6 +348,15 @@ export const handlers = [
   http.get(`*${base}/settings/certification`, () =>
     HttpResponse.json({ hveCampaignStartMd: "01-01", hveMethod: "campaign", hveIftScale: "current", hveBeaujolais: null, hveLivestock: null, rotationYears: 5, rotationSameSpeciesMax: 2, organicNitrogenPeriod: "calendar", abNotifiedOn: null, abCommittedOn: null }),
   ),
+  http.get(`*${base}/control/hve/iae`, ({ request }) =>
+    HttpResponse.json({
+      campaign: Number(new URL(request.url).searchParams.get("campaign")),
+      items: [
+        { id: "00000000-0000-7000-8000-0000000000c1", label: "Haie", capType: "V4", type: "hedge", proposed: true, validated: false, shared: false, quantity: 420, unit: "m", equivalentM2: 8400, onArable: true },
+      ],
+    }),
+  ),
+  http.put(`*${base}/landscape-features/:id/hve`, () => new HttpResponse(null, { status: 204 })),
   http.get(`*${base}/control/hve/irrigated`, ({ request }) => {
     const campaign = Number(new URL(request.url).searchParams.get("campaign"));
     return HttpResponse.json({

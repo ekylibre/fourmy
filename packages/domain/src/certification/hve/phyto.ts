@@ -83,6 +83,8 @@ export interface HvePhytoContext {
   referenceIssues: Partial<Record<HveFamily, string>>;
   /** Semences traitées semées pendant la période (produit de traitement non connu). */
   treatedSeeds: { interventionId: string; articleId: string; product: string }[];
+  /** 5.2 : surface des IAE comptées comme non traitées (lot CT4 ; plafond déjà appliqué). */
+  untreatedIaeM2?: number;
 }
 
 const pct = (n: number) => `${n.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %`;
@@ -158,7 +160,7 @@ export function cmrFindings(treatments: HveTreatment[], seeds: HvePhytoContext["
 const sau = (parcels: HveParcel[]) => parcels.reduce((s, p) => s + p.areaM2, 0);
 
 /** 5.2 : part de la SAU sans traitement phytosanitaire hors biocontrôle. */
-export function untreatedFindings(year: HveYear): ControlFinding[] {
+export function untreatedFindings(year: HveYear, iaeM2 = 0): ControlFinding[] {
   const total = sau(year.parcels);
   if (!total) return [];
   const chemical = year.treatments.filter((t) => t.biocontrol !== true);
@@ -170,13 +172,13 @@ export function untreatedFindings(year: HveYear): ControlFinding[] {
     // Prairie permanente traitée localement : seule la surface traitée est exclue.
     treated += p.family === "permanent_grassland" ? Math.min(p.areaM2, Math.max(...ts.map((t) => t.treatedM2 ?? p.areaM2))) : p.areaM2;
   }
-  const share = ((total - treated) / total) * 100;
+  const share = Math.min(((total - treated + iaeM2) / total) * 100, 100);
   const got = pointsBySlices(share);
   return [
     finding({
       ruleId: "hve.5.2",
       level: "ok",
-      message: `${pct(share)} de la SAU sans traitement phytosanitaire hors biocontrôle : ${got} point(s). Les infrastructures agro-écologiques sous le seuil s'ajouteront avec le lot CT4.`,
+      message: `${pct(share)} de la SAU sans traitement phytosanitaire hors biocontrôle${iaeM2 ? `, IAE validées comprises (${n2(iaeM2 / 10_000)} ha)` : ""} : ${got} point(s).`,
       value: round(share),
       unit: "%",
       points: { got, max: 10 },
@@ -335,7 +337,7 @@ export function hvePhytoFindings(ctx: HvePhytoContext): ControlFinding[] {
   const [year] = ctx.years;
   if (!year) return [];
   const cmr = cmrFindings(year.treatments, ctx.treatedSeeds);
-  const items = [...cmr.findings, ...untreatedFindings(year), ...iftFindings(ctx), ...diversityFindings(year), ...declarativePhytoFindings(year)];
+  const items = [...cmr.findings, ...untreatedFindings(year, ctx.untreatedIaeM2 ?? 0), ...iftFindings(ctx), ...diversityFindings(year), ...declarativePhytoFindings(year)];
   return cmr.cmr1 ? items.map((f) => (f.points ? { ...f, points: { ...f.points, got: 0 } } : f)) : items;
 }
 

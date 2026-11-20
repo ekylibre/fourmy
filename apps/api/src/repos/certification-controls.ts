@@ -11,8 +11,11 @@ import {
   type ControlReport,
   type ArticleCopperWrite,
   type ProductionCertificationWrite,
+  type HveIaeItem,
+  type LandscapeFeatureHveWrite,
 } from "@fourmy/contracts";
-import { NotFound } from "../routes/helpers.js";
+import { BadRequest, NotFound } from "../routes/helpers.js";
+import { IAE_BY_CODE, iaeEquivalentM2 } from "@fourmy/certification-refs";
 import { REFS_VERSION } from "@fourmy/certification-refs";
 import {
   DomainError,
@@ -24,7 +27,8 @@ import {
 } from "@fourmy/domain";
 import type { CheckableBody } from "./phyto.js";
 import { abApplications, abDraftApplications, abParcelInputs, abProductions } from "./certification-ab.js";
-import { loadHveFertilization, loadHveIrrigation, loadHvePhyto } from "./certification-hve.js";
+import { loadHveBiodiversity, loadHveFertilization, loadHveIrrigation, loadHvePhyto } from "./certification-hve.js";
+import { untreatedIaeM2 } from "@fourmy/domain";
 import { abStatuses, type AbParcelStatus } from "@fourmy/domain";
 
 /**
@@ -117,13 +121,56 @@ export async function loadCertificationContext(tx: Tx, kind: ControlKind, campai
   }
   if (kind === "hve") {
     const phyto = await loadHvePhyto(tx, campaign, period, settings);
-    ctx.hve = {
-      phyto,
-      fertilization: await loadHveFertilization(tx, campaign, period, settings, phyto.years[0]?.parcels ?? []),
-      irrigation: await loadHveIrrigation(tx, campaign, period),
-    };
+    const fertilization = await loadHveFertilization(tx, campaign, period, settings, phyto.years[0]?.parcels ?? []);
+    const biodiversity = await loadHveBiodiversity(tx, campaign, period, fertilization.parcels);
+    // 5.2 : les IAE validées comptent comme surfaces non traitées.
+    phyto.untreatedIaeM2 = untreatedIaeM2(biodiversity);
+    ctx.hve = { phyto, fertilization, irrigation: await loadHveIrrigation(tx, campaign, period), biodiversity };
   }
   return ctx;
+}
+
+/** IAE de la campagne HVE (onglet IAE) : type proposé ou validé, surface équivalente, adjacence. */
+export async function hveIaeList(db: Database, farmId: string, campaign: number): Promise<{ campaign: number; items: HveIaeItem[] }> {
+  return withFarm(db, farmId, async (tx) => {
+    const ctx = await loadCertificationContext(tx, "hve", campaign);
+    const b = ctx.hve!.biodiversity!;
+    const caps = await rows<{ id: string; cap_type: string | null; hve_type: string | null }>(tx, sql`SELECT id, cap_type, hve_type FROM farm_landscape_features`);
+    const capOf = new Map(caps.map((c) => [c.id, c]));
+    return {
+      campaign,
+      items: b.iae.map((f) => {
+        const t = f.type ? IAE_BY_CODE[f.type] : undefined;
+        return {
+          id: f.id,
+          label: f.label,
+          capType: capOf.get(f.id)?.cap_type ?? null,
+          type: f.type,
+          proposed: !capOf.get(f.id)?.hve_type && !!f.type,
+          validated: f.validated,
+          shared: f.shared,
+          quantity: Math.round(f.quantity * 10) / 10,
+          unit: t?.unit ?? null,
+          equivalentM2: t ? Math.round(iaeEquivalentM2(t, f.quantity)) : null,
+          onArable: f.onArable,
+        };
+      }),
+    };
+  });
+}
+
+/** Validation d'une IAE : type HVE (null : pas une IAE), mitoyenneté. */
+export async function putLandscapeFeatureHve(db: Database, farmId: string, id: string, w: LandscapeFeatureHveWrite): Promise<void> {
+  if (w.type !== null && !IAE_BY_CODE[w.type]) throw new BadRequest(`Type d'IAE inconnu : ${w.type}.`);
+  await withFarm(db, farmId, async (tx) => {
+    const [f] = await rows<{ id: string }>(
+      tx,
+      sql`UPDATE farm_landscape_features SET hve_type = ${w.type}, hve_shared = ${w.shared},
+            hve_validated_at = ${w.validated && w.type !== null ? sql`now()` : sql`NULL`}
+          WHERE id = ${id} RETURNING id`,
+    );
+    if (!f) throw new NotFound("Élément du paysage introuvable.");
+  });
 }
 
 /** Parcelles irriguées d'une campagne HVE et leurs données d'irrigation (onglet Irrigation). */
@@ -160,7 +207,7 @@ async function dataHash(tx: Tx): Promise<string> {
           (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM article_fertilizers),
           (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM cover_crops),
           (SELECT count(*) || ':' || coalesce(max(lower(valid))::text, '') FROM land_parcel_versions),
-          (SELECT count(*) || ':' || coalesce(max(created_at)::text, '') || ':' || coalesce(max(hve_validated_at)::text, '') FROM farm_landscape_features),
+          (SELECT count(*) || ':' || coalesce(max(created_at)::text, '') || ':' || coalesce(md5(string_agg(id::text || coalesce(hve_type, '') || hve_shared::text || coalesce(hve_validated_at::text, ''), ',' ORDER BY id)), '') FROM farm_landscape_features),
           (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM hve_questionnaires),
           (SELECT count(*) || ':' || coalesce(max(created_at)::text, '') FROM seed_derogations),
           (SELECT coalesce(certification::text, '') FROM farm_settings),
