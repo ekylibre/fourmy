@@ -1,12 +1,14 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { articleCopperWrite, certificationSettings, controlKind, interventionPlanWrite, landscapeFeatureHveWrite, productionCertificationWrite } from "@fourmy/contracts";
+import { articleCopperWrite, certificationSettings, controlKind, hveAnswers, interventionPlanWrite, landscapeFeatureHveWrite, productionCertificationWrite } from "@fourmy/contracts";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import {
   abParcelStatuses,
   checkInterventionCertificationFor,
+  getHveQuestionnaire,
   hveIaeList,
+  putHveQuestionnaire,
   hveIrrigatedParcels,
   putLandscapeFeatureHve,
   controlAvailability,
@@ -56,6 +58,13 @@ export const certificationControlRoutes = new Hono<Env>()
     const parsed = productionCertificationWrite.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.issues[0]?.message);
     return c.json(await putProductionCertification(db(), c.get("farmId"), uuidParam(c, "id"), parsed.data));
+  })
+  // Questionnaire HVE annuel (items déclaratifs) ; justificatifs : /fertilization/documents, ownerType « hve_questionnaire ».
+  .get("/control/hve/questionnaire", async (c) => c.json(await getHveQuestionnaire(db(), c.get("farmId"), campaignOf(c.req.query("campaign")))))
+  .put("/control/hve/questionnaire", requireOwner, async (c) => {
+    const parsed = hveAnswers.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.issues.map((i) => `${i.path.join(".")} : ${i.message}`).join(" "));
+    return c.json(await putHveQuestionnaire(db(), c.get("farmId"), c.get("userId"), campaignOf(c.req.query("campaign")), parsed.data));
   })
   // IAE de la campagne HVE (onglet IAE) et leur validation.
   .get("/control/hve/iae", async (c) => c.json(await hveIaeList(db(), c.get("farmId"), campaignOf(c.req.query("campaign")))))

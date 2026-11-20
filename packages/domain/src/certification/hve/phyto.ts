@@ -1,7 +1,12 @@
-import type { ControlFinding } from "@fourmy/contracts";
+import type { ControlFinding, HveAnswers } from "@fourmy/contracts";
+import { declaredItem, given } from "./declared.js";
 import {
+  alternativeMethodsPoints,
   cite,
   CMR_MAX,
+  interRowPoints,
+  leakEquipmentPoints,
+  surveillancePoints,
   cmrClassOf,
   HVE_FAMILY_LABELS,
   HVE_GRID_SOURCE,
@@ -85,6 +90,8 @@ export interface HvePhytoContext {
   treatedSeeds: { interventionId: string; articleId: string; product: string }[];
   /** 5.2 : surface des IAE comptées comme non traitées (lot CT4 ; plafond déjà appliqué). */
   untreatedIaeM2?: number;
+  /** Réponses du questionnaire annuel (5.5, 5.6, 5.7, 5.9). */
+  answers?: HveAnswers["phyto"];
 }
 
 const pct = (n: number) => `${n.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %`;
@@ -311,25 +318,44 @@ export function diversityFindings(year: HveYear): ControlFinding[] {
   return out;
 }
 
-/** Items déclaratifs, en attente du questionnaire HVE (lot CT4). */
-export function declarativePhytoFindings(year: HveYear): ControlFinding[] {
-  const perennial = year.parcels.some((p) => p.family === "vine" || p.family === "orchard");
-  const items: [string, string, number][] = [
-    ["hve.5.5", "5.5 Surveillance active des bioagresseurs", 3],
-    ["hve.5.6", "5.6 Méthodes alternatives", 3],
-    ["hve.5.7", "5.7 Limitation des fuites (équipements du pulvérisateur)", 2],
-    ...(perennial ? ([["hve.5.9", "5.9 Couvert de l'inter-rang", 3]] as [string, string, number][]) : []),
+/** Items déclaratifs (questionnaire annuel) : 5.5, 5.6, 5.7 ; 5.9 pour les cultures pérennes, × leur part de SAU. */
+export function declarativePhytoFindings(year: HveYear, a: HveAnswers["phyto"] = {}): ControlFinding[] {
+  const total = sau(year.parcels);
+  const perennialShare = total ? sau(year.parcels.filter((p) => p.family === "vine" || p.family === "orchard")) / total : 0;
+  const out = [
+    declaredItem(
+      "hve.5.5",
+      "5.5 Surveillance active des bioagresseurs",
+      3,
+      given(a.diagnosticTool) || given(a.collectiveProspection) || given(a.bsvObserverPercent)
+        ? {
+            points: surveillancePoints(!!a.diagnosticTool, !!a.collectiveProspection, a.bsvObserverPercent ?? 0),
+            detail: `outil de diagnostic ${a.diagnosticTool ? "oui" : "non"}, prospection collective ${a.collectiveProspection ? "oui" : "non"}, observateur BSV ${pct(a.bsvObserverPercent ?? 0)}`,
+          }
+        : null,
+      "onglet Phyto, R199:R200",
+    ),
+    declaredItem(
+      "hve.5.6",
+      "5.6 Méthodes alternatives",
+      3,
+      given(a.alternativeMethodsPercent) ? { points: alternativeMethodsPoints(a.alternativeMethodsPercent), detail: `${pct(a.alternativeMethodsPercent)} de la SAU` } : null,
+      "onglet Phyto, P239:P242",
+    ),
+    declaredItem("hve.5.7", "5.7 Limitation des fuites (équipements du pulvérisateur)", 2, given(a.leakEquipment) ? { points: leakEquipmentPoints(a.leakEquipment), detail: `${a.leakEquipment} équipement(s)` } : null, "onglet Phyto ; plan V4.4 annexe 6"),
   ];
-  return items.map(([ruleId, label, max]) =>
-    finding({
-      ruleId,
-      level: "missing",
-      message: `${label} : à déclarer dans le questionnaire HVE annuel (lot CT4).`,
-      points: { got: 0, max },
-      missing: [missing(label, "questionnaire")],
-      source: SOURCE(`§${ruleId.slice(4)}`, "onglet Phyto"),
-    }),
-  );
+  if (perennialShare > 0) {
+    out.push(
+      declaredItem(
+        "hve.5.9",
+        "5.9 Couvert de l'inter-rang",
+        round(3 * perennialShare),
+        given(a.interRowCoverPercent) ? { points: interRowPoints(a.interRowCoverPercent) * perennialShare, detail: `${pct(a.interRowCoverPercent)} de l'inter-rang × ${pct(perennialShare * 100)} de la SAU` } : null,
+        "onglet Phyto",
+      ),
+    );
+  }
+  return out;
 }
 
 /** Indicateur complet ; avec un CMR1, tous les items valent 0 (« audit non valide »). */
@@ -337,7 +363,7 @@ export function hvePhytoFindings(ctx: HvePhytoContext): ControlFinding[] {
   const [year] = ctx.years;
   if (!year) return [];
   const cmr = cmrFindings(year.treatments, ctx.treatedSeeds);
-  const items = [...cmr.findings, ...untreatedFindings(year, ctx.untreatedIaeM2 ?? 0), ...iftFindings(ctx), ...diversityFindings(year), ...declarativePhytoFindings(year)];
+  const items = [...cmr.findings, ...untreatedFindings(year, ctx.untreatedIaeM2 ?? 0), ...iftFindings(ctx), ...diversityFindings(year), ...declarativePhytoFindings(year, ctx.answers)];
   return cmr.cmr1 ? items.map((f) => (f.points ? { ...f, points: { ...f.points, got: 0 } } : f)) : items;
 }
 

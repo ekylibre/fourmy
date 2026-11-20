@@ -71,6 +71,16 @@ describe("menu principal", () => {
     await user.click(within(table).getByRole("checkbox", { name: "Valider Haie" }));
   });
 
+  it("contrôle HVE : questionnaire annuel, réponses enregistrées par le responsable", async () => {
+    const user = userEvent.setup();
+    renderApp(`/f/${FARM}/control/hve`);
+    await user.click(await screen.findByRole("tab", { name: "Questionnaire" }));
+    const species = await screen.findByRole("textbox", { name: /4\.5 Espèces animales élevées/ });
+    await user.type(species, "3");
+    await user.click(screen.getByRole("button", { name: "Enregistrer le questionnaire" }));
+    expect(await screen.findByText(/^Questionnaire \d{4} enregistré\.$/)).toBeInTheDocument();
+  });
+
   it("entrée active par segment de chemin", () => {
     expect(isActivePath("", "")).toBe(true);
     expect(isActivePath("/map", "")).toBe(false);

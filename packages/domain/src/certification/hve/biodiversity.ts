@@ -1,4 +1,5 @@
-import type { ControlFinding } from "@fourmy/contracts";
+import type { ControlFinding, HveAnswers } from "@fourmy/contracts";
+import { declaredItem, given } from "./declared.js";
 import {
   cite,
   HVE_GRID_SOURCE,
@@ -6,8 +7,10 @@ import {
   IAE_BY_CODE,
   IAE_DIVERSITY_POINTS,
   IAE_SOURCE,
+  animalSpeciesPoints,
   iaeEquivalentM2,
   iaeWeightPoints,
+  threatenedPoints,
   mainCropPoints,
   smallPlotsPoints,
   speciesCountPoints,
@@ -53,6 +56,8 @@ export interface HveBiodiversityContext {
   crops: { species: string; label: string; areaM2: number; permanentGrassland: boolean; temporaryGrassland: boolean }[];
   /** Espèces des couverts d'interculture et dérobées. */
   coverSpecies: string[];
+  /** Réponses du questionnaire annuel (4.5 à 4.8). */
+  answers?: HveAnswers["biodiversity"];
 }
 
 const n1 = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
@@ -177,27 +182,26 @@ export function speciesFindings(ctx: HveBiodiversityContext): ControlFinding[] {
 }
 
 /** Items déclaratifs : 4.5 espèces animales, 4.6 ruches, 4.7 variétés et races menacées, 4.8 qualité biologique du sol. */
-export function declarativeBiodiversityFindings(): ControlFinding[] {
-  const items: [string, string, number][] = [
-    ["hve.4.5", "4.5 Espèces animales élevées", 3],
-    ["hve.4.6", "4.6 Ruches (3 au moins, toute la campagne)", 1],
-    ["hve.4.7", "4.7 Variétés, races ou espèces menacées", 6],
-    ["hve.4.8", "4.8 Qualité biologique du sol (test bêche, biomasse microbienne)", 1],
+export function declarativeBiodiversityFindings(a: HveAnswers["biodiversity"] = {}): ControlFinding[] {
+  const SOIL = { none: "aucun", spade_test: "test bêche OPVT", microbial_analysis: "analyse de biomasse microbienne" } as const;
+  return [
+    declaredItem("hve.4.5", "4.5 Espèces animales élevées", 3, given(a.animalSpecies) ? { points: animalSpeciesPoints(a.animalSpecies), detail: `${a.animalSpecies} espèce(s)` } : null, "onglet Biodiversité, L180"),
+    declaredItem("hve.4.6", "4.6 Ruches (3 au moins, toute la campagne)", 1, given(a.hives) ? { points: a.hives ? 1 : 0, detail: a.hives ? "oui" : "non" } : null, "onglet Biodiversité"),
+    declaredItem(
+      "hve.4.7",
+      "4.7 Variétés, races ou espèces menacées",
+      6,
+      given(a.threatenedVarieties) || given(a.threatenedBreeds)
+        ? { points: threatenedPoints(a.threatenedVarieties ?? 0, a.threatenedBreeds ?? 0), detail: `${a.threatenedVarieties ?? 0} variété(s), ${a.threatenedBreeds ?? 0} race(s)` }
+        : null,
+      "onglet Biodiversité ; plan V4.4 annexe 3",
+    ),
+    declaredItem("hve.4.8", "4.8 Qualité biologique du sol", 1, given(a.soilBiology) ? { points: a.soilBiology === "none" ? 0 : 1, detail: SOIL[a.soilBiology] } : null, "onglet Biodiversité"),
   ];
-  return items.map(([ruleId, label, max]) =>
-    finding({
-      ruleId,
-      level: "missing",
-      message: `${label} : à déclarer dans le questionnaire HVE annuel.`,
-      points: { got: 0, max },
-      missing: [missing(label, "questionnaire")],
-      source: SOURCE(`§${ruleId.slice(4)}`, "onglet Biodiversité"),
-    }),
-  );
 }
 
 export function hveBiodiversityFindings(ctx: HveBiodiversityContext): ControlFinding[] {
-  return [...iaeFindings(ctx), ...plotSizeFindings(ctx), ...mainCropFindings(ctx), ...speciesFindings(ctx), ...declarativeBiodiversityFindings()];
+  return [...iaeFindings(ctx), ...plotSizeFindings(ctx), ...mainCropFindings(ctx), ...speciesFindings(ctx), ...declarativeBiodiversityFindings(ctx.answers)];
 }
 
 /** IAE comptées au 5.2 (surfaces non traitées) : jachères, vergers haute-tige, zones humides… sans plafond ; IAE « sous le seuil SAU » plafonnées à 5 % de la SAU. */

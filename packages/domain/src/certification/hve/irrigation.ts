@@ -1,5 +1,6 @@
-import type { ControlFinding } from "@fourmy/contracts";
-import { cite, HVE_GRID_SOURCE, irrigationRecordPoints, lowWaterPoints } from "@fourmy/certification-refs";
+import type { ControlFinding, HveAnswers } from "@fourmy/contracts";
+import { cite, HVE_GRID_SOURCE, irrigatedSharePoints, irrigationRecordPoints, irrigationToolPoints, lowWaterPoints } from "@fourmy/certification-refs";
+import { declaredItem, given } from "./declared.js";
 import { finding, missing } from "../report.js";
 
 /**
@@ -42,6 +43,8 @@ export interface HveIrrigationContext {
   parcels: HveIrrigatedParcel[];
   /** Matériel d'irrigation au parc (enrouleur, pivot…), pour vérifier une exploitation déclarée non irrigante. */
   irrigationEquipment: string[];
+  /** Réponses du questionnaire annuel (7.2 à 7.5). */
+  answers?: HveAnswers["irrigation"];
 }
 
 const n1 = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
@@ -129,24 +132,22 @@ export function hveIrrigationFindings(ctx: HveIrrigationContext): ControlFinding
       }),
     ];
   }
-  const declarative: [string, string, number][] = [
-    ["hve.7.2", "7.2 Outils de mesure (sondes, tensiomètres, OAD)", 2],
-    ["hve.7.3", "7.3 Matériels optimisant les apports", 6],
-    ["hve.7.4", "7.4 Démarche collective de gestion de la ressource", 2],
-    ["hve.7.5", "7.5 Pratiques économes en eau", 6],
-  ];
+  const a = ctx.answers ?? {};
+  const yes = (v: boolean | null | undefined) => (v ? "oui" : "non");
   return [
     ...irrigationRecordFindings(ctx),
     ...lowWaterFindings(ctx),
-    ...declarative.map(([ruleId, label, max]) =>
-      finding({
-        ruleId,
-        level: "missing",
-        message: `${label} : à déclarer dans le questionnaire HVE annuel.`,
-        points: { got: 0, max },
-        missing: [missing(label, "questionnaire")],
-        source: SOURCE(`§${ruleId.slice(4)}`, "onglet Irrigation"),
-      }),
+    declaredItem(
+      "hve.7.2",
+      "7.2 Outils de mesure (sondes, tensiomètres, OAD)",
+      2,
+      given(a.supplyTool) || given(a.demandTool) || given(a.mixedTool)
+        ? { points: irrigationToolPoints(!!a.supplyTool, !!a.demandTool, !!a.mixedTool), detail: `offre ${yes(a.supplyTool)}, demande ${yes(a.demandTool)}, OAD mixte ${yes(a.mixedTool)}` }
+        : null,
+      "onglet Irrigation",
     ),
+    declaredItem("hve.7.3", "7.3 Matériels optimisant les apports", 6, given(a.efficientEquipmentPercent) ? { points: irrigatedSharePoints(a.efficientEquipmentPercent), detail: `${pct(a.efficientEquipmentPercent)} de la SAU irriguée` } : null, "onglet Irrigation"),
+    declaredItem("hve.7.4", "7.4 Démarche collective de gestion de la ressource", 2, given(a.collective) ? { points: a.collective ? 2 : 0, detail: yes(a.collective) } : null, "onglet Irrigation"),
+    declaredItem("hve.7.5", "7.5 Pratiques économes en eau", 6, given(a.waterSavingPercent) ? { points: irrigatedSharePoints(a.waterSavingPercent), detail: `${pct(a.waterSavingPercent)} de la SAU irriguée` } : null, "onglet Irrigation"),
   ];
 }

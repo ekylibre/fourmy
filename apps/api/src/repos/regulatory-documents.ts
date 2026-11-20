@@ -19,6 +19,7 @@ const OWNER_TABLES: Record<DocumentOwnerType, string> = {
   product_analysis: "product_analyses",
   cover_crop: "cover_crops",
   steering: "steering_measurements",
+  hve_questionnaire: "hve_questionnaires",
 };
 
 export function sniffDocument(bytes: Uint8Array): "application/pdf" | "image/jpeg" | "image/png" | null {

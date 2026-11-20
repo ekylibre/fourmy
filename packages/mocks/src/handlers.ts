@@ -357,6 +357,17 @@ export const handlers = [
     }),
   ),
   http.put(`*${base}/landscape-features/:id/hve`, () => new HttpResponse(null, { status: 204 })),
+  http.get(`*${base}/control/hve/questionnaire`, ({ request }) =>
+    HttpResponse.json({
+      id: null,
+      campaign: Number(new URL(request.url).searchParams.get("campaign")),
+      answers: { biodiversity: {}, phyto: {}, fertilization: {}, irrigation: {} },
+      updatedAt: null,
+    }),
+  ),
+  http.put(`*${base}/control/hve/questionnaire`, async ({ request }) =>
+    HttpResponse.json({ id: "00000000-0000-7000-8000-0000000000d1", campaign: Number(new URL(request.url).searchParams.get("campaign")), answers: await request.json(), updatedAt: "2026-11-20T10:00:00.000Z" }),
+  ),
   http.get(`*${base}/control/hve/irrigated`, ({ request }) => {
     const campaign = Number(new URL(request.url).searchParams.get("campaign"));
     return HttpResponse.json({

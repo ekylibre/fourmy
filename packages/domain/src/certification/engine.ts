@@ -120,7 +120,7 @@ export const CAMPAIGN_SECTIONS: Record<ControlKind, RuleSection[]> = {
       id: "fertilization",
       label: "Gestion de la fertilisation",
       points: { min: HVE_INDICATOR_MIN },
-      rules: [(ctx) => (ctx.hve?.fertilization ? hveFertilizationFindings(ctx.hve.fertilization) : [])],
+      rules: [(ctx) => (ctx.hve?.fertilization ? hveFertilizationFindings(ctx.hve.fertilization, ctx.hve.phyto.answers?.interRowCoverPercent) : [])],
     },
     {
       id: "irrigation",
