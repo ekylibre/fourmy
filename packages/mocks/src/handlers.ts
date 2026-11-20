@@ -345,6 +345,9 @@ export const handlers = [
   // Contrôles HVE et AB (lot CT1) : une parcelle de démo est certifiée AB depuis 2020.
   http.get(`*${base}/control/availability`, () => HttpResponse.json({ hve: false, ab: true })),
   http.post(`*${base}/control/check`, () => HttpResponse.json({ check: null })),
+  // Assolement (lot AS2b) : pas encore d'assolement ; les tests de l'écran posent les leurs.
+  http.get(`*${base}/crop-plans`, () => HttpResponse.json([])),
+  http.get(`*${base}/crop-plans/:year`, () => HttpResponse.json({ title: "Introuvable", status: 404 }, { status: 404 })),
   http.get(`*${base}/settings/certification`, () =>
     HttpResponse.json({ hveCampaignStartMd: "01-01", hveMethod: "campaign", hveIftScale: "current", hveBeaujolais: null, hveLivestock: null, rotationYears: 5, rotationSameSpeciesMax: 2, organicNitrogenPeriod: "calendar", abNotifiedOn: null, abCommittedOn: null }),
   ),

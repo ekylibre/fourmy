@@ -121,8 +121,10 @@ function totals(parcels: Bcae7Parcel[]): Totals {
 function exemption(t: Totals, farm: Bcae7Farm): string | null {
   const { exemptArableMaxHa, exemptGrassLegumeShare } = BCAE7_2026;
   if (farm.allOrganic) return "toute l'exploitation est certifiée ou en conversion en agriculture biologique";
-  if (t.unknown.length) return null; // sans les codes de toutes les parcelles, on ne conclut pas à une exemption de surface
-  if (t.arableM2 <= exemptArableMaxHa * HA) return `terres arables de ${formatHa(t.arableM2)}, au plus ${exemptArableMaxHa} ha`;
+  // Parcelles sans code connu : comptées comme terres arables (le cas le plus défavorable).
+  const unknownM2 = t.unknown.reduce((s, p) => s + p.areaM2, 0);
+  if (t.arableM2 + unknownM2 <= exemptArableMaxHa * HA) return `terres arables de ${formatHa(t.arableM2 + unknownM2)} au plus, ${exemptArableMaxHa} ha ou moins`;
+  if (t.unknown.length) return null; // sans les codes de toutes les parcelles, pas d'exemption sur les parts d'herbe
   const sum = (set: Set<string>, ps: Bcae7Parcel[]) => ps.filter((p) => p.main && set.has(p.main.toUpperCase())).reduce((s, p) => s + p.areaM2, 0);
   const grass = sum(GRASS_LEGUMES, t.arable);
   if (t.arableM2 > 0 && grass / t.arableM2 > exemptGrassLegumeShare) {
@@ -262,6 +264,11 @@ function bcae7Diversification(t: Totals, farm: Bcae7Farm): ControlFinding {
     });
   }
   const ta = t.arableM2;
+  const missingCodes = t.unknown.map((p) => missing(`code PAC de la culture prévue sur ${p.name}`, "parcel", p.key));
+  // Terres arables connues sous le seuil : les parcelles sans code décident (exemption ou non).
+  if (ta <= BCAE7_2026.diversification.smallFarm.fromHa * HA) {
+    return finding({ ...common, level: "missing", message: `Diversification : ${formatHa(ta)} de terres arables connues ; cultures à préciser pour conclure.`, missing: missingCodes });
+  }
   const crops = new Map<string, number>();
   for (const p of t.arable) {
     if (bcae7Class(p.main) === "not-exploited") continue;
@@ -278,7 +285,6 @@ function bcae7Diversification(t: Totals, farm: Bcae7Farm): ControlFinding {
     .map(([k, m2]) => `${bcae7Label(k)} ${formatPct(ta > 0 ? m2 / ta : 0)}`)
     .join(", ");
   const head = `Diversification : ${sorted.length} culture(s) sur ${formatHa(ta)} de terres arables (${listing}${sorted.length > 4 ? "…" : ""}).`;
-  const missingCodes = t.unknown.map((p) => missing(`code PAC de la culture prévue sur ${p.name}`, "parcel", p.key));
   if (sorted.length < rule.minCrops) {
     return finding({ ...common, level: "danger", message: `${head} Au moins ${rule.minCrops} cultures attendues.`, value: sorted.length, threshold: rule.minCrops, missing: missingCodes });
   }
@@ -328,7 +334,9 @@ export function bcae7Findings(parcels: Bcae7Parcel[], farm: Bcae7Farm): ControlF
   const underSau = t.sauM2 < BCAE7_2026.noControlUnderSauHa * HA;
 
   let message: string;
-  if (level === "ok") {
+  if (level === "na") {
+    message = "BCAE 7 : pas de terres arables cultivées à vérifier.";
+  } else if (level === "ok") {
     message = rotationLevel === "ok" && divers.level === "ok" && viaRotation ? "BCAE 7 respectée par la rotation et par la diversification." : `BCAE 7 respectée par la ${best}.`;
   } else if (level === "missing") {
     message = `BCAE 7 : données manquantes pour conclure (meilleur critère : ${best}).`;
@@ -336,6 +344,12 @@ export function bcae7Findings(parcels: Bcae7Parcel[], farm: Bcae7Farm): ControlF
     message = `BCAE 7 : écart faible (${best}), alerte sans réduction des aides.`;
   } else {
     message = viaRotation ? "BCAE 7 non respectée : ni la rotation ni la diversification." : "BCAE 7 non respectée (diversification).";
+  }
+  // Pas de faux vert : des parcelles sans code culture peuvent changer le résultat.
+  const unknownParcels = parcels.filter((p) => bcae7Class(p.main) === "unknown");
+  if (unknownParcels.length && (level === "ok" || level === "na")) {
+    level = "missing";
+    message = `BCAE 7 : ${unknownParcels.length} parcelle(s) sans culture prévue ou sans code PAC (${unknownParcels.map((p) => p.name).join(", ")}) : à préciser pour conclure.`;
   }
   if (underSau && level === "danger") {
     level = "warning";

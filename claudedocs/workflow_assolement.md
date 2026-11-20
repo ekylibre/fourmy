@@ -90,6 +90,14 @@ Branche `feat/crop-plan-as2b-web`. Dépend d'AS2a.
 
 *Point de contrôle avec toi* : essai sur une ferme de dev, puis avec l'exploitant testeur (Q5).
 
+*Réalisé le 20/11/2026* :
+- Menu « Assolement » dans Activités : campagne de la frise et suivante, avec leur état ; page `/f/:ferme/crop-plan/:year` (années voisines en un clic).
+- Choix des parcelles par la carte (clic, Maj + glisser) et par une liste accessible (cases, filtre « sans culture prévue ») ; pas de lasso libre, ni de « parcelles d'un précédent » (la liste montre le précédent).
+- Dates prévues saisies à la main (pas encore proposées d'après l'an passé).
+- Pas d'étiquettes sur la carte (la carte n'a pas de jeu de glyphes) : nom, précédent et culture prévue dans la liste.
+- Défauts du contrôle BCAE 7 trouvés à l'essai sur la ferme viticole et corrigés : exemption « 10 ha au plus » tentée en comptant les parcelles sans code comme arables ; verdict « données manquantes » (ni conforme, ni non conforme) tant qu'une parcelle n'a pas de culture ou de code PAC.
+- e2e `crop-plan.spec.ts` sur la ferme pilote, campagne 2031, nettoyée à la fin.
+
 ## AS3 — Découpe et fusion
 
 Branche `feat/crop-plan-as3-split`. Dépend d'AS2b et de Q1.
