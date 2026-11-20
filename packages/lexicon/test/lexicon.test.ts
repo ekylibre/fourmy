@@ -197,7 +197,11 @@ function fakeServer(phytoVersion: string, { agroedi = false, apiKey }: { agroedi
 
 class Rollback extends Error {}
 
-describe.skipIf(!url)("synchro du référentiel (intégration)", () => {
+// Le chargement prend le verrou du référentiel sans attendre et réessaie
+// pendant deux minutes (load.ts) : en CI, les tests de l'API lisent ces tables
+// en parallèle et peuvent le retarder de plusieurs secondes. Le délai du test
+// dépasse celui du verrou : il n'échoue que si le verrou est impossible à prendre.
+describe.skipIf(!url)("synchro du référentiel (intégration)", { timeout: 150_000 }, () => {
   const sql = postgres(url!, { max: 1, onnotice: () => {} });
 
   it("charge produits, usages, ensembles et taxonomie ; une version connue n'est pas retéléchargée", async () => {
