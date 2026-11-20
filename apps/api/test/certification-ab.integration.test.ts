@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import postgres from "postgres";
 import { createApp } from "../src/app.js";
+import { unzip } from "@fourmy/isoxml";
 import { addMember, setupFarm, teardown } from "./helpers.js";
 
 /**
@@ -185,6 +186,24 @@ describe.skipIf(!url)("contrôle AB (intégration)", () => {
     const uncontrolled = await section("uncontrolled");
     expect(uncontrolled.level).toBe("na");
     expect(uncontrolled.findings.map((f: { ruleId: string }) => f.ruleId)).toContain("ab.R28");
+  });
+
+  it("registre AB : zip (synthèse, parcelles, intrants…), export enregistré, données modifiées depuis signalées", async () => {
+    const res = await send("GET", "/control/ab/export?campaign=2026");
+    expect(res.status, await res.clone().text()).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/zip");
+    const files = unzip(new Uint8Array(await res.arrayBuffer()));
+    expect([...files.keys()].sort()).toEqual(["cultures.csv", "intrants.csv", "nettoyages.csv", "parcelles.csv", "recoltes.csv", "synthese.html"]);
+    const text = (name: string) => new TextDecoder().decode(files.get(name));
+    expect(text("synthese.html")).toMatch(/Contrôle Agriculture biologique — Ferme test AB/);
+    expect(text("parcelles.csv")).toMatch(/"Parcelle Bio"/);
+    expect(text("intrants.csv")).toMatch(/"Urée 46";"Fertilisant"/);
+    expect((await send("GET", "/control/ab/export?campaign=2026", undefined, worker)).status).toBe(403);
+    const after = await json("GET", "/control/ab?campaign=2026");
+    expect(after.exportedAt).toBeTruthy();
+    expect(after.changedSinceExport).toBe(false);
+    await send("PUT", "/settings/certification", { rotationYears: 4 });
+    expect((await json("GET", "/control/ab?campaign=2026")).changedSinceExport).toBe(true);
   });
 
   it("rapport et parcelles : l'azote minéral fait redémarrer la conversion ; production modifiable", async () => {

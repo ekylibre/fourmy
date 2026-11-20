@@ -870,3 +870,19 @@ export async function fertilizationRecord(db: Database, farmId: string, campaign
     };
   });
 }
+
+/** Cahier d'enregistrement de la fertilisation en CSV (séparateur « ; », décimales françaises). */
+export function fertilizationRecordCsv(record: FertilizationRecord): string {
+  const q = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const lines = [
+    ["Parcelle", "Surface (ha)", "Culture", "Variété", "Semis", "Date d'apport", "Surface épandue (ha)", "Produit", "Teneur", "Type", "Dose", "N total (kg/ha)", "N efficace (kg/ha)", "Saisi le", "Récolte", "Rendement (q/ha)", "Dose prévue (kg N/ha)"].map(q).join(";"),
+    ...record.parcels.flatMap((p) =>
+      (p.applications.length ? p.applications : [null]).map((a) =>
+        [p.name, p.areaHa, p.crop, p.variety, p.sownOn, a?.date, a?.areaHa, a?.product, a?.content, a?.nitrateType, a?.doseLabel, a?.nTotalKgHa, a?.nEfficientKgHa, a?.recordedOn, p.harvestedOn.join(" "), p.yieldQHa, p.plannedDose]
+          .map((v) => (typeof v === "number" ? q(String(v).replace(".", ",")) : q(v)))
+          .join(";"),
+      ),
+    ),
+  ];
+  return `\ufeff${lines.join("\r\n")}\r\n`;
+}

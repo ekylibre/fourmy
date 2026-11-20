@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import postgres from "postgres";
 import { createApp } from "../src/app.js";
+import { unzip } from "@fourmy/isoxml";
 import { setupFarm, teardown } from "./helpers.js";
 
 /**
@@ -166,6 +167,18 @@ describe.skipIf(!url)("contrôle HVE phyto (intégration)", () => {
     form.set("ownerId", saved.id);
     const doc = await app.request(`/api/v1/farms/${farmId}/fertilization/documents`, { method: "POST", headers: { authorization: headers.authorization! }, body: form });
     expect(doc.status, await doc.clone().text()).toBe(201);
+  });
+
+  it("liasse HVE : zip (synthèse, IFT signés, cahiers, IAE)", async () => {
+    const res = await app.request(`/api/v1/farms/${farmId}/control/hve/export?campaign=2026`, { headers });
+    expect(res.status, await res.clone().text()).toBe(200);
+    const files = unzip(new Uint8Array(await res.arrayBuffer()));
+    expect([...files.keys()].sort()).toEqual(["cahier-fertilisation.csv", "iae.csv", "ift.csv", "irrigation.csv", "parcelles-irriguees.csv", "parcelles.csv", "registre-phyto.csv", "synthese.html"]);
+    const text = (name: string) => new TextDecoder().decode(files.get(name));
+    expect(text("ift.csv")).toMatch(/"SULTAN";"2000003";"Herbicides";"2";"x";"jwt"/);
+    expect(text("iae.csv")).toMatch(/"hedge";"oui"/);
+    expect(text("synthese.html")).toMatch(/Stratégie phytosanitaire — /);
+    expect((await json("GET", "/control/hve?campaign=2026")).exportedAt).toBeTruthy();
   });
 
   it("réglage : notation IFT « ancienne » ; saisie : herbicide CMR2 en orange", async () => {

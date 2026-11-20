@@ -45,6 +45,7 @@ describe("menu principal", () => {
     const user = userEvent.setup();
     renderApp(`/f/${FARM}/control/hve`);
     expect(await screen.findByText("Stratégie phytosanitaire — 16 / 30 points (minimum 10)")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Exporter la liasse HVE" })).toBeInTheDocument();
     expect(screen.getByText(/Surveillance active des bioagresseurs/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Réglages" }));
     expect(await screen.findByRole("textbox", { name: /Début de la période/ })).toHaveValue("01/01");

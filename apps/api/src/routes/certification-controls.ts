@@ -34,6 +34,7 @@ import {
   putProductionCertification,
 } from "../repos/certification-controls.js";
 import { BadRequest, intQuery, problem, uuidParam } from "./helpers.js";
+import { abRegisterZip, hveBundleZip } from "../repos/certification-exports.js";
 
 const checkWrite = interventionPlanWrite.extend({ interventionId: z.string().uuid().optional() });
 
@@ -73,6 +74,19 @@ export const certificationControlRoutes = new Hono<Env>()
     const parsed = productionCertificationWrite.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.issues[0]?.message);
     return c.json(await putProductionCertification(db(), c.get("farmId"), uuidParam(c, "id"), parsed.data));
+  })
+  // Exports (lot CT6) : registre AB et liasse HVE (zip), enregistrés sur le calcul.
+  .get("/control/:kind/export", requireOwner, async (c) => {
+    const kind = controlKind.safeParse(c.req.param("kind"));
+    if (!kind.success) throw new BadRequest("Contrôle inconnu : hve ou ab.");
+    const campaign = campaignOf(c.req.query("campaign"));
+    const { bytes, sha256 } = kind.data === "ab" ? await abRegisterZip(db(), c.get("farmId"), c.get("userId"), campaign) : await hveBundleZip(db(), c.get("farmId"), c.get("userId"), campaign);
+    return c.body(bytes, 200, {
+      "content-type": "application/zip",
+      "content-disposition": `attachment; filename="${kind.data === "ab" ? "registre-ab" : "liasse-hve"}-${campaign}.zip"`,
+      "x-export-sha256": sha256,
+      "cache-control": "private, no-cache",
+    });
   })
   // Questionnaire HVE annuel (items déclaratifs) ; justificatifs : /fertilization/documents, ownerType « hve_questionnaire ».
   .get("/control/hve/questionnaire", async (c) => c.json(await getHveQuestionnaire(db(), c.get("farmId"), campaignOf(c.req.query("campaign")))))
