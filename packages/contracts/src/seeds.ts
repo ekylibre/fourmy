@@ -110,3 +110,92 @@ export const SEED_FLAG_LABELS: Record<SeedFlag, string> = {
   species_unknown: "Espèce inconnue",
   tgw_far_from_reference: "PMG loin du repère de l'espèce",
 };
+
+// --- Page Semences (lot SE3) ---------------------------------------------------------
+
+/** Enregistrement de la fiche : la fiche, et l'unité de stock si elle change (facteur 1 seulement). */
+export const seedSheetSave = z.object({ unit: z.string().trim().min(1).max(60).optional() }).and(seedSheetWrite);
+export type SeedSheetSave = z.infer<typeof seedSheetSave>;
+
+/** Repère de PMG de l'espèce, avec sa source (Arvalis, Terres Inovia). */
+export interface SeedTgwReference {
+  label: string;
+  typicalG: number;
+  minG: number | null;
+  maxG: number | null;
+  typicalStated: boolean;
+  org: string;
+  url: string;
+  note: string | null;
+}
+
+/** PMG retenu par défaut pour la semence (lot non compris). */
+export interface SeedTgwResolved {
+  tgwG: number;
+  origin: TgwOrigin;
+  from: "lot" | "article" | "reference";
+  estimated: boolean;
+}
+
+export interface SeedListItem {
+  articleId: string;
+  name: string;
+  /** Unité de stock (articles.unit). */
+  unit: string;
+  /** Unité reconnue : masse, grains, dose ; null sinon. */
+  unitDim: "mass" | "grain" | "dose" | null;
+  lexiconRef: string | null;
+  organicStatus: "organic" | "conversion" | "conventional" | null;
+  seedTreated: boolean | null;
+  sheet: SeedSheet | null;
+  /** Libellé de l'espèce (taxonomie Lexicon). */
+  speciesLabel: string | null;
+  /** Espèce et code GNIS lus dans un fichier importé (articles.custom), avant rattachement. */
+  importedSpecies: string | null;
+  importedGnis: string | null;
+  componentCount: number;
+  reference: SeedTgwReference | null;
+  tgw: SeedTgwResolved | null;
+  flags: SeedFlag[];
+  looksLikeMixture: boolean;
+  /** Stock à la date, dans l'unité de l'article. */
+  stock: number;
+  /** Interventions qui l'utilisent, par campagne (année de récolte). */
+  usage: { campaign: number; interventions: number }[];
+}
+
+export interface SeedLotView {
+  id: string;
+  code: string;
+  stock: number;
+  seed: LotSeed | null;
+}
+
+export interface SeedInterventionUse {
+  interventionId: string;
+  startedAt: string;
+  status: string;
+  campaign: number | null;
+  parcels: string[];
+  quantity: number | null;
+  unit: string | null;
+  areaHa: number | null;
+  /** Densité et dose équivalentes (PMG retenu ; « estimées » s'il vient du repère). */
+  grainsPerM2: number | null;
+  kgPerHa: number | null;
+  estimated: boolean;
+}
+
+export interface SeedDetail extends SeedListItem {
+  components: MixtureComponent[];
+  lots: SeedLotView[];
+  interventions: SeedInterventionUse[];
+}
+
+/** Espèce proposée sur la fiche : taxonomie Lexicon et catalogue des variétés. */
+export interface SeedSpeciesOption {
+  species: string;
+  label: string;
+  legume: boolean;
+  hasReference: boolean;
+}

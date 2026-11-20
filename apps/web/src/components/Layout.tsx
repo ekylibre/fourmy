@@ -2,7 +2,7 @@ import { Anchor, AppShell, Box as MBox, Burger, Group, NavLink, Stack, Text } fr
 import { useDisclosure } from "@mantine/hooks";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { BadgeCheck, Box, Boxes, Grid3x3, Leaf, ClipboardList, Database, FileText, LayoutDashboard, Map, Plug, Scale, Wine, FlaskConical, Sprout, Tractor, type LucideIcon } from "lucide-react";
+import { BadgeCheck, Box, Boxes, Grid3x3, Leaf, ClipboardList, Database, FileText, LayoutDashboard, Map, Plug, Scale, Wine, FlaskConical, Sprout, Tractor, Wheat, type LucideIcon } from "lucide-react";
 import { Link, Outlet, useLocation } from "react-router";
 import { Wordmark } from "@fourmy/ui-lyvre";
 import { useFarm } from "../app/farm";
@@ -41,6 +41,7 @@ export const NAVIGATION: NavEntry[] = [
     icon: Boxes,
     children: [
       { path: "/stocks", label: "État des stocks", icon: Boxes },
+      { path: "/seeds", label: "Semences", icon: Wheat },
       { path: "/phyto", label: "Produits phyto", icon: FlaskConical },
       { path: "/fertilizers", label: "Fertilisants", icon: Leaf },
       { path: "/cellar", label: "Cuverie", icon: Wine },
