@@ -34,7 +34,7 @@ import {
   type ParcelCertificationRef,
 } from "@fourmy/domain";
 import type { CheckableBody } from "./phyto.js";
-import { abApplications, abDraftApplications, abParcelInputs, abProductions, nonAbProductions } from "./certification-ab.js";
+import { abApplications, abDraftApplications, abParcelInputs, abProductions, equipmentEvents, nonAbProductions, rotationHistory, uncleanedEquipment } from "./certification-ab.js";
 import { loadHveBiodiversity, loadHveFertilization, loadHveIrrigation, loadHvePhyto } from "./certification-hve.js";
 import { untreatedIaeM2 } from "@fourmy/domain";
 import { abStatuses, type AbParcelStatus } from "@fourmy/domain";
@@ -130,6 +130,9 @@ export async function loadCertificationContext(tx: Tx, kind: ControlKind, campai
       productions: await abProductions(tx, ids, period.from, period.to),
       applications: await abApplications(tx, ids, since, period.to),
       others: await nonAbProductions(tx, ids, campaign),
+      // Matériel : depuis un an avant la période (dernier usage avant le premier usage AB).
+      equipment: await equipmentEvents(tx, `${campaign - 1}-01-01`, period.to),
+      rotation: await rotationHistory(tx, abParcels, campaign, settings.rotationYears),
     };
   }
   if (kind === "hve") {
@@ -335,7 +338,14 @@ export async function checkInterventionCertification(
       inputs: body.inputs,
     });
     const history = await abApplications(tx, abParcelIds, `${Number(day.slice(0, 4)) - 7}-01-01`, `${day.slice(0, 4)}-12-31`, interventionId);
-    ab = { parcels: areas.filter((a) => abParcelIds.includes(a.id)).map((a) => ({ id: a.id, name: a.name })), current, history };
+    const equipmentIds = [
+      ...new Set([
+        ...((body as { tools?: { equipmentId: string }[] }).tools ?? []).map((t) => t.equipmentId),
+        ...((body as { crews?: { tools: { equipmentId: string }[] }[] }).crews ?? []).flatMap((c) => c.tools.map((t) => t.equipmentId)),
+      ]),
+    ];
+    const uncleaned = await uncleanedEquipment(tx, equipmentIds, new Date(at).toISOString(), interventionId);
+    ab = { parcels: areas.filter((a) => abParcelIds.includes(a.id)).map((a) => ({ id: a.id, name: a.name })), current, history, uncleaned };
   }
   // HVE (lot CT3) : produits phytopharmaceutiques saisis, pour le classement CMR à la date.
   let hve: Parameters<typeof evaluateIntervention>[0]["hve"];

@@ -141,6 +141,8 @@ const DEFINITIONS: Def[] = [
   // --- Matériel et bâtiments ---
   ["equipment_maintenance", "maintenance", "equipment", MAINTENANCE_SUPPLIES],
   ["installation_maintenance", "maintenance", "equipment", MAINTENANCE_SUPPLIES],
+  // Nettoyage d'un matériel à usage mixte avant une parcelle AB (contrôle AB, R27) : matériels choisis comme outils.
+  ["equipment_cleaning", "work", "equipment", ["other"]],
 ];
 
 const humanize = (code: string) => code.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());

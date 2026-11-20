@@ -81,6 +81,7 @@ export const PROCEDURE_ICONS: Record<string, string> = {
   mecanical_vine_harvest: "grape-harvester",
   // Matériel et bâtiments
   equipment_maintenance: "tools",
+  equipment_cleaning: "tools",
   installation_maintenance: "wrench",
 };
 

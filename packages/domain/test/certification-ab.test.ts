@@ -97,7 +97,7 @@ describe("rapport et saisie AB", () => {
       ab: { parcels: [P], productions: [], applications: [app({ organicAllowed: false })] },
     };
     const r = evaluateCampaign(ctx);
-    expect(r.sections.map((s) => s.id)).toEqual(["perimeter", "conversion", "treatments", "seeds", "production", "fertilization"]);
+    expect(r.sections.map((s) => s.id)).toEqual(["perimeter", "conversion", "treatments", "seeds", "production", "rotation", "equipment", "fertilization", "uncontrolled"]);
     expect(r.verdict).toBe("danger");
     expect(r.sections.find((s) => s.id === "fertilization")!.level).toBe("na");
   });

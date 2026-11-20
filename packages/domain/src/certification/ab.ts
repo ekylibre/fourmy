@@ -481,3 +481,147 @@ export function mixityFindings(abProductions: AbProduction[], others: { species:
   }
   return out;
 }
+
+// --- Lot CT5b : matériel à usage mixte, rotation, règles non contrôlées ----------------------
+
+/** Usage ou nettoyage d'un matériel (interventions réalisées). */
+export interface AbEquipmentEvent {
+  equipmentId: string;
+  equipment: string;
+  interventionId: string;
+  /** Début de l'intervention (ISO). */
+  at: string;
+  kind: "use" | "cleaning";
+  /** Usage : toutes les parcelles ciblées sont en AB (ou en conversion) à cette date. */
+  organic: boolean;
+  parcelIds: string[];
+}
+
+/**
+ * R27 : un matériel utilisé sur une parcelle AB après un usage hors AB, sans
+ * nettoyage enregistré entre les deux (orange : description insuffisante des
+ * mesures, n° 19 ; l'absence de toute mesure, n° 350, relève de l'audit).
+ */
+export function equipmentFindings(events: AbEquipmentEvent[], from: string, to: string): ControlFinding[] {
+  const out: ControlFinding[] = [];
+  const byEquipment = new Map<string, AbEquipmentEvent[]>();
+  for (const e of events) byEquipment.set(e.equipmentId, [...(byEquipment.get(e.equipmentId) ?? []), e]);
+  for (const list of byEquipment.values()) {
+    const sorted = [...list].sort((a, b) => a.at.localeCompare(b.at));
+    for (let i = 1; i < sorted.length; i++) {
+      const cur = sorted[i]!;
+      const prev = sorted[i - 1]!;
+      const day = cur.at.slice(0, 10);
+      if (cur.kind !== "use" || !cur.organic || day < from || day > to) continue;
+      if (prev.kind === "use" && !prev.organic) {
+        const b = breach("R27_unrecorded");
+        out.push(
+          finding({
+            ruleId: "ab.R27",
+            level: b.level,
+            message: `${cur.equipment} : utilisé sur une parcelle AB le ${fr(day)} après un usage hors AB le ${fr(prev.at.slice(0, 10))}, sans nettoyage enregistré entre les deux.`,
+            breach: b.breach,
+            refs: { parcelIds: cur.parcelIds, interventionIds: [prev.interventionId, cur.interventionId] },
+            source: "Règlement (UE) 2018/848, art. 9.2 et annexe II partie I 1.11 ; GDL INAO l. 72",
+          }),
+        );
+      }
+    }
+  }
+  return out;
+}
+
+/** Une campagne d'une parcelle AB pour la rotation. */
+export interface AbRotationYear {
+  campaign: number;
+  /** Espèce de la culture principale ; null : aucune production connue. */
+  species: string | null;
+  label: string | null;
+  legume: boolean;
+  /** Couvert ou dérobée de légumineuses (famille du couvert). */
+  coverLegume: boolean;
+  vegetable: boolean;
+  /** Pérenne, prairie ou fourrage pérenne : hors rotation. */
+  perennial: boolean;
+}
+
+/**
+ * R11 : rotation pluriannuelle par parcelle AB, sur N campagnes (réglable) :
+ * une légumineuse au moins (culture ou couvert), la même espèce au plus K
+ * années de suite, 3 espèces au moins en maraîchage. Repères du guide de
+ * lecture INAO, appréciés par l'organisme certificateur : orange seulement
+ * (n° 39, mineur).
+ */
+export function rotationFindings(history: Map<string, { name: string; years: AbRotationYear[] }>, campaign: number, years: number, sameSpeciesMax: number): ControlFinding[] {
+  const source = "Règlement (UE) 2018/848, annexe II partie I 1.9.2 a ; GDL INAO l. 136-137 (11/07/2024)";
+  const out: ControlFinding[] = [];
+  for (const [parcelId, { name, years: all }] of history) {
+    const window = all.filter((y) => y.campaign > campaign - years && y.campaign <= campaign).sort((a, b) => a.campaign - b.campaign);
+    const current = window.find((y) => y.campaign === campaign);
+    if (!current || current.perennial) continue;
+    const known = window.filter((y) => y.species);
+    const refs = { parcelIds: [parcelId] };
+    if (known.length < years) {
+      out.push(
+        finding({
+          ruleId: "ab.R11",
+          level: "missing",
+          message: `${name} : ${known.length} campagne(s) connue(s) sur ${years} : historique de culture à compléter (imports N-1 à N-5).`,
+          missing: [missing(`historique de culture (${years} campagnes)`, "parcel", parcelId)],
+          refs,
+          source,
+        }),
+      );
+      continue;
+    }
+    const issues: string[] = [];
+    if (!window.some((y) => y.legume || y.coverLegume)) issues.push(`aucune légumineuse (culture ou couvert) en ${years} campagnes`);
+    let run = 1;
+    let longest = 1;
+    for (let i = 1; i < known.length; i++) {
+      run = known[i]!.species === known[i - 1]!.species && known[i]!.campaign === known[i - 1]!.campaign + 1 ? run + 1 : 1;
+      longest = Math.max(longest, run);
+    }
+    if (longest > sameSpeciesMax) issues.push(`même espèce ${longest} années de suite (repère : ${sameSpeciesMax} au plus)`);
+    if (window.some((y) => y.vegetable)) {
+      const species = new Set(known.filter((y) => y.vegetable).map((y) => y.species));
+      if (species.size < 3) issues.push(`${species.size} espèce(s) légumière(s) seulement (3 au moins en maraîchage)`);
+    }
+    const sequence = known.map((y) => `${y.campaign} ${y.label ?? y.species}`).join(", ");
+    if (issues.length) {
+      const b = breach("R11");
+      out.push(finding({ ruleId: "ab.R11", level: "warning", message: `${name} : rotation à justifier : ${issues.join(" ; ")} (${sequence}).`, breach: b.breach, refs, source }));
+    } else {
+      out.push(finding({ ruleId: "ab.R11", level: "ok", message: `${name} : rotation diversifiée avec légumineuse (${sequence}).`, refs, source }));
+    }
+  }
+  return out;
+}
+
+/** Règles du règlement que Fourmy ne contrôle pas (ou pas encore), dites explicitement. */
+export const AB_UNCONTROLLED: [rule: string, label: string, reason: string][] = [
+  ["R3", "Date de début de la conversion", "date de début lue sur la certification de la parcelle (notification à l'Agence Bio non vérifiée)"],
+  ["R4", "Reconnaissance rétroactive", "décision de l'organisme certificateur, hors saisie"],
+  ["R6", "Terres liées à l'élevage", "élevage hors du périmètre (production végétale)"],
+  ["R8", "Pérennes en plan de conversion (préavis de 48 h)", "déclarations à l'organisme certificateur non suivies"],
+  ["R9", "Obligations en cas de mixité (séparation, registre)", "registre et séparation des lots non suivis ; la mixité elle-même est contrôlée (R7)"],
+  ["R12", "Serres et pérennes : engrais verts, légumineuses", "recommandation sans seuil chiffré"],
+  ["R18", "Préférence pour les effluents bio et compostés", "préférence, sans seuil"],
+  ["R19", "Priorité à la prévention (vapeur, paillages)", "pratiques non saisies"],
+  ["R22", "Pièges et distributeurs", "non saisis"],
+  ["R23", "OGM et rayonnements ionisants", "attestations fournisseurs non suivies"],
+  ["R26", "Matériel hétérogène biologique", "type de semence non saisi"],
+  ["R28", "Produits de nettoyage et de désinfection", "liste des produits admis non intégrée ; produits du nettoyage à présenter à l'audit"],
+  ["R29", "Stockage des produits et des intrants", "stocks sans statut AB"],
+  ["R30", "Collecte et transport", "hors périmètre de l'exploitation"],
+  ["R31", "Mesures de précaution (dérive, contaminations)", "appréciation de l'audit"],
+  ["R32", "Soupçon de non-conformité", "procédure d'enquête, hors saisie"],
+  ["R33", "Certificats des fournisseurs", "certificats non rattachés aux achats"],
+  ["R34", "Catastrophes, dérogations exceptionnelles", "décision de l'autorité, hors saisie"],
+];
+
+export function uncontrolledFindings(): ControlFinding[] {
+  return AB_UNCONTROLLED.map(([rule, label, reason]) =>
+    finding({ ruleId: `ab.${rule}`, level: "na", message: `${rule} ${label} : non contrôlé par Fourmy (${reason}).`, source: "docs/ab/rapport_ab.md §2 et §8.3.3" }),
+  );
+}

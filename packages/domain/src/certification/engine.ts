@@ -11,6 +11,11 @@ import {
   nitrogenFindings,
   phytoFindings,
   seedFindings,
+  equipmentFindings,
+  rotationFindings,
+  uncontrolledFindings,
+  type AbEquipmentEvent,
+  type AbRotationYear,
   type AbApplication,
   type AbParcelInput,
   type AbProduction,
@@ -63,6 +68,10 @@ export interface CertificationContext {
     applications: AbApplication[];
     /** Productions des parcelles non AB de la campagne (mixité). */
     others?: { species: string; label: string; variety: string | null }[];
+    /** Usages et nettoyages des matériels (R27). */
+    equipment?: AbEquipmentEvent[];
+    /** Historique des cultures des parcelles AB (R11). */
+    rotation?: Map<string, { name: string; years: AbRotationYear[] }>;
   };
   /** HVE : SAU, traitements et IFT de la période (et des deux précédentes pour la moyenne), références. */
   hve?: { phyto: HvePhytoContext; fertilization?: HveFertilizationContext; irrigation?: HveIrrigationContext; biodiversity?: HveBiodiversityContext };
@@ -158,10 +167,17 @@ export const CAMPAIGN_SECTIONS: Record<ControlKind, RuleSection[]> = {
       rules: [(ctx) => growingModeFindings(ctx.ab?.productions ?? [], parcelNames(ctx)), (ctx) => mixityFindings(ctx.ab?.productions ?? [], ctx.ab?.others ?? [])],
     },
     {
+      id: "rotation",
+      label: "Rotation",
+      rules: [(ctx) => (ctx.ab?.rotation ? rotationFindings(ctx.ab.rotation, ctx.campaign, ctx.settings.rotationYears, ctx.settings.rotationSameSpeciesMax) : [])],
+    },
+    { id: "equipment", label: "Matériel à usage mixte", rules: [(ctx) => equipmentFindings(ctx.ab?.equipment ?? [], ctx.period.from, ctx.period.to)] },
+    {
       id: "fertilization",
       label: "Fertilisation",
       rules: [(ctx) => fertilizerFindings(inPeriod(ctx), parcelNames(ctx)), (ctx) => nitrogenFindings(ctx.ab?.parcels ?? [], inPeriod(ctx), ctx.period.from, ctx.period.to)],
     },
+    { id: "uncontrolled", label: "Règles non contrôlées", rules: [() => uncontrolledFindings()] },
   ],
 };
 
@@ -189,7 +205,13 @@ export interface InterventionCertificationInput {
    * (ramenés à l'hectare, par parcelle) et apports réalisés avant (cumuls du
    * cuivre sur 7 ans et de l'azote sur l'année).
    */
-  ab?: { parcels: { id: string; name: string }[]; current: AbApplication[]; history: AbApplication[] };
+  ab?: {
+    parcels: { id: string; name: string }[];
+    current: AbApplication[];
+    history: AbApplication[];
+    /** Matériel venu d'une parcelle non AB sans nettoyage depuis (R27). */
+    uncleaned?: { equipment: string; lastUseOn: string }[];
+  };
   /** HVE : produits phytopharmaceutiques saisis (n° d'autorisation), pour le classement CMR à la date. */
   hve?: { products: { articleId: string; product: string; authorization: string | null }[] };
 }
@@ -209,6 +231,14 @@ const abIntervention: InterventionRule = (input) => {
     ...phytoFindings(current, names),
     ...justificationFindings(current, names),
     ...seedFindings(current, names),
+    ...(input.ab.uncleaned ?? []).map((u) =>
+      finding({
+        ruleId: "ab.R27",
+        level: "warning",
+        message: `${u.equipment} : dernier usage hors AB le ${u.lastUseOn.split("-").reverse().join("/")}, sans nettoyage enregistré depuis : enregistrez le nettoyage avant cette intervention.`,
+        source: "Règlement (UE) 2018/848, art. 9.2 ; GDL INAO l. 72",
+      }),
+    ),
     ...fertilizerFindings(current, names),
     ...copperFindings(withCopper, all, input.day > `${year}-12-31` ? input.day : `${year}-12-31`),
     ...nitrogenFindings(withEffluent, all, `${year}-01-01`, `${year}-12-31`).filter((f) => f.level !== "ok" || (f.value ?? 0) > 0),
