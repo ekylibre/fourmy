@@ -50,7 +50,7 @@ test("préparer l'assolement 2031 depuis Activités, affecter, valider, rouvrir"
     // Rouvrir, puis abandonner le brouillon : retour à la version 1.
     await page.goto(`/f/${FARM}/crop-plan/${YEAR}`);
     await page.getByRole("button", { name: "Modifier" }).click();
-    await expect(page.getByText(/brouillon \(révision de la version 1\)/)).toBeVisible();
+    await expect(page.getByText(/révision de la version 1/)).toBeVisible();
     await page.getByRole("button", { name: "Abandonner le brouillon" }).click();
     await page.getByRole("dialog", { name: "Abandonner le brouillon ?" }).getByRole("button", { name: "Abandonner" }).click();
     await expect(page.getByText("validé · version 1")).toBeVisible();

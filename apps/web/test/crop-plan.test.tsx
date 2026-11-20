@@ -76,6 +76,25 @@ async function choose(user: ReturnType<typeof userEvent.setup>, name: string, op
 }
 
 describe("assolement", () => {
+  it("brouillon en plein écran ; « Quitter » revient à la vue classique, « Reprendre » y retourne ; la validation en sort", async () => {
+    const user = userEvent.setup();
+    cropPlanServer();
+    renderApp(`/f/${FARM}/crop-plan/2027`);
+    await user.click(await screen.findByRole("button", { name: "Préparer l'assolement 2027" }));
+    const workspace = await screen.findByRole("region", { name: "Assolement 2027 en plein écran" });
+    expect(within(workspace).getByRole("heading", { name: "Assolement 2027", level: 1 })).toBeInTheDocument();
+    // Pas de feuille d'affectation tant qu'aucune parcelle n'est choisie.
+    expect(screen.queryByLabelText("Affecter une culture")).not.toBeInTheDocument();
+    // Panneau repliable.
+    await user.click(within(workspace).getByRole("button", { name: "Replier le panneau" }));
+    expect(within(workspace).queryByRole("table", { name: "Parcelles de l'assolement" })).not.toBeInTheDocument();
+    await user.click(within(workspace).getByRole("button", { name: "Déplier le panneau" }));
+    await user.click(within(workspace).getByRole("button", { name: "Quitter" }));
+    expect(screen.queryByRole("region", { name: "Assolement 2027 en plein écran" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Reprendre en plein écran" }));
+    expect(await screen.findByRole("region", { name: "Assolement 2027 en plein écran" })).toBeInTheDocument();
+  });
+
   it("campagne déjà saisie sans assolement : cultures affichées, « Modifier l'assolement »", async () => {
     const user = userEvent.setup();
     cropPlanServer();
@@ -152,6 +171,7 @@ describe("assolement", () => {
     await user.click(await screen.findByRole("button", { name: "Préparer l'assolement 2027" }));
     const table = await screen.findByRole("table", { name: "Parcelles de l'assolement" });
     await user.click(within(table).getByRole("checkbox", { name: `Choisir ${R!.name}` }));
+    await user.click(screen.getByRole("button", { name: "Dérobée, couvert…" }));
     const cover = screen.getByLabelText("Couvert d'interculture");
     expect(within(cover).getByRole("button", { name: "Ajouter le couvert" })).toBeDisabled();
     await user.click(within(cover).getByRole("combobox", { name: "Famille" }));
@@ -179,6 +199,9 @@ describe("assolement", () => {
     renderApp(`/f/${FARM}/crop-plan/2027`);
     await user.click(await screen.findByRole("button", { name: "Préparer l'assolement 2027" }));
     expect(await screen.findByText("Parcellaire 2026 repris")).toBeInTheDocument();
+    // Le message se ferme, et reste fermé pour cette campagne.
+    await user.click(screen.getByRole("button", { name: "Fermer le message" }));
+    expect(screen.queryByText("Parcellaire 2026 repris")).not.toBeInTheDocument();
     const table = await screen.findByRole("table", { name: "Parcelles de l'assolement" });
     expect(within(table).getByText("reprise de 2026").closest("[title]")).toHaveAttribute("title", "Parcelle 2026 : Grande Maïs 2026");
     await user.click(within(table).getByRole("checkbox", { name: "Choisir Grande" }));
@@ -252,5 +275,7 @@ describe("assolement", () => {
     expect(saves.at(-1)!.fallow).toEqual([{ key: `p:${G!.id}`, capCode: "JAC" }]);
     expect(await screen.findByText(/validé · version 1/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Modifier" })).toBeInTheDocument();
+    // Validé : retour à l'interface classique.
+    expect(screen.queryByRole("region", { name: "Assolement 2027 en plein écran" })).not.toBeInTheDocument();
   });
 });

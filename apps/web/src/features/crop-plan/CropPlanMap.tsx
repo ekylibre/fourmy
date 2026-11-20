@@ -48,6 +48,9 @@ export function CropPlanMap({
   onCut,
   onError,
   height = 520,
+  bare = false,
+  controls = "top-right",
+  fitPadding = 30,
 }: {
   parcels: CropPlanMapParcel[];
   selected: string[];
@@ -56,7 +59,14 @@ export function CropPlanMap({
   cutting?: string | null;
   onCut?: (key: string, pieces: Polygon[]) => void;
   onError?: (message: string) => void;
-  height?: number;
+  /** Hauteur en pixels, ou « 100% » pour remplir son conteneur (mode plein écran). */
+  height?: number | string;
+  /** Sans cadre ni coins arrondis (plein écran). */
+  bare?: boolean;
+  /** Coin des boutons de zoom (en plein écran, le panneau couvre le haut à droite). */
+  controls?: "top-right" | "bottom-left";
+  /** Marges du cadrage initial (en plein écran, place du panneau et de la légende). */
+  fitPadding?: number | { top: number; right: number; bottom: number; left: number };
 }) {
   const farmId = useFarmId();
   const container = useRef<HTMLDivElement>(null);
@@ -104,7 +114,7 @@ export function CropPlanMap({
         ],
       },
     });
-    m.addControl(new NavigationControl({ showCompass: false }), "top-right");
+    m.addControl(new NavigationControl({ showCompass: false }), controls);
     m.addControl(new ScaleControl({ unit: "metric" }), "bottom-left");
     whenStyleLoaded(m, () => {
       // Outils carto communs : la découpe (ligne tracée) seulement.
@@ -163,7 +173,7 @@ export function CropPlanMap({
       setMap(null);
       m.remove();
     };
-  }, [farmId]);
+  }, [farmId, controls]);
 
   // Découpe : la parcelle seule dans l'éditeur, outil « cut » ; sinon rien.
   useEffect(() => {
@@ -183,6 +193,8 @@ export function CropPlanMap({
   }, [map, cutting]);
 
   const fitted = useRef(false);
+  const fitPaddingRef = useRef(fitPadding);
+  fitPaddingRef.current = fitPadding;
   useEffect(() => {
     if (!map) return;
     (map.getSource("parcels") as GeoJSONSource).setData({
@@ -196,14 +208,14 @@ export function CropPlanMap({
     if (!fitted.current) {
       const b = bounds(parcels);
       if (b) {
-        map.fitBounds(b, { padding: 30, duration: 0 });
+        map.fitBounds(b, { padding: fitPaddingRef.current, duration: 0 });
         fitted.current = true;
       }
     }
   }, [map, parcels, selected]);
 
   return (
-    <Paper withBorder style={{ height, position: "relative", overflow: "hidden" }}>
+    <Paper withBorder={!bare} radius={bare ? 0 : undefined} style={{ height, position: "relative", overflow: "hidden" }}>
       <div ref={container} style={{ position: "absolute", inset: 0 }} data-testid="crop-plan-map" />
       {box && (
         <div

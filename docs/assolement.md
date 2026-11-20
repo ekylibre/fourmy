@@ -29,6 +29,15 @@ Les fermes reprises d'Ekylibre ont une parcelle par culture et par campagne (« 
 
 L'historique d'une parcelle se retrouve aussi par **recoupement géographique** : pour une année sans culture connue, la culture de la parcelle qui en recouvre au moins la moitié cette année-là.
 
+## Mode plein écran
+
+Un brouillon s'ouvre en plein écran : la carte occupe tout l'écran sous une barre de commande (titre, enregistrement, annuler et rétablir, abandonner, valider, quitter).
+
+- En haut à gauche, la légende ; au centre, découper et fusionner ; à droite, le panneau Parcelles, Récapitulatif, Contrôles, Historique, Réglages, repliable ; les boutons de zoom passent en bas à gauche.
+- La feuille d'affectation monte du bas dès qu'une parcelle est choisie ; dérobée et couvert sont repliés derrière « Dérobée, couvert… ».
+- « Quitter » revient à l'interface classique, le brouillon gardé (« Reprendre en plein écran ») ; valider ou abandonner y revient aussi.
+- Le message « parcellaire repris » se ferme et reste fermé pour la campagne (mémorisé dans le navigateur).
+
 ## Préparer
 
 1. **Préparer l'assolement** : le brouillon part des cultures déjà saisies ou importées pour l'année. Rien ne change dans les productions avant la validation.

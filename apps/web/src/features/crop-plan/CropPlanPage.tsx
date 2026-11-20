@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 import { Alert, Badge, Button, Grid, Group, Modal, Paper, Stack, Tabs, Text, Title, Tooltip } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
-import { ChevronLeft, ChevronRight, Lock, Pencil, Redo2, Undo2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Lock, PanelRightClose, PanelRightOpen, Pencil, Redo2, Undo2, X } from "lucide-react";
 import type { CropPlanContext, CropPlanParcelKey, CropPlanView } from "@fourmy/contracts";
 import { worstControlLevel } from "@fourmy/domain";
 import { api, farmPath } from "../../app/api";
@@ -17,6 +17,7 @@ import { FALLOW, MapLegend } from "./legend";
 import { draftShapes, ParcelTools, PendingOperations, splitOperation } from "./operations";
 import { cropPlanKeys, useCropPlan, useCropPlanContext } from "./queries";
 import { useCropPlanEditor, type SaveState } from "./useCropPlanEditor";
+import "./workspace.css";
 
 /**
  * Assolement prévisionnel d'une campagne (lot AS2b, conception §7) : carte,
@@ -146,6 +147,245 @@ function Editor({ farmId, year, plan, context, owner, nav }: { farmId: string; y
   const checksLevel = worstControlLevel(editor.sections.map((s) => s.level));
   const issues = editor.sections.flatMap((s) => s.findings).filter((f) => f.level === "danger" || f.level === "warning").length;
 
+  // Mode plein écran (retours du 20/11) : tant que le brouillon est ouvert ; « Quitter » revient à la vue classique.
+  const [closed, setClosed] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(true);
+  const fullscreen = editable && !closed;
+  useEffect(() => {
+    if (!fullscreen) return;
+    const before = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = before;
+    };
+  }, [fullscreen]);
+  // Bandeau « parcellaire repris » : fermé une fois pour cette campagne (mémorisé dans le navigateur).
+  const carried = context.parcels.filter((p) => p.carryOver).length;
+  const noticeKey = `fourmy.cropPlan.carryNotice.${farmId}.${year}`;
+  const [carryHidden, setCarryHidden] = useState(() => {
+    try {
+      return localStorage.getItem(noticeKey) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const hideCarry = () => {
+    setCarryHidden(true);
+    try {
+      localStorage.setItem(noticeKey, "1");
+    } catch {
+      /* stockage indisponible : fermé pour cette visite */
+    }
+  };
+  const carryNotice =
+    plan.status === "draft" && carried > 0 && !carryHidden ? (
+      <Alert color="ardoise" variant="light" title={`Parcellaire ${year - 1} repris`} withCloseButton onClose={hideCarry} closeButtonLabel="Fermer le message">
+        {carried} parcelle(s) de {year - 1} s'arrêtent à la fin de la campagne (une parcelle par culture et par an, comme dans Ekylibre). L'assolement les reprend sous un
+        nom sans culture ni année ; la validation crée les parcelles {year}. Écartez celles qui ne sont plus cultivées par « Ne pas reconduire ».
+      </Alert>
+    ) : null;
+  const conflict =
+    editor.saveState === "conflict" ? (
+      <Alert color="brique" title="L'assolement a été modifié ailleurs (autre onglet, autre responsable)">
+        <Group gap="xs" mt="xs">
+          <Button size="xs" variant="light" onClick={() => void editor.reload()}>
+            Recharger sa version
+          </Button>
+          <Button size="xs" variant="subtle" color="brique" onClick={() => void editor.overwrite()}>
+            Garder la mienne
+          </Button>
+        </Group>
+      </Alert>
+    ) : null;
+
+  const map = (full: boolean) => (
+    <div style={{ position: "relative", height: full ? "100%" : undefined }}>
+      <MapBoundary what="la carte de l'assolement">
+        <CropPlanMap
+          parcels={mapParcels}
+          selected={selected}
+          onSelect={(k) => setSelected(k as CropPlanParcelKey[])}
+          cutting={cutting}
+          onCut={(key, pieces) => {
+            const op = splitOperation(editor, context, key, pieces);
+            editor.apply((d) => ({ ...d, operations: [...d.operations, op] }));
+            setCutting(null);
+            if (op.kind === "split") setSelected(op.pieces.map((p) => p.key));
+          }}
+          onError={setNotice}
+          {...(full ? { height: "100%", bare: true, controls: "bottom-left" as const, fitPadding: { top: 120, right: 520, bottom: 60, left: 60 } } : {})}
+        />
+      </MapBoundary>
+      {/* Légende hors de la carte : visible même si la carte ne s'affiche pas (WebGL). */}
+      <div style={{ position: "absolute", top: full ? 12 : 8, left: full ? 12 : 8, zIndex: 2, maxWidth: full ? 320 : "45%" }}>
+        <MapLegend editor={editor} context={context} colors={colors} />
+      </div>
+    </div>
+  );
+  const tabs = (
+    <Tabs value={tab} onChange={setTab} styles={{ tab: { paddingInline: 10 } }}>
+      <Tabs.List>
+        <Tabs.Tab value="parcels">Parcelles</Tabs.Tab>
+        <Tabs.Tab value="summary">Récapitulatif</Tabs.Tab>
+        <Tabs.Tab value="checks" rightSection={issues ? <Badge size="xs" color={checksLevel === "danger" ? "brique" : "paille"}>{issues}</Badge> : null}>
+          Contrôles
+        </Tabs.Tab>
+        <Tabs.Tab value="history">Historique</Tabs.Tab>
+        {owner && <Tabs.Tab value="settings">Réglages</Tabs.Tab>}
+      </Tabs.List>
+      <Tabs.Panel value="parcels" pt="sm">
+        <ParcelsPanel editor={editor} context={context} selected={selected} onSelect={setSelected} filter={filter} onFilter={setFilter} editable={editable} />
+      </Tabs.Panel>
+      <Tabs.Panel value="summary" pt="sm">
+        <SummaryPanel editor={editor} context={context} />
+      </Tabs.Panel>
+      <Tabs.Panel value="checks" pt="sm">
+        <Group mb="xs" gap="xs">
+          <Text size="sm">Ensemble :</Text>
+          <ControlLight level={checksLevel} />
+        </Group>
+        <ChecksPanel
+          sections={editor.sections}
+          onSelect={(keys) => {
+            setSelected(keys);
+            setFilter("all");
+            setTab("parcels");
+          }}
+        />
+      </Tabs.Panel>
+      <Tabs.Panel value="history" pt="sm">
+        <HistoryPanel farmId={farmId} year={year} versions={plan.versions} editor={editor} context={context} />
+      </Tabs.Panel>
+      {owner && (
+        <Tabs.Panel value="settings" pt="sm">
+          <SettingsPanel farmId={farmId} year={year} context={context} />
+        </Tabs.Panel>
+      )}
+    </Tabs>
+  );
+  const modals = (
+    <>
+      {validating && (
+        <ValidateModal
+          farmId={farmId}
+          year={year}
+          editor={editor}
+          context={context}
+          revision={validating.revision}
+          revising={plan.currentVersion !== null}
+          opened
+          onClose={closeValidation}
+          onSelect={(keys) => {
+            setSelected(keys);
+            setFilter("all");
+            setTab("parcels");
+          }}
+        />
+      )}
+      <Modal opened={discarding} onClose={() => setDiscarding(false)} title="Abandonner le brouillon ?">
+        <Stack>
+          <Text size="sm">
+            {plan.currentVersion ? `Les modifications sont perdues ; l'assolement revient à la version ${plan.currentVersion}.` : `L'assolement ${year} est supprimé ; les productions déjà saisies ne changent pas.`}
+          </Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setDiscarding(false)}>
+              Garder
+            </Button>
+            <Button color="brique" loading={discard.isPending} onClick={() => discard.mutate()}>
+              Abandonner
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+    </>
+  );
+
+  if (fullscreen) {
+    return (
+      <div className="cp-workspace" role="region" aria-label={`Assolement ${year} en plein écran`}>
+        <header className="cp-workspace__bar">
+          <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+            <Tooltip label="Revenir à l'interface classique ; le brouillon est gardé">
+              <Button size="compact-sm" variant="subtle" color="gray" className="cp-on-night" leftSection={<X size={14} />} onClick={() => setClosed(true)}>
+                Quitter
+              </Button>
+            </Tooltip>
+            <h1 className="cp-workspace__title">Assolement {year}</h1>
+            <Badge color="paille" variant="filled" size="sm">
+              brouillon{plan.currentVersion ? ` · révision de la version ${plan.currentVersion}` : ""}
+            </Badge>
+            <Text size="xs" className={editor.saveState === "error" || editor.saveState === "conflict" ? "cp-on-night cp-alert" : "cp-on-night cp-muted"} aria-live="polite">
+              {SAVE_LABELS[editor.saveState]}
+            </Text>
+          </Group>
+          <Group gap="xs" wrap="nowrap">
+            <Tooltip label="Annuler">
+              <Button size="compact-sm" variant="subtle" color="gray" className="cp-on-night" aria-label="Annuler le dernier geste" disabled={!editor.canUndo} onClick={editor.undo}>
+                <Undo2 size={16} />
+              </Button>
+            </Tooltip>
+            <Tooltip label="Rétablir">
+              <Button size="compact-sm" variant="subtle" color="gray" className="cp-on-night" aria-label="Rétablir" disabled={!editor.canRedo} onClick={editor.redo}>
+                <Redo2 size={16} />
+              </Button>
+            </Tooltip>
+            <Button size="compact-sm" variant="subtle" color="gray" className="cp-on-night" onClick={() => setDiscarding(true)}>
+              Abandonner le brouillon
+            </Button>
+            <Button size="sm" color="paille" onClick={() => void openValidation()} disabled={editor.saveState === "conflict"}>
+              Valider…
+            </Button>
+          </Group>
+        </header>
+        <div className="cp-workspace__body">
+          {map(true)}
+          <div className="cp-workspace__tools" data-panel={panelOpen}>
+            <Paper p={6} shadow="sm">
+              <ParcelTools
+                editor={editor}
+                context={context}
+                selected={selected}
+                shapes={shapes}
+                cutting={cutting}
+                onCutting={setCutting}
+                onSelect={setSelected}
+                notice={notice}
+                onNotice={setNotice}
+                compact
+              />
+            </Paper>
+          </div>
+          {(carryNotice || conflict || editor.saveError) && (
+            <div className="cp-workspace__notices" data-panel={panelOpen}>
+              {conflict}
+              {editor.saveError && <Alert color="brique">{editor.saveError}</Alert>}
+              {carryNotice}
+            </div>
+          )}
+          <aside className="cp-workspace__panel" data-open={panelOpen} aria-label="Panneau de l'assolement">
+            <Tooltip label={panelOpen ? "Replier le panneau" : "Déplier le panneau"} position="left">
+              <Button className="cp-workspace__panel-toggle" size="compact-sm" variant="default" aria-label={panelOpen ? "Replier le panneau" : "Déplier le panneau"} onClick={() => setPanelOpen((o) => !o)}>
+                {panelOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+              </Button>
+            </Tooltip>
+            {panelOpen && (
+              <Paper className="cp-workspace__panel-body" p="sm" shadow="md">
+                <PendingOperations editor={editor} context={context} editable={editable} />
+                {tabs}
+              </Paper>
+            )}
+          </aside>
+          {selected.length > 0 && (
+            <div className="cp-workspace__sheet" data-panel={panelOpen}>
+              <AssignForm editor={editor} context={context} selected={selected} onSelect={setSelected} compact />
+            </div>
+          )}
+        </div>
+        {modals}
+      </div>
+    );
+  }
+
   return (
     <Stack gap="sm">
       <Group justify="space-between" wrap="wrap">
@@ -234,122 +474,28 @@ function Editor({ farmId, year, plan, context, owner, nav }: { farmId: string; y
       {reopen.error && <ErrorAlert error={reopen.error} />}
       {start.error && <ErrorAlert error={start.error} />}
 
+      {editable && closed && (
+        <Alert color="paille" variant="light" title="Brouillon en cours">
+          <Group justify="space-between" gap="xs">
+            <Text size="sm">Le brouillon est enregistré ; reprenez-le en plein écran pour continuer l'assolement.</Text>
+            <Button size="xs" onClick={() => setClosed(false)}>
+              Reprendre en plein écran
+            </Button>
+          </Group>
+        </Alert>
+      )}
       <Grid gap="sm">
         <Grid.Col span={{ base: 12, md: 7 }}>
           <Stack gap="xs">
-            {editable && (
-              <ParcelTools
-                editor={editor}
-                context={context}
-                selected={selected}
-                shapes={shapes}
-                cutting={cutting}
-                onCutting={setCutting}
-                onSelect={setSelected}
-                notice={notice}
-                onNotice={setNotice}
-              />
-            )}
-            <div style={{ position: "relative" }}>
-              <MapBoundary what="la carte de l'assolement">
-                <CropPlanMap
-                  parcels={mapParcels}
-                  selected={selected}
-                  onSelect={(k) => setSelected(k as CropPlanParcelKey[])}
-                  cutting={cutting}
-                  onCut={(key, pieces) => {
-                    const op = splitOperation(editor, context, key, pieces);
-                    editor.apply((d) => ({ ...d, operations: [...d.operations, op] }));
-                    setCutting(null);
-                    if (op.kind === "split") setSelected(op.pieces.map((p) => p.key));
-                  }}
-                  onError={setNotice}
-                />
-              </MapBoundary>
-              {/* Légende hors de la carte : visible même si la carte ne s'affiche pas (WebGL). */}
-              <div style={{ position: "absolute", top: 8, left: 8, zIndex: 2, maxWidth: "45%" }}>
-                <MapLegend editor={editor} context={context} colors={colors} />
-              </div>
-            </div>
-            <PendingOperations editor={editor} context={context} editable={editable} />
-            {editable && <AssignForm editor={editor} context={context} selected={selected} onSelect={setSelected} />}
+            {map(false)}
+            <PendingOperations editor={editor} context={context} editable={false} />
           </Stack>
         </Grid.Col>
         <Grid.Col span={{ base: 12, md: 5 }}>
-          <Tabs value={tab} onChange={setTab}>
-            <Tabs.List>
-              <Tabs.Tab value="parcels">Parcelles</Tabs.Tab>
-              <Tabs.Tab value="summary">Récapitulatif</Tabs.Tab>
-              <Tabs.Tab value="checks" rightSection={issues ? <Badge size="xs" color={checksLevel === "danger" ? "brique" : "paille"}>{issues}</Badge> : null}>
-                Contrôles
-              </Tabs.Tab>
-              <Tabs.Tab value="history">Historique</Tabs.Tab>
-              {owner && <Tabs.Tab value="settings">Réglages</Tabs.Tab>}
-            </Tabs.List>
-            <Tabs.Panel value="parcels" pt="sm">
-              <ParcelsPanel editor={editor} context={context} selected={selected} onSelect={setSelected} filter={filter} onFilter={setFilter} editable={editable} />
-            </Tabs.Panel>
-            <Tabs.Panel value="summary" pt="sm">
-              <SummaryPanel editor={editor} context={context} />
-            </Tabs.Panel>
-            <Tabs.Panel value="checks" pt="sm">
-              <Group mb="xs" gap="xs">
-                <Text size="sm">Ensemble :</Text>
-                <ControlLight level={checksLevel} />
-              </Group>
-              <ChecksPanel
-                sections={editor.sections}
-                onSelect={(keys) => {
-                  setSelected(keys);
-                  setFilter("all");
-                  setTab("parcels");
-                }}
-              />
-            </Tabs.Panel>
-            <Tabs.Panel value="history" pt="sm">
-              <HistoryPanel farmId={farmId} year={year} versions={plan.versions} editor={editor} context={context} />
-            </Tabs.Panel>
-            {owner && (
-              <Tabs.Panel value="settings" pt="sm">
-                <SettingsPanel farmId={farmId} year={year} context={context} />
-              </Tabs.Panel>
-            )}
-          </Tabs>
+          {tabs}
         </Grid.Col>
       </Grid>
-
-      {validating && (
-        <ValidateModal
-          farmId={farmId}
-          year={year}
-          editor={editor}
-          context={context}
-          revision={validating.revision}
-          revising={plan.currentVersion !== null}
-          opened
-          onClose={closeValidation}
-          onSelect={(keys) => {
-            setSelected(keys);
-            setFilter("all");
-            setTab("parcels");
-          }}
-        />
-      )}
-      <Modal opened={discarding} onClose={() => setDiscarding(false)} title="Abandonner le brouillon ?">
-        <Stack>
-          <Text size="sm">
-            {plan.currentVersion ? `Les modifications sont perdues ; l'assolement revient à la version ${plan.currentVersion}.` : `L'assolement ${year} est supprimé ; les productions déjà saisies ne changent pas.`}
-          </Text>
-          <Group justify="flex-end">
-            <Button variant="default" onClick={() => setDiscarding(false)}>
-              Garder
-            </Button>
-            <Button color="brique" loading={discard.isPending} onClick={() => discard.mutate()}>
-              Abandonner
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
+      {modals}
     </Stack>
   );
 }
