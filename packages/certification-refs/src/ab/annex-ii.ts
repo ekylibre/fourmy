@@ -9,9 +9,9 @@ import type { RefSource } from "../source.js";
  * limitatif de la liste.
  */
 export const ANNEX_II_SOURCE: RefSource = {
-  text: "Règlement d'exécution (UE) 2021/1165",
-  version: "15/07/2021 (version d'origine, modifications ultérieures non lues)",
-  at: "annexe II, p. 13 à 17",
+  text: "Règlement d'exécution (UE) 2021/1165, version consolidée (modifié par les règlements 2023/121, 2023/2229, 2025/973, 2025/2501)",
+  version: "01/01/2026",
+  at: "annexe II, p. 15 à 21 de la version consolidée",
 };
 
 export type AnnexIIGroup = "effluent" | "compost" | "digestate" | "animal" | "plant" | "mineral" | "calcium" | "humic";
@@ -47,7 +47,9 @@ export const ANNEX_II: AnnexIICategory[] = [
   c("dried_manure", "Fumier séché et fiente de volaille déshydratée", "effluent", 13, { industrialForbidden: true, counts170N: true }),
   c("composted_manure", "Compost d'excréments d'animaux solides, fientes et fumiers compostés", "effluent", 13, { industrialForbidden: true, counts170N: true }),
   c("liquid_manure", "Excréments d'animaux liquides (lisier, purin)", "effluent", 13, { industrialForbidden: true, counts170N: true, condition: "après fermentation contrôlée ou dilution appropriée" }),
-  c("household_compost", "Déchets ménagers compostés ou fermentés", "compost", 13, { condition: "tri à la source, collecte agréée, plafonds de métaux lourds" }),
+  c("household_compost", "Biodéchets compostés ou fermentés (directive 2008/98/CE)", "compost", 15, {
+    condition: "biodéchets végétaux et animaux collectés séparément, compostage ou méthanisation, collecte agréée, plafonds de métaux lourds",
+  }),
   c("peat", "Tourbe", "compost", 13, { condition: "horticulture seulement (maraîchage, floriculture, arboriculture, pépinière)" }),
   c("mushroom_compost", "Compost de champignonnières", "compost", 13, { condition: "substrat initial composé de produits de l'annexe" }),
   c("vermicompost", "Lombricompost et déjections d'insectes", "compost", 13),
@@ -77,13 +79,28 @@ export const ANNEX_II: AnnexIICategory[] = [
   c("sulphur", "Soufre élémentaire", "calcium", 16),
   c("trace_elements", "Engrais inorganique à oligo-éléments", "calcium", 16),
   c("sodium_chloride", "Chlorure de sodium", "calcium", 16),
-  c("rock_dust", "Poudres de roche, argiles", "calcium", 16),
+  c("rock_dust", "Poudres de roche, sable d'origine naturelle, argiles et minéraux argileux (perlite, vermiculite)", "calcium", 18),
   c("leonardite", "Léonardite et xylite", "humic", 16),
   c("humic_acids", "Acides humiques et fulviques", "humic", 16, { condition: "hors sels d'ammonium" }),
   c("chitin", "Chitine", "humic", 16, { condition: "aquaculture biologique ou pêche durable" }),
   c("sapropel", "Sédiments anaérobies d'eau douce (sapropèle)", "humic", 16),
   c("biochar", "Biochar", "humic", 17, { condition: "matières végétales seulement" }),
+  // Ajouts des règlements modificatifs (version consolidée au 01/01/2026).
+  c("struvite", "Struvite et sels de phosphate précipités valorisés", "mineral", 19, { industrialForbidden: true, condition: "conformes au règlement 2019/1009 ; lisier de base non issu d'un élevage industriel" }),
+  c("potassium_chloride", "Chlorure de potassium (muriate de potasse)", "mineral", 19, { condition: "d'origine naturelle seulement" }),
+  c("selenium_salts", "Sels de sélénium", "calcium", 19, { condition: "seulement en cas de carence des sols d'élevage, de pâturage ou de cultures fourragères" }),
+  c("calcium_acetate", "Acétate de calcium", "calcium", 20, { condition: "applications foliaires sur légumes sous serre et pommiers, contre les carences en calcium" }),
+  c("calcium_phosphate_ash", "Phosphate de calcium issu de cendres de boues d'épuration", "mineral", 20, { condition: "conforme au règlement 2019/1009" }),
+  c("calcium_magnesium_gluconate", "Gluconate de calcium et de magnésium", "calcium", 20, { condition: "issu de la fermentation microbienne" }),
 ];
+
+/**
+ * Matières de l'annexe II réservées à d'autres productions que les cultures
+ * de plein champ (non proposées pour un fertilisant de parcelle) : nitrate de
+ * sodium (algues en système fermé), dioxyde de carbone (algues, serres),
+ * tapis de fibres végétales (graines germées).
+ */
+export const ANNEX_II_NOT_FOR_PARCELS = ["Nitrate de sodium", "Dioxyde de carbone", "Tapis de fibres végétales"];
 
 export const ANNEX_II_BY_CODE: Record<string, AnnexIICategory> = Object.fromEntries(ANNEX_II.map((x) => [x.code, x]));
 

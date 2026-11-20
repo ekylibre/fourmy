@@ -611,7 +611,7 @@ export const AB_UNCONTROLLED: [rule: string, label: string, reason: string][] = 
   ["R22", "Pièges et distributeurs", "non saisis"],
   ["R23", "OGM et rayonnements ionisants", "attestations fournisseurs non suivies"],
   ["R26", "Matériel hétérogène biologique", "type de semence non saisi"],
-  ["R28", "Produits de nettoyage et de désinfection", "liste des produits admis non intégrée ; produits du nettoyage à présenter à l'audit"],
+  ["R28", "Produits de nettoyage et de désinfection", "liste de l'annexe IV applicable au 01/01/2028 (règlement 2021/1165 art. 13, modifié par le 2025/2501) ; produits du nettoyage à présenter à l'audit"],
   ["R29", "Stockage des produits et des intrants", "stocks sans statut AB"],
   ["R30", "Collecte et transport", "hors périmètre de l'exploitation"],
   ["R31", "Mesures de précaution (dérive, contaminations)", "appréciation de l'audit"],

@@ -20,4 +20,4 @@ export * from "./hve/nitrogen-exports-2026.js";
 export * from "./hve/iae.js";
 
 /** Version des référentiels, gardée avec chaque calcul de contrôle. */
-export const REFS_VERSION = "2026-11-20.8";
+export const REFS_VERSION = "2026-11-20.9";

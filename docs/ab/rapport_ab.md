@@ -724,3 +724,18 @@ Les règles les plus lourdes pour un cultivateur sont :
 - INAO-DEC-CONT-AB-4 v10 du 17/09/2026, `docs/ab/INAO-DEC-CONT-AB-4_22-09-2026.pdf` : p. 1-39 (certification, fréquences, points de contrôle généraux et végétaux), 100-123 (manquements, catalogue généraux, agricoles, végétaux) et 160-162 (collecte et stockage) lues ; p. 112-123 et 162 vérifiées visuellement ; parties élevage, aquaculture, transformation et import non lues.
 - INAO-DIR-CAC-7 v2 du 30/09/2026, `docs/ab/INAO-DIR-CAC-7_01-10-2026.pdf` : lue en entier.
 - Recherche du mot « cuivre » dans le texte des cinq documents INAO : aucune occurrence.
+
+### 8.6 Version consolidée du règlement 2021/1165 (01/01/2026)
+
+Fichier `CELEX_02021R1165-20260101_FR_TXT.pdf` (52 p.), déposé le 20/11/2026. Actes modificatifs : 2023/121 (M1), 2023/2229 (M2), 2025/973 (M3), 2025/2501 (M4) ; rectificatifs C1 à C4.
+
+Ce qui change pour les contrôles de Fourmy :
+- **Annexe I, cuivre** : entrée inchangée (28 kg de cuivre par hectare sur 7 ans). Les autres ajouts de l'annexe I passent par la mention « utilisable en AB » d'E-Phy.
+- **Annexe II** (référentiel `ab/annex-ii.ts`) :
+  - les « déchets ménagers » deviennent les **biodéchets compostés ou fermentés** (directive 2008/98/CE), méthanisation comprise (M2) ;
+  - ajouts : **struvite et sels de phosphate précipités** (lisier de base non issu d'un élevage industriel) et **chlorure de potassium** d'origine naturelle (M1) ; **sels de sélénium** en cas de carence des sols d'élevage ou de fourrages (M2) ; **acétate de calcium** (foliaire, légumes sous serre et pommiers), **phosphate de calcium** issu de cendres de boues d'épuration, **gluconate de calcium et de magnésium** (M3) ;
+  - poudres de roche étendues au **sable**, à la **perlite** et à la **vermiculite** (M3) ;
+  - réservés à d'autres productions que la parcelle : nitrate de sodium (algues en système fermé, M1), dioxyde de carbone (algues, serres) et tapis de fibres végétales (graines germées) (M3).
+- **Nettoyage** (R28) : l'article 5, paragraphes 1 à 3 (produits de l'annexe IV) n'est applicable qu'au **1er janvier 2028** (M4) ; la règle reste « non contrôlé ».
+- **Article 10 bis** (M3) : autorisations propres aux régions ultrapériphériques, sans effet pour la métropole.
+
