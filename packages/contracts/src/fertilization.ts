@@ -33,7 +33,8 @@ export const NITRATE_TYPE_LABELS: Record<NitrateType, string> = {
 };
 
 /** D'où vient la composition : proposée par Fourmy, reprise d'Ekylibre, confirmée par l'utilisateur, analyse. */
-export const compositionOrigin = z.enum(["proposed", "migrated", "confirmed", "analysis"]);
+/** Origine de la composition ; « imported » : lue dans un fichier importé (Geofolia, DAPLOS), migration 0062. */
+export const compositionOrigin = z.enum(["proposed", "migrated", "confirmed", "analysis", "imported"]);
 export type CompositionOrigin = z.infer<typeof compositionOrigin>;
 
 export const COMPOSITION_ORIGIN_LABELS: Record<CompositionOrigin, string> = {
@@ -41,6 +42,7 @@ export const COMPOSITION_ORIGIN_LABELS: Record<CompositionOrigin, string> = {
   migrated: "Reprise d'Ekylibre",
   confirmed: "Confirmée",
   analysis: "Analyse",
+  imported: "Importée d'un fichier",
 };
 
 const share = z.number().min(0).max(1);
