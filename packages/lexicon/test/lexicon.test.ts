@@ -251,6 +251,10 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", { timeout: 150_
           { name: "protected_water_zones", version: "", status: "absent", rows: 0 },
           { name: "protected_natural_zones", version: "", status: "absent", rows: 0 },
         ]);
+        expect(await tx`SELECT reference_name, started_on::text, stopped_on::text FROM lexicon_productions ORDER BY 1`).toEqual([
+          { reference_name: "grain_corn", started_on: "2000-03-01", stopped_on: "2000-11-30" },
+          { reference_name: "vine", started_on: "2000-11-01", stopped_on: "2001-10-31" },
+        ]);
         expect(await tx`SELECT reference_name, agroedi_crop_code FROM lexicon_productions ORDER BY 1`).toEqual([
           { reference_name: "grain_corn", agroedi_crop_code: "ZMA" },
           { reference_name: "vine", agroedi_crop_code: "ZMO" },

@@ -176,3 +176,22 @@ Repris de la conception §11 : performance sur 300 parcelles (mesurée dès AS1b
 repères agronomiques sans source structurée, extraction de la fiche BCAE 7,
 codes PAC manquants dans l'historique, interventions sur une parcelle
 d'origine après la date d'effet, mobile hors ligne après une découpe.
+
+## AS5 — Reconduction du parcellaire (fermes reprises d'Ekylibre)
+
+Lot ajouté le 20/11/2026, avant l'essai sur la ferme de l'exploitant testeur : sa ferme, reprise d'Ekylibre, a une parcelle par culture et par campagne (close au 30/12) ; l'assolement 2027 ne proposait qu'une parcelle sur 12, et l'historique s'arrêtait à un an.
+
+- Contexte : parcelles de l'an passé closes en décembre et non remplacées, proposées à la reconduction (nom sans culture ni année, numéroté en cas de doublon ; recouvrement de 90 % : la plus grande).
+- Brouillon : `excluded` (« Ne pas reconduire »).
+- Validation : changement `parcel.carry` ; nouvelle parcelle à la suite de l'ancienne, filiation `carry` (migration 0073), certifications reprises ; découpe ou fusion d'une parcelle à reconduire refusée.
+- Historique par recoupement géographique (au moins 50 % de la parcelle) pour les années sans culture connue, après l'historique propre et la filiation.
+- Vérifié sur la ferme de l'exploitant testeur en local : 12 parcelles proposées pour 2027, 5 ans d'historique.
+
+### Retours de l'essai du 20/11 (`docs/assolement/retour_test.md`, hors dépôt)
+
+- Menu Assolement : « Modifier l'assolement » pour une campagne qui a déjà des cultures ou un assolement validé, « Reprendre » un brouillon, « Préparer » sinon.
+- Campagne déjà saisie sans assolement : affichée telle quelle (statut `current`), « Modifier l'assolement » crée le brouillon.
+- Carte : parcelles à affecter en pointillés rouges, contour et remplissage à la couleur de l'activité, sans culture en gris ; légende en haut à gauche (image de l'activité, surface).
+- Dates de semis et de récolte pré-remplies d'après Lexicon (`lexicon_productions.started_on/stopped_on`, migration 0074, chargement des productions) pour une culture annuelle.
+- Formulaire d'affectation sous la carte ; sélection vidée après un geste ; filtre « Sans culture prévue » appliqué à la carte ; bandeau du bas retiré (légende) ; contrôles repliés par défaut.
+- Mode plein écran (second retour, inspiré de la carte des parcelles d'Agroptima) : barre de commande couleur nuit, carte pleine, légende et outils flottants, panneau repliable à droite, feuille d'affectation qui monte du bas à la sélection ; « Quitter » ou valider ou abandonner reviennent à l'interface classique ; message de reprise refermable.

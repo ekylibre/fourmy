@@ -6,6 +6,7 @@ import {
   checkCropPlan,
   cropPlanCheckInput,
   defaultEffectiveOn,
+  diffCropPlan,
   operationBlockers,
   regulatoryFindings,
   emptyDraft,
@@ -269,5 +270,30 @@ describe("Réglementaire : ZNT, captages, Natura 2000", () => {
     const r = checkCropPlan({ base, draft, activities, history: new Map(), settings: { bcae7Preferred: "rotation", alsaceRhinePlain: false, returnIntervals: {} }, certification: noCert, zones });
     expect(r.sections.map((s) => s.id)).toEqual(["pac", "agronomy", "regulatory"]);
     expect(r.sections[2]!.level).toBe("warning");
+  });
+});
+
+describe("reconduction du parcellaire (lot AS5)", () => {
+  const carry = new Map([["b", { name: "La Côte", sourceName: "La Côte Maïs 2026" }]]);
+
+  it("parcelle écartée : hors du parcellaire ; gardée : reconduite à la validation", () => {
+    const kept: CropPlanDraft = { ...emptyDraft(2027), assignments: [assign("p:a", 1), assign("p:b", 1), assign("p:c", 1)] };
+    expect(diffCropPlan(kept, resolveParcels(base, kept), [], { campaignExists: true, carryOver: carry }).changes[0]).toEqual({
+      kind: "parcel.carry",
+      key: "p:b",
+      name: "La Côte",
+      sourceName: "La Côte Maïs 2026",
+    });
+    const dropped: CropPlanDraft = { ...kept, assignments: kept.assignments.filter((a) => a.key !== "p:b"), excluded: ["p:b"] };
+    const r = resolveParcels(base, dropped);
+    expect(r.byKey.has("p:b")).toBe(false);
+    const d = diffCropPlan(dropped, r, [], { campaignExists: true, carryOver: carry });
+    expect(d.changes.some((c) => c.kind === "parcel.carry")).toBe(false);
+    expect(d.blockers).toEqual([]);
+  });
+
+  it("brouillon enregistré avant le lot AS5 (sans « excluded ») : accepté", () => {
+    const { excluded: _ignored, ...old } = emptyDraft(2027);
+    expect(resolveParcels(base, old as CropPlanDraft).parcels).toHaveLength(3);
   });
 });

@@ -31,8 +31,11 @@ function combine(origins: CropPlanOrigin[]): CropPlanOrigin[] {
 
 export function resolveParcels(base: CropPlanBaseParcel[], draft: CropPlanDraft): ResolvedPlan {
   const current = new Map<CropPlanParcelKey, ResolvedParcel>();
+  // Parcelles proposées à la reconduction et écartées (lot AS5) : hors du parcellaire.
+  const excluded = new Set<string>(draft.excluded ?? []);
   for (const p of base) {
     const key = parcelKeyOf(p.id);
+    if (excluded.has(key)) continue;
     current.set(key, { key, name: p.name, areaM2: p.areaM2, existing: true, origins: [{ parcelId: p.id, share: 1 }] });
   }
   const issues: ResolveIssue[] = [];

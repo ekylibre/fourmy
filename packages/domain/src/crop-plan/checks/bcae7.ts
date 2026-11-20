@@ -349,7 +349,8 @@ export function bcae7Findings(parcels: Bcae7Parcel[], farm: Bcae7Farm): ControlF
   const unknownParcels = parcels.filter((p) => bcae7Class(p.main) === "unknown");
   if (unknownParcels.length && (level === "ok" || level === "na")) {
     level = "missing";
-    message = `BCAE 7 : ${unknownParcels.length} parcelle(s) sans culture prévue ou sans code PAC (${unknownParcels.map((p) => p.name).join(", ")}) : à préciser pour conclure.`;
+    const names = unknownParcels.slice(0, 5).map((p) => p.name).join(", ") + (unknownParcels.length > 5 ? ` et ${unknownParcels.length - 5} autre(s)` : "");
+    message = `BCAE 7 : ${unknownParcels.length} parcelle(s) sans culture prévue ou sans code PAC (${names}) : à préciser pour conclure.`;
   }
   if (underSau && level === "danger") {
     level = "warning";

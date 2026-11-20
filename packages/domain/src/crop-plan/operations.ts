@@ -34,6 +34,11 @@ export function operationBlockers(draft: CropPlanDraft, resolved: ResolvedPlan, 
     const sources = op.kind === "split" ? [op.source] : op.sources;
     const pieces = op.kind === "split" ? op.pieces : [op.result];
     const names = pieces.map((p) => p.name).join(", ");
+    const carried = sources.map((k) => base.get(k)).filter((p) => p?.carryOver);
+    if (carried.length) {
+      out.push({ code: "operation", message: `${carried.map((p) => p!.name).join(", ")} : parcelle reprise de l'an passé ; validez d'abord sa reconduction, puis découpez ou fusionnez.`, keys: sources });
+      continue;
+    }
     if (op.effectiveOn < from || op.effectiveOn > to) {
       out.push({ code: "effective-date", message: `${names} : date d'effet hors de la campagne (du ${from} au ${to}).`, keys: pieces.map((p) => p.key) });
     }
@@ -52,7 +57,11 @@ export function operationBlockers(draft: CropPlanDraft, resolved: ResolvedPlan, 
       if (!resolved.byKey.has(piece.key)) continue;
       const early = draft.assignments.find((a) => a.key === piece.key && a.startedOn && a.startedOn < op.effectiveOn);
       if (early) {
-        out.push({ code: "effective-date", message: `${piece.name} : culture prévue à partir du ${early.startedOn}, avant la date d'effet (${op.effectiveOn}).`, keys: [piece.key] });
+        out.push({
+          code: "effective-date",
+          message: `${piece.name} : culture prévue à partir du ${early.startedOn}, avant la date d'effet (${op.effectiveOn}) : avancez la date d'effet ou la date de semis.`,
+          keys: [piece.key],
+        });
       }
     }
   }

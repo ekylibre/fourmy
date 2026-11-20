@@ -33,7 +33,7 @@ test("préparer l'assolement 2031 depuis Activités, affecter, valider, rouvrir"
     const activity = (await option.textContent())!.trim();
     await option.click();
     await page.getByRole("button", { name: "Affecter", exact: true }).click();
-    await expect(page.getByLabel("Surfaces prévues")).toContainText(activity);
+    await expect(page.getByLabel("Légende de la carte")).toContainText(activity);
     await expect(page.getByText("Enregistré", { exact: true })).toBeVisible({ timeout: 10_000 });
 
     await page.getByRole("button", { name: "Valider…" }).click();
@@ -50,7 +50,7 @@ test("préparer l'assolement 2031 depuis Activités, affecter, valider, rouvrir"
     // Rouvrir, puis abandonner le brouillon : retour à la version 1.
     await page.goto(`/f/${FARM}/crop-plan/${YEAR}`);
     await page.getByRole("button", { name: "Modifier" }).click();
-    await expect(page.getByText(/brouillon \(révision de la version 1\)/)).toBeVisible();
+    await expect(page.getByText(/révision de la version 1/)).toBeVisible();
     await page.getByRole("button", { name: "Abandonner le brouillon" }).click();
     await page.getByRole("dialog", { name: "Abandonner le brouillon ?" }).getByRole("button", { name: "Abandonner" }).click();
     await expect(page.getByText("validé · version 1")).toBeVisible();

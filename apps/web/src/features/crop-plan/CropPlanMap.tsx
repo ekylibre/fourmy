@@ -19,6 +19,8 @@ export interface CropPlanMapParcel extends ParcelShape {
 
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 const NONE = "#FFF8E7";
+/** Parcelles sans culture prévue (contour en pointillés). */
+export const TODO = "#E03131";
 
 function bounds(parcels: ParcelShape[]): LngLatBoundsLike | null {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -46,6 +48,9 @@ export function CropPlanMap({
   onCut,
   onError,
   height = 520,
+  bare = false,
+  controls = "top-right",
+  fitPadding = 30,
 }: {
   parcels: CropPlanMapParcel[];
   selected: string[];
@@ -54,7 +59,14 @@ export function CropPlanMap({
   cutting?: string | null;
   onCut?: (key: string, pieces: Polygon[]) => void;
   onError?: (message: string) => void;
-  height?: number;
+  /** Hauteur en pixels, ou « 100% » pour remplir son conteneur (mode plein écran). */
+  height?: number | string;
+  /** Sans cadre ni coins arrondis (plein écran). */
+  bare?: boolean;
+  /** Coin des boutons de zoom (en plein écran, le panneau couvre le haut à droite). */
+  controls?: "top-right" | "bottom-left";
+  /** Marges du cadrage initial (en plein écran, place du panneau et de la légende). */
+  fitPadding?: number | { top: number; right: number; bottom: number; left: number };
 }) {
   const farmId = useFarmId();
   const container = useRef<HTMLDivElement>(null);
@@ -81,20 +93,28 @@ export function CropPlanMap({
             id: "parcels-fill",
             type: "fill",
             source: "parcels",
-            paint: { "fill-color": ["get", "color"], "fill-opacity": ["case", ["get", "planned"], 0.55, 0.12] },
+            paint: { "fill-color": ["case", ["get", "planned"], ["get", "color"], TODO], "fill-opacity": ["case", ["get", "planned"], 0.45, 0.12] },
           },
+          // Sans culture prévue : contour rouge en pointillés ; affectées : contour de la couleur de l'activité.
           {
             id: "parcels-line",
             type: "line",
             source: "parcels",
-            filter: ["!", ["get", "selected"]],
-            paint: { "line-color": ["case", ["get", "planned"], ["get", "color"], NONE], "line-width": 1.5, "line-dasharray": ["case", ["get", "planned"], ["literal", [1, 0]], ["literal", [2, 2]]] },
+            filter: ["all", ["!", ["get", "selected"]], ["get", "planned"]],
+            paint: { "line-color": ["get", "color"], "line-width": 3 },
+          },
+          {
+            id: "parcels-todo",
+            type: "line",
+            source: "parcels",
+            filter: ["all", ["!", ["get", "selected"]], ["!", ["get", "planned"]]],
+            paint: { "line-color": TODO, "line-width": 3, "line-dasharray": [2, 1.5] },
           },
           { id: "parcels-selected", type: "line", source: "parcels", filter: ["get", "selected"], paint: { "line-color": "#FFFFFF", "line-width": 4 } },
         ],
       },
     });
-    m.addControl(new NavigationControl({ showCompass: false }), "top-right");
+    m.addControl(new NavigationControl({ showCompass: false }), controls);
     m.addControl(new ScaleControl({ unit: "metric" }), "bottom-left");
     whenStyleLoaded(m, () => {
       // Outils carto communs : la découpe (ligne tracée) seulement.
@@ -153,7 +173,7 @@ export function CropPlanMap({
       setMap(null);
       m.remove();
     };
-  }, [farmId]);
+  }, [farmId, controls]);
 
   // Découpe : la parcelle seule dans l'éditeur, outil « cut » ; sinon rien.
   useEffect(() => {
@@ -173,6 +193,8 @@ export function CropPlanMap({
   }, [map, cutting]);
 
   const fitted = useRef(false);
+  const fitPaddingRef = useRef(fitPadding);
+  fitPaddingRef.current = fitPadding;
   useEffect(() => {
     if (!map) return;
     (map.getSource("parcels") as GeoJSONSource).setData({
@@ -186,14 +208,14 @@ export function CropPlanMap({
     if (!fitted.current) {
       const b = bounds(parcels);
       if (b) {
-        map.fitBounds(b, { padding: 30, duration: 0 });
+        map.fitBounds(b, { padding: fitPaddingRef.current, duration: 0 });
         fitted.current = true;
       }
     }
   }, [map, parcels, selected]);
 
   return (
-    <Paper withBorder style={{ height, position: "relative", overflow: "hidden" }}>
+    <Paper withBorder={!bare} radius={bare ? 0 : undefined} style={{ height, position: "relative", overflow: "hidden" }}>
       <div ref={container} style={{ position: "absolute", inset: 0 }} data-testid="crop-plan-map" />
       {box && (
         <div

@@ -71,7 +71,7 @@ export type CropPlanHistory = ReadonlyMap<string, Readonly<Record<number, Parcel
 
 export const parcelKeyOf = (landParcelId: string): CropPlanParcelKey => `p:${landParcelId}`;
 
-export const emptyDraft = (year: number): CropPlanDraft => ({ schema: 1, year, operations: [], assignments: [], covers: [], fallow: [] });
+export const emptyDraft = (year: number): CropPlanDraft => ({ schema: 1, year, operations: [], assignments: [], covers: [], fallow: [], excluded: [] });
 
 /** Surface en hectares, à la française (« 12,40 ha »). */
 export function formatHa(m2: number): string {

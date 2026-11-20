@@ -24,11 +24,12 @@ import { activeDuring, CertificationBadges, CertificationRecap, ParcelCertificat
 function CropPlanMenu({ farmId, year, owner }: { farmId: string; year: number; owner: boolean }) {
   const plans = useCropPlans(farmId);
   const state = (y: number) => plans.data?.find((p) => p.year === y);
+  // Campagne déjà saisie (cultures, imports) ou assolement validé : « Modifier » ; sinon « Préparer ».
   const label = (y: number) => {
     const p = state(y);
     if (!p) return owner ? `Préparer l'assolement ${y}` : `Assolement ${y} (pas encore préparé)`;
-    if (p.status === "draft") return `Assolement ${y} : brouillon`;
-    return `Assolement ${y} : validé (version ${p.currentVersion})`;
+    if (p.status === "draft") return owner ? `Reprendre l'assolement ${y} (brouillon)` : `Assolement ${y} : brouillon`;
+    return owner ? `Modifier l'assolement ${y}` : `Voir l'assolement ${y}`;
   };
   return (
     <Menu position="bottom-end">

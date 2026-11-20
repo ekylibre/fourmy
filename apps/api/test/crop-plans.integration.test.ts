@@ -90,7 +90,17 @@ describe.skipIf(!url)("assolement (intégration)", () => {
     expect(plan).toMatchObject({ year: 2027, status: "draft", revision: 0, currentVersion: null, versions: [] });
     expect(plan.draft.assignments).toEqual([]);
     expect((await send("POST", "/crop-plans/2027")).status).toBe(409);
-    expect((await json<{ year: number }[]>(send("GET", "/crop-plans", undefined, worker))).map((p) => p.year)).toEqual([2027]);
+    // Liste : l'assolement 2027, et les campagnes 2026 et 2025 déjà saisies (sans assolement).
+    expect((await json<{ year: number; status: string }[]>(send("GET", "/crop-plans", undefined, worker))).map((p) => [p.year, p.status])).toEqual([
+      [2027, "draft"],
+      [2026, "current"],
+      [2025, "current"],
+    ]);
+    // Campagne 2026 sans assolement : affichée telle quelle (cultures saisies).
+    const current = await json<CropPlanView>(send("GET", "/crop-plans/2026", undefined, worker));
+    expect(current).toMatchObject({ year: 2026, status: "current", currentVersion: null });
+    expect(current.draft.assignments).toHaveLength(3);
+    expect((await send("GET", "/crop-plans/2030", undefined, worker)).status).toBe(404);
     // Autre ferme : rien à voir.
     expect((await app.request(`/api/v1/farms/${other.farmId}/crop-plans/2027`, { headers: other.headers })).status).toBe(404);
   });
@@ -322,5 +332,115 @@ describe.skipIf(!url)("assolement (intégration)", () => {
     expect((await send("POST", "/crop-plans/2028")).status).toBe(201);
     expect((await send("DELETE", "/crop-plans/2028/draft")).status).toBe(204);
     expect((await send("GET", "/crop-plans/2028")).status).toBe(404);
+  });
+});
+
+/**
+ * Lot AS5 : ferme reprise d'Ekylibre, une parcelle par culture et par
+ * campagne (« Braquet Maïs 2025 », « Braquet Maïs 2026 »). L'assolement 2027
+ * propose de reconduire les parcelles 2026 (noms nettoyés), retrouve
+ * l'historique par recoupement géographique, et crée les parcelles 2027.
+ */
+describe.skipIf(!url)("assolement : reconduction d'un parcellaire repris d'Ekylibre (intégration)", () => {
+  const sql = postgres(url!, { max: 1, onnotice: () => {} });
+  let farmId = "";
+  let users: string[] = [];
+  let headers: Record<string, string> = {};
+  let base = "";
+  const maize = crypto.randomUUID();
+  const triticale = crypto.randomUUID();
+  const ids = { b25: crypto.randomUUID(), b26: crypto.randomUUID(), strip26: crypto.randomUUID(), s26: crypto.randomUUID() };
+  const BRAQUET = "MULTIPOLYGON(((0.6 44.8,0.6013 44.8,0.6013 44.8009,0.6 44.8009,0.6 44.8)))";
+  const STRIP = "MULTIPOLYGON(((0.6 44.8,0.6012 44.8,0.6012 44.8008,0.6 44.8008,0.6 44.8)))";
+  const SEDZERE = "MULTIPOLYGON(((0.603 44.8,0.6043 44.8,0.6043 44.8009,0.603 44.8009,0.603 44.8)))";
+
+  beforeAll(async () => {
+    const owner = await setupFarm(sql, "Ferme test reprise Ekylibre");
+    farmId = owner.farmId;
+    headers = owner.headers;
+    users = [owner.userId];
+    base = `/api/v1/farms/${farmId}`;
+    await sql`INSERT INTO lexicon_productions (reference_name, family, specie, label, started_on, stopped_on)
+              VALUES ('fourmy_test_triticale', 'plant_farming', 'x_triticosecale', 'Triticale d''essai', '2000-09-01', '2001-07-31') ON CONFLICT DO NOTHING`;
+    await sql`INSERT INTO activities (id, farm_id, name, family, cap_code, reference) VALUES (${maize}, ${farmId}, 'Maïs', 'plant_farming', 'MIS', NULL), (${triticale}, ${farmId}, 'Triticale', 'plant_farming', 'TTH', 'fourmy_test_triticale')`;
+    const parcels: [string, string, string, string, string][] = [
+      [ids.b25, "Braquet Maïs 2025", BRAQUET, "2024-12-31", "2025-12-30"],
+      [ids.b26, "Braquet Maïs 2026", BRAQUET, "2025-12-31", "2026-12-30"],
+      [ids.strip26, "Braquet bande Maïs 2026", STRIP, "2025-12-31", "2026-12-30"],
+      [ids.s26, "Sedzère Triticale 2026", SEDZERE, "2025-08-31", "2026-12-30"],
+    ];
+    for (const [id, name, shape, from, to] of parcels) {
+      await sql`INSERT INTO land_parcels (id, farm_id, name) VALUES (${id}, ${farmId}, ${name})`;
+      await sql`INSERT INTO land_parcel_versions (id, land_parcel_id, shape, area_m2, valid)
+                VALUES (${crypto.randomUUID()}, ${id}, ST_GeomFromText(${shape}, 4326), ST_Area(ST_GeomFromText(${shape}, 4326)::geography), tstzrange(${from}, ${to}))`;
+    }
+    for (const [year, rows] of [[2025, [[ids.b25, maize]]], [2026, [[ids.b26, maize], [ids.strip26, maize], [ids.s26, triticale]]]] as const) {
+      const campaign = crypto.randomUUID();
+      await sql`INSERT INTO campaigns (id, farm_id, year, starts_on, stops_on) VALUES (${campaign}, ${farmId}, ${year}, make_date(${year}, 1, 1), make_date(${year}, 12, 31))`;
+      for (const [parcel, activity] of rows) {
+        await sql`INSERT INTO productions (id, farm_id, campaign_id, land_parcel_id, nature, activity_id) VALUES (${crypto.randomUUID()}, ${farmId}, ${campaign}, ${parcel}, 'field_crop', ${activity})`;
+      }
+    }
+  });
+  afterAll(async () => {
+    await teardown(sql, farmId, users);
+    await sql`DELETE FROM lexicon_productions WHERE reference_name = 'fourmy_test_triticale'`;
+    await sql.end();
+  });
+
+  const send = (method: string, path: string, body?: unknown) =>
+    app.request(`${base}${path}`, { method, headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  const json = async <T>(res: Response | Promise<Response>) => (await res).json() as Promise<T>;
+
+  it("propose les parcelles 2026 à reconduire, noms nettoyés, bande en double écartée, historique par la carte", async () => {
+    const ctx = await json<CropPlanContext>(send("GET", "/crop-plans/2027/context"));
+    expect(ctx.parcels.map((p) => [p.name, p.carryOver, p.sourceName])).toEqual([
+      ["Braquet", true, "Braquet Maïs 2026"],
+      ["Sedzère", true, "Sedzère Triticale 2026"],
+    ]);
+    // Même nom nettoyé pour deux parcelles distinctes : numérotées (Cazala, Cazala 2).
+    const { carriedName } = await import("../src/repos/crop-plans.js");
+    expect(carriedName("Cazala Triticale 2026", ["Triticale", "Triticale d'hiver"])).toBe("Cazala");
+    expect(carriedName("Monassut Chisné Maïs 2026", ["Maïs", "Maïs grain"])).toBe("Monassut Chisné");
+    expect(carriedName("Le Champ", ["Blé"])).toBe("Le Champ");
+    // Dates types de Lexicon ramenées à la campagne 2027 : semis en 2026, récolte en 2027.
+    expect(ctx.activities.find((a) => a.id === triticale)).toMatchObject({ defaultStartedOn: "2026-09-01", defaultStoppedOn: "2027-07-31" });
+    expect(ctx.activities.find((a) => a.id === maize)).toMatchObject({ defaultStartedOn: null, defaultStoppedOn: null });
+    // 2026 : sa propre culture ; 2025 : celle de « Braquet Maïs 2025 », au même endroit.
+    expect(ctx.history[ids.b26]).toMatchObject({ "2025": { main: "MIS" }, "2026": { main: "MIS" } });
+  });
+
+  it("valide : parcelle 2027 créée à la suite de l'ancienne, l'autre écartée ; découpe d'une parcelle à reconduire refusée", async () => {
+    const plan = await json<CropPlanView>(send("POST", "/crop-plans/2027"));
+    const square = { type: "Polygon", coordinates: [[[0.6, 44.8], [0.60065, 44.8], [0.60065, 44.8009], [0.6, 44.8009], [0.6, 44.8]]] };
+    const withSplit = {
+      ...plan.draft,
+      operations: [{ kind: "split", source: `p:${ids.b26}`, effectiveOn: "2027-01-01", pieces: [{ key: "n:x1", name: "A", shape: square, areaM2: 1 }, { key: "n:x2", name: "B", shape: square, areaM2: 1 }] }],
+    };
+    const s1 = await json<CropPlanView>(send("PUT", "/crop-plans/2027/draft", { revision: plan.revision, draft: withSplit }));
+    const refused = await json<CropPlanValidation>(send("POST", "/crop-plans/2027/validate?dryRun=1", { revision: s1.revision }));
+    expect(refused.blockers.map((b) => b.message).join(" ")).toContain("parcelle reprise de l'an passé");
+
+    const draft = {
+      ...plan.draft,
+      assignments: [{ id: "a1", key: `p:${ids.b26}`, role: "main", activityId: triticale, startedOn: "2026-10-20", stoppedOn: null }],
+      excluded: [`p:${ids.s26}`],
+    };
+    const s2 = await json<CropPlanView>(send("PUT", "/crop-plans/2027/draft", { revision: s1.revision, draft }));
+    const done = await json<CropPlanValidation>(send("POST", "/crop-plans/2027/validate", { revision: s2.revision }));
+    expect(done.blockers).toEqual([]);
+    expect(done.changes.map((c) => c.kind)).toEqual(["campaign.create", "parcel.carry", "production.create"]);
+    const created = await sql`SELECT lp.id, lp.name, lower(v.valid)::date::text AS from_day, upper(v.valid) AS until
+                              FROM land_parcels lp JOIN land_parcel_versions v ON v.land_parcel_id = lp.id WHERE lp.farm_id = ${farmId} AND lp.name = 'Braquet'`;
+    expect(created).toEqual([{ id: expect.any(String), name: "Braquet", from_day: "2026-12-30", until: null }]);
+    const [lineage] = await sql`SELECT parent_id, kind FROM land_parcel_lineage WHERE child_id = ${created[0]!.id}`;
+    expect(lineage).toEqual({ parent_id: ids.b26, kind: "carry" });
+    const [prod] = await sql`SELECT p.activity_id FROM productions p JOIN campaigns c ON c.id = p.campaign_id WHERE c.year = 2027 AND p.land_parcel_id = ${created[0]!.id}`;
+    expect(prod!.activity_id).toBe(triticale);
+
+    // 2028 : « Braquet » est la parcelle en cours ; historique 2025 à 2027.
+    const ctx = await json<CropPlanContext>(send("GET", "/crop-plans/2028/context"));
+    expect(ctx.parcels.map((p) => [p.name, !!p.carryOver])).toEqual([["Braquet", false]]);
+    expect(ctx.history[created[0]!.id as string]).toMatchObject({ "2025": { main: "MIS" }, "2026": { main: "MIS" }, "2027": { main: "TTH" } });
   });
 });

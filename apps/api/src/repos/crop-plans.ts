@@ -19,7 +19,7 @@ import {
 } from "@fourmy/contracts";
 import { checkCropPlan, cropPlanCheckInput, diffCropPlan, emptyDraft, operationBlockers, parcelKeyOf, resolveParcels, type ExistingCover, type ExistingProduction } from "@fourmy/domain";
 import { Conflict, NotFound } from "../routes/helpers.js";
-import { natureOf } from "./activities.js";
+import { natureOf, pictureUrl } from "./activities.js";
 import { getCertificationSettings } from "./certification-controls.js";
 
 /**
@@ -70,19 +70,72 @@ export async function putCropPlanSettings(db: Database, farmId: string, body: Cr
 // --- Contexte des contrôles (§4.1) ------------------------------------------------
 
 /** Parcellaire de la campagne : chaque parcelle dans sa dernière version qui recouvre l'année. */
+type BaseParcelRow = { id: string; name: string; area_m2: number; shape: string; valid_from: string; last_stopped_on: string | null; carry: boolean; activities: string[] | null };
+
+/**
+ * Nom d'une parcelle reconduite : sans l'année ni la culture finales que les
+ * reprises d'Ekylibre y ajoutent (« Braquet Maïs 2026 » → « Braquet »).
+ */
+export function carriedName(name: string, activityNames: string[]): string {
+  let out = name.trim().replace(/\s+\d{4}$/, "");
+  for (const a of [...activityNames].sort((x, y) => y.length - x.length)) {
+    const suffix = ` ${a.trim()}`;
+    if (a.trim() && out.toLowerCase().endsWith(suffix.toLowerCase())) {
+      out = out.slice(0, -suffix.length);
+      break;
+    }
+  }
+  return out.trim() || name.trim();
+}
+
+/**
+ * Parcellaire de départ de la campagne (§3.3) : les parcelles valides pendant
+ * l'année, plus celles de l'an passé closes en décembre (fin de campagne) et
+ * que rien ne remplace, proposées à la reconduction (lot AS5 : fermes
+ * reprises d'Ekylibre, une parcelle par culture et par campagne). Deux
+ * parcelles de l'an passé qui se recouvrent (90 %) : la plus grande seule.
+ */
 async function baseParcels(tx: Tx, year: number) {
-  return rows<{ id: string; name: string; area_m2: number; shape: string; valid_from: string; last_stopped_on: string | null }>(
+  const list = await rows<BaseParcelRow>(
     tx,
-    sql`SELECT lp.id, lp.name, v.area_m2::float8 AS area_m2, ST_AsGeoJSON(v.shape) AS shape, v.valid_from,
+    sql`WITH cur AS (
+          SELECT lp.id, lp.name, v.area_m2, v.shape, (lower(v.valid) AT TIME ZONE 'Europe/Paris')::date::text AS valid_from, false AS carry
+          FROM land_parcels lp
+          JOIN LATERAL (
+            SELECT v.area_m2, v.shape, v.valid FROM land_parcel_versions v
+            WHERE v.land_parcel_id = lp.id AND v.valid && tstzrange(make_date(${year}, 1, 1)::timestamptz, make_date(${year + 1}, 1, 1)::timestamptz)
+            ORDER BY upper(v.valid) DESC NULLS FIRST LIMIT 1) v ON true),
+        prev AS (
+          SELECT lp.id, lp.name, v.area_m2, v.shape, (lower(v.valid) AT TIME ZONE 'Europe/Paris')::date::text AS valid_from, true AS carry
+          FROM land_parcels lp
+          JOIN LATERAL (
+            SELECT v.area_m2, v.shape, v.valid FROM land_parcel_versions v WHERE v.land_parcel_id = lp.id
+            ORDER BY upper(v.valid) DESC NULLS FIRST LIMIT 1) v ON true
+          WHERE upper(v.valid) > make_date(${year - 1}, 12, 1)::timestamptz AND upper(v.valid) <= make_date(${year}, 1, 2)::timestamptz
+            AND NOT EXISTS (SELECT 1 FROM cur WHERE ST_Intersects(cur.shape, v.shape)
+                            AND ST_Area(ST_Intersection(cur.shape, v.shape)::geography) >= 0.9 * least(ST_Area(cur.shape::geography), ST_Area(v.shape::geography)))),
+        prev_kept AS (
+          SELECT p.* FROM prev p
+          WHERE NOT EXISTS (SELECT 1 FROM prev q WHERE q.id <> p.id AND (q.area_m2, q.id::text) > (p.area_m2, p.id::text) AND ST_Intersects(q.shape, p.shape)
+                            AND ST_Area(ST_Intersection(q.shape, p.shape)::geography) >= 0.9 * ST_Area(p.shape::geography)))
+        SELECT b.id, b.name, b.area_m2::float8 AS area_m2, ST_AsGeoJSON(b.shape) AS shape, b.valid_from, b.carry,
                (SELECT max(p.stopped_on)::text FROM productions p JOIN campaigns c ON c.id = p.campaign_id
-                WHERE p.land_parcel_id = lp.id AND c.year < ${year}) AS last_stopped_on
-        FROM land_parcels lp
-        JOIN LATERAL (
-          SELECT v.area_m2, v.shape, (lower(v.valid) AT TIME ZONE 'Europe/Paris')::date::text AS valid_from FROM land_parcel_versions v
-          WHERE v.land_parcel_id = lp.id AND v.valid && tstzrange(make_date(${year}, 1, 1)::timestamptz, make_date(${year + 1}, 1, 1)::timestamptz)
-          ORDER BY upper(v.valid) DESC NULLS FIRST LIMIT 1) v ON true
-        ORDER BY lp.name`,
+                WHERE p.land_parcel_id = b.id AND c.year < ${year}) AS last_stopped_on,
+               (SELECT array_agg(DISTINCT x) FROM (SELECT a.name AS x FROM productions p JOIN activities a ON a.id = p.activity_id WHERE p.land_parcel_id = b.id
+                                                   UNION SELECT lx.label FROM productions p JOIN activities a ON a.id = p.activity_id
+                                                   JOIN lexicon_productions lx ON lx.reference_name = a.reference WHERE p.land_parcel_id = b.id) n) AS activities
+        FROM (SELECT * FROM cur UNION ALL SELECT * FROM prev_kept) b`,
   );
+  const out = list.map((r) => (r.carry ? { ...r, source_name: r.name, name: carriedName(r.name, r.activities ?? []) } : { ...r, source_name: r.name }));
+  // Deux parcelles reprises au même nom nettoyé (« Cazala Maïs », « Cazala Triticale ») : numérotées, la plus grande d'abord.
+  const taken = new Set(out.filter((r) => !r.carry).map((r) => r.name));
+  for (const r of [...out].filter((x) => x.carry).sort((a, b) => b.area_m2 - a.area_m2)) {
+    let name = r.name;
+    for (let n = 2; taken.has(name); n++) name = `${r.name} ${n}`;
+    r.name = name;
+    taken.add(name);
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name, "fr"));
 }
 
 async function contextActivities(tx: Tx, year: number): Promise<CropPlanContext["activities"]> {
@@ -96,11 +149,18 @@ async function contextActivities(tx: Tx, year: number): Promise<CropPlanContext[
     life_years: number | null;
     usage: string | null;
     legume: boolean;
+    picture: string | null;
+    default_started_on: string | null;
+    default_stopped_on: string | null;
   }>(
     tx,
     sql`SELECT a.id, a.name, a.family, a.color, ${activityCapCode(year)} AS cap_code,
                coalesce(a.cultivation, lx.specie) AS species, lx.life_years::float8 AS life_years, lx.usage,
-               ${legumeOf(sql`coalesce(a.cultivation, lx.specie)`)} AS legume
+               ${legumeOf(sql`coalesce(a.cultivation, lx.specie)`)} AS legume,
+               fourmy_activity_picture(coalesce(a.cultivation, lx.specie), a.family, a.reference) AS picture,
+               -- Dates types de Lexicon (2000/2001) ramenées à la campagne : la récolte tombe l'année de la campagne.
+               (lx.started_on + make_interval(years => ${year} - extract(year FROM lx.stopped_on)::int))::date::text AS default_started_on,
+               (lx.stopped_on + make_interval(years => ${year} - extract(year FROM lx.stopped_on)::int))::date::text AS default_stopped_on
         FROM activities a LEFT JOIN lexicon_productions lx ON lx.reference_name = a.reference
         ORDER BY a.suspended, a.family, a.name`,
   );
@@ -116,6 +176,9 @@ async function contextActivities(tx: Tx, year: number): Promise<CropPlanContext[
       cycle: cycleFromLexicon(a.life_years, a.usage) as CropCycle,
       legume: a.legume,
       vegetable: a.usage === "vegetable",
+      pictureUrl: pictureUrl(a.picture),
+      defaultStartedOn: a.default_started_on,
+      defaultStoppedOn: a.default_stopped_on,
     }));
 }
 
@@ -233,11 +296,46 @@ async function parcelZones(tx: Tx, year: number): Promise<CropPlanContext["zones
   return out;
 }
 
+/**
+ * Historique par recoupement géographique (lot AS5) : pour une année sans
+ * culture connue sur la parcelle (ni par filiation), la culture de la parcelle
+ * de la ferme qui en recouvre au moins la moitié cette année-là. Les reprises
+ * d'Ekylibre créent une parcelle par culture et par campagne : sans cela,
+ * l'historique s'arrête à un an.
+ */
+async function geometricHistory(tx: Tx, ids: string[], year: number, known: CropPlanContext["history"]): Promise<CropPlanContext["history"]> {
+  if (!ids.length) return known;
+  const matches = await rows<{ id: string; year: number; other: string }>(
+    tx,
+    sql`WITH base AS (
+          SELECT lp.id, v.shape, ST_Area(v.shape::geography) AS area FROM land_parcels lp
+          JOIN LATERAL (SELECT v.shape FROM land_parcel_versions v WHERE v.land_parcel_id = lp.id ORDER BY upper(v.valid) DESC NULLS FIRST LIMIT 1) v ON true
+          WHERE lp.id = ANY(${uuids(ids)}))
+        SELECT DISTINCT ON (b.id, c.year) b.id, c.year, p.land_parcel_id AS other
+        FROM base b
+        JOIN land_parcel_versions ov ON ov.land_parcel_id <> b.id AND ST_Intersects(ov.shape, b.shape)
+        JOIN productions p ON p.land_parcel_id = ov.land_parcel_id
+        JOIN campaigns c ON c.id = p.campaign_id AND c.year >= ${year - HISTORY_YEARS} AND c.year < ${year}
+          AND ov.valid && tstzrange(make_date(c.year, 1, 1)::timestamptz, make_date(c.year + 1, 1, 1)::timestamptz)
+        WHERE ST_Area(ST_Intersection(ov.shape, b.shape)::geography) >= 0.5 * b.area
+        ORDER BY b.id, c.year, ST_Area(ST_Intersection(ov.shape, b.shape)::geography) DESC`,
+  );
+  const wanted = matches.filter((m) => !known[m.id]?.[String(m.year)]);
+  if (!wanted.length) return known;
+  const others = await history(tx, [...new Set(wanted.map((m) => m.other))], year);
+  const out = { ...known };
+  for (const m of wanted) {
+    const crop = others[m.other]?.[String(m.year)];
+    if (crop) out[m.id] = { ...(out[m.id] ?? {}), [String(m.year)]: crop };
+  }
+  return out;
+}
+
 async function loadContext(tx: Tx, year: number, abRotation: CropPlanContext["certification"]["abRotation"]): Promise<CropPlanContext> {
   const parcels = await baseParcels(tx, year);
   const ids = parcels.map((p) => p.id);
   const activities = await contextActivities(tx, year);
-  const hist = await inheritedHistory(tx, ids, year, await history(tx, ids, year));
+  const hist = await geometricHistory(tx, ids, year, await inheritedHistory(tx, ids, year, await history(tx, ids, year)));
   const previous = await rows<{ activity_id: string; m2: number }>(
       tx,
       sql`SELECT p.activity_id, sum(v.area_m2)::float8 AS m2
@@ -265,6 +363,7 @@ async function loadContext(tx: Tx, year: number, abRotation: CropPlanContext["ce
       shape: JSON.parse(p.shape) as unknown,
       validFrom: p.valid_from,
       lastStoppedOn: p.last_stopped_on,
+      ...(p.carry ? { carryOver: true, sourceName: p.source_name } : {}),
     })),
     activities,
     history: hist,
@@ -372,7 +471,7 @@ async function liveDraft(tx: Tx, year: number): Promise<CropPlanDraft> {
 type PlanRow = {
   id: string;
   year: number;
-  status: "draft" | "validated";
+  status: "draft" | "validated" | "current";
   draft: CropPlanDraft | null;
   revision: number;
   current_version: number | null;
@@ -403,9 +502,18 @@ async function view(tx: Tx, p: PlanRow): Promise<CropPlanView> {
   };
 }
 
+/** Assolements, et campagnes qui ont déjà des cultures sans assolement (« current »). */
 export async function listCropPlans(db: Database, farmId: string): Promise<CropPlanListItem[]> {
   return withFarm(db, farmId, async (tx) => {
-    const list = await rows<PlanRow>(tx, sql`SELECT year, status, current_version, updated_at::text FROM crop_plans ORDER BY year DESC`);
+    const list = await rows<{ year: number; status: CropPlanListItem["status"]; current_version: number | null; updated_at: string }>(
+      tx,
+      sql`SELECT year, status, current_version, updated_at::text FROM crop_plans
+          UNION ALL
+          SELECT c.year, 'current', NULL, max(p.updated_at)::text FROM campaigns c JOIN productions p ON p.campaign_id = c.id
+          WHERE p.activity_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM crop_plans cp WHERE cp.year = c.year)
+          GROUP BY c.year
+          ORDER BY year DESC`,
+    );
     return list.map((p) => ({ year: p.year, status: p.status, currentVersion: p.current_version, updatedAt: p.updated_at }));
   });
 }
@@ -413,8 +521,11 @@ export async function listCropPlans(db: Database, farmId: string): Promise<CropP
 export async function getCropPlan(db: Database, farmId: string, year: number): Promise<CropPlanView> {
   return withFarm(db, farmId, async (tx) => {
     const p = await planRow(tx, year);
-    if (!p) throw new NotFound(`Pas d'assolement ${year}`);
-    return view(tx, p);
+    if (p) return view(tx, p);
+    // Pas d'assolement, mais des cultures saisies ou importées : affichées telles quelles.
+    const draft = await liveDraft(tx, year);
+    if (!draft.assignments.length) throw new NotFound(`Pas d'assolement ${year}`);
+    return { year, status: "current", revision: 0, draft, currentVersion: null, versions: [], updatedAt: new Date().toISOString() };
   });
 }
 
@@ -503,7 +614,8 @@ export async function validateCropPlan(
     const resolved = resolveParcels(context.parcels, draft);
     const campaign = await campaignOf(tx, year);
     const existing = campaign ? await existingProductions(tx, year) : [];
-    const { changes, blockers } = diffCropPlan(draft, resolved, existing, { campaignExists: !!campaign }, await existingCovers(tx, year));
+    const carryOver = new Map(context.parcels.filter((p) => p.carryOver).map((p) => [p.id, { name: p.name, sourceName: p.sourceName ?? p.name }]));
+    const { changes, blockers } = diffCropPlan(draft, resolved, existing, { campaignExists: !!campaign, carryOver }, await existingCovers(tx, year));
     const activityIds = new Set(context.activities.map((a) => a.id));
     const unknownActivities = draft.assignments.filter((a) => !activityIds.has(a.activityId));
     if (unknownActivities.length) {
@@ -620,8 +732,25 @@ async function applyOperation(tx: Tx, farmId: string, planId: string, sources: s
 }
 
 async function applyChanges(tx: Tx, farmId: string, year: number, changes: CropPlanChange[], draft: CropPlanDraft, planId: string): Promise<CropPlanDraft> {
-  // Découpes et fusions d'abord : les productions des morceaux en dépendent.
   const keyMap = new Map<string, string>();
+  // Reconduction (lot AS5) : une parcelle par parcelle de l'an passé gardée, au nom nettoyé,
+  // valide à partir de la fin de l'ancienne ; filiation « carry ».
+  for (const c of changes) {
+    if (c.kind !== "parcel.carry") continue;
+    const parentId = c.key.slice(2);
+    const id = crypto.randomUUID();
+    keyMap.set(c.key, id);
+    await tx.execute(sql`INSERT INTO land_parcels (id, farm_id, name) VALUES (${id}, ${farmId}, ${c.name})`);
+    await tx.execute(sql`INSERT INTO land_parcel_versions (id, land_parcel_id, shape, area_m2, pac_islet, viti, valid)
+      SELECT ${crypto.randomUUID()}, ${id}, v.shape, v.area_m2, v.pac_islet, v.viti, tstzrange(upper(v.valid), NULL)
+      FROM land_parcel_versions v WHERE v.land_parcel_id = ${parentId} ORDER BY upper(v.valid) DESC NULLS FIRST LIMIT 1`);
+    await tx.execute(sql`INSERT INTO land_parcel_lineage (child_id, parent_id, farm_id, kind, effective_at, share, plan_id)
+      SELECT ${id}, ${parentId}, ${farmId}, 'carry', lower(valid), 1, ${planId} FROM land_parcel_versions WHERE land_parcel_id = ${id}`);
+    await tx.execute(sql`INSERT INTO parcel_certifications (id, farm_id, land_parcel_id, kind, level, label, certifier, reference, started_on, stopped_on)
+      SELECT gen_random_uuid(), farm_id, ${id}, kind, level, label, certifier, reference, started_on, stopped_on
+      FROM parcel_certifications WHERE land_parcel_id = ${parentId} AND (stopped_on IS NULL OR stopped_on >= make_date(${year}, 1, 1))`);
+  }
+  // Découpes et fusions ensuite : les productions des morceaux en dépendent.
   for (const op of draft.operations) {
     if (op.kind === "split") await applyOperation(tx, farmId, planId, [op.source], op.pieces, op.effectiveOn, "split", keyMap);
     else await applyOperation(tx, farmId, planId, op.sources, [op.result], op.effectiveOn, "merge", keyMap);

@@ -1,0 +1,162 @@
+/*
+ * Mode plein écran de l'assolement (retours du 20/11) : la carte occupe tout
+ * l'écran, sous une barre de commande couleur nuit ; outils, panneau et
+ * feuille d'affectation flottent dessus (charte Lyvre).
+ */
+.cp-workspace {
+  position: fixed;
+  inset: 0;
+  z-index: 150; /* au-dessus de la coquille (100), sous les fenêtres (200) et listes (300) */
+  display: flex;
+  flex-direction: column;
+  background: var(--lv-paper);
+}
+
+.cp-workspace__bar {
+  flex: none;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px 0 8px;
+  background: var(--lv-night);
+  color: var(--lv-on-night);
+}
+
+.cp-workspace__title {
+  margin: 0;
+  font-family: "Bricolage Grotesque", "IBM Plex Sans", system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 22px;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--lv-on-night);
+}
+
+.cp-workspace .cp-on-night {
+  color: var(--lv-on-night);
+}
+.cp-workspace .cp-on-night:disabled {
+  color: color-mix(in srgb, var(--lv-on-night) 35%, transparent);
+  background: transparent;
+}
+.cp-workspace .cp-muted {
+  opacity: 0.72;
+}
+.cp-workspace .cp-alert {
+  color: #f3b19f;
+}
+
+.cp-workspace__body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Outils de découpe et de fusion : en haut, au centre de l'espace libre à gauche du panneau. */
+.cp-workspace {
+  --cp-panel: 470px;
+}
+.cp-workspace__tools {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+}
+.cp-workspace__tools[data-panel="true"] {
+  left: calc((100% - var(--cp-panel) - 60px) / 2);
+}
+
+.cp-workspace__notices {
+  position: absolute;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  width: min(620px, calc(100% - 24px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Panneau de droite, repliable : Parcelles, Récapitulatif, Contrôles… */
+.cp-workspace__panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 4;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  pointer-events: none;
+}
+.cp-workspace__panel > * {
+  pointer-events: auto;
+}
+.cp-workspace__panel-toggle {
+  box-shadow: var(--lv-shadow-float);
+}
+.cp-workspace__panel-body {
+  width: min(var(--cp-panel), calc(100vw - 80px));
+  max-height: 100%;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Feuille d'affectation : monte du bas dès qu'une parcelle est choisie. */
+.cp-workspace__sheet {
+  position: absolute;
+  bottom: 16px;
+  left: 64px; /* boutons de zoom en bas à gauche */
+  right: 64px;
+  z-index: 3;
+  max-width: 980px;
+  animation: cp-sheet-in 160ms ease-out;
+}
+.cp-workspace__sheet[data-panel="true"] {
+  right: calc(12px + var(--cp-panel) + 8px + 40px);
+}
+
+@keyframes cp-sheet-in {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-workspace__sheet {
+    animation: none;
+  }
+}
+
+/* Écrans étroits : le panneau passe par-dessus, la feuille prend la largeur. */
+.cp-workspace__notices[data-panel="true"] {
+  left: calc((100% - var(--cp-panel) - 60px) / 2);
+  width: min(560px, calc(100% - var(--cp-panel) - 100px));
+}
+
+@media (max-width: 900px) {
+  .cp-workspace__tools[data-panel="true"],
+  .cp-workspace__notices[data-panel="true"] {
+    left: 50%;
+    width: auto;
+  }
+  .cp-workspace__sheet,
+  .cp-workspace__sheet[data-panel="true"] {
+    left: 12px;
+    right: 12px;
+  }
+  .cp-workspace__title {
+    font-size: 18px;
+  }
+}

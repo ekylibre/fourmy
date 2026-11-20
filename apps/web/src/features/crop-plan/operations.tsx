@@ -59,6 +59,7 @@ export function ParcelTools({
   onSelect,
   notice,
   onNotice,
+  compact = false,
 }: {
   editor: CropPlanEditor;
   context: CropPlanContext;
@@ -69,6 +70,8 @@ export function ParcelTools({
   onSelect: (keys: CropPlanParcelKey[]) => void;
   notice: string | null;
   onNotice: (message: string | null) => void;
+  /** Plein écran : consigne courte, sauf pendant une découpe. */
+  compact?: boolean;
 }) {
   const one = selected.length === 1 ? selected[0]! : null;
   const cuttable = one && polygons(shapes.get(one)).length === 1;
@@ -88,7 +91,9 @@ export function ParcelTools({
         <Text size="xs" c="dimmed">
           {cutting
             ? "Tracez une ligne qui commence et finit hors de la parcelle ; double-cliquez pour finir."
-            : "Clic : choisir ou retirer une parcelle · Maj + glisser : plusieurs parcelles."}
+            : compact
+              ? "Maj + glisser : plusieurs parcelles"
+              : "Clic : choisir ou retirer une parcelle · Maj + glisser : plusieurs parcelles."}
         </Text>
         <Group gap="xs">
           {cutting ? (
