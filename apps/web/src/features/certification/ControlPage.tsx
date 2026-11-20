@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { Alert, Button, Group, Paper, Select, Stack, Tabs, Text, Title } from "@mantine/core";
-import { Settings } from "lucide-react";
+import { Download, Settings } from "lucide-react";
+import { notifications } from "@mantine/notifications";
+import { useQueryClient } from "@tanstack/react-query";
+import { api, farmPath } from "../../app/api";
 import { ControlSettingsModal } from "./ControlSettings";
 import { useParams } from "react-router";
 import { CONTROL_KIND_LABELS, type ControlKind } from "@fourmy/contracts";
@@ -28,6 +31,26 @@ export function ControlPage() {
   const report = useControlReport(farm.id, kind, campaign);
   const [tab, setTab] = useState<string>("rules");
   const [settings, setSettings] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const client = useQueryClient();
+  // Registre AB ou liasse HVE (zip) : l'export est enregistré sur le calcul.
+  const exportZip = async () => {
+    setExporting(true);
+    try {
+      const blob = await api.download(farmPath(farm.id, `/control/${kind}/export?campaign=${campaign}`));
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${kind === "ab" ? "registre-ab" : "liasse-hve"}-${campaign}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      void client.invalidateQueries({ queryKey: ["certifications", "report"] });
+    } catch (e) {
+      notifications.show({ color: "brique", title: "Export impossible", message: String(e) });
+    } finally {
+      setExporting(false);
+    }
+  };
   const thisYear = new Date().getFullYear();
   const years = Array.from({ length: thisYear + 2 - 2015 }, (_, i) => String(thisYear + 1 - i));
   const fmt = (d: string) => new Date(d).toLocaleDateString("fr-FR");
@@ -38,9 +61,14 @@ export function ControlPage() {
         <Title order={1}>Contrôle {kind === "hve" ? "HVE" : "AB"}</Title>
         <Group align="flex-end">
           {farm.role === "owner" && (
-            <Button variant="default" leftSection={<Settings size={16} />} onClick={() => setSettings(true)}>
-              Réglages
-            </Button>
+            <>
+              <Button variant="default" leftSection={<Settings size={16} />} onClick={() => setSettings(true)}>
+                Réglages
+              </Button>
+              <Button leftSection={<Download size={16} />} loading={exporting} onClick={() => void exportZip()}>
+                {kind === "ab" ? "Exporter le registre AB" : "Exporter la liasse HVE"}
+              </Button>
+            </>
           )}
           <Select label="Campagne" data={years} value={String(campaign)} onChange={(v) => v && setCampaign(Number(v))} w={120} allowDeselect={false} />
         </Group>
@@ -81,6 +109,7 @@ export function ControlPage() {
                 </Text>
                 <Text size="xs" c="dimmed">
                   Calculé le {new Date(report.data.computedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}, référentiels {report.data.refsVersion}.
+                  {report.data.exportedAt && ` Dernier export le ${new Date(report.data.exportedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}.`}
                 </Text>
               </div>
               <ControlLight level={report.data.verdict} />
