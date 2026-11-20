@@ -45,6 +45,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | [`docs/equipe-personnes-design.md`](docs/equipe-personnes-design.md) | Équipe et personnes : fiche personne, données personnelles, rôle lecture seule, temps de travaux, invitations, import Ekylibre, synchro mobile |
 | [`docs/routage-osrm.md`](docs/routage-osrm.md) | Routage tracteur (OSRM auto-hébergé) : trajets du rejeu recalés sur la route |
 | [`docs/imports.md`](docs/imports.md) · [`claudedocs/conception_import_onboarding.md`](claudedocs/conception_import_onboarding.md) | Imports DAPLOS, Geofolia et TelePAC, assistant de premier démarrage : besoins, conception, plan (lots IM1 à IM7) et état |
+| [`docs/controles-hve-ab.md`](docs/controles-hve-ab.md) · [`claudedocs/conception_controle_hve_ab.md`](claudedocs/conception_controle_hve_ab.md) | Contrôles HVE (niveau 3) et Agriculture biologique : ce qui est contrôlé, où, exports ; besoins, conception, plan (lots CT1 à CT6) et état |
 | [`docs/specifications-metier.md`](docs/specifications-metier.md) | Spécification métier : toutes les règles de gestion (RG-…), par domaine |
 | [`claudedocs/besoins_ma_ferme.md`](claudedocs/besoins_ma_ferme.md) · [`claudedocs/conception_ma_ferme.md`](claudedocs/conception_ma_ferme.md) | « Ma ferme » : fiche de l'exploitation, sites, cache IGN sur le serveur, copie hors ligne dans le navigateur |
 | [`claudedocs/besoins_itineraires_techniques.md`](claudedocs/besoins_itineraires_techniques.md) · [`claudedocs/conception_itineraires_techniques.md`](claudedocs/conception_itineraires_techniques.md) | Itinéraires techniques d'une parcelle et d'une activité (TIKA, fork `ekylibre/itineraire-technique` et reversement à OSFarm) |
@@ -52,7 +53,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | [`claudedocs/besoins_navigation_compte.md`](claudedocs/besoins_navigation_compte.md) | Navigation : menu du compte, onglets Équipe et Préférences de « Ma ferme », version en pied de menu |
 | [`claudedocs/points_ouverts.md`](claudedocs/points_ouverts.md) | Points ouverts, par thème et priorité (alimente la roadmap GitHub) |
 
-## État du projet (2026-11-16)
+## État du projet (2026-11-20)
 
 | Étape | État |
 |---|---|
@@ -85,11 +86,13 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | « Ma ferme » (lots F1 à F5, 13/11) | ✅ fiche de l'exploitation (identité, certifications, logo, reprise Ekylibre), sites géocodés, réglages regroupés, cache IGN sur le serveur (fonds, relief, bâtiments) préchargé par le worker, copie hors ligne dans le navigateur (`claudedocs/conception_ma_ferme.md`) |
 | Itinéraires techniques (lots T0 à T3, 13/11) | ✅ frise TIKA d'une parcelle (campagne ou rotation) et d'une activité (vue fusionnée, groupes, descente sur une parcelle) ; fork TIKA `v1.3.0-ekylibre.3`, reversement à OSFarm à faire (`claudedocs/conception_itineraires_techniques.md`) |
 | Navigation et compte (13/11) | ✅ menu du compte en haut à droite (profil, ferme, mot de passe, déconnexion), équipe et préférences dans « Ma ferme », version en pied de menu (`claudedocs/besoins_navigation_compte.md`) |
+| Imports et assistant (lots IM1 à IM6, 17-19/11) | ✅ DAPLOS, Geofolia et TelePAC de bout en bout, historique N-1 à N-5, annulation d'un import, assistant de premier démarrage et reprise d'une sauvegarde Ekylibre ; recette avec l'exploitant testeur à faire (IM7) (`docs/imports.md`) |
+| Contrôles HVE et AB (lots CT1 à CT6a, 19-20/11) | 🟡 menu Réglementaire selon les certifications ; HVE niveau 3 (quatre indicateurs, IAE, questionnaire, IFT certifié) ; AB (règles R1 à R34, conversion déduite, cuivre, annexe II consolidée au 01/01/2026, semences, rotation) ; feux à la saisie ; registre AB et liasse HVE. Reste l'export de la grille HVE officielle remplie, qui attend une grille de référence remplie à la main (`docs/controles-hve-ab.md`) |
 | Migration réelle et recette | ✅ trois fermes reprises (08/11) ; recettes des 11 et 12/11 sur la ferme pilote de grandes cultures (`claudedocs/plan_de_test_global.md`), spécification métier (`docs/specifications-metier.md`) |
 
 ### À reprendre
 
-La liste complète des points ouverts (114 au 16/11/2026, par thème et par
+La liste complète des points ouverts (118 au 20/11/2026, par thème et par
 priorité) est dans `claudedocs/points_ouverts.md` ; elle alimente la
 roadmap du projet GitHub [Fourmy — Roadmap](https://github.com/orgs/ekylibre/projects/2)
 (issues pour P1 et P2, brouillons pour P3). Avant l'envoi à la ferme pilote : sauvegardes,

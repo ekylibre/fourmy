@@ -241,6 +241,23 @@ tableau de bord (US-3) ; contenu du registre AB.
 **Fini quand** : US-3 passe ; la grille exportée s'ouvre dans Excel et
 LibreOffice et donne les mêmes points que Fourmy.
 
+## État au 20/11/2026
+
+| Lot | PR | État |
+|---|---|---|
+| CT1 | #87 | ✅ |
+| CT2 | #88 | ✅ |
+| CT3a, CT3b, CT3c | #89, #90, #91 | ✅ |
+| CT4a, CT4b | #92, #93 | ✅ |
+| CT5a, CT5b | #94, #95 | ✅ |
+| CT6a | #96 | ✅ |
+| 6.7 calculé, P4 (2021/1165 consolidé) | #98, #99 | ✅ |
+| CT6b | — | ⏳ attend P2 (choix du 20/11 : classeur embarqué) |
+
+Prérequis : P1 ✅ ; P2 ⏳ (grille de référence, point 119) ; P3 ⏳
+(organisme certificateur, point 120) ; P4 ✅ (PR #99). Mode d'emploi :
+`docs/controles-hve-ab.md`.
+
 ## Ordonnancement
 
 ```mermaid

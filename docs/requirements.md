@@ -238,6 +238,10 @@ conception : [`teledetection-design.md`](teledetection-design.md).
   minéraux, pilotage, carte de modulation d'un apport, justificatifs joints,
   saisies à compléter, éditions.*
 - **FR-REG-4 (S)** Indicateurs HVE (repris de `ekylibre-hve`).
+  *Réalisé le 2026-11-20 : contrôle HVE niveau 3 (quatre indicateurs,
+  questionnaire annuel, liasse d'audit) et contrôle Agriculture biologique
+  (règles R1 à R34, registre AB) ; reste l'export de la grille officielle
+  remplie (`docs/controles-hve-ab.md`).*
 
 ### 4.11 Migration depuis Ekylibre
 - **FR-MIG-1 (M)** Importer une instance Ekylibre existante : parcellaire
