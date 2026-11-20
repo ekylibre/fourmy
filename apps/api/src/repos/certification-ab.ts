@@ -2,7 +2,16 @@ import { sql } from "drizzle-orm";
 import type { Tx } from "@fourmy/db";
 import type { FertilizerArticle } from "@fourmy/contracts";
 import { copperOfAmm, cycleFromLexicon, type CropCycle } from "@fourmy/certification-refs";
-import { splitUnit, unitScale, type AbApplication, type AbParcelInput, type AbProduction, type ParcelCertificationRef } from "@fourmy/domain";
+import {
+  splitUnit,
+  unitScale,
+  type AbApplication,
+  type AbEquipmentEvent,
+  type AbParcelInput,
+  type AbProduction,
+  type AbRotationYear,
+  type ParcelCertificationRef,
+} from "@fourmy/domain";
 import { nitrogen } from "./fertilization-record.js";
 import { fertilizersInTx } from "./fertilizers.js";
 
@@ -307,4 +316,108 @@ export async function nonAbProductions(tx: Tx, abParcelIds: string[], campaign: 
         WHERE ${abParcelIds.length ? sql`p.land_parcel_id <> ALL(${uuids(abParcelIds)})` : sql`true`}`,
   );
   return list.flatMap((r) => (r.specie ? [{ species: r.specie, label: r.label, variety: r.variety }] : []));
+}
+
+// --- Lot CT5b : matériel à usage mixte, rotation ------------------------------------------
+
+/** Certifications AB de toutes les parcelles (toutes dates), pour dire si un usage était en AB. */
+async function organicSpans(tx: Tx): Promise<Map<string, { from: string; to: string | null }[]>> {
+  const list = await rows<{ land_parcel_id: string; started_on: string; stopped_on: string | null }>(
+    tx,
+    sql`SELECT land_parcel_id, started_on::text, stopped_on::text FROM parcel_certifications WHERE kind = 'organic'`,
+  );
+  const out = new Map<string, { from: string; to: string | null }[]>();
+  for (const c of list) out.set(c.land_parcel_id, [...(out.get(c.land_parcel_id) ?? []), { from: c.started_on, to: c.stopped_on }]);
+  return out;
+}
+const isOrganic = (spans: Map<string, { from: string; to: string | null }[]>, parcelId: string, day: string) =>
+  (spans.get(parcelId) ?? []).some((s) => s.from <= day && (s.to === null || s.to >= day));
+
+/** Usages et nettoyages des matériels jusqu'à une date (R27). */
+export async function equipmentEvents(tx: Tx, from: string, to: string): Promise<AbEquipmentEvent[]> {
+  const list = await rows<{ equipment_id: string; equipment: string; intervention_id: string; at: string; procedure: string; parcel_ids: string[] | null }>(
+    tx,
+    sql`SELECT e.id AS equipment_id, e.name AS equipment, i.id AS intervention_id, i.started_at::text AS at, i.procedure,
+               (SELECT array_agg(t.ref_id) FROM intervention_parameters t WHERE t.intervention_id = i.id AND t.role = 'target' AND t.ref_type = 'land_parcel') AS parcel_ids
+        FROM interventions i
+        JOIN intervention_parameters p ON p.intervention_id = i.id AND p.ref_type = 'equipment' AND (p.role = 'tool' OR (i.procedure = 'equipment_cleaning' AND p.role = 'target'))
+        JOIN equipments e ON e.id = p.ref_id
+        WHERE i.status = 'done' AND i.started_at >= ${from}::date AND i.started_at < ${to}::date + 1
+        ORDER BY i.started_at`,
+  );
+  const spans = await organicSpans(tx);
+  return list.flatMap((r): AbEquipmentEvent[] => {
+    const day = new Date(r.at).toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" });
+    const parcels = r.parcel_ids ?? [];
+    if (r.procedure === "equipment_cleaning") return [{ equipmentId: r.equipment_id, equipment: r.equipment, interventionId: r.intervention_id, at: new Date(r.at).toISOString(), kind: "cleaning" as const, organic: true, parcelIds: [] }];
+    if (!parcels.length) return [];
+    return [
+      {
+        equipmentId: r.equipment_id,
+        equipment: r.equipment,
+        interventionId: r.intervention_id,
+        at: new Date(r.at).toISOString(),
+        kind: "use" as const,
+        organic: parcels.every((p) => isOrganic(spans, p, day)),
+        parcelIds: parcels,
+      },
+    ];
+  });
+}
+
+/** Saisie : matériels dont le dernier usage avant l'intervention était hors AB, sans nettoyage depuis. */
+export async function uncleanedEquipment(tx: Tx, equipmentIds: string[], before: string, exclude: string | null): Promise<{ equipment: string; lastUseOn: string }[]> {
+  if (!equipmentIds.length) return [];
+  const events = (await equipmentEvents(tx, `${Number(before.slice(0, 4)) - 2}-01-01`, before.slice(0, 10)))
+    .filter((e) => equipmentIds.includes(e.equipmentId) && e.interventionId !== exclude && e.at < before);
+  return equipmentIds.flatMap((id) => {
+    const last = events.filter((e) => e.equipmentId === id).at(-1);
+    return last && last.kind === "use" && !last.organic ? [{ equipment: last.equipment, lastUseOn: last.at.slice(0, 10) }] : [];
+  });
+}
+
+/** Historique des cultures des parcelles AB sur N campagnes (R11). */
+export async function rotationHistory(tx: Tx, parcels: { id: string; name: string }[], campaign: number, years: number): Promise<Map<string, { name: string; years: AbRotationYear[] }>> {
+  const out = new Map(parcels.map((p) => [p.id, { name: p.name, years: [] as AbRotationYear[] }]));
+  if (!parcels.length) return out;
+  const list = await rows<{
+    land_parcel_id: string;
+    year: number;
+    specie: string | null;
+    label: string | null;
+    usage: string | null;
+    life_years: number | null;
+    cycle: CropCycle | null;
+    legume: boolean;
+    cover_legume: boolean;
+  }>(
+    tx,
+    sql`SELECT DISTINCT ON (p.land_parcel_id, c.year) p.land_parcel_id, c.year,
+               coalesce(a.cultivation, lp.specie, p.cultivation) AS specie, coalesce(a.name, lp.label, p.nature) AS label,
+               lp.usage, lp.life_years::float8 AS life_years, p.cycle,
+               EXISTS (WITH RECURSIVE l AS (
+                         SELECT reference_name, parent, 0 AS depth FROM taxonomy WHERE reference_name = coalesce(a.cultivation, lp.specie, p.cultivation)
+                         UNION ALL SELECT x.reference_name, x.parent, l.depth + 1 FROM taxonomy x JOIN l ON x.reference_name = l.parent WHERE l.depth < 30)
+                       SELECT 1 FROM l WHERE reference_name = 'fabaceae') AS legume,
+               EXISTS (SELECT 1 FROM cover_crops cc WHERE cc.land_parcel_id = p.land_parcel_id AND cc.campaign = c.year AND cc.family LIKE '%legumineuses%') AS cover_legume
+        FROM productions p
+        JOIN campaigns c ON c.id = p.campaign_id
+        LEFT JOIN activities a ON a.id = p.activity_id
+        LEFT JOIN lexicon_productions lp ON lp.reference_name = a.reference
+        WHERE p.land_parcel_id = ANY(${uuids(parcels.map((p) => p.id))}) AND c.year > ${campaign - years} AND c.year <= ${campaign}
+        ORDER BY p.land_parcel_id, c.year, p.created_at`,
+  );
+  for (const r of list) {
+    const cycle = r.cycle ?? cycleFromLexicon(r.life_years, r.usage);
+    out.get(r.land_parcel_id)!.years.push({
+      campaign: r.year,
+      species: r.specie,
+      label: r.label,
+      legume: r.legume,
+      coverLegume: r.cover_legume,
+      vegetable: r.usage === "vegetable",
+      perennial: cycle !== "annual",
+    });
+  }
+  return out;
 }

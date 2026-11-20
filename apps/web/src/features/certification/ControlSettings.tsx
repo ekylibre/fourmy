@@ -1,25 +1,25 @@
 import { useState } from "react";
-import { Button, Group, Modal, Select, Stack, TextInput } from "@mantine/core";
+import { Button, Group, Modal, NumberInput, Select, Stack, TextInput } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CertificationSettings } from "@fourmy/contracts";
 import { api, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { ErrorAlert, Loading } from "../../components/states";
 
-/** Réglages du contrôle HVE (responsable) : période, méthode, références IFT. */
-export function ControlSettingsModal({ onClose }: { onClose: () => void }) {
+/** Réglages des contrôles (responsable) : HVE (période, méthode, références IFT), AB (repères de rotation). */
+export function ControlSettingsModal({ onClose, kind = "hve" }: { onClose: () => void; kind?: "hve" | "ab" }) {
   const farm = useFarm();
   const q = useQuery({ queryKey: ["certification-settings", farm.id], queryFn: () => api.get<CertificationSettings>(farmPath(farm.id, "/settings/certification")) });
   return (
-    <Modal opened onClose={onClose} title="Réglages du contrôle HVE">
+    <Modal opened onClose={onClose} title={kind === "hve" ? "Réglages du contrôle HVE" : "Réglages du contrôle AB"}>
       {q.isLoading && <Loading />}
       {q.error && <ErrorAlert error={q.error} />}
-      {q.data && <SettingsForm initial={q.data} onClose={onClose} />}
+      {q.data && <SettingsForm initial={q.data} onClose={onClose} kind={kind} />}
     </Modal>
   );
 }
 
-function SettingsForm({ initial, onClose }: { initial: CertificationSettings; onClose: () => void }) {
+function SettingsForm({ initial, onClose, kind }: { initial: CertificationSettings; onClose: () => void; kind: "hve" | "ab" }) {
   const farm = useFarm();
   const client = useQueryClient();
   const [s, setS] = useState(initial);
@@ -31,6 +31,33 @@ function SettingsForm({ initial, onClose }: { initial: CertificationSettings; on
       onClose();
     },
   });
+  if (kind === "ab") {
+    return (
+      <Stack>
+        <NumberInput
+          label="Rotation : légumineuse au moins une fois en N campagnes"
+          description="Repère du guide de lecture INAO (5 par défaut), apprécié par l'organisme certificateur"
+          min={2}
+          max={10}
+          value={s.rotationYears}
+          onChange={(v) => setS({ ...s, rotationYears: Number(v) || 5 })}
+        />
+        <NumberInput
+          label="Rotation : même espèce au plus K années de suite"
+          min={1}
+          max={5}
+          value={s.rotationSameSpeciesMax}
+          onChange={(v) => setS({ ...s, rotationSameSpeciesMax: Number(v) || 2 })}
+        />
+        {save.error && <ErrorAlert error={save.error} />}
+        <Group>
+          <Button loading={save.isPending} onClick={() => save.mutate(s)}>
+            Enregistrer
+          </Button>
+        </Group>
+      </Stack>
+    );
+  }
   return (
     <Stack>
       <TextInput

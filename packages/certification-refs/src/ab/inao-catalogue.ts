@@ -74,6 +74,7 @@ export const INAO_BREACHES: Record<string, InaoBreach> = {
   "38": b("38", "Semences non biologiques sans dérogation, ou dérogation obtenue après le semis", "minor", ["AV"], ["DL"], 121),
   "349": b("349", "Semences non biologiques « hors dérogation » (dérogation refusée ou non demandée)", "major", ["DL"], ["DL"], 121),
   "350": b("350", "Absence de mesures de précaution ou de nettoyage", "major", ["SPC"], ["SC"], 115),
+  "19": b("19", "Description insuffisante des mesures de précaution ou de nettoyage, mesures insuffisantes en pratique", "minor", ["AV"], ["SPC"], 115),
   "366": b("366", "Nettoyage avec des produits non autorisés", "minor", ["AV"], ["AV"], 114),
   "50": b("50", "Cahier de culture absent ou mal tenu, ne permettant pas de s'assurer de la conformité", "major", ["DL", "DPA"], ["SPC"], 123),
 };
@@ -103,6 +104,8 @@ export const RULE_BREACH: Record<string, string> = {
   /** Semence non bio sans dérogation demandée. */
   R25_none: "349",
   R27: "350",
+  /** Nettoyage non enregistré entre un usage hors AB et un usage AB. */
+  R27_unrecorded: "19",
   R28: "366",
 };
 

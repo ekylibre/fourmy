@@ -154,6 +154,39 @@ describe.skipIf(!url)("contrôle AB (intégration)", () => {
     expect((await json("GET", "/seed-derogations")).items).toHaveLength(1);
   });
 
+  it("matériel à usage mixte : semoir venu d'une parcelle non AB, signalé puis conforme après nettoyage ; rotation et règles non contrôlées", async () => {
+    const other = crypto.randomUUID();
+    const drill = crypto.randomUUID();
+    await sql`INSERT INTO land_parcels (id, farm_id, name) VALUES (${other}, ${farmId}, 'Parcelle conventionnelle')`;
+    await sql`INSERT INTO land_parcel_versions (id, land_parcel_id, shape, area_m2, valid)
+      VALUES (${crypto.randomUUID()}, ${other}, ST_GeomFromText('MULTIPOLYGON(((0.6 44.8,0.6013 44.8,0.6013 44.8009,0.6 44.8009,0.6 44.8)))', 4326), 10000, tstzrange('2020-01-01', NULL))`;
+    await sql`INSERT INTO equipments (id, farm_id, name, kind) VALUES (${drill}, ${farmId}, 'Semoir test', 'trailed_equipment')`;
+    const use = async (day: string, parcel: string, procedure = "sowing") => {
+      const id = crypto.randomUUID();
+      await sql`INSERT INTO interventions (id, farm_id, procedure, status, origin, started_at, stopped_at) VALUES (${id}, ${farmId}, ${procedure}, 'done', 'web', ${`${day}T08:00:00Z`}, ${`${day}T10:00:00Z`})`;
+      if (parcel) await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id) VALUES (${crypto.randomUUID()}, ${id}, 'target', 'land_parcel', ${parcel})`;
+      await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id) VALUES (${crypto.randomUUID()}, ${id}, 'tool', 'equipment', ${drill})`;
+      return id;
+    };
+    await use("2026-09-01", other);
+    await use("2026-09-02", parcelId);
+    const section = async (id: string) => (await json("GET", "/control/ab?campaign=2026")).sections.find((s: { id: string }) => s.id === id);
+    expect((await section("equipment")).findings[0]).toMatchObject({ ruleId: "ab.R27", level: "warning", breach: { inao: "19" } });
+    // Saisie d'un nouvel usage sur la parcelle AB : le dernier usage (AB) ne pose pas de problème ; après un usage hors AB, si.
+    await use("2026-09-03", other);
+    const check = await json("POST", "/control/check", { ...draft("sowing", "2026-09-04", []), tools: [{ equipmentId: drill }] });
+    expect(check.check.findings).toEqual([expect.objectContaining({ ruleId: "ab.R27", level: "warning" })]);
+    // Nettoyage enregistré entre les deux usages du 1er et du 2 : plus de constat pour ce passage.
+    const cleaning = crypto.randomUUID();
+    await sql`INSERT INTO interventions (id, farm_id, procedure, status, origin, started_at, stopped_at) VALUES (${cleaning}, ${farmId}, 'equipment_cleaning', 'done', 'web', '2026-09-01T15:00:00Z', '2026-09-01T16:00:00Z')`;
+    await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id) VALUES (${crypto.randomUUID()}, ${cleaning}, 'tool', 'equipment', ${drill})`;
+    expect((await section("equipment")).findings).toEqual([]);
+    expect((await section("rotation")).findings[0]).toMatchObject({ ruleId: "ab.R11", level: "missing" });
+    const uncontrolled = await section("uncontrolled");
+    expect(uncontrolled.level).toBe("na");
+    expect(uncontrolled.findings.map((f: { ruleId: string }) => f.ruleId)).toContain("ab.R28");
+  });
+
   it("rapport et parcelles : l'azote minéral fait redémarrer la conversion ; production modifiable", async () => {
     const report = await json("GET", "/control/ab?campaign=2026");
     expect(report.verdict).toBe("danger");

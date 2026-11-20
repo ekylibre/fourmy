@@ -37,7 +37,7 @@ export function ControlPage() {
       <Group justify="space-between" align="flex-end">
         <Title order={1}>Contrôle {kind === "hve" ? "HVE" : "AB"}</Title>
         <Group align="flex-end">
-          {kind === "hve" && farm.role === "owner" && (
+          {farm.role === "owner" && (
             <Button variant="default" leftSection={<Settings size={16} />} onClick={() => setSettings(true)}>
               Réglages
             </Button>
@@ -45,7 +45,7 @@ export function ControlPage() {
           <Select label="Campagne" data={years} value={String(campaign)} onChange={(v) => v && setCampaign(Number(v))} w={120} allowDeselect={false} />
         </Group>
       </Group>
-      {settings && <ControlSettingsModal onClose={() => setSettings(false)} />}
+      {settings && <ControlSettingsModal kind={kind} onClose={() => setSettings(false)} />}
       <Text c="dimmed">{CONTROL_KIND_LABELS[kind]} : contrôle calculé à partir de vos saisies, pour préparer l'audit. Il ne remplace pas la décision de l'organisme certificateur.</Text>
       <Tabs value={tab} onChange={(v) => v && setTab(v)}>
         <Tabs.List>

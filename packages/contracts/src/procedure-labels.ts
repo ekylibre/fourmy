@@ -39,6 +39,7 @@ export const PROCEDURE_LABELS: Record<string, string> = {
   "enzyme_addition": "Ajout d'enzymes",
   "equipment_item_replacement": "Équipement pièce de rechange",
   "equipment_maintenance": "Réparation et maintenance",
+  "equipment_cleaning": "Nettoyage du matériel",
   "equipment_part_replacement": "Remplacement de pièces d'équipement",
   "fermentation": "Fermentation",
   "fertilizing": "Fertilisation",
