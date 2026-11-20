@@ -11,6 +11,7 @@ import { ControlLight, FindingList, useControlReport } from "./controls";
 import { AbParcels } from "./AbParcels";
 import { HveIrrigated } from "./HveIrrigated";
 import { HveIae } from "./HveIae";
+import { HveQuestionnaireForm } from "./HveQuestionnaire";
 
 /**
  * Tableau de bord d'un contrôle HVE ou AB pour une campagne (lot CT1) :
@@ -52,6 +53,7 @@ export function ControlPage() {
             <Tabs.Tab value="parcels">Parcelles</Tabs.Tab>
           ) : (
             <>
+              <Tabs.Tab value="questionnaire">Questionnaire</Tabs.Tab>
               <Tabs.Tab value="iae">IAE</Tabs.Tab>
               <Tabs.Tab value="irrigation">Parcelles irriguées</Tabs.Tab>
             </>
@@ -61,6 +63,7 @@ export function ControlPage() {
       {kind === "ab" && tab === "parcels" && <AbParcels campaign={campaign} />}
       {kind === "hve" && tab === "irrigation" && <HveIrrigated campaign={campaign} />}
       {kind === "hve" && tab === "iae" && <HveIae campaign={campaign} />}
+      {kind === "hve" && tab === "questionnaire" && <HveQuestionnaireForm key={campaign} campaign={campaign} />}
       {tab === "rules" && report.isLoading && <Loading />}
       {tab === "rules" && report.error && <ErrorAlert error={report.error} />}
       {tab === "rules" && report.data && (

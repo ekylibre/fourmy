@@ -143,6 +143,31 @@ describe.skipIf(!url)("contrôle HVE phyto (intégration)", () => {
     expect((await app.request(`/api/v1/farms/${farmId}/landscape-features/${hedge}/hve`, { method: "PUT", headers, body: JSON.stringify({ type: "dragon", validated: true }) })).status).toBe(400);
   });
 
+  it("questionnaire annuel : réponses validées, items déclaratifs notés, justificatif rattaché", async () => {
+    const empty = await json("GET", "/control/hve/questionnaire?campaign=2026");
+    expect(empty).toMatchObject({ id: null, campaign: 2026, updatedAt: null });
+    const bad = await app.request(`/api/v1/farms/${farmId}/control/hve/questionnaire?campaign=2026`, { method: "PUT", headers, body: JSON.stringify({ biodiversity: { animalSpecies: -1 } }) });
+    expect(bad.status).toBe(400);
+    const saved = await json("PUT", "/control/hve/questionnaire?campaign=2026", {
+      biodiversity: { animalSpecies: 2, hives: true, soilBiology: "spade_test" },
+      phyto: { leakEquipment: 1 },
+      fertilization: { livestockNitrogenKg: 0 },
+    });
+    expect(saved.id).toBeTruthy();
+    const report = await json("GET", "/control/hve?campaign=2026");
+    const item = (section: string, id: string) =>
+      report.sections.find((s: { id: string }) => s.id === section).findings.find((f: { ruleId: string }) => f.ruleId === id);
+    expect(item("biodiversity", "hve.4.5")).toMatchObject({ level: "ok", points: { got: 1 } });
+    expect(item("biodiversity", "hve.4.7")).toMatchObject({ level: "missing" });
+    expect(item("phyto", "hve.5.7")).toMatchObject({ level: "ok", points: { got: 1 } });
+    const form = new FormData();
+    form.set("file", new File([new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31])], "test-beche.pdf"));
+    form.set("ownerType", "hve_questionnaire");
+    form.set("ownerId", saved.id);
+    const doc = await app.request(`/api/v1/farms/${farmId}/fertilization/documents`, { method: "POST", headers: { authorization: headers.authorization! }, body: form });
+    expect(doc.status, await doc.clone().text()).toBe(201);
+  });
+
   it("réglage : notation IFT « ancienne » ; saisie : herbicide CMR2 en orange", async () => {
     await json("PUT", "/settings/certification", { hveIftScale: "old", hveLivestock: false });
     const phyto = (await json("GET", "/control/hve?campaign=2026")).sections.find((s: { id: string }) => s.id === "phyto");

@@ -13,6 +13,10 @@ import {
   type ProductionCertificationWrite,
   type HveIaeItem,
   type LandscapeFeatureHveWrite,
+  type HveAnswers,
+  type HveQuestionnaire,
+  hveAnswers,
+  EMPTY_HVE_ANSWERS,
 } from "@fourmy/contracts";
 import { BadRequest, NotFound } from "../routes/helpers.js";
 import { IAE_BY_CODE, iaeEquivalentM2 } from "@fourmy/certification-refs";
@@ -123,11 +127,40 @@ export async function loadCertificationContext(tx: Tx, kind: ControlKind, campai
     const phyto = await loadHvePhyto(tx, campaign, period, settings);
     const fertilization = await loadHveFertilization(tx, campaign, period, settings, phyto.years[0]?.parcels ?? []);
     const biodiversity = await loadHveBiodiversity(tx, campaign, period, fertilization.parcels);
+    // Questionnaire annuel (lot CT4b) : items déclaratifs des quatre indicateurs.
+    const answers = (await questionnaireOf(tx, campaign)).answers;
+    phyto.answers = answers.phyto;
+    fertilization.answers = answers.fertilization;
+    biodiversity.answers = answers.biodiversity;
     // 5.2 : les IAE validées comptent comme surfaces non traitées.
     phyto.untreatedIaeM2 = untreatedIaeM2(biodiversity);
-    ctx.hve = { phyto, fertilization, irrigation: await loadHveIrrigation(tx, campaign, period), biodiversity };
+    ctx.hve = { phyto, fertilization, irrigation: { ...(await loadHveIrrigation(tx, campaign, period)), answers: answers.irrigation }, biodiversity };
   }
   return ctx;
+}
+
+// --- Questionnaire HVE annuel (lot CT4b) ------------------------------------------------
+
+async function questionnaireOf(tx: Tx, campaign: number): Promise<HveQuestionnaire> {
+  const [q] = await rows<{ id: string; answers: unknown; updated_at: string }>(
+    tx,
+    sql`SELECT id, answers, updated_at::text FROM hve_questionnaires WHERE campaign = ${campaign}`,
+  );
+  const parsed = hveAnswers.safeParse(q?.answers ?? {});
+  return { id: q?.id ?? null, campaign, answers: parsed.success ? parsed.data : EMPTY_HVE_ANSWERS, updatedAt: q ? new Date(q.updated_at).toISOString() : null };
+}
+
+export async function getHveQuestionnaire(db: Database, farmId: string, campaign: number): Promise<HveQuestionnaire> {
+  return withFarm(db, farmId, (tx) => questionnaireOf(tx, campaign));
+}
+
+export async function putHveQuestionnaire(db: Database, farmId: string, userId: string, campaign: number, answers: HveAnswers): Promise<HveQuestionnaire> {
+  return withFarm(db, farmId, async (tx) => {
+    await tx.execute(sql`
+      INSERT INTO hve_questionnaires (farm_id, campaign, answers, updated_by, updated_at) VALUES (${farmId}, ${campaign}, ${JSON.stringify(answers)}::jsonb, ${userId}, now())
+      ON CONFLICT (farm_id, campaign) DO UPDATE SET answers = excluded.answers, updated_by = excluded.updated_by, updated_at = now()`);
+    return questionnaireOf(tx, campaign);
+  });
 }
 
 /** IAE de la campagne HVE (onglet IAE) : type proposé ou validé, surface équivalente, adjacence. */

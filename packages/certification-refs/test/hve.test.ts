@@ -27,6 +27,16 @@ import {
   IAE_BY_CODE,
   IAE_OF_CAP_TYPE,
   iaeEquivalentM2,
+  animalSpeciesPoints,
+  threatenedPoints,
+  surveillancePoints,
+  alternativeMethodsPoints,
+  leakEquipmentPoints,
+  interRowPoints,
+  soilCoverPoints,
+  minorOadPoints,
+  irrigationToolPoints,
+  irrigatedSharePoints,
 } from "../src/index.js";
 
 describe("grille HVE v1.15 : barèmes aux bornes", () => {
@@ -162,5 +172,34 @@ describe("grille HVE : biodiversité, barèmes aux bornes", () => {
     expect(IAE_TYPES.filter((t) => t.base)).toHaveLength(10);
     expect(iaeEquivalentM2(IAE_BY_CODE[IAE_OF_CAP_TYPE.V4!]!, 100)).toBe(2000);
     expect(iaeEquivalentM2(IAE_BY_CODE.tree!, 3)).toBe(90);
+  });
+});
+
+describe("grille HVE : items déclaratifs, barèmes aux bornes", () => {
+  it("biodiversité et phyto", () => {
+    expect([0, 1, 2, 3, 4, 9].map(animalSpeciesPoints)).toEqual([0, 0, 1, 2, 3, 3]);
+    expect(threatenedPoints(5, 1)).toBe(4);
+    expect(surveillancePoints(true, true, 60)).toBe(3);
+    expect(surveillancePoints(true, false, 25)).toBe(1.5);
+    expect([24.9, 25, 37.5, 50, 62.5, 75].map(alternativeMethodsPoints)).toEqual([0, 1, 1.5, 2, 2.5, 3]);
+    expect([0, 1, 5].map(leakEquipmentPoints)).toEqual([0, 1, 2]);
+    expect([49, 50, 75, 99, 100].map(interRowPoints)).toEqual([0, 1, 2, 2, 3]);
+  });
+
+  it("6.7 couverture des sols et 6.4 cultures mineures", () => {
+    expect(soilCoverPoints(false, 12, 100, false)).toBe(0);
+    expect(soilCoverPoints(true, 6, 100, false)).toBe(0);
+    expect([7, 8, 9, 10, 14].map((w) => soilCoverPoints(true, w, 100, false))).toEqual([1, 2, 3, 4, 4]);
+    expect([9, 12].map((w) => soilCoverPoints(true, w, 80, true))).toEqual([0.5, 2]);
+    expect(soilCoverPoints(true, 12, 74, true)).toBe(0);
+    expect([30, 31, 40, 95].map((p) => minorOadPoints(p, false))).toEqual([0, 1, 1, 7]);
+    expect(minorOadPoints(95, true)).toBe(7);
+  });
+
+  it("irrigation", () => {
+    expect(irrigationToolPoints(true, true, false)).toBe(2);
+    expect(irrigationToolPoints(true, false, false)).toBe(1);
+    expect(irrigationToolPoints(false, false, true)).toBe(2);
+    expect([24, 25, 50, 75].map(irrigatedSharePoints)).toEqual([0, 2, 4, 6]);
   });
 });

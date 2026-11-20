@@ -192,3 +192,86 @@ export const productionCertificationWrite = z
   })
   .strict();
 export type ProductionCertificationWrite = z.infer<typeof productionCertificationWrite>;
+
+// --- Questionnaire HVE annuel (lot CT4b, D10) ---------------------------------------------
+
+const pct = z.number().min(0).max(100);
+const count = z.number().int().min(0).max(1000);
+
+/**
+ * Réponses du questionnaire HVE d'une campagne : items déclaratifs des
+ * quatre indicateurs. Chaque réponse est facultative ; absente, l'item reste
+ * en « données manquantes » (jamais de point d'office).
+ */
+export const hveAnswers = z
+  .object({
+    biodiversity: z
+      .object({
+        /** 4.5 : espèces animales élevées (pas les races), abeilles exclues. */
+        animalSpecies: count.nullable().optional(),
+        /** 4.6 : 3 ruches sédentaires au moins, toute la campagne. */
+        hives: z.boolean().nullable().optional(),
+        /** 4.7 : variétés (annexe 3, région) et races menacées (arrêté du 29/04/2015). */
+        threatenedVarieties: count.nullable().optional(),
+        threatenedBreeds: count.nullable().optional(),
+        /** 4.8 : test bêche OPVT (valable 3 campagnes) ou analyse de biomasse microbienne (année précédente). */
+        soilBiology: z.enum(["none", "spade_test", "microbial_analysis"]).nullable().optional(),
+      })
+      .strict()
+      .default({}),
+    phyto: z
+      .object({
+        /** 5.5 : outil de diagnostic ou de modélisation (BSV tracé), prospection collective, observateur BSV (% de SAU représentée). */
+        diagnosticTool: z.boolean().nullable().optional(),
+        collectiveProspection: z.boolean().nullable().optional(),
+        bsvObserverPercent: pct.nullable().optional(),
+        /** 5.6 : % de SAU où une méthode alternative a remplacé un traitement. */
+        alternativeMethodsPercent: pct.nullable().optional(),
+        /** 5.7 : équipements de l'annexe 6 présents sur tous les pulvérisateurs. */
+        leakEquipment: count.nullable().optional(),
+        /** 5.9 : % de l'inter-rang couvert toute la campagne, sans destruction chimique. */
+        interRowCoverPercent: pct.nullable().optional(),
+      })
+      .strict()
+      .default({}),
+    fertilization: z
+      .object({
+        /** Bilan azoté : azote des animaux (rejets − effluents cédés + effluents reçus, kg N), restitutions au pâturage comprises. */
+        livestockNitrogenKg: z.number().min(0).max(10_000_000).nullable().optional(),
+        /** 6.4 : % de la surface en blé sous OPI ; cultures mineures : % sous PPF ajusté ou outil de pilotage, PPF sur plus de 50 %. */
+        opiWheatPercent: pct.nullable().optional(),
+        minorOadPercent: pct.nullable().optional(),
+        minorPpf: z.boolean().nullable().optional(),
+        /** 6.7 : durée réglementaire de couverture respectée partout, semaines de couvert, % de surface couverte, zone vulnérable. */
+        coverRegulatory: z.boolean().nullable().optional(),
+        coverWeeks: z.number().int().min(0).max(52).nullable().optional(),
+        coverPercent: pct.nullable().optional(),
+        vulnerableZone: z.boolean().nullable().optional(),
+      })
+      .strict()
+      .default({}),
+    irrigation: z
+      .object({
+        /** 7.2 : outils d'offre (sondes…), de demande (ETP…), OAD mixte. */
+        supplyTool: z.boolean().nullable().optional(),
+        demandTool: z.boolean().nullable().optional(),
+        mixedTool: z.boolean().nullable().optional(),
+        /** 7.3 et 7.5 : % de la SAU irriguée équipée, en pratiques économes. */
+        efficientEquipmentPercent: pct.nullable().optional(),
+        /** 7.4 : démarche collective de gestion de la ressource. */
+        collective: z.boolean().nullable().optional(),
+        waterSavingPercent: pct.nullable().optional(),
+      })
+      .strict()
+      .default({}),
+  })
+  .strict();
+export type HveAnswers = z.infer<typeof hveAnswers>;
+export const EMPTY_HVE_ANSWERS: HveAnswers = hveAnswers.parse({});
+
+export interface HveQuestionnaire {
+  id: string | null;
+  campaign: number;
+  answers: HveAnswers;
+  updatedAt: string | null;
+}

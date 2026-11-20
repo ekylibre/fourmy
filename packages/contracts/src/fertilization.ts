@@ -596,7 +596,7 @@ export type CoverCrop = CoverCropWrite & { id: string; parcelId: string };
 export const COVER_BIOMASS_LABELS = { le_1: "1 t MS/ha ou moins", "1_3": "1 à 3 t MS/ha", ge_3: "3 t MS/ha ou plus" } as const;
 export const DESTRUCTION_MODE_LABELS = { mechanical: "Mécanique (broyage, labour)", chemical: "Chimique", frost: "Gel", harvest: "Récolte ou fauche", grazing: "Pâturage" } as const;
 
-export const DOCUMENT_OWNER_TYPES = ["plan", "soil_analysis", "water_source", "product_analysis", "cover_crop", "steering"] as const;
+export const DOCUMENT_OWNER_TYPES = ["plan", "soil_analysis", "water_source", "product_analysis", "cover_crop", "steering", "hve_questionnaire"] as const;
 export type DocumentOwnerType = (typeof DOCUMENT_OWNER_TYPES)[number];
 export const DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
 export const DOCUMENT_TYPES = ["application/pdf", "image/jpeg", "image/png"] as const;

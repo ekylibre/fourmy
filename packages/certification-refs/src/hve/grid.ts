@@ -133,3 +133,41 @@ export function mainCropPoints(sharePercent: number): number {
 export function speciesCountPoints(n: number, mainCropAtLeast60: boolean): number {
   return mainCropAtLeast60 ? Math.min(Math.max(n - 5, 0), 5) : Math.min(Math.max(n - 4, 0), 6);
 }
+
+// --- Items déclaratifs (questionnaire annuel, lot CT4b) --------------------------------
+
+/** 4.5 espèces animales : 0-1 : 0 ; 2 : 1 ; 3 : 2 ; ≥ 4 : 3. */
+export const animalSpeciesPoints = (n: number) => (n >= 4 ? 3 : n === 3 ? 2 : n === 2 ? 1 : 0);
+/** 4.7 : 1 point par variété ou race menacée, plafond 3 + 3. */
+export const threatenedPoints = (varieties: number, breeds: number) => Math.min(varieties, 3) + Math.min(breeds, 3);
+/** 5.5 : outil de diagnostic 1 + prospection collective 1 + observateur BSV 2 × part ; plafond 3. */
+export const surveillancePoints = (tool: boolean, prospection: boolean, observerPercent: number) =>
+  Math.min(3, Math.round(((tool ? 1 : 0) + (prospection ? 1 : 0) + 2 * Math.min(observerPercent, 100) / 100) * 100) / 100);
+/** 5.6 (hors horticulture) : < 25 : 0 ; [25 ; 37,5[ : 1 ; [37,5 ; 50[ : 1,5 ; [50 ; 62,5[ : 2 ; [62,5 ; 75[ : 2,5 ; ≥ 75 : 3. */
+export const alternativeMethodsPoints = (p: number) => (p < 25 ? 0 : p < 37.5 ? 1 : p < 50 ? 1.5 : p < 62.5 ? 2 : p < 75 ? 2.5 : 3);
+/** 5.7 : 1 point par équipement présent sur tous les appareils, plafond 2. */
+export const leakEquipmentPoints = (n: number) => Math.min(n, 2);
+/** 5.9 et 6.7 (pérennes) : inter-rang couvert < 50 : 0 ; [50,75[ : 1 ; [75,100[ : 2 ; 100 % : 3. */
+export const interRowPoints = (p: number) => (p < 50 ? 0 : p < 75 ? 1 : p < 100 ? 2 : 3);
+
+/**
+ * 6.7 (terres arables) : durée réglementaire respectée sur 100 % de la
+ * surface, sinon 0 ; puis selon les semaines de couvert (hors zone
+ * vulnérable : 7, 8, 9, ≥ 10 ; en zone vulnérable : 9, 10, 11, ≥ 12) et la
+ * part C de la surface couverte : 75 % ≤ C < 100 % : 0,5 / 1 / 1,5 / 2 ;
+ * C = 100 % : 1 / 2 / 3 / 4. (PdC4 §6.7 ; Grille!AI288:AJ289.)
+ */
+export function soilCoverPoints(regulatory: boolean, weeks: number, coverPercent: number, vulnerableZone: boolean): number {
+  if (!regulatory || coverPercent < 75) return 0;
+  const step = Math.min(weeks - (vulnerableZone ? 9 : 7) + 1, 4);
+  if (step < 1) return 0;
+  return coverPercent >= 100 ? step : step / 2;
+}
+
+/** 6.4 cultures mineures : % sous PPF ajusté ou outil de pilotage ≤ 30 : 0 ; ]30,40] : 1 … ]90,100] : 7 ; + 1 si PPF sur plus de 50 % ; plafond 7. */
+export const minorOadPoints = (p: number, ppf: boolean) => Math.min(7, Math.max(0, Math.ceil((Math.min(p, 100) - 30) / 10)) + (ppf ? 1 : 0));
+
+/** 7.2 : outil d'offre 1 + outil de demande 1, ou OAD mixte 2 ; plafond 2. */
+export const irrigationToolPoints = (supply: boolean, demand: boolean, mixed: boolean) => (mixed ? 2 : Math.min((supply ? 1 : 0) + (demand ? 1 : 0), 2));
+/** 7.3 et 7.5 : % de la SAU irriguée < 25 : 0 ; [25,50[ : 2 ; [50,75[ : 4 ; ≥ 75 : 6. */
+export const irrigatedSharePoints = (p: number) => (p < 25 ? 0 : p < 50 ? 2 : p < 75 ? 4 : 6);

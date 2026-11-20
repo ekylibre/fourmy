@@ -1,8 +1,12 @@
-import type { ControlFinding } from "@fourmy/contracts";
+import type { ControlFinding, HveAnswers } from "@fourmy/contracts";
+import { declaredItem, given } from "./declared.js";
 import {
   cite,
   HVE_GRID_SOURCE,
+  interRowPoints,
   legumePoints,
+  minorOadPoints,
+  soilCoverPoints,
   MINOR_CROPS_THRESHOLD,
   NITROGEN_EXPORTS_SOURCE,
   nitrogenBalancePoints,
@@ -61,7 +65,13 @@ export interface HveFertilizationContext {
   planParcelIds: string[];
   rshParcelIds: string[];
   steeringParcelIds: string[];
+  /** Réponses du questionnaire annuel : azote des animaux, OPI, OAD des cultures mineures, couverture des sols. */
+  answers?: HveAnswers["fertilization"];
 }
+
+/** Azote des animaux déclaré (kg N) ; null : non déclaré alors qu'il y a de l'élevage (ou que ce n'est pas dit). */
+const livestockN = (ctx: HveFertilizationContext): number | null =>
+  ctx.livestock === false ? 0 : given(ctx.answers?.livestockNitrogenKg) ? ctx.answers!.livestockNitrogenKg! : null;
 
 const ha = (m2: number) => m2 / 10_000;
 const round = (n: number, d = 2) => Math.round(n * 10 ** d) / 10 ** d;
@@ -98,7 +108,8 @@ export function nitrogenBalanceFindings(ctx: HveFertilizationContext): ControlFi
   const ids = new Set(principal.map((p) => p.id));
   const area = new Map(ctx.parcels.map((p) => [p.id, p.areaM2]));
   const inputs = ctx.inputs.filter((i) => ids.has(i.parcelId));
-  const entered = inputs.reduce((s, i) => s + (i.nTotalKgHa ?? 0) * ha(area.get(i.parcelId)!), 0);
+  const animals = livestockN(ctx);
+  const entered = inputs.reduce((s, i) => s + (i.nTotalKgHa ?? 0) * ha(area.get(i.parcelId)!), 0) + (animals ?? 0);
   const harvests = ctx.harvests.filter((h) => ids.has(h.parcelId));
   const rowsOf = new Map(principal.map((p) => [p.id, p.exports]));
   let exported = 0;
@@ -116,14 +127,14 @@ export function nitrogenBalanceFindings(ctx: HveFertilizationContext): ControlFi
   const lacks = [
     ...inputs.filter((i) => i.nTotalKgHa === null).map((i) => missing(`teneur en azote ou dose de ${i.product}`, "article", i.articleId)),
     ...unusable.map((h) => missing(`récolte de ${h.product} en masse (t), ou sa référence d'exportation`, "intervention", h.interventionId)),
-    ...(ctx.livestock !== false ? [missing("élevage : effectifs et présence des animaux (rejets, pâturage)", "questionnaire")] : []),
+    ...(animals === null ? [missing("élevage : azote des animaux (rejets, pâturage), questionnaire ou réglage « pas d'élevage »", "questionnaire")] : []),
   ];
   const out = [
     finding({
       ruleId: "hve.6.1",
       level: "ok",
       message:
-        `Balance globale azotée : ${n1(entered)} kg N apportés, ${n1(exported)} kg N exportés sur les cultures principales, ` +
+        `Balance globale azotée : ${n1(entered)} kg N apportés${animals ? ` (dont ${n1(animals)} kg des animaux)` : ""}, ${n1(exported)} kg N exportés sur les cultures principales, ` +
         `soit ${n1(b)} kg N/ha de SAU : ${raw} point(s)` +
         (minor >= MINOR_CROPS_THRESHOLD ? `, × (1 − ${pct(minor)} de cultures mineures) = ${n1(corrected)}` : "") +
         `. Récoltes comptées à la MS de référence de la table.`,
@@ -153,8 +164,9 @@ export function nitrogenBalanceFindings(ctx: HveFertilizationContext): ControlFi
 export function organicNitrogenFindings(ctx: HveFertilizationContext): ControlFinding[] {
   const area = new Map(ctx.parcels.map((p) => [p.id, p.areaM2]));
   const known = ctx.inputs.filter((i) => i.nTotalKgHa !== null && area.has(i.parcelId));
-  const totalN = known.reduce((s, i) => s + i.nTotalKgHa! * ha(area.get(i.parcelId)!), 0);
-  if (!totalN && ctx.livestock === false) {
+  const animals = livestockN(ctx);
+  const totalN = known.reduce((s, i) => s + i.nTotalKgHa! * ha(area.get(i.parcelId)!), 0) + (animals ?? 0);
+  if (!totalN && animals !== null) {
     return [
       finding({
         ruleId: "hve.6.3",
@@ -165,7 +177,7 @@ export function organicNitrogenFindings(ctx: HveFertilizationContext): ControlFi
       }),
     ];
   }
-  const organic = known.filter((i) => i.organic).reduce((s, i) => s + i.nTotalKgHa! * ha(area.get(i.parcelId)!), 0);
+  const organic = known.filter((i) => i.organic).reduce((s, i) => s + i.nTotalKgHa! * ha(area.get(i.parcelId)!), 0) + (animals ?? 0);
   const share = totalN ? (organic / totalN) * 100 : 0;
   const got = organicNitrogenPoints(share);
   return [
@@ -178,7 +190,7 @@ export function organicNitrogenFindings(ctx: HveFertilizationContext): ControlFi
       points: { got, max: 4 },
       missing: [
         ...ctx.inputs.filter((i) => i.nTotalKgHa === null).map((i) => missing(`teneur en azote ou dose de ${i.product}`, "article", i.articleId)),
-        ...(ctx.livestock !== false ? [missing("élevage : azote produit par les animaux (Q1), restitutions au pâturage", "questionnaire")] : []),
+        ...(animals === null ? [missing("élevage : azote produit par les animaux (Q1), restitutions au pâturage", "questionnaire")] : []),
       ],
       source: SOURCE("§6.3 p. 69-71", "onglet Fertilisation, P122"),
     }),
@@ -202,6 +214,12 @@ export function decisionToolFindings(ctx: HveFertilizationContext): ControlFindi
     const odp = covered(ctx.steeringParcelIds, fieldCrops) >= 0.5 ? 1 : 0;
     got = Math.max(got, ppf + aj + odp);
     parts.push(`grandes cultures : plan de fumure ${ppf}, reliquat sortie d'hiver sur ≥ 50 % ${aj}, outil de pilotage sur ≥ 50 % ${odp}`);
+    // OPI (blé) déclaré : 3 × part des grandes cultures principales en blé sous OPI.
+    const opi = ctx.answers?.opiWheatPercent;
+    if (given(opi) && opi > 0) {
+      got = Math.max(got, round((3 * opi) / 100));
+      parts.push(`OPI sur ${pct(opi)} des grandes cultures (déclaré)`);
+    }
   }
   if (grassland.length && covered(ctx.planParcelIds, grassland) > 0) {
     got = Math.max(got, 1);
@@ -219,21 +237,22 @@ export function decisionToolFindings(ctx: HveFertilizationContext): ControlFindi
     finding({
       ruleId: "hve.6.4",
       level: "ok",
-      message: `Outils d'aide à la décision (${parts.join(" ; ") || "aucun"}) : ${n1(got)} point(s)${minor >= MINOR_CROPS_THRESHOLD ? `, × (1 − ${pct(minor)}) = ${n1(corrected)}` : ""}. Les OPI (blé) se déclarent dans le questionnaire.`,
+      message: `Outils d'aide à la décision (${parts.join(" ; ") || "aucun"}) : ${n1(got)} point(s)${minor >= MINOR_CROPS_THRESHOLD ? `, × (1 − ${pct(minor)}) = ${n1(corrected)}` : ""}.`,
       points: { got: corrected, max: 3 },
       source: SOURCE("§6.4 p. 71-73", "onglet Fertilisation, P168:P191"),
     }),
   ];
   if (minor >= MINOR_CROPS_THRESHOLD) {
+    const a = ctx.answers ?? {};
+    const share = minor / 100;
     out.push(
-      finding({
-        ruleId: "hve.6.4.minor",
-        level: "missing",
-        message: `Cultures mineures (${pct(minor)} de la SAU) : outils d'aide à la décision à déclarer dans le questionnaire.`,
-        points: { got: 0, max: round(7 * (minor / 100)) },
-        missing: [missing("OAD des cultures mineures", "questionnaire")],
-        source: SOURCE("§6.4 p. 72-73", "onglet Fertilisation, P191"),
-      }),
+      declaredItem(
+        "hve.6.4.minor",
+        `6.4 OAD des cultures mineures (${pct(minor)} de la SAU)`,
+        round(7 * share),
+        given(a.minorOadPercent) ? { points: minorOadPoints(a.minorOadPercent, !!a.minorPpf) * share, detail: `${pct(a.minorOadPercent)} sous PPF ajusté ou pilotage${a.minorPpf ? ", PPF sur plus de 50 %" : ""}, × ${pct(minor)}` } : null,
+        "onglet Fertilisation, P191",
+      ),
     );
   }
   return out;
@@ -280,14 +299,46 @@ export function legumeFindings(ctx: HveFertilizationContext): ControlFinding[] {
   ];
 }
 
-/** Items en attente de déclaration : 6.7 couverture des sols ; horticulture (6.2, 6.8) et hors-sol (6.9). */
-export function declarativeFertilizationFindings(ctx: HveFertilizationContext): ControlFinding[] {
-  const perennialOnly = ctx.parcels.length > 0 && ctx.parcels.every((p) => p.family === "vine" || p.family === "orchard");
-  const items: [string, string, number][] = [["hve.6.7", "6.7 Couverture des sols (durée des couverts, inter-rang)", perennialOnly ? 3 : 4]];
-  if (ctx.parcels.some((p) => p.family === "horticulture")) {
-    items.push(["hve.6.2", "6.2 Quantité d'azote (horticulture)", 5], ["hve.6.8", "6.8 Matériels optimisant les fertilisants (horticulture)", 6]);
-  }
-  return items.map(([ruleId, label, max]) =>
+/**
+ * 6.7 couverture des sols (déclarée) : terres arables (durée des couverts)
+ * et cultures pérennes (inter-rang, réponse du 5.9), pondérées par la SAU ;
+ * items horticoles (6.2, 6.8) en attente.
+ */
+export function declarativeFertilizationFindings(ctx: HveFertilizationContext, interRowCoverPercent?: number | null): ControlFinding[] {
+  const total = sau(ctx.parcels);
+  const perennial = total ? sau(ctx.parcels.filter((p) => p.family === "vine" || p.family === "orchard")) / total : 0;
+  const arable = 1 - perennial;
+  const a = ctx.answers ?? {};
+  const arableAnswered = arable === 0 || (given(a.coverRegulatory) && given(a.coverWeeks) && given(a.coverPercent));
+  const perennialAnswered = perennial === 0 || given(interRowCoverPercent);
+  const max = round(4 * arable + 3 * perennial);
+  const arablePts = arable && arableAnswered ? soilCoverPoints(!!a.coverRegulatory, a.coverWeeks!, a.coverPercent!, !!a.vulnerableZone) * arable : 0;
+  const perennialPts = perennial && perennialAnswered ? interRowPoints(interRowCoverPercent!) * perennial : 0;
+  const out = [
+    declaredItem(
+      "hve.6.7",
+      "6.7 Couverture des sols",
+      max,
+      arableAnswered && perennialAnswered
+        ? {
+            points: arablePts + perennialPts,
+            detail: [
+              arable ? `terres arables : ${a.coverRegulatory ? "durée réglementaire respectée" : "durée réglementaire non respectée"}, ${a.coverWeeks} semaines sur ${pct(a.coverPercent ?? 0)}${a.vulnerableZone ? " en zone vulnérable" : ""}` : "",
+              perennial ? `inter-rang couvert ${pct(interRowCoverPercent ?? 0)}` : "",
+            ]
+              .filter(Boolean)
+              .join(" ; "),
+          }
+        : null,
+      "onglet Fertilisation, AI288:AJ289, Q300",
+    ),
+  ];
+  if (!ctx.parcels.some((p) => p.family === "horticulture")) return out;
+  const items: [string, string, number][] = [
+    ["hve.6.2", "6.2 Quantité d'azote (horticulture)", 5],
+    ["hve.6.8", "6.8 Matériels optimisant les fertilisants (horticulture)", 6],
+  ];
+  return [...out, ...items.map(([ruleId, label, max]) =>
     finding({
       ruleId,
       level: "missing",
@@ -296,16 +347,16 @@ export function declarativeFertilizationFindings(ctx: HveFertilizationContext): 
       missing: [missing(label, "questionnaire")],
       source: SOURCE(`§${ruleId.slice(4)}`, "onglet Fertilisation"),
     }),
-  );
+  )];
 }
 
-export function hveFertilizationFindings(ctx: HveFertilizationContext): ControlFinding[] {
+export function hveFertilizationFindings(ctx: HveFertilizationContext, interRowCoverPercent?: number | null): ControlFinding[] {
   return [
     ...nitrogenBalanceFindings(ctx),
     ...organicNitrogenFindings(ctx),
     ...decisionToolFindings(ctx),
     ...unfertilizedFindings(ctx),
     ...legumeFindings(ctx),
-    ...declarativeFertilizationFindings(ctx),
+    ...declarativeFertilizationFindings(ctx, interRowCoverPercent),
   ];
 }
