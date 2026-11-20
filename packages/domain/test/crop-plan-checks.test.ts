@@ -4,6 +4,7 @@ import {
   abPlanFindings,
   agronomyFindings,
   checkCropPlan,
+  cropPlanCheckInput,
   emptyDraft,
   hvePlanFindings,
   resolveParcels,
@@ -170,5 +171,27 @@ describe("checkCropPlan", () => {
     const ms = performance.now() - t0;
     expect(r.plan.parcels).toHaveLength(300);
     expect(ms).toBeLessThan(200);
+  });
+});
+
+describe("cropPlanCheckInput", () => {
+  it("contexte JSON de l'API → entrée des contrôles (années numériques, tables)", () => {
+    const input = cropPlanCheckInput(
+      {
+        year: 2027,
+        parcels: [{ id: "a", name: "Le Champ", areaM2: 12 * HA, shape: null }],
+        activities: [{ id: uuid(1), name: "Blé tendre", family: "plant_farming", color: null, capCode: "BTH", species: "triticum_aestivum", cycle: "annual", legume: false, vegetable: false }],
+        history: { a: { "2026": { main: "CZH", secondary: false } } },
+        previousByActivity: {},
+        certification: { abParcels: { a: { conversionStart: "2020-01-01" } }, hve: false, abRotation: { years: 5, sameSpeciesMax: 2 } },
+        settings: { bcae7Preferred: "rotation", alsaceRhinePlain: false, returnIntervals: {} },
+        refsVersion: "x",
+      },
+      emptyDraft(2027),
+    );
+    expect(input.base).toEqual([{ id: "a", name: "Le Champ", areaM2: 12 * HA }]);
+    expect(input.history.get("a")![2026]).toEqual({ main: "CZH", secondary: false });
+    expect(input.activities.get(uuid(1))!.capCode).toBe("BTH");
+    expect(input.certification.abParcels.get("a")).toEqual({ conversionStart: "2020-01-01" });
   });
 });

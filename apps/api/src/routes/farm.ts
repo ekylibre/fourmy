@@ -18,6 +18,7 @@ import { phytoRoutes } from "./phyto.js";
 import { activityRoutes } from "./activities.js";
 import { certificationRoutes } from "./certifications.js";
 import { certificationControlRoutes } from "./certification-controls.js";
+import { cropPlanRoutes } from "./crop-plans.js";
 import { equipmentRoutes } from "./equipments.js";
 import { maintenanceRoutes } from "./maintenance.js";
 import { crewTemplateRoutes } from "./crew-templates.js";
@@ -40,6 +41,7 @@ export const farmRoutes = new Hono<Env>()
   .route("/", activityRoutes)
   .route("/", certificationRoutes)
   .route("/", certificationControlRoutes)
+  .route("/", cropPlanRoutes)
   .route("/", equipmentRoutes)
   .route("/", maintenanceRoutes)
   .route("/", inventoryRoutes)

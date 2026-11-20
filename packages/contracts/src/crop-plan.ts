@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { geoJsonGeometry } from "./primitives.js";
+import type { ControlSection } from "./certification.js";
 
 /**
  * Assolement prévisionnel (claudedocs/conception_assolement.md §3.3) : le
@@ -137,3 +138,103 @@ export const cropPlanBlocker = z.object({
   keys: z.array(z.string()).default([]),
 });
 export type CropPlanBlocker = z.infer<typeof cropPlanBlocker>;
+
+// --- API (lot AS2a, conception §5) ---------------------------------------
+
+export const cropPlanStatus = z.enum(["draft", "validated"]);
+export type CropPlanStatus = z.infer<typeof cropPlanStatus>;
+
+export interface CropPlanVersionSummary {
+  version: number;
+  validatedAt: string;
+  validatedBy: string | null;
+  reason: string | null;
+}
+
+/** Assolement d'une campagne : brouillon en cours, ou état actuel des productions s'il est validé. */
+export interface CropPlanView {
+  year: number;
+  status: CropPlanStatus;
+  /** Révision du brouillon (concurrence optimiste de la sauvegarde). */
+  revision: number;
+  draft: CropPlanDraft;
+  currentVersion: number | null;
+  versions: CropPlanVersionSummary[];
+  updatedAt: string;
+}
+
+export interface CropPlanListItem {
+  year: number;
+  status: CropPlanStatus;
+  currentVersion: number | null;
+  updatedAt: string;
+}
+
+export const cropPlanDraftWrite = z.object({ revision: z.number().int().min(0), draft: cropPlanDraft });
+export type CropPlanDraftWrite = z.infer<typeof cropPlanDraftWrite>;
+
+export const cropPlanValidateWrite = z.object({
+  revision: z.number().int().min(0),
+  /** Motif d'une révision (sortie d'hiver…). */
+  reason: z.string().trim().max(500).optional(),
+});
+export type CropPlanValidateWrite = z.infer<typeof cropPlanValidateWrite>;
+
+/** Culture d'une parcelle une année passée (historique du contexte). */
+export interface CropPlanYearCrop {
+  main: string | null;
+  secondary: boolean;
+  species?: string | null;
+  label?: string | null;
+  legume?: boolean;
+  coverLegume?: boolean;
+  vegetable?: boolean;
+  perennial?: boolean;
+}
+
+/** Contexte des contrôles de l'assolement (conception §4.1), chargé une fois par l'écran. */
+export interface CropPlanContext {
+  year: number;
+  /** Parcellaire de départ, valide pendant la campagne. */
+  parcels: { id: string; name: string; areaM2: number; shape: unknown }[];
+  activities: {
+    id: string;
+    name: string;
+    family: string;
+    color: string | null;
+    capCode: string | null;
+    species: string | null;
+    cycle: "annual" | "semi_perennial" | "perennial";
+    legume: boolean;
+    vegetable: boolean;
+  }[];
+  /** Historique : land_parcel_id → année → culture (Y-5 à Y-1). */
+  history: Record<string, Record<string, CropPlanYearCrop>>;
+  /** Surface (m²) par activité à la campagne précédente. */
+  previousByActivity: Record<string, number>;
+  certification: {
+    /** Parcelles certifiées AB pendant la campagne : début de la conversion. */
+    abParcels: Record<string, { conversionStart: string }>;
+    hve: boolean;
+    abRotation: { years: number; sameSpeciesMax: number };
+  };
+  settings: CropPlanSettings;
+  refsVersion: string;
+}
+
+/** Aperçu ou résultat d'une validation. */
+export interface CropPlanValidation {
+  dryRun: boolean;
+  changes: CropPlanChange[];
+  blockers: CropPlanBlocker[];
+  sections: ControlSection[];
+  /** Version créée (validation appliquée). */
+  version: number | null;
+}
+
+export interface CropPlanVersionView extends CropPlanVersionSummary {
+  snapshot: CropPlanDraft;
+  changes: CropPlanChange[];
+  findings: ControlSection[];
+  refsVersion: string;
+}
