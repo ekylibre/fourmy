@@ -15,6 +15,10 @@ import {
   type LandscapeFeatureHveWrite,
   type HveAnswers,
   type HveQuestionnaire,
+  type AbSeedUse,
+  type ArticleOrganicWrite,
+  type SeedDerogation,
+  type SeedDerogationWrite,
   hveAnswers,
   EMPTY_HVE_ANSWERS,
 } from "@fourmy/contracts";
@@ -30,7 +34,7 @@ import {
   type ParcelCertificationRef,
 } from "@fourmy/domain";
 import type { CheckableBody } from "./phyto.js";
-import { abApplications, abDraftApplications, abParcelInputs, abProductions } from "./certification-ab.js";
+import { abApplications, abDraftApplications, abParcelInputs, abProductions, nonAbProductions } from "./certification-ab.js";
 import { loadHveBiodiversity, loadHveFertilization, loadHveIrrigation, loadHvePhyto } from "./certification-hve.js";
 import { untreatedIaeM2 } from "@fourmy/domain";
 import { abStatuses, type AbParcelStatus } from "@fourmy/domain";
@@ -121,7 +125,12 @@ export async function loadCertificationContext(tx: Tx, kind: ControlKind, campai
     const ids = abParcels.map((p) => p.id);
     // Cuivre : 7 ans glissants ; conversion : depuis le début de la certification la plus ancienne.
     const since = [`${campaign - 7}-01-01`, ...abParcels.map((p) => p.startedOn)].sort()[0]!;
-    ctx.ab = { parcels: abParcels, productions: await abProductions(tx, ids, period.from, period.to), applications: await abApplications(tx, ids, since, period.to) };
+    ctx.ab = {
+      parcels: abParcels,
+      productions: await abProductions(tx, ids, period.from, period.to),
+      applications: await abApplications(tx, ids, since, period.to),
+      others: await nonAbProductions(tx, ids, campaign),
+    };
   }
   if (kind === "hve") {
     const phyto = await loadHvePhyto(tx, campaign, period, settings);
@@ -319,6 +328,8 @@ export async function checkInterventionCertification(
     const current = await abDraftApplications(tx, {
       day,
       interventionId: interventionId ?? "draft",
+      procedure: body.procedure,
+      justification: body.justification ?? null,
       parcels: areas.map((a) => ({ id: a.id, areaM2: worked.get(a.id) ?? a.area_m2 })),
       abParcelIds,
       inputs: body.inputs,
@@ -411,5 +422,86 @@ export async function putProductionCertification(db: Database, farmId: string, p
     );
     if (!p) throw new NotFound("Production introuvable.");
     return { id: p.id, cycle: p.cycle, plantedOn: p.planted_on, cultivationMode: p.cultivation_mode, droughtTolerant: p.drought_tolerant, waterSaving: p.water_saving };
+  });
+}
+
+// --- Semences AB (lot CT5a) -------------------------------------------------------------
+
+export async function putArticleOrganic(db: Database, farmId: string, articleId: string, w: ArticleOrganicWrite): Promise<void> {
+  await withFarm(db, farmId, async (tx) => {
+    const [a] = await rows<{ id: string }>(
+      tx,
+      sql`UPDATE articles SET organic_status = ${w.organicStatus}, seed_treated = ${w.seedTreated === undefined ? sql`seed_treated` : w.seedTreated}, updated_at = now()
+          WHERE id = ${articleId} RETURNING id`,
+    );
+    if (!a) throw new NotFound("Article introuvable.");
+  });
+}
+
+type DerogationRow = { id: string; species: string; variety: string | null; article_id: string | null; granted_on: string; season: number; quantity: string | null; unit: string | null; reference: string | null; certifier: string | null };
+const derogationView = (r: DerogationRow): SeedDerogation => ({
+  id: r.id,
+  species: r.species,
+  variety: r.variety,
+  articleId: r.article_id,
+  grantedOn: r.granted_on,
+  season: r.season,
+  quantity: r.quantity === null ? null : Number(r.quantity),
+  unit: r.unit,
+  reference: r.reference,
+  certifier: r.certifier,
+});
+
+export async function listSeedDerogations(db: Database, farmId: string): Promise<SeedDerogation[]> {
+  return withFarm(db, farmId, async (tx) =>
+    (await rows<DerogationRow>(tx, sql`SELECT id, species, variety, article_id, granted_on::text, season, quantity::text, unit, reference, certifier FROM seed_derogations ORDER BY season DESC, granted_on DESC`)).map(derogationView),
+  );
+}
+
+export async function addSeedDerogation(db: Database, farmId: string, w: SeedDerogationWrite): Promise<SeedDerogation> {
+  return withFarm(db, farmId, async (tx) => {
+    if (w.articleId) {
+      const [a] = await rows<{ id: string }>(tx, sql`SELECT id FROM articles WHERE id = ${w.articleId} AND kind = 'seed'`);
+      if (!a) throw new BadRequest("Semence inconnue.");
+    }
+    const [r] = await rows<DerogationRow>(
+      tx,
+      sql`INSERT INTO seed_derogations (id, farm_id, species, variety, article_id, granted_on, season, quantity, unit, reference, certifier)
+          VALUES (${crypto.randomUUID()}, ${farmId}, ${w.species}, ${w.variety}, ${w.articleId}, ${w.grantedOn}, ${w.season}, ${w.quantity}, ${w.unit}, ${w.reference}, ${w.certifier})
+          RETURNING id, species, variety, article_id, granted_on::text, season, quantity::text, unit, reference, certifier`,
+    );
+    return derogationView(r!);
+  });
+}
+
+export async function deleteSeedDerogation(db: Database, farmId: string, id: string): Promise<void> {
+  await withFarm(db, farmId, async (tx) => {
+    const [r] = await rows<{ id: string }>(tx, sql`DELETE FROM seed_derogations WHERE id = ${id} RETURNING id`);
+    if (!r) throw new NotFound("Dérogation introuvable.");
+  });
+}
+
+/** Semences et plants semés sur les parcelles AB pendant la campagne. */
+export async function abSeedUses(db: Database, farmId: string, campaign: number): Promise<{ campaign: number; items: AbSeedUse[] }> {
+  return withFarm(db, farmId, async (tx) => {
+    const certs = (await certificationsBetween(tx, `${campaign}-01-01`, `${campaign}-12-31`)).filter((c) => c.kind === "ab");
+    const ids = [...new Set(certs.map((c) => c.parcelId))];
+    if (!ids.length) return { campaign, items: [] };
+    const list = await rows<{ article_id: string; name: string; organic_status: AbSeedUse["organicStatus"]; seed_treated: boolean | null; first: string; parcels: string[] }>(
+      tx,
+      sql`SELECT a.id AS article_id, a.name, a.organic_status, a.seed_treated, min(i.started_at)::date::text AS first, array_agg(DISTINCT lp.name) AS parcels
+          FROM interventions i
+          JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_type = 'land_parcel'
+            AND t.ref_id IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})
+          JOIN land_parcels lp ON lp.id = t.ref_id
+          JOIN intervention_parameters p ON p.intervention_id = i.id AND p.role = 'input' AND p.ref_type = 'article'
+          JOIN articles a ON a.id = p.ref_id AND a.kind = 'seed'
+          WHERE i.status = 'done' AND extract(year FROM i.started_at) = ${campaign}
+          GROUP BY a.id, a.name, a.organic_status, a.seed_treated ORDER BY a.name`,
+    );
+    return {
+      campaign,
+      items: list.map((r) => ({ articleId: r.article_id, name: r.name, organicStatus: r.organic_status, seedTreated: r.seed_treated, firstSownOn: r.first, parcels: r.parcels })),
+    };
   });
 }

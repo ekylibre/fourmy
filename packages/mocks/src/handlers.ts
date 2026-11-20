@@ -348,6 +348,15 @@ export const handlers = [
   http.get(`*${base}/settings/certification`, () =>
     HttpResponse.json({ hveCampaignStartMd: "01-01", hveMethod: "campaign", hveIftScale: "current", hveBeaujolais: null, hveLivestock: null, rotationYears: 5, rotationSameSpeciesMax: 2, organicNitrogenPeriod: "calendar", abNotifiedOn: null, abCommittedOn: null }),
   ),
+  http.get(`*${base}/control/ab/seeds`, ({ request }) =>
+    HttpResponse.json({
+      campaign: Number(new URL(request.url).searchParams.get("campaign")),
+      items: [{ articleId: "00000000-0000-7000-8000-0000000000e1", name: "Blé Renan", organicStatus: "conventional", seedTreated: false, firstSownOn: "2026-10-20", parcels: ["Les Rouffiats"] }],
+    }),
+  ),
+  http.get(`*${base}/seed-derogations`, () => HttpResponse.json({ items: [] })),
+  http.post(`*${base}/seed-derogations`, async ({ request }) => HttpResponse.json({ id: crypto.randomUUID(), ...((await request.json()) as object) }, { status: 201 })),
+  http.put(`*${base}/articles/:id/organic`, () => new HttpResponse(null, { status: 204 })),
   http.get(`*${base}/control/hve/iae`, ({ request }) =>
     HttpResponse.json({
       campaign: Number(new URL(request.url).searchParams.get("campaign")),

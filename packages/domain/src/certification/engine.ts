@@ -5,8 +5,12 @@ import {
   conversionFindings,
   copperFindings,
   fertilizerFindings,
+  growingModeFindings,
+  justificationFindings,
+  mixityFindings,
   nitrogenFindings,
   phytoFindings,
+  seedFindings,
   type AbApplication,
   type AbParcelInput,
   type AbProduction,
@@ -53,7 +57,13 @@ export interface CertificationContext {
    * Agriculture biologique : parcelles certifiées, productions, et intrants
    * apportés depuis 7 ans (cuivre) jusqu'à la fin de la période.
    */
-  ab?: { parcels: AbParcelInput[]; productions: AbProduction[]; applications: AbApplication[] };
+  ab?: {
+    parcels: AbParcelInput[];
+    productions: AbProduction[];
+    applications: AbApplication[];
+    /** Productions des parcelles non AB de la campagne (mixité). */
+    others?: { species: string; label: string; variety: string | null }[];
+  };
   /** HVE : SAU, traitements et IFT de la période (et des deux précédentes pour la moyenne), références. */
   hve?: { phyto: HvePhytoContext; fertilization?: HveFertilizationContext; irrigation?: HveIrrigationContext; biodiversity?: HveBiodiversityContext };
 }
@@ -135,7 +145,17 @@ export const CAMPAIGN_SECTIONS: Record<ControlKind, RuleSection[]> = {
     {
       id: "treatments",
       label: "Traitements",
-      rules: [(ctx) => phytoFindings(inPeriod(ctx), parcelNames(ctx)), (ctx) => copperFindings(ctx.ab?.parcels ?? [], ctx.ab?.applications ?? [], ctx.period.to)],
+      rules: [
+        (ctx) => phytoFindings(inPeriod(ctx), parcelNames(ctx)),
+        (ctx) => justificationFindings(inPeriod(ctx), parcelNames(ctx)),
+        (ctx) => copperFindings(ctx.ab?.parcels ?? [], ctx.ab?.applications ?? [], ctx.period.to),
+      ],
+    },
+    { id: "seeds", label: "Semences et plants", rules: [(ctx) => seedFindings(inPeriod(ctx), parcelNames(ctx))] },
+    {
+      id: "production",
+      label: "Mode de production",
+      rules: [(ctx) => growingModeFindings(ctx.ab?.productions ?? [], parcelNames(ctx)), (ctx) => mixityFindings(ctx.ab?.productions ?? [], ctx.ab?.others ?? [])],
     },
     {
       id: "fertilization",
@@ -187,6 +207,8 @@ const abIntervention: InterventionRule = (input) => {
   const all = [...history, ...current];
   return [
     ...phytoFindings(current, names),
+    ...justificationFindings(current, names),
+    ...seedFindings(current, names),
     ...fertilizerFindings(current, names),
     ...copperFindings(withCopper, all, input.day > `${year}-12-31` ? input.day : `${year}-12-31`),
     ...nitrogenFindings(withEffluent, all, `${year}-01-01`, `${year}-12-31`).filter((f) => f.level !== "ok" || (f.value ?? 0) > 0),

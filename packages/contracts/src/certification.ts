@@ -154,6 +154,42 @@ export const CULTIVATION_MODE_LABELS: Record<z.infer<typeof cultivationMode>, st
   container: "En conteneur",
 };
 
+/** Statut biologique d'un article (semence : et traitement), pour les contrôles AB (R24). */
+export const articleOrganicWrite = z
+  .object({
+    organicStatus: z.enum(["organic", "conversion", "conventional"]).nullable(),
+    seedTreated: z.boolean().nullable().optional(),
+  })
+  .strict();
+export type ArticleOrganicWrite = z.infer<typeof articleOrganicWrite>;
+
+/** Dérogation pour une semence non biologique (R25) : avant le semis, pour une saison. */
+export const seedDerogationWrite = z
+  .object({
+    species: z.string().trim().min(1).max(120),
+    variety: z.string().trim().max(120).nullable().default(null),
+    articleId: z.string().uuid().nullable().default(null),
+    grantedOn: z.string().date(),
+    season: z.number().int().min(2000).max(2100),
+    quantity: z.number().positive().nullable().default(null),
+    unit: z.string().trim().max(40).nullable().default(null),
+    reference: z.string().trim().max(120).nullable().default(null),
+    certifier: z.string().trim().max(120).nullable().default(null),
+  })
+  .strict();
+export type SeedDerogationWrite = z.infer<typeof seedDerogationWrite>;
+export type SeedDerogation = SeedDerogationWrite & { id: string };
+
+/** Semence utilisée sur une parcelle AB (onglet Semences). */
+export interface AbSeedUse {
+  articleId: string;
+  name: string;
+  organicStatus: "organic" | "conversion" | "conventional" | null;
+  seedTreated: boolean | null;
+  firstSownOn: string;
+  parcels: string[];
+}
+
 /** IAE (HVE 4.1) : type validé par l'exploitant (null : pas une IAE), linéaire mitoyen. */
 export const landscapeFeatureHveWrite = z
   .object({

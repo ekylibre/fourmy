@@ -81,6 +81,17 @@ describe("menu principal", () => {
     expect(await screen.findByText(/^Questionnaire \d{4} enregistré\.$/)).toBeInTheDocument();
   });
 
+  it("contrôle AB : onglet Semences, statut et dérogation", async () => {
+    const user = userEvent.setup();
+    renderApp(`/f/${FARM}/control/ab`);
+    await user.click(await screen.findByRole("tab", { name: "Semences" }));
+    const table = await screen.findByRole("table", { name: "Semences des parcelles AB" });
+    expect(within(table).getByText("Blé Renan")).toBeInTheDocument();
+    expect(within(table).getByDisplayValue("Non biologique")).toBeInTheDocument();
+    await user.type(screen.getByRole("textbox", { name: /^Espèce/ }), "Blé tendre");
+    expect(screen.getByRole("button", { name: "Ajouter la dérogation" })).toBeDisabled();
+  });
+
   it("entrée active par segment de chemin", () => {
     expect(isActivePath("", "")).toBe(true);
     expect(isActivePath("/map", "")).toBe(false);

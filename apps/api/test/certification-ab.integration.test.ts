@@ -81,23 +81,27 @@ describe.skipIf(!url)("contrôle AB (intégration)", () => {
     expect(res.status, await res.clone().text()).toBe(200);
     return res.json();
   };
-  const draft = (procedure: string, day: string, inputs: unknown[]) => ({
+  const draft = (procedure: string, day: string, inputs: unknown[], justification?: string) => ({
     procedure,
     periods: [{ startedAt: `${day}T09:00:00Z`, stoppedAt: `${day}T10:00:00Z` }],
     targets: [{ kind: "land_parcel", id: parcelId }],
     inputs,
+    ...(justification ? { justification } : {}),
   });
 
   it("cuivre : teneur saisie sur un produit absent du catalogue E-Phy, puis cumul sur 7 ans dans le feu de saisie", async () => {
     // Sans teneur connue, le produit n'est pas reconnu comme cuprique : aucun constat.
-    const before = await json("POST", "/control/check", draft("spraying", "2026-06-01", [{ articleId: copper, quantity: 6, per: "hectare" }]));
+    const before = await json("POST", "/control/check", draft("spraying", "2026-06-01", [{ articleId: copper, quantity: 6, per: "hectare" }], "Mildiou observé, BSV"));
     expect(before.check).toBeNull();
     expect((await send("PUT", `/articles/${copper}/copper`, { g: 400, per: "kg" }, worker)).status).toBe(403);
     expect((await send("PUT", `/articles/${copper}/copper`, { g: 400, per: "kg" })).status).toBe(204);
     const articles = await json("GET", "/phyto/articles");
     expect(articles.items.find((a: { id: string }) => a.id === copper).copper).toEqual({ g: 400, per: "kg", from: "article" });
     // 20 kg (2023) + 6 kg/ha × 400 g/kg = 22,4 kg : proche du plafond de 28 kg.
-    const after = await json("POST", "/control/check", draft("spraying", "2026-06-01", [{ articleId: copper, quantity: 6, per: "hectare" }]));
+    const after = await json("POST", "/control/check", draft("spraying", "2026-06-01", [{ articleId: copper, quantity: 6, per: "hectare" }], "Mildiou observé, BSV"));
+    // Sans justification : le rappel R20 (orange) s'ajoute.
+    const unjustified = await json("POST", "/control/check", draft("spraying", "2026-06-01", [{ articleId: copper, quantity: 6, per: "hectare" }]));
+    expect(unjustified.check.findings.map((f: { ruleId: string }) => f.ruleId)).toEqual(["ab.R20", "ab.R21"]);
     expect(after.check).toMatchObject({ level: "warning", findings: [{ ruleId: "ab.R21", level: "warning", value: 22.4 }] });
   });
 
@@ -123,6 +127,31 @@ describe.skipIf(!url)("contrôle AB (intégration)", () => {
     const ok = await send("POST", `/interventions/${id}/complete`, { ...body, compliance: { usages: {}, reason: "Erreur de produit, déclarée à l'OC" } });
     expect(ok.status, await ok.clone().text()).toBe(200);
     expect((await ok.json()).intervention.certificationCheck).toMatchObject({ level: "danger", reason: "Erreur de produit, déclarée à l'OC", findings: [{ ruleId: "ab.R15" }] });
+  });
+
+  it("semences : non bio sans dérogation (rouge), conforme avec une dérogation antérieure ; traitement sans justification (orange)", async () => {
+    const seed = crypto.randomUUID();
+    await sql`INSERT INTO articles (id, farm_id, name, kind, unit) VALUES (${seed}, ${farmId}, 'Blé Renan', 'seed', 'Kilogramme')`;
+    expect((await send("PUT", `/articles/${seed}/organic`, { organicStatus: "conventional", seedTreated: false })).status).toBe(204);
+    const sow = crypto.randomUUID();
+    const spray = crypto.randomUUID();
+    await sql`INSERT INTO interventions (id, farm_id, procedure, status, origin, started_at, stopped_at, justification) VALUES
+      (${sow}, ${farmId}, 'sowing', 'done', 'web', '2026-10-20T08:00:00Z', '2026-10-20T10:00:00Z', NULL),
+      (${spray}, ${farmId}, 'spraying', 'done', 'web', '2026-06-10T08:00:00Z', '2026-06-10T09:00:00Z', NULL)`;
+    await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id, quantity, unit) VALUES
+      (${crypto.randomUUID()}, ${sow}, 'target', 'land_parcel', ${parcelId}, NULL, NULL),
+      (${crypto.randomUUID()}, ${sow}, 'input', 'article', ${seed}, 180, 'Kilogramme_per_hectare'),
+      (${crypto.randomUUID()}, ${spray}, 'target', 'land_parcel', ${parcelId}, NULL, NULL),
+      (${crypto.randomUUID()}, ${spray}, 'input', 'article', ${copper}, 2, 'Kilogramme_per_hectare')`;
+    const section = async (id: string) => (await json("GET", "/control/ab?campaign=2026")).sections.find((s: { id: string }) => s.id === id);
+    expect((await section("seeds")).findings[0]).toMatchObject({ ruleId: "ab.R25", level: "danger", breach: { inao: "349" } });
+    expect((await section("treatments")).findings.find((f: { ruleId: string }) => f.ruleId === "ab.R20")).toMatchObject({ level: "warning", breach: { inao: "44" } });
+    const uses = await json("GET", "/control/ab/seeds?campaign=2026");
+    expect(uses.items[0]).toMatchObject({ articleId: seed, organicStatus: "conventional", seedTreated: false, parcels: ["Parcelle Bio"] });
+    const created = await send("POST", "/seed-derogations", { species: "blé", articleId: seed, grantedOn: "2026-09-01", season: 2026, reference: "DER-2026-1" });
+    expect(created.status, await created.clone().text()).toBe(201);
+    expect((await section("seeds")).findings[0]).toMatchObject({ level: "ok" });
+    expect((await json("GET", "/seed-derogations")).items).toHaveLength(1);
   });
 
   it("rapport et parcelles : l'azote minéral fait redémarrer la conversion ; production modifiable", async () => {
