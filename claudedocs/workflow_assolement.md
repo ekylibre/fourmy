@@ -52,6 +52,12 @@ Branche `feat/crop-plan-as1b-checks`. Dépend d'AS1a.
 4. **`checks/index.ts`** : `checkCropPlan(input)` → constats groupés (PAC, Agronomie, Certifications, Réglementaire), avec `parcelKeys`.
 5. **Tests** : chaque repère a une source ; colza en retour de 2 ans ; mixité AB ; projection HVE ; mesure du temps de `checkCropPlan` sur 300 parcelles (moins de 200 ms dans vitest).
 
+*Réalisé le 20/11/2026* :
+- Repères tirés de 10 pages Triple Performance qui donnent un nombre d'années (blé, crucifères, pois, soja, féverole, lentille, luzerne, lin, betterave, pomme de terre) et d'un précédent à éviter (féverole après légumineuse) ; phrase citée mot pour mot, tous `reviewed: false`. Le soja diverge entre deux pages (2 ans contre 4 à 6) : la page de la culture est retenue.
+- Pas repris faute de source chiffrée : alternance hiver/printemps, deux cultures d'hiver de la même famille à la suite ; conseils liés à une maladie déclarée (sclérotinia des oléo-protéagineux, précédents du soja).
+- R10 (hors sol) non vérifié sur l'assolement : le mode de culture n'est pas connu au stade de la préparation.
+- HVE 4.2 : une unité culturale par parcelle (les parcelles contiguës d'une même culture ne sont pas réunies dans la projection).
+
 ## AS2a — Base et API
 
 Branche `feat/crop-plan-as2a-api`. Dépend d'AS1b.

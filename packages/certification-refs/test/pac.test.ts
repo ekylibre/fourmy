@@ -7,6 +7,9 @@ import {
   BCAE7_CATEGORIES,
   BCAE7_NON_ARABLE_CODES,
   bcae7Category,
+  DISCOURAGED_SUCCESSIONS,
+  RETURN_INTERVALS,
+  returnIntervalOf,
 } from "../src/index.js";
 
 const allCodes = BCAE7_CATEGORIES.flatMap((c) => c.codes);
@@ -57,5 +60,24 @@ describe("BCAE 7 2026 : catégories (annexes 3 et 4)", () => {
     expect(BCAE7_2026.multiannualYears).toBe(4);
     expect(BCAE7_2026.diversification.largeFarm).toMatchObject({ minCrops: 3, mainMaxShare: 0.75, twoMainMaxShare: 0.95, toleranceHa: 2 });
     expect(BCAE7_2026.diversification.smallFarm).toMatchObject({ minCrops: 2, mainMaxShare: 0.75, toleranceHa: 0.5 });
+  });
+});
+
+describe("Repères agronomiques (Triple Performance)", () => {
+  it("chaque repère a sa page, son adresse et sa phrase citée ; les nombres viennent de la phrase", () => {
+    for (const r of [...RETURN_INTERVALS, ...DISCOURAGED_SUCCESSIONS]) {
+      expect(r.source.url, r.id).toMatch(/^https:\/\/wiki\.tripleperformance\.fr\/wiki\//);
+      expect(r.source.quote.length, r.id).toBeGreaterThan(20);
+      expect(r.reviewed, r.id).toBe(false);
+    }
+    for (const r of RETURN_INTERVALS) expect(r.source.quote, r.id).toContain(String(r.minYears));
+  });
+
+  it("codes culture connus de la BCAE 7, un seul repère par code", () => {
+    const codes = RETURN_INTERVALS.flatMap((r) => r.capCodes);
+    expect(new Set(codes).size).toBe(codes.length);
+    for (const c of codes) expect(bcae7Category(c), c).toBeDefined();
+    expect(returnIntervalOf("czh")!.id).toBe("cruciferes");
+    expect(returnIntervalOf("MIS")).toBeUndefined();
   });
 });

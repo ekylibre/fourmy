@@ -88,8 +88,10 @@ export const cropPlanSettings = z
     bcae7Preferred: z.enum(["rotation", "diversification"]).default("rotation"),
     /** Au moins une parcelle dans la plaine du Rhin (arrêté BCAE) : diversification à points. */
     alsaceRhinePlain: z.boolean().default(false),
+    /** Délais de retour propres à la ferme (années), par repère (`RETURN_INTERVALS`). */
+    returnIntervals: z.record(z.string(), z.number().int().min(1).max(15)).default({}),
   })
-  .default({ bcae7Preferred: "rotation", alsaceRhinePlain: false });
+  .default({ bcae7Preferred: "rotation", alsaceRhinePlain: false, returnIntervals: {} });
 export type CropPlanSettings = z.infer<typeof cropPlanSettings>;
 
 /** Champs d'une production que l'assolement fixe. */
