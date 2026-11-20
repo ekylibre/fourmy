@@ -19,6 +19,7 @@ const urea = crypto.randomUUID();
 const grain = crypto.randomUUID();
 const activity = crypto.randomUUID();
 const productions: Record<string, string> = {};
+const hedge = crypto.randomUUID();
 
 describe.skipIf(!url)("contrôle HVE phyto (intégration)", () => {
   const sql = postgres(url!, { max: 1, onnotice: () => {} });
@@ -50,6 +51,10 @@ describe.skipIf(!url)("contrôle HVE phyto (intégration)", () => {
       ${sql.json({ status: "ok", total: 2, computedAt: "2026-04-10T12:00:00Z", error: null, lines: [{ articleId: herbicide, parcelId: treated, ift: 2, segment: "Herbicides", segmentCode: "S3", doseReference: 1, warning: null, certifiedId: "x", signature: "jwt" }] })})`;
     await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id) VALUES (${crypto.randomUUID()}, ${spraying}, 'target', 'land_parcel', ${treated})`;
     await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id, quantity, unit) VALUES (${crypto.randomUUID()}, ${spraying}, 'input', 'article', ${herbicide}, 1.5, 'Litre_per_hectare')`;
+    // Haie TelePAC (V4) de 2,2 m le long du bord sud des parcelles.
+    await sql`INSERT INTO farm_landscape_features (id, farm_id, source, campaign, ref, kind, cap_type, width_m, area_m2, geom) VALUES
+      (${hedge}, ${farmId}, 'telepac', 2026, 'SNA-1', 'hedge', 'V4', 2.2, 1620,
+       ST_GeomFromText('POLYGON((7.5 48.49999,7.51 48.49999,7.51 48.50001,7.5 48.50001,7.5 48.49999))', 4326))`;
     // Fertilisation : 200 kg/ha d'urée (92 kg N/ha) sur la parcelle traitée ; récolte de 80 q/ha de blé.
     await sql`INSERT INTO articles (id, farm_id, name, kind, unit) VALUES (${urea}, ${farmId}, 'Urée 46', 'fertilizer', 'Kilogramme'), (${grain}, ${farmId}, 'Blé grain', 'harvest', 'Tonne')`;
     await sql`INSERT INTO article_fertilizers (article_id, farm_id, basis, n_total, n_mineral_share, nitrate_type, foliar, origin) VALUES (${urea}, ${farmId}, 'mass_percent', 46, 1, 'III', false, 'confirmed')`;
@@ -119,6 +124,23 @@ describe.skipIf(!url)("contrôle HVE phyto (intégration)", () => {
     await json("PUT", `/productions/${productions[treated]}/certification`, { droughtTolerant: false, waterSaving: "non-labour" });
     irrigation = await section();
     expect(item(irrigation, "hve.7.1")).toMatchObject({ value: 8.3, points: { got: 6 } });
+  });
+
+  it("biodiversité : haie TelePAC proposée, comptée une fois validée (socle sur les terres arables, poids)", async () => {
+    const bio = async () => (await json("GET", "/control/hve?campaign=2026")).sections.find((s: { id: string }) => s.id === "biodiversity");
+    const iae = (s: { findings: { ruleId: string }[] }) => s.findings.find((f) => f.ruleId === "hve.4.1") as { level: string; points: { got: number }; message: string };
+    expect(iae(await bio())).toMatchObject({ level: "missing", points: { got: 0 } });
+    const list = await json("GET", "/control/hve/iae?campaign=2026");
+    expect(list.items[0]).toMatchObject({ id: hedge, type: "hedge", proposed: true, validated: false, unit: "m", onArable: true });
+    expect(list.items[0].quantity).toBeGreaterThan(700);
+    const put = await app.request(`/api/v1/farms/${farmId}/landscape-features/${hedge}/hve`, { method: "PUT", headers, body: JSON.stringify({ type: "hedge", validated: true, shared: false }) });
+    expect(put.status).toBe(204);
+    const after = iae(await bio());
+    // ≈ 736 m × 20 m² = 1,47 ha équivalents sur 20 ha de terres arables : socle atteint, poids ≈ 7 % → 4 points.
+    expect(after.level).toBe("ok");
+    expect(after.points.got).toBe(4);
+    expect(after.message).toMatch(/Socle : 7,\d % des terres arables/);
+    expect((await app.request(`/api/v1/farms/${farmId}/landscape-features/${hedge}/hve`, { method: "PUT", headers, body: JSON.stringify({ type: "dragon", validated: true }) })).status).toBe(400);
   });
 
   it("réglage : notation IFT « ancienne » ; saisie : herbicide CMR2 en orange", async () => {

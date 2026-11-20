@@ -15,6 +15,7 @@ import {
 import {
   splitUnit,
   unitScale,
+  type HveBiodiversityContext,
   type HveFertilizationContext,
   type HveFertParcel,
   type HveIrrigation,
@@ -23,7 +24,7 @@ import {
   type HvePhytoContext,
   type HveYear,
 } from "@fourmy/domain";
-import { nitrogenExportsOf } from "@fourmy/certification-refs";
+import { IAE_BY_CODE, IAE_OF_CAP_TYPE, nitrogenExportsOf } from "@fourmy/certification-refs";
 import { abApplications } from "./certification-ab.js";
 
 /**
@@ -363,5 +364,109 @@ export async function loadHveIrrigation(tx: Tx, campaign: number, period: { from
       harvested: p.harvested,
     })),
     irrigationEquipment: equipment.map((e) => e.name),
+  };
+}
+
+// --- Biodiversité (lot CT4) --------------------------------------------------------------
+
+const PT_REFERENCES = ["ryegrass", "annual_ryegrass", "cocksfoot", "fescue", "rough_bluegrass", "alfalfa", "dehydrated_alfalfa", "clover", "dehydrated_clover", "leguminous_mix", "festulolium", "bromus"];
+
+/**
+ * Données de l'indicateur biodiversité : surfaces (SAU, terres arables,
+ * dispenses du socle), IAE (type proposé d'après TelePAC ou validé,
+ * quantité, adjacence aux terres arables), unités culturales, espèces.
+ */
+export async function loadHveBiodiversity(tx: Tx, campaign: number, period: { from: string; to: string }, parcels: HveFertParcel[]): Promise<HveBiodiversityContext> {
+  const ids = parcels.map((p) => p.id);
+  const refs = ids.length
+    ? await rows<{ id: string; reference: string | null }>(
+        tx,
+        sql`SELECT lp.id, a.reference FROM land_parcels lp
+            LEFT JOIN LATERAL (SELECT p.* FROM productions p JOIN campaigns c ON c.id = p.campaign_id
+                               WHERE p.land_parcel_id = lp.id AND c.year = ${campaign} ORDER BY p.created_at LIMIT 1) pr ON true
+            LEFT JOIN activities a ON a.id = pr.activity_id
+            WHERE lp.id = ANY(${uuidList(ids)})`,
+      )
+    : [];
+  const refOf = new Map(refs.map((r) => [r.id, r.reference]));
+  const temporary = (p: HveFertParcel) => p.family === "field_crops" && PT_REFERENCES.includes(refOf.get(p.id) ?? "");
+  const fallow = (p: HveFertParcel) => /fallow/.test(refOf.get(p.id) ?? "");
+  const arable = parcels.filter((p) => p.family === "field_crops" || p.family === "vegetables");
+  const sum = (ps: HveFertParcel[]) => ps.reduce((s, p) => s + p.areaM2, 0);
+  const sauM2 = sum(parcels);
+  const arableIds = arable.map((p) => p.id);
+
+  const features = await rows<{ id: string; label: string | null; cap_type: string | null; hve_type: string | null; validated: boolean; shared: boolean; quantity_m: number | null; area_m2: number | null; is_point: boolean; on_arable: boolean; outside: number | null }>(
+    tx,
+    sql`WITH arable AS (
+          SELECT v.shape FROM land_parcel_versions v
+          WHERE v.land_parcel_id = ANY(${uuidList(arableIds.length ? arableIds : ["00000000-0000-0000-0000-000000000000"])})
+            AND v.valid && tstzrange(${period.from}::date, (${period.to}::date + 1))),
+        farm AS (
+          SELECT ST_Union(v.shape) AS shape FROM land_parcel_versions v
+          WHERE v.land_parcel_id = ANY(${uuidList(ids.length ? ids : ["00000000-0000-0000-0000-000000000000"])})
+            AND v.valid && tstzrange(${period.from}::date, (${period.to}::date + 1))),
+        latest AS (SELECT max(campaign) AS c FROM farm_landscape_features WHERE campaign IS NULL OR campaign <= ${campaign})
+        SELECT f.id, coalesce(f.attrs->>'label', f.kind) AS label, f.cap_type, f.hve_type, f.hve_validated_at IS NOT NULL AS validated, f.hve_shared AS shared,
+               geometrytype(f.geom) = 'POINT' AS is_point,
+               CASE WHEN geometrytype(f.geom) LIKE '%POLYGON' THEN ST_Area(f.geom::geography) END AS area_m2,
+               -- Linéaire : surface / largeur, sinon demi-périmètre.
+               CASE WHEN geometrytype(f.geom) LIKE '%POLYGON' THEN
+                 CASE WHEN f.width_m > 0 THEN ST_Area(f.geom::geography) / f.width_m ELSE ST_Perimeter(f.geom::geography) / 2 END
+                    WHEN geometrytype(f.geom) LIKE '%LINESTRING' THEN ST_Length(f.geom::geography) END AS quantity_m,
+               -- Porté par une terre arable ou adjacent par sa longueur : ≥ 50 % de l'élément dans un tampon de 1 m.
+               EXISTS (SELECT 1 FROM arable a WHERE ST_DWithin(a.shape::geography, f.geom::geography, 1) AND (
+                 geometrytype(f.geom) = 'POINT'
+                 OR (geometrytype(f.geom) LIKE '%POLYGON' AND ST_Area(ST_Intersection(f.geom, ST_Buffer(a.shape::geography, 1)::geometry)::geography) >= 0.5 * ST_Area(f.geom::geography))
+                 OR (geometrytype(f.geom) LIKE '%LINESTRING' AND ST_Length(ST_Intersection(f.geom, ST_Buffer(a.shape::geography, 1)::geometry)::geography) >= 0.5 * ST_Length(f.geom::geography))
+               )) AS on_arable,
+               -- Surface hors SAU (surface totale de l'exploitation).
+               CASE WHEN geometrytype(f.geom) LIKE '%POLYGON' THEN ST_Area(coalesce(ST_Difference(f.geom, (SELECT shape FROM farm)), f.geom)::geography) END AS outside
+        FROM farm_landscape_features f, latest
+        WHERE f.campaign IS NOT DISTINCT FROM latest.c`,
+  );
+  const iae = features.map((f) => {
+    const type = f.hve_type ?? (f.cap_type ? (IAE_OF_CAP_TYPE[f.cap_type] ?? null) : null);
+    const unit = type ? IAE_BY_CODE[type]?.unit : undefined;
+    const quantity = unit === "tree" ? 1 : unit === "m" ? (f.quantity_m ?? 0) : (f.area_m2 ?? 0);
+    return { id: f.id, label: f.label ?? "IAE", type, validated: f.validated, shared: f.shared, quantity, onArable: f.on_arable, realM2: f.area_m2 };
+  });
+  const nonAgricultural = features.reduce((s, f) => s + (f.outside ?? 0), 0);
+
+  // 4.2 : parcelles contiguës (à 1 m près) d'une même espèce réunies en une unité culturale.
+  const plots = ids.length
+    ? await rows<{ area_m2: number; pp: boolean }>(
+        tx,
+        sql`WITH p AS (
+              SELECT DISTINCT ON (v.land_parcel_id) v.land_parcel_id AS id, v.area_m2::float8 AS area, v.shape FROM land_parcel_versions v
+              WHERE v.land_parcel_id = ANY(${uuidList(ids)}) AND v.valid && tstzrange(${period.from}::date, (${period.to}::date + 1))
+              ORDER BY v.land_parcel_id, upper(v.valid) DESC NULLS FIRST),
+            t(id, species, pp) AS (VALUES ${sql.join(
+              parcels.map((x) => sql`(${x.id}::uuid, ${x.species ?? `inconnue-${x.id}`}::text, ${x.family === "permanent_grassland"}::boolean)`),
+              sql`, `,
+            )}),
+            s AS (SELECT p.*, t.species, t.pp FROM p JOIN t ON t.id = p.id),
+            c AS (SELECT area, pp, species, ST_ClusterDBSCAN(ST_Transform(shape, 2154), 1, 1) OVER (PARTITION BY species) AS cid FROM s)
+            SELECT sum(area)::float8 AS area_m2, bool_or(pp) AS pp FROM c GROUP BY species, cid`,
+      )
+    : [];
+  const cover = await rows<{ species: string | null }>(tx, sql`SELECT DISTINCT species FROM cover_crops WHERE campaign = ${campaign} AND species IS NOT NULL`);
+  const crops = parcels.map((p) => ({
+    species: p.species ?? `inconnue-${p.id}`,
+    label: p.species ?? p.name,
+    areaM2: p.areaM2,
+    permanentGrassland: p.family === "permanent_grassland",
+    temporaryGrassland: temporary(p),
+  }));
+  return {
+    sauM2,
+    totalM2: sauM2 + nonAgricultural,
+    arableM2: sum(arable),
+    arableGrassFallowLegumeM2: sum(arable.filter((p) => temporary(p) || fallow(p) || p.legume)),
+    grassRiceM2: sum(parcels.filter((p) => p.family === "permanent_grassland" || temporary(p) || (p.species ?? "").startsWith("oryza"))),
+    iae,
+    plots: plots.map((p) => ({ areaM2: p.area_m2, permanentGrassland: p.pp })),
+    crops,
+    coverSpecies: [...new Set(cover.flatMap((c) => (c.species ?? "").split(/[,;+]/).map((x) => x.trim().toLowerCase()).filter(Boolean)))],
   };
 }

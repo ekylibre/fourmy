@@ -61,6 +61,16 @@ describe("menu principal", () => {
     expect(await screen.findByRole("textbox", { name: /Autres pratiques économes en eau/ })).toBeInTheDocument();
   });
 
+  it("contrôle HVE : onglet IAE, type proposé d'après TelePAC, validation par le responsable", async () => {
+    const user = userEvent.setup();
+    renderApp(`/f/${FARM}/control/hve`);
+    await user.click(await screen.findByRole("tab", { name: "IAE" }));
+    const table = await screen.findByRole("table", { name: "Infrastructures agro-écologiques" });
+    expect(within(table).getByText("Proposé")).toBeInTheDocument();
+    expect(within(table).getByText("8 400 m²")).toBeInTheDocument();
+    await user.click(within(table).getByRole("checkbox", { name: "Valider Haie" }));
+  });
+
   it("entrée active par segment de chemin", () => {
     expect(isActivePath("", "")).toBe(true);
     expect(isActivePath("/map", "")).toBe(false);

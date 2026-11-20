@@ -1,12 +1,14 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { articleCopperWrite, certificationSettings, controlKind, interventionPlanWrite, productionCertificationWrite } from "@fourmy/contracts";
+import { articleCopperWrite, certificationSettings, controlKind, interventionPlanWrite, landscapeFeatureHveWrite, productionCertificationWrite } from "@fourmy/contracts";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import {
   abParcelStatuses,
   checkInterventionCertificationFor,
+  hveIaeList,
   hveIrrigatedParcels,
+  putLandscapeFeatureHve,
   controlAvailability,
   controlReport,
   getCertificationSettings,
@@ -54,6 +56,14 @@ export const certificationControlRoutes = new Hono<Env>()
     const parsed = productionCertificationWrite.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.issues[0]?.message);
     return c.json(await putProductionCertification(db(), c.get("farmId"), uuidParam(c, "id"), parsed.data));
+  })
+  // IAE de la campagne HVE (onglet IAE) et leur validation.
+  .get("/control/hve/iae", async (c) => c.json(await hveIaeList(db(), c.get("farmId"), campaignOf(c.req.query("campaign")))))
+  .put("/landscape-features/:id/hve", requireOwner, async (c) => {
+    const parsed = landscapeFeatureHveWrite.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.issues[0]?.message);
+    await putLandscapeFeatureHve(db(), c.get("farmId"), uuidParam(c, "id"), parsed.data);
+    return c.body(null, 204);
   })
   // Parcelles irriguées de la campagne HVE (onglet Irrigation).
   .get("/control/hve/irrigated", async (c) => c.json(await hveIrrigatedParcels(db(), c.get("farmId"), campaignOf(c.req.query("campaign")))))

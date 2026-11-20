@@ -19,6 +19,14 @@ import {
   legumePoints,
   irrigationRecordPoints,
   lowWaterPoints,
+  iaeWeightPoints,
+  smallPlotsPoints,
+  mainCropPoints,
+  speciesCountPoints,
+  IAE_TYPES,
+  IAE_BY_CODE,
+  IAE_OF_CAP_TYPE,
+  iaeEquivalentM2,
 } from "../src/index.js";
 
 describe("grille HVE v1.15 : barèmes aux bornes", () => {
@@ -137,5 +145,22 @@ describe("grille HVE : irrigation, barèmes aux bornes", () => {
   it("7.1 enregistrement et 7.6 étiage", () => {
     expect([9.99, 10, 20, 30].map(irrigationRecordPoints)).toEqual([6, 4, 2, 0]);
     expect([90, 89.99, 80, 79.99, 60, 40, 20, 19.99].map(lowWaterPoints)).toEqual([0, 1, 1, 2, 2, 3, 4, 5]);
+  });
+});
+
+describe("grille HVE : biodiversité, barèmes aux bornes", () => {
+  it("4.1 poids, 4.2, 4.3, 4.4", () => {
+    expect([3.99, 4, 4.99, 5, 9.99, 10, 25].map(iaeWeightPoints)).toEqual([0, 1, 1, 2, 6, 7, 7]);
+    expect([39.99, 40, 50, 79.99, 80, 100].map(smallPlotsPoints)).toEqual([0, 1, 2, 4, 5, 5]);
+    expect([60, 59.99, 50, 40, 30, 20, 19.99].map(mainCropPoints)).toEqual([0, 1, 1, 2, 3, 4, 5]);
+    expect([5, 6, 10, 12].map((n) => speciesCountPoints(n, true))).toEqual([0, 1, 5, 5]);
+    expect([4, 5, 10, 11].map((n) => speciesCountPoints(n, false))).toEqual([0, 1, 6, 6]);
+  });
+
+  it("17 types d'IAE, 10 au socle ; types TelePAC proposés", () => {
+    expect(IAE_TYPES).toHaveLength(17);
+    expect(IAE_TYPES.filter((t) => t.base)).toHaveLength(10);
+    expect(iaeEquivalentM2(IAE_BY_CODE[IAE_OF_CAP_TYPE.V4!]!, 100)).toBe(2000);
+    expect(iaeEquivalentM2(IAE_BY_CODE.tree!, 3)).toBe(90);
   });
 });

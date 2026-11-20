@@ -158,6 +158,11 @@ US-2 passe.
 
 Branche `feat/control-ct4-hve-biodiv`. Dépend de CT3.
 
+**Découpage (20/11/2026)** : CT4a biodiversité calculée (4.1 à 4.4, IAE
+validées dans l'onglet IAE, IAE comptées au 5.2) ; CT4b questionnaire
+annuel (4.5 à 4.8 et tous les items déclaratifs des autres indicateurs).
+La carte des IAE est reportée : la validation se fait dans une liste.
+
 4.1 **IAE** : `hve/iae.ts` (17 types, coefficients, familles) ; proposition
 type PAC → type HVE ; validation et mitoyenneté (`PUT
 /landscape-features/:id/hve`, onglet IAE avec carte) ; adjacence PostGIS

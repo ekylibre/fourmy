@@ -154,6 +154,32 @@ export const CULTIVATION_MODE_LABELS: Record<z.infer<typeof cultivationMode>, st
   container: "En conteneur",
 };
 
+/** IAE (HVE 4.1) : type validé par l'exploitant (null : pas une IAE), linéaire mitoyen. */
+export const landscapeFeatureHveWrite = z
+  .object({
+    type: z.string().trim().min(1).max(40).nullable(),
+    validated: z.boolean(),
+    shared: z.boolean().default(false),
+  })
+  .strict();
+export type LandscapeFeatureHveWrite = z.infer<typeof landscapeFeatureHveWrite>;
+
+/** IAE de l'exploitation, telles que le contrôle HVE les compte. */
+export interface HveIaeItem {
+  id: string;
+  label: string;
+  capType: string | null;
+  /** Type HVE retenu (validé) ou proposé d'après TelePAC. */
+  type: string | null;
+  proposed: boolean;
+  validated: boolean;
+  shared: boolean;
+  quantity: number;
+  unit: "m" | "m2" | "tree" | null;
+  equivalentM2: number | null;
+  onArable: boolean;
+}
+
 /** Production : ce que les contrôles AB lisent (conversion, mode de culture). Absent : inchangé ; cycle null : déduit de Lexicon. */
 export const productionCertificationWrite = z
   .object({
