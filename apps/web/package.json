@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@fourmy/carto": "workspace:*",
+    "@fourmy/certification-refs": "workspace:*",
     "@fourmy/contracts": "workspace:*",
     "@fourmy/domain": "workspace:*",
     "@fourmy/equipment-3d": "workspace:*",

@@ -11,8 +11,8 @@ const UAN = "00000000-0000-7000-8000-00000000f101";
 const MANURE = "00000000-0000-7000-8000-00000000f102";
 const proposal = { basis: "kg_per_m3", nTotal: 390, nMineralShare: 1, p2o5: null, k2o: null, so3: null, density: 1.3, nitrateType: "III", foliar: false, source: "nom « Solution azotée 390 » (solution azotée)" } as const;
 const items: FertilizerArticle[] = [
-  { id: UAN, name: "Solution azotée 390", kind: "fertilizer", unit: "Tonne", lexiconRef: null, composition: null, origin: null, source: null, proposal, analyses: [], usage: 3 },
-  { id: MANURE, name: "Fumier", kind: "fertilizer", unit: "Tonne", lexiconRef: null, composition: null, origin: null, source: null, proposal: null, analyses: [], usage: 2 },
+  { id: UAN, name: "Solution azotée 390", kind: "fertilizer", unit: "Tonne", lexiconRef: null, composition: null, origin: null, source: null, proposal, analyses: [], usage: 3, abCategories: null, effluentOrigin: null },
+  { id: MANURE, name: "Fumier", kind: "fertilizer", unit: "Tonne", lexiconRef: null, composition: null, origin: null, source: null, proposal: null, analyses: [], usage: 2, abCategories: null, effluentOrigin: null },
 ];
 
 describe("fertilisants", () => {

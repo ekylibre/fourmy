@@ -169,6 +169,9 @@ importers:
       '@fourmy/carto':
         specifier: workspace:*
         version: link:../../packages/carto
+      '@fourmy/certification-refs':
+        specifier: workspace:*
+        version: link:../../packages/certification-refs
       '@fourmy/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -408,6 +411,9 @@ importers:
 
   packages/domain:
     dependencies:
+      '@fourmy/certification-refs':
+        specifier: workspace:*
+        version: link:../certification-refs
       '@fourmy/contracts':
         specifier: workspace:*
         version: link:../contracts

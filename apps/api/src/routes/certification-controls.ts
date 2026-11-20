@@ -1,16 +1,19 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { certificationSettings, controlKind, interventionPlanWrite } from "@fourmy/contracts";
+import { articleCopperWrite, certificationSettings, controlKind, interventionPlanWrite, productionCertificationWrite } from "@fourmy/contracts";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import {
+  abParcelStatuses,
   checkInterventionCertificationFor,
   controlAvailability,
   controlReport,
   getCertificationSettings,
+  putArticleCopper,
   putCertificationSettings,
+  putProductionCertification,
 } from "../repos/certification-controls.js";
-import { BadRequest, intQuery, problem } from "./helpers.js";
+import { BadRequest, intQuery, problem, uuidParam } from "./helpers.js";
 
 const checkWrite = interventionPlanWrite.extend({ interventionId: z.string().uuid().optional() });
 
@@ -29,8 +32,8 @@ export const certificationControlRoutes = new Hono<Env>()
   .post("/control/check", async (c) => {
     const parsed = checkWrite.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.message);
-    const { interventionId: _id, ...body } = parsed.data;
-    return c.json({ check: await checkInterventionCertificationFor(db(), c.get("farmId"), body) });
+    const { interventionId, ...body } = parsed.data;
+    return c.json({ check: await checkInterventionCertificationFor(db(), c.get("farmId"), body, interventionId ?? null) });
   })
   .get("/settings/certification", async (c) => c.json(await getCertificationSettings(db(), c.get("farmId"))))
   .put("/settings/certification", requireOwner, async (c) => {
@@ -38,6 +41,21 @@ export const certificationControlRoutes = new Hono<Env>()
     if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.issues[0]?.message);
     return c.json(await putCertificationSettings(db(), c.get("farmId"), parsed.data));
   })
+  // Cuivre métal d'un produit (contrôle AB) : quand E-Phy ne permet pas de la déduire.
+  .put("/articles/:id/copper", requireOwner, async (c) => {
+    const parsed = articleCopperWrite.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.issues[0]?.message);
+    await putArticleCopper(db(), c.get("farmId"), uuidParam(c, "id"), parsed.data);
+    return c.body(null, 204);
+  })
+  // Cycle, date de plantation, mode de culture d'une production (conversion AB).
+  .put("/productions/:id/certification", requireOwner, async (c) => {
+    const parsed = productionCertificationWrite.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.issues[0]?.message);
+    return c.json(await putProductionCertification(db(), c.get("farmId"), uuidParam(c, "id"), parsed.data));
+  })
+  // Statut de conversion des parcelles AB (onglet Parcelles).
+  .get("/control/ab/parcels", async (c) => c.json(await abParcelStatuses(db(), c.get("farmId"), campaignOf(c.req.query("campaign")))))
   // Rapport d'une campagne : `hve` ou `ab`.
   .get("/control/:kind", async (c) => {
     const kind = controlKind.safeParse(c.req.param("kind"));

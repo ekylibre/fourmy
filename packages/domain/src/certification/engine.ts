@@ -1,5 +1,16 @@
 import type { CertificationSettings, ControlFinding, ControlKind, ControlLevel, ControlSection } from "@fourmy/contracts";
 import { finding, section, verdictOf, worstControlLevel } from "./report.js";
+import {
+  abParcelStatuses,
+  conversionFindings,
+  copperFindings,
+  fertilizerFindings,
+  nitrogenFindings,
+  phytoFindings,
+  type AbApplication,
+  type AbParcelInput,
+  type AbProduction,
+} from "./ab.js";
 
 /**
  * Moteur des contrôles HVE et AB (claudedocs/conception_controle_hve_ab.md
@@ -33,6 +44,11 @@ export interface CertificationContext {
   parcels: CertificationParcel[];
   certifications: ParcelCertificationRef[];
   settings: CertificationSettings;
+  /**
+   * Agriculture biologique : parcelles certifiées, productions, et intrants
+   * apportés depuis 7 ans (cuivre) jusqu'à la fin de la période.
+   */
+  ab?: { parcels: AbParcelInput[]; productions: AbProduction[]; applications: AbApplication[] };
 }
 
 export type CampaignRule = (ctx: CertificationContext) => ControlFinding[];
@@ -74,10 +90,31 @@ const perimeter: CampaignRule = (ctx) => {
   ];
 };
 
-/** Sections de chaque contrôle ; les règles arrivent avec les lots CT2 à CT5. */
+const inPeriod = (ctx: CertificationContext) => (ctx.ab?.applications ?? []).filter((a) => a.day >= ctx.period.from && a.day <= ctx.period.to);
+const parcelNames = (ctx: CertificationContext) => new Map((ctx.ab?.parcels ?? []).map((p) => [p.id, p.name]));
+
+/** Statut de conversion des parcelles AB à la fin de la période (lot CT2). */
+export function abStatuses(ctx: CertificationContext) {
+  return ctx.ab ? abParcelStatuses(ctx.ab.parcels, ctx.ab.productions, ctx.ab.applications, ctx.period.to) : [];
+}
+
+/** Sections de chaque contrôle ; HVE arrive avec les lots CT3 et CT4. */
 export const CAMPAIGN_SECTIONS: Record<ControlKind, RuleSection[]> = {
   hve: [{ id: "perimeter", label: "Périmètre", rules: [perimeter] }],
-  ab: [{ id: "perimeter", label: "Périmètre", rules: [perimeter] }],
+  ab: [
+    { id: "perimeter", label: "Périmètre", rules: [perimeter] },
+    { id: "conversion", label: "Conversion", rules: [(ctx) => conversionFindings(abStatuses(ctx))] },
+    {
+      id: "treatments",
+      label: "Traitements",
+      rules: [(ctx) => phytoFindings(inPeriod(ctx), parcelNames(ctx)), (ctx) => copperFindings(ctx.ab?.parcels ?? [], ctx.ab?.applications ?? [], ctx.period.to)],
+    },
+    {
+      id: "fertilization",
+      label: "Fertilisation",
+      rules: [(ctx) => fertilizerFindings(inPeriod(ctx), parcelNames(ctx)), (ctx) => nitrogenFindings(ctx.ab?.parcels ?? [], inPeriod(ctx), ctx.period.from, ctx.period.to)],
+    },
+  ],
 };
 
 /** Rapport d'une campagne (sans les champs d'enregistrement : date de calcul, export). */
@@ -99,12 +136,35 @@ export interface InterventionCertificationInput {
   inputs: { articleId: string; quantity: number; per: "hectare" | "total"; unit?: string }[];
   equipmentIds: string[];
   justification: string | null;
+  /**
+   * Agriculture biologique : parcelles AB de l'intervention, intrants saisis
+   * (ramenés à l'hectare, par parcelle) et apports réalisés avant (cumuls du
+   * cuivre sur 7 ans et de l'azote sur l'année).
+   */
+  ab?: { parcels: { id: string; name: string }[]; current: AbApplication[]; history: AbApplication[] };
 }
 
 export type InterventionRule = (input: InterventionCertificationInput) => ControlFinding[];
 
-/** Règles de saisie, par contrôle ; ajoutées par les lots CT2 à CT5. */
-export const INTERVENTION_RULES: Record<ControlKind, InterventionRule[]> = { hve: [], ab: [] };
+/** Saisie AB : produits interdits, et cumuls cuivre et azote avec l'apport saisi. */
+const abIntervention: InterventionRule = (input) => {
+  if (!input.ab) return [];
+  const { parcels, current, history } = input.ab;
+  const names = new Map(parcels.map((p) => [p.id, p.name]));
+  const year = input.day.slice(0, 4);
+  const withCopper = parcels.filter((p) => current.some((a) => a.parcelId === p.id && a.copperKgHa !== undefined));
+  const withEffluent = parcels.filter((p) => current.some((a) => a.parcelId === p.id && a.kind === "fertilizer" && !a.syntheticNitrogen));
+  const all = [...history, ...current];
+  return [
+    ...phytoFindings(current, names),
+    ...fertilizerFindings(current, names),
+    ...copperFindings(withCopper, all, input.day > `${year}-12-31` ? input.day : `${year}-12-31`),
+    ...nitrogenFindings(withEffluent, all, `${year}-01-01`, `${year}-12-31`).filter((f) => f.level !== "ok" || (f.value ?? 0) > 0),
+  ];
+};
+
+/** Règles de saisie, par contrôle ; HVE arrive avec le lot CT3. */
+export const INTERVENTION_RULES: Record<ControlKind, InterventionRule[]> = { hve: [], ab: [abIntervention] };
 
 /**
  * Constats de certification d'une intervention ; `null` si aucune de ses

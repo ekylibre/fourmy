@@ -345,6 +345,26 @@ export const handlers = [
   // Contrôles HVE et AB (lot CT1) : une parcelle de démo est certifiée AB depuis 2020.
   http.get(`*${base}/control/availability`, () => HttpResponse.json({ hve: false, ab: true })),
   http.post(`*${base}/control/check`, () => HttpResponse.json({ check: null })),
+  http.get(`*${base}/control/ab/parcels`, ({ request }) => {
+    const campaign = Number(new URL(request.url).searchParams.get("campaign"));
+    return HttpResponse.json({
+      campaign,
+      period: { from: `${campaign}-01-01`, to: `${campaign}-12-31` },
+      items: [
+        {
+          parcelId: "00000000-0000-7000-8000-0000000000a0",
+          name: "Les Rouffiats",
+          areaM2: 25_000,
+          declaredLevel: "certified",
+          startedOn: "2020-01-01",
+          conversionStart: "2020-01-01",
+          resetBy: null,
+          status: "AB",
+          productions: [{ id: "00000000-0000-7000-8000-0000000000b0", label: "Vigne", cycle: "perennial", sownOn: "2005-03-01", harvestOn: `${campaign}-09-20`, status: "AB" }],
+        },
+      ],
+    });
+  }),
   http.get(`*${base}/control/:kind`, ({ request, params }) => {
     const campaign = Number(new URL(request.url).searchParams.get("campaign"));
     return HttpResponse.json({

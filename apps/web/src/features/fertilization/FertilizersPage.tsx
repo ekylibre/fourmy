@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { ActionIcon, Alert, Badge, Button, Group, Modal, NumberInput, Paper, Select, SimpleGrid, Stack, Switch, Table, Text, TextInput, Title } from "@mantine/core";
+import { ActionIcon, Alert, Badge, Button, Group, Modal, MultiSelect, NumberInput, Paper, Select, SimpleGrid, Stack, Switch, Table, Text, TextInput, Title } from "@mantine/core";
+import { ANNEX_II, ANNEX_II_BY_CODE, ANNEX_II_GROUP_LABELS } from "@fourmy/certification-refs";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
@@ -11,6 +12,8 @@ import {
   type FertilizerArticle,
   type FertilizerComposition,
   type FertilizerWrite,
+  type EffluentOrigin,
+  EFFLUENT_ORIGIN_LABELS,
   type NitrateType,
   type ProductAnalysisWrite,
 } from "@fourmy/contracts";
@@ -138,6 +141,10 @@ function FertilizerModal({ farmId, article, onClose }: { farmId: string; article
   const start = article.composition ?? article.proposal ?? EMPTY;
   const [c, setC] = useState<FertilizerComposition>(start);
   const [source, setSource] = useState<string>(article.composition ? (article.source ?? "") : (article.proposal?.source ?? ""));
+  // Agriculture biologique (lot CT2) : catégories de l'annexe II, provenance de l'effluent.
+  const [abCategories, setAbCategories] = useState<string[]>(article.abCategories ?? []);
+  const [effluentOrigin, setEffluentOrigin] = useState<EffluentOrigin | null>(article.effluentOrigin ?? null);
+  const needsOrigin = abCategories.some((code) => ANNEX_II_BY_CODE[code]?.industrialForbidden);
   const refresh = () => client.invalidateQueries({ queryKey: ["fertilizers", farmId] });
   const save = useMutation({
     mutationFn: (w: FertilizerWrite) => api.put(farmPath(farmId, `/articles/${article.id}/fertilizer`), w),
@@ -238,9 +245,40 @@ function FertilizerModal({ farmId, article, onClose }: { farmId: string; article
         )}
         <Switch label="Apport foliaire (hors calendrier d'épandage)" checked={c.foliar} onChange={(e) => setC({ ...c, foliar: e.currentTarget.checked })} />
         <TextInput label="Source" placeholder="Étiquette, fiche du fournisseur…" value={source} onChange={(e) => setSource(e.currentTarget.value)} maxLength={200} />
+        <SimpleGrid cols={{ base: 1, sm: 2 }}>
+          <MultiSelect
+            label="Agriculture biologique : matières (annexe II)"
+            description="Toutes les matières du produit ; une matière non listée le rend interdit en AB"
+            placeholder={abCategories.length ? undefined : "Non renseigné"}
+            data={[
+              ...Object.entries(ANNEX_II_GROUP_LABELS).map(([group, label]) => ({
+                group: label,
+                items: ANNEX_II.filter((x) => x.group === group).map((x) => ({ value: x.code, label: x.label })),
+              })),
+              { group: "Autre", items: [{ value: "outside", label: "Matière hors annexe II (engrais de synthèse, boues…)" }] },
+            ]}
+            value={abCategories}
+            onChange={setAbCategories}
+            searchable
+            clearable
+          />
+          {needsOrigin && (
+            <Select
+              label="Provenance de l'effluent"
+              description="Élevage industriel interdit en AB"
+              data={Object.entries(EFFLUENT_ORIGIN_LABELS).map(([value, label]) => ({ value, label }))}
+              value={effluentOrigin}
+              onChange={(v) => setEffluentOrigin(v as EffluentOrigin | null)}
+              clearable
+            />
+          )}
+        </SimpleGrid>
         {(save.error || clear.error) && <ErrorAlert error={save.error ?? clear.error} />}
         <Group>
-          <Button onClick={() => save.mutate({ ...c, source: source.trim() || null })} loading={save.isPending}>
+          <Button
+            onClick={() => save.mutate({ ...c, source: source.trim() || null, abCategories: abCategories.length ? abCategories : null, effluentOrigin: needsOrigin ? effluentOrigin : null })}
+            loading={save.isPending}
+          >
             Enregistrer
           </Button>
           {article.composition && (

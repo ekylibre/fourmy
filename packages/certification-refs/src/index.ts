@@ -8,6 +8,9 @@
 export * from "./source.js";
 export * from "./ab/conversion.js";
 export * from "./ab/inao-catalogue.js";
+export * from "./ab/copper.js";
+export * from "./ab/copper-ephy.js";
+export * from "./ab/annex-ii.js";
 
 /** Version des référentiels, gardée avec chaque calcul de contrôle. */
-export const REFS_VERSION = "2026-11-19.1";
+export const REFS_VERSION = "2026-11-20.1";

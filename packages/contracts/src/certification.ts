@@ -121,3 +121,39 @@ export const certificationSettings = z
   .strict();
 export type CertificationSettings = z.infer<typeof certificationSettings>;
 export const DEFAULT_CERTIFICATION_SETTINGS: CertificationSettings = certificationSettings.parse({});
+
+/** Teneur en cuivre métal saisie sur un produit cuprique (prime sur celle déduite d'E-Phy) ; null : effacée. */
+export const articleCopperWrite = z.object({
+  g: z.number().positive().max(1000).nullable(),
+  per: z.enum(["kg", "L"]).default("kg"),
+});
+export type ArticleCopperWrite = z.infer<typeof articleCopperWrite>;
+
+/** Cuivre d'un produit : saisi, déduit d'E-Phy, ou à saisir (`unknown`). */
+export type ArticleCopper = { g: number; per: "kg" | "L"; from: "article" | "ephy" } | { from: "unknown" };
+
+export const cropCycle = z.enum(["annual", "semi_perennial", "perennial"]);
+export const CROP_CYCLE_LABELS: Record<z.infer<typeof cropCycle>, string> = {
+  annual: "Annuelle",
+  semi_perennial: "Semi-pérenne (prairie, fraise, asperge…)",
+  perennial: "Pérenne (vigne, verger…)",
+};
+export const cultivationMode = z.enum(["open_field", "shelter", "heated_shelter", "soilless", "pot", "container"]);
+export const CULTIVATION_MODE_LABELS: Record<z.infer<typeof cultivationMode>, string> = {
+  open_field: "Plein champ",
+  shelter: "Sous abri",
+  heated_shelter: "Sous abri chauffé",
+  soilless: "Hors sol",
+  pot: "En pot",
+  container: "En conteneur",
+};
+
+/** Production : ce que les contrôles AB lisent (conversion, mode de culture). Absent : inchangé ; cycle null : déduit de Lexicon. */
+export const productionCertificationWrite = z
+  .object({
+    cycle: cropCycle.nullable().optional(),
+    plantedOn: z.string().date().nullable().optional(),
+    cultivationMode: cultivationMode.optional(),
+  })
+  .strict();
+export type ProductionCertificationWrite = z.infer<typeof productionCertificationWrite>;

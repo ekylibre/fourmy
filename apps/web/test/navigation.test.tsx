@@ -31,6 +31,16 @@ describe("menu principal", () => {
     expect(await screen.findByText(/1 parcelle\(s\) en conversion ou certifiée\(s\) AB/)).toBeInTheDocument();
   });
 
+  it("contrôle AB : onglet Parcelles, statut de conversion déduit de chaque récolte", async () => {
+    const user = userEvent.setup();
+    renderApp(`/f/${FARM}/control/ab`);
+    await user.click(await screen.findByRole("tab", { name: "Parcelles" }));
+    const table = await screen.findByRole("table", { name: "Statut de conversion des parcelles" });
+    expect(within(table).getByText("Les Rouffiats")).toBeInTheDocument();
+    expect(within(table).getAllByLabelText("Agriculture biologique")).toHaveLength(2);
+    expect(within(table).getByRole("button", { name: "Modifier Vigne" })).toBeInTheDocument();
+  });
+
   it("entrée active par segment de chemin", () => {
     expect(isActivePath("", "")).toBe(true);
     expect(isActivePath("/map", "")).toBe(false);

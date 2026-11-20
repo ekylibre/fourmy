@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Alert, Badge, Button, Group, Modal, Paper, SegmentedControl, SimpleGrid, Stack, Table, Text, TextInput, Title } from "@mantine/core";
+import { Alert, Badge, Button, Group, Modal, NumberInput, Paper, SegmentedControl, SimpleGrid, Stack, Table, Text, TextInput, Title } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, RefreshCw, Search } from "lucide-react";
-import type { PhytoProduct, PhytoStatus } from "@fourmy/contracts";
+import type { ArticleCopper, PhytoProduct, PhytoStatus } from "@fourmy/contracts";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { formatDate, formatDateTime } from "../../app/labels";
@@ -16,6 +16,7 @@ const PHYTO_COLUMNS: ColumnDef[] = [
   { key: "name", label: "Produit", required: true },
   { key: "amm", label: "N° AMM" },
   { key: "referential", label: "Référentiel" },
+  { key: "copper", label: "Cuivre" },
   { key: "actions", label: "Actions", required: true },
 ];
 
@@ -25,6 +26,7 @@ interface FarmPhytoArticle {
   unit: string;
   amm: string | null;
   product: { name: string; state: string; stoppedOn: string | null } | null;
+  copper?: ArticleCopper;
 }
 
 const STATE: Record<string, { label: string; color: string }> = {
@@ -48,6 +50,7 @@ export function PhytoProductsPage() {
     queryFn: () => api.get<{ items: FarmPhytoArticle[] }>(farmPath(farm.id, "/phyto/articles")),
   });
   const [linking, setLinking] = useState<FarmPhytoArticle | null>(null);
+  const [coppering, setCoppering] = useState<FarmPhytoArticle | null>(null);
   const [adding, setAdding] = useState(false);
   const columns = useColumns("phyto-products", PHYTO_COLUMNS);
   const refresh = () => {
@@ -131,6 +134,7 @@ export function PhytoProductsPage() {
             <Table.Th>Produit</Table.Th>
             {columns.visible("amm") && <Table.Th>N° AMM</Table.Th>}
             {columns.visible("referential") && <Table.Th>Référentiel</Table.Th>}
+            {columns.visible("copper") && <Table.Th>Cuivre métal</Table.Th>}
             <Table.Th />
           </Table.Tr>
         </Table.Thead>
@@ -160,17 +164,56 @@ export function PhytoProductsPage() {
                   )}
                 </Table.Td>
               )}
+              {columns.visible("copper") && (
+                <Table.Td>
+                  {!a.copper ? (
+                    "—"
+                  ) : a.copper.from === "unknown" ? (
+                    <Badge color="paille" variant="light" title="E-Phy ne permet pas de déduire la teneur en cuivre métal (contrôle AB)">
+                      À saisir
+                    </Badge>
+                  ) : (
+                    <Text size="sm">
+                      {a.copper.g.toLocaleString("fr-FR")} g/{a.copper.per}{" "}
+                      <Text span size="xs" c="dimmed">
+                        ({a.copper.from === "ephy" ? "E-Phy" : "saisi"})
+                      </Text>
+                    </Text>
+                  )}
+                </Table.Td>
+              )}
               <Table.Td ta="right">
-                {owner && !a.product && (
-                  <Button size="xs" variant="light" onClick={() => setLinking(a)}>
-                    Rattacher
-                  </Button>
-                )}
+                <Group gap="xs" justify="flex-end" wrap="nowrap">
+                  {owner && a.copper && (
+                    <Button size="xs" variant="subtle" onClick={() => setCoppering(a)}>
+                      Teneur en cuivre
+                    </Button>
+                  )}
+                  {owner && !a.product && (
+                    <Button size="xs" variant="light" onClick={() => setLinking(a)}>
+                      Rattacher
+                    </Button>
+                  )}
+                </Group>
               </Table.Td>
             </Table.Tr>
           ))}
         </Table.Tbody>
       </Table>
+
+      {coppering && (
+        <CopperModal
+          farmId={farm.id}
+          article={coppering}
+          onClose={() => setCoppering(null)}
+          onSaved={() => {
+            setCoppering(null);
+            refresh();
+            void queryClient.invalidateQueries({ queryKey: ["certifications"] });
+            void queryClient.invalidateQueries({ queryKey: ["certification-check"] });
+          }}
+        />
+      )}
 
       <ProductSearchModal
         farmId={farm.id}
@@ -192,6 +235,51 @@ export function PhytoProductsPage() {
         }}
       />
     </Stack>
+  );
+}
+
+/** Teneur en cuivre métal d'un produit (contrôle AB : 28 kg/ha sur 7 ans), quand E-Phy ne permet pas de la déduire. */
+function CopperModal({ farmId, article, onClose, onSaved }: { farmId: string; article: FarmPhytoArticle; onClose: () => void; onSaved: () => void }) {
+  const current = article.copper && article.copper.from !== "unknown" ? article.copper : null;
+  const [g, setG] = useState<number | "">(current?.from === "article" ? current.g : "");
+  const [per, setPer] = useState<"kg" | "L">(current?.per ?? (/litre|liter|^l$/i.test(article.unit) ? "L" : "kg"));
+  const save = useMutation({
+    mutationFn: (value: number | null) => api.put(farmPath(farmId, `/articles/${article.id}/copper`), { g: value, per }),
+    onSuccess: onSaved,
+  });
+  return (
+    <Modal opened onClose={onClose} title={`Cuivre métal : ${article.name}`}>
+      <Stack>
+        <Text size="sm">
+          {current?.from === "ephy"
+            ? `Teneur déduite d'E-Phy : ${current.g.toLocaleString("fr-FR")} g de cuivre métal par ${current.per}. Une teneur saisie la remplace.`
+            : "E-Phy ne permet pas de déduire la teneur en cuivre métal de ce produit (sulfate de cuivre, sulfate tribasique ou teneur absente). Reportez celle de l'étiquette."}
+        </Text>
+        <Group align="flex-end" grow>
+          <NumberInput label="Cuivre métal" suffix=" g" min={0} max={1000} decimalSeparator="," decimalScale={1} value={g} onChange={(v) => setG(v === "" ? "" : Number(v))} />
+          <SegmentedControl
+            aria-label="par"
+            value={per}
+            onChange={(v) => setPer(v as "kg" | "L")}
+            data={[
+              { value: "kg", label: "par kg" },
+              { value: "L", label: "par litre" },
+            ]}
+          />
+        </Group>
+        {save.error && <ErrorAlert error={save.error} />}
+        <Group>
+          <Button disabled={g === "" || g <= 0} loading={save.isPending} onClick={() => save.mutate(Number(g))}>
+            Enregistrer
+          </Button>
+          {current?.from === "article" && (
+            <Button variant="subtle" color="gray" loading={save.isPending} onClick={() => save.mutate(null)}>
+              Effacer la teneur saisie
+            </Button>
+          )}
+        </Group>
+      </Stack>
+    </Modal>
   );
 }
 
