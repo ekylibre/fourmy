@@ -41,6 +41,12 @@ export interface CropPlanActivity {
   family: string;
   /** Code culture PAC (catégorie BCAE 7) ; null s'il n'est pas connu. */
   capCode: string | null;
+  /** Espèce (taxonomie), pour la rotation et la mixité AB et la diversité HVE. */
+  species?: string | null;
+  /** Cycle de la culture (conversion AB). */
+  cycle?: "annual" | "semi_perennial" | "perennial";
+  legume?: boolean;
+  vegetable?: boolean;
 }
 
 /** Culture d'une parcelle de départ une année passée (historique). */
@@ -49,6 +55,15 @@ export interface ParcelYearCrop {
   main: string | null;
   /** Une culture secondaire (dérobée, couvert) a suivi la culture principale. */
   secondary: boolean;
+  /** Espèce et libellé de la culture principale (rotation AB). */
+  species?: string | null;
+  label?: string | null;
+  legume?: boolean;
+  /** Couvert ou dérobée de légumineuses. */
+  coverLegume?: boolean;
+  vegetable?: boolean;
+  /** Pérenne, prairie ou fourrage pérenne : hors rotation AB. */
+  perennial?: boolean;
 }
 
 /** Historique des parcelles de départ : land_parcel_id → année → culture. */
