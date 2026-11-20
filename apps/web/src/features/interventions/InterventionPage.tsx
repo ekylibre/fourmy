@@ -12,7 +12,7 @@ import { crewLabel } from "./week";
 import type { FeatureCollection, Geometry } from "geojson";
 import type { ComplianceResult, Intervention, InterventionDetail, InterventionWaterMap, Snapshot, TrackReplay, TrackSession } from "@fourmy/contracts";
 import { getProcedure, TREATMENT_PURPOSE_LABELS } from "@fourmy/contracts";
-import { displayStatus, type Light } from "@fourmy/domain";
+import { displayStatus, storedUnit, type Light } from "@fourmy/domain";
 import { api, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { formatDateTime, formatDays, formatNumber, formatPeriod, procedureLabel, unitLabel } from "../../app/labels";
@@ -26,6 +26,8 @@ import { ProcedureIcon } from "../../components/ProcedureIcon";
 import { ParcelMap } from "../map/ParcelMap";
 import { kgN, nitrogenNote, useFertilizers } from "../fertilization/fertilization";
 import { NitrogenLine } from "../fertilization/NitrogenLine";
+import { isAreaRate, SeedLine } from "../seeds/SeedLine";
+import { useSeeds } from "../seeds/queries";
 import { CancelModal } from "./CancelModal";
 import { LIGHTS, TrafficLight } from "../../components/TrafficLight";
 import { actionLabel, changeLines, interventionDay, STATUS, targetName, type Names } from "./presenters";
@@ -102,6 +104,9 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
   const fertilizers = useFertilizers(farm.id, i.inputs.length > 0);
   const nitrogenOfInput = (q: (typeof i.inputs)[number]) =>
     nitrogenNote(fertilizers.data?.get(q.articleId), { quantity: q.quantity, per: q.per, unit: q.unit }, treatedHa || null, (i.startedAt ?? new Date().toISOString()).slice(0, 10));
+  // Semences (lot SE5) : densité et dose du semis, quelle que soit l'unité saisie.
+  const isSeed = (id: string) => articles.data?.items.find((a) => a.id === id)?.kind === "seed";
+  const seeds = useSeeds(farm.id, i.stoppedAt ?? i.startedAt ?? new Date().toISOString(), i.inputs.some((q) => isSeed(q.articleId)));
   const nitrogenTotal = i.inputs.reduce((sum, q) => {
     const n = nitrogenOfInput(q);
     return n?.ok ? sum + n.totalKgHa : sum;
@@ -420,8 +425,10 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
           {[...i.inputs.map((q) => ({ ...q, role: "Intrant" })), ...i.outputs.map((q) => ({ ...q, role: "Sortie" }))].map((q, k) => {
             const a = names.article.get(q.articleId);
             const unit = unitLabel(q.unit);
-            const perHa = q.per === "hectare" ? q.quantity : treatedHa ? q.quantity / treatedHa : null;
-            const total = q.per === "total" ? q.quantity : treatedHa ? q.quantity * treatedHa : null;
+            // Grains/m² : dose déjà rapportée à la surface (×10 000 par hectare).
+            const rate = isAreaRate(q.unit);
+            const perHa = rate || q.per === "hectare" ? q.quantity : treatedHa ? q.quantity / treatedHa : null;
+            const total = rate ? (treatedHa ? q.quantity * 10_000 * treatedHa : null) : q.per === "total" ? q.quantity : treatedHa ? q.quantity * treatedHa : null;
             const light = q.role === "Intrant" ? doseLight(q.articleId) : null;
             return (
               <Table.Tr key={k}>
@@ -446,12 +453,21 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
                     </Box>
                   )}
                   {q.role === "Intrant" && <NitrogenLine note={nitrogenOfInput(q)} farmId={farm.id} />}
+                  {q.role === "Intrant" && isSeed(q.articleId) && (
+                    <SeedLine
+                      quantity={q.quantity}
+                      unit={rate ? q.unit : storedUnit(q.unit, q.per)}
+                      seed={seeds.data?.items.find((x) => x.articleId === q.articleId)}
+                      areaHa={treatedHa || null}
+                      farmId={farm.id}
+                    />
+                  )}
                 </Table.Td>
-                <Table.Td ta="right" className="lv-num" fw={q.per === "hectare" ? 600 : undefined}>
-                  {perHa === null ? "—" : `${formatNumber(perHa, 3)} ${unit}/ha`}
+                <Table.Td ta="right" className="lv-num" fw={rate || q.per === "hectare" ? 600 : undefined}>
+                  {perHa === null ? "—" : rate ? `${formatNumber(perHa, 3)} ${unit}` : `${formatNumber(perHa, 3)} ${unit}/ha`}
                 </Table.Td>
-                <Table.Td ta="right" className="lv-num" fw={q.per === "total" ? 600 : undefined}>
-                  {total === null ? "—" : `${formatNumber(total, 3)} ${unit}`}
+                <Table.Td ta="right" className="lv-num" fw={!rate && q.per === "total" ? 600 : undefined}>
+                  {total === null ? "—" : rate ? `${formatNumber(total, 0)} grains` : `${formatNumber(total, 3)} ${unit}`}
                 </Table.Td>
               </Table.Tr>
             );

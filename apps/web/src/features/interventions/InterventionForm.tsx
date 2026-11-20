@@ -43,6 +43,8 @@ import { irrigationBody, irrigationDraft, IrrigationFields, type IrrigationDraft
 import { kgN, nitrogenNote, useFertilizers } from "../fertilization/fertilization";
 import type { FertilizationCheckRequest } from "@fourmy/contracts";
 import { NitrogenLine } from "../fertilization/NitrogenLine";
+import { isAreaRate, SeedLine, seedInputUnits } from "../seeds/SeedLine";
+import { useSeeds } from "../seeds/queries";
 import { FertilizationSummary, useFertilizationCheck, weatherExtremes } from "../fertilization/FertilizationChecks";
 import { api, ApiError, farmPath } from "../../app/api";
 import { unitLabel } from "../../app/labels";
@@ -50,7 +52,7 @@ import { invalidateAfterIntervention, useActivities, useCrewTemplates, useEquipm
 import { useFarm } from "../../app/farm";
 import { RegulatoryPictos } from "../phyto/Hazards";
 import { PrecautionsPanel } from "../phyto/Precautions";
-import { crewRules, dangerMessages, inputUnitChoices, mergePeriods, toFree } from "@fourmy/domain";
+import { crewRules, dangerMessages, inputUnitChoices, mergePeriods, storedUnit, toFree } from "@fourmy/domain";
 import { ActivityBadge, activityOfParcel } from "../activities/ActivityBadge";
 import { MapBoundary } from "../../components/MapBoundary";
 import { ProcedureIcon } from "../../components/ProcedureIcon";
@@ -288,9 +290,19 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
     if (!a || row.quantity === "") return null;
     return nitrogenNote(fertilizers.data?.get(a.id), { quantity: Number(row.quantity), per: row.per, unit: row.unit ?? a.unit }, treatedM2 > 0 ? treatedM2 / 10_000 : null, inputDay);
   };
+  // Semences (lot SE5) : PMG retenu et grains par dose, pour les unités de semis et la densité.
+  const seeds = useSeeds(farmId, maintenanceAt, inputs.some((r) => article(r.articleId)?.kind === "seed"));
+  const seedOf = (id: string | null) => seeds.data?.items.find((s) => s.articleId === id);
   // Unités de saisie d'un fertilisant : la sienne, ses voisines, le volume ou la masse si la densité est connue.
+  // D'une semence : grains/m², kg, milliers de grains, doses, selon le PMG et la dose.
   const unitChoices = (a: ReturnType<typeof article>) =>
-    a?.kind === "fertilizer" ? inputUnitChoices(a.unit, fertilizers.data?.get(a.id)?.composition?.density ?? null) : a ? [a.unit] : [];
+    a?.kind === "fertilizer"
+      ? inputUnitChoices(a.unit, fertilizers.data?.get(a.id)?.composition?.density ?? null)
+      : a?.kind === "seed"
+        ? seedInputUnits(a.unit, seedOf(a.id))
+        : a
+          ? [a.unit]
+          : [];
   const nitrogenTotal = inputs.reduce((s, r) => {
     const n = nitrogenOf(r);
     return n?.ok ? s + n.totalKgHa : s;
@@ -367,7 +379,8 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       inputs: quantity(inputs).map((r) => ({
         articleId: r.articleId!,
         quantity: Number(r.quantity),
-        per: r.per,
+        // Grains/m² : déjà une dose par surface.
+        per: isAreaRate(r.unit) ? "total" : r.per,
         ...(r.unit && r.unit !== article(r.articleId)?.unit && unitChoices(article(r.articleId)).includes(r.unit) ? { unit: r.unit } : {}),
         ...(r.keep?.lotId ? { lotId: r.keep.lotId } : {}),
         ...(r.keep?.from ? { from: r.keep.from } : {}),
@@ -567,10 +580,10 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
                 allowDeselect={false}
                 data={units.map((u) => ({ value: u, label: unitLabel(u) }))}
                 value={unit ?? null}
-                onChange={(v) => update({ unit: v && v !== a?.unit ? v : undefined })}
+                onChange={(v) => update({ unit: v && v !== a?.unit ? v : undefined, ...(isAreaRate(v) ? { per: "total" as QuantityPer } : {}) })}
               />
             )}
-            <SegmentedControl
+            {!isAreaRate(unit) && <SegmentedControl
               aria-label="Quantité par"
               size="xs"
               value={row.per}
@@ -579,7 +592,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
                 { value: "hectare", label: unit ? `${unitLabel(unit)}/ha` : "par ha" },
                 { value: "total", label: unit ? `${unitLabel(unit)} au total` : "total" },
               ]}
-            />
+            />}
             <ActionIcon
               variant="subtle"
               color="brique"
@@ -589,13 +602,22 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               <Trash2 size={16} />
             </ActionIcon>
           </Group>
-          {kind === "input" && row.per === "hectare" && a && row.quantity !== "" && treatedM2 > 0 && (
+          {kind === "input" && row.per === "hectare" && !isAreaRate(unit) && a && row.quantity !== "" && treatedM2 > 0 && (
             <Text size="xs" c="dimmed" className="lv-num">
               ≈ {(Number(row.quantity) * (treatedM2 / 10_000)).toLocaleString("fr-FR", { maximumFractionDigits: 3 })} {unitLabel(unit ?? a.unit)} au total sur{" "}
               {area(treatedM2)}
             </Text>
           )}
           {kind === "input" && <NitrogenLine note={nitrogenOf(row)} farmId={farmId} />}
+          {kind === "input" && a?.kind === "seed" && (
+            <SeedLine
+              quantity={row.quantity === "" ? null : Number(row.quantity)}
+              unit={isAreaRate(unit) ? (unit ?? null) : storedUnit(unit ?? a.unit, row.per)}
+              seed={seedOf(a.id)}
+              areaHa={treatedM2 > 0 ? treatedM2 / 10_000 : null}
+              farmId={farmId}
+            />
+          )}
           {kind === "input" && row.articleId && a?.kind === "phyto" && (
             <RegulatoryPictos
               article={phytoArticles.data?.items.find((x) => x.id === row.articleId)}

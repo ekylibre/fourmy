@@ -9,6 +9,8 @@ import {
   seedEquivalents,
   seedFlags,
   seedUnitChoices,
+  splitUnit,
+  storedUnit,
   tgwWarning,
   toStockQuantity,
 } from "../src/index.js";
@@ -135,3 +137,13 @@ describe("repères d'une semence", () => {
     expect(looksLikeMixture("Thermidor", "Blé tendre")).toBe(false);
   });
 });
+
+describe("unité enregistrée d'un semis (lot SE5)", () => {
+  it("grains/m² : déjà par surface, sans suffixe « par hectare » ; relu tel quel", () => {
+    expect(storedUnit("grain_per_square_meter", "hectare")).toBe("grain_per_square_meter");
+    expect(storedUnit("grain_per_square_meter", "total")).toBe("grain_per_square_meter");
+    expect(storedUnit("kilogram", "hectare")).toBe("kilogram_per_hectare");
+    expect(splitUnit("grain_per_square_meter")).toEqual({ unit: "grain_per_square_meter", per: "total" });
+  });
+});
+
