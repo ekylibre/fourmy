@@ -5,6 +5,7 @@ import type { DomainCtx } from "@fourmy/domain";
 import type { BundleParcel, ImportBundle } from "@fourmy/importers";
 import { completeInTx, planInTx } from "./interventions.js";
 import type { ReconcilePlan } from "./import-reconcile.js";
+import { attachSeedsIn, importAttachable } from "./seed-catalog.js";
 
 /**
  * Écriture d'un import (lot IM2, claudedocs/conception_import_onboarding.md
@@ -253,6 +254,9 @@ export async function applyPlan(tx: Tx, farmId: string, ctx: DomainCtx, runId: s
     const [ns, key] = Object.entries(src.sourceIds)[0] ?? ["article.name", src.name.toLowerCase()];
     await link(tx, farmId, runId, ns, key, "article", a.articleId, a.action === "create");
   }
+  // Semences créées : rattachées à leur espèce et à leur variété (code GNIS, espèce du fichier) ; rien d'approché.
+  const seeds = plan.articles.filter((a) => a.action === "create" && a.kind === "seed").map((a) => a.articleId);
+  if (seeds.length) await attachSeedsIn(tx, farmId, null, seeds, importAttachable);
 
   for (const p of plan.people) {
     tally("people", p.action);

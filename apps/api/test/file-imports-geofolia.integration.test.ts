@@ -78,6 +78,13 @@ describe.skipIf(!url)("import Geofolia (intégration)", () => {
     expect(counts.covers).toEqual({ created: 5, linked: 0, skipped: 0 });
     expect(counts.interventions.failed, JSON.stringify(done.report.failures)).toBe(0);
     expect(counts.interventions.created).toBeGreaterThan(150);
+    // Semences rattachées à leur espèce par le code GNIS ou l'espèce du fichier (lot SE4), si le référentiel est chargé.
+    const [ref] = await sql`SELECT (SELECT count(*) FROM lexicon_seed_varieties) + (SELECT count(*) FROM taxonomy) AS n`;
+    if (Number(ref!.n) > 0) {
+      const sheets = await sql`SELECT a.name, s.species, s.is_mixture FROM article_seeds s JOIN articles a ON a.id = s.article_id WHERE s.farm_id = ${farmId}`;
+      expect(sheets.length).toBeGreaterThan(0);
+      expect(sheets.every((x) => x.species !== null || x.is_mixture)).toBe(true);
+    }
 
     const [{ n: parcels }] = await sql`SELECT count(*)::int AS n FROM land_parcels WHERE farm_id = ${farmId}`;
     expect(parcels).toBe(6);

@@ -152,7 +152,7 @@ async function seedRow(tx: Tx, articleId: string, at: string): Promise<Row> {
   return r;
 }
 
-async function detailIn(tx: Tx, articleId: string, at: string): Promise<SeedDetail> {
+export async function getSeedIn(tx: Tx, articleId: string, at: string): Promise<SeedDetail> {
   const r = await seedRow(tx, articleId, at);
   const usage = await usageOf(tx, articleId);
   const item = itemOf(r, usage.get(articleId) ?? []);
@@ -223,7 +223,7 @@ async function detailIn(tx: Tx, articleId: string, at: string): Promise<SeedDeta
 }
 
 export async function getSeed(db: Database, farmId: string, articleId: string, at: string): Promise<SeedDetail> {
-  return withFarm(db, farmId, (tx) => detailIn(tx, articleId, at));
+  return withFarm(db, farmId, (tx) => getSeedIn(tx, articleId, at));
 }
 
 /** Deux unités de semence équivalentes (même dimension, même facteur) : la changer ne change pas les stocks. */
@@ -257,7 +257,7 @@ export async function saveSeed(db: Database, farmId: string, userId: string, art
         tgw_g = EXCLUDED.tgw_g, tgw_origin = EXCLUDED.tgw_origin, tgw_on = EXCLUDED.tgw_on, updated_by = EXCLUDED.updated_by, updated_at = now()`);
     // L'article suit (mobile, registre) : sa date de mise à jour bouge.
     await tx.execute(sql`UPDATE articles SET updated_at = now() WHERE id = ${articleId}`);
-    return detailIn(tx, articleId, at);
+    return getSeedIn(tx, articleId, at);
   });
 }
 
@@ -274,7 +274,7 @@ export async function saveLotSeed(db: Database, farmId: string, lotId: string, s
         ? sql`UPDATE lots SET attrs = jsonb_set(coalesce(attrs, '{}'::jsonb), '{seed}', ${JSON.stringify(seed)}::jsonb), updated_at = now() WHERE id = ${lotId}`
         : sql`UPDATE lots SET attrs = coalesce(attrs, '{}'::jsonb) - 'seed', updated_at = now() WHERE id = ${lotId}`,
     );
-    return detailIn(tx, lot.article_id, at);
+    return getSeedIn(tx, lot.article_id, at);
   });
 }
 

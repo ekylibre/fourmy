@@ -199,3 +199,48 @@ export interface SeedSpeciesOption {
   legume: boolean;
   hasReference: boolean;
 }
+
+// --- Catalogue GNIS et rattachement (lot SE4) ----------------------------------------
+
+/** Variété du catalogue officiel (SEMAE, via Lexicon), avec ce que Fourmy propose pour la fiche. */
+export interface SeedCatalogItem {
+  gnisCode: string;
+  varietyName: string;
+  species: string;
+  speciesLabel: string;
+  registeredOn: string | null;
+  legume: boolean;
+  reference: SeedTgwReference | null;
+  /** Unité de stock proposée : doses pour le maïs et le tournesol, kg sinon. */
+  proposedUnit: string;
+  proposedGrainsPerDose: number | null;
+}
+
+/** Nouvelle semence : depuis le catalogue (fiche pré-remplie) ou saisie libre. */
+export const seedCreate = z.object({
+  name: name,
+  unit: z.string().trim().min(1).max(60),
+  sheet: seedSheetWrite,
+});
+export type SeedCreate = z.infer<typeof seedCreate>;
+
+/** Rattachement proposé d'une semence au référentiel (FR-SE-12, 28, 29). */
+export interface SeedAttachProposal {
+  articleId: string;
+  name: string;
+  species: string | null;
+  speciesLabel: string | null;
+  varietyName: string | null;
+  gnisCode: string | null;
+  isMixture: boolean;
+  /** Pourquoi : « code GNIS 512E492 au catalogue », « espèce importée « Blé tendre » »… */
+  reason: string;
+  /** Sûr : code GNIS trouvé au catalogue. Sinon, à confirmer. */
+  sure: boolean;
+  /** Approché : libellé proche, ou fichier et catalogue en désaccord. Jamais appliqué sans confirmation. */
+  approximate: boolean;
+}
+
+/** Rattacher : les semences choisies parmi les propositions. */
+export const seedAttachWrite = z.object({ articleIds: z.array(z.string().uuid()).min(1).max(500) });
+export type SeedAttachWrite = z.infer<typeof seedAttachWrite>;
