@@ -15,9 +15,9 @@ export const COPPER = {
 } as const;
 
 export const COPPER_SOURCE: RefSource = {
-  text: "Règlement d'exécution (UE) 2021/1165",
-  version: "15/07/2021 (version d'origine, modifications ultérieures non lues)",
-  at: "annexe I, sous-catégorie 4, composés de cuivre, p. 12",
+  text: "Règlement d'exécution (UE) 2021/1165, version consolidée",
+  version: "01/01/2026 (entrée inchangée depuis la version d'origine)",
+  at: "annexe I, sous-catégorie 4, composés de cuivre",
 };
 
 /** Masse molaire du cuivre et des composés exprimés en composé dans E-Phy. */

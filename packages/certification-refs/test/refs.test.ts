@@ -65,6 +65,8 @@ describe("cuivre métal des produits E-Phy", () => {
   it("annexe II : codes uniques, effluents comptés dans les 170 N", () => {
     expect(new Set(ANNEX_II.map((c) => c.code)).size).toBe(ANNEX_II.length);
     expect(ANNEX_II.filter((c) => c.counts170N).map((c) => c.code)).toEqual(["manure", "dried_manure", "composted_manure", "liquid_manure"]);
-    expect(ANNEX_II.filter((c) => c.industrialForbidden)).toHaveLength(6);
+    // Six dans la version d'origine, plus la struvite (règlement 2023/121 : lisier non issu d'un élevage industriel).
+    expect(ANNEX_II.filter((c) => c.industrialForbidden)).toHaveLength(7);
+    expect(ANNEX_II.find((c) => c.code === "household_compost")!.label).toMatch(/^Biodéchets/);
   });
 });
