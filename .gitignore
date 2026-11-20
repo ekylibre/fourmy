@@ -29,3 +29,6 @@ docs/hve/*
 !docs/hve/rapport_hve.md
 docs/ab/*
 !docs/ab/rapport_ab.md
+# Fiches de conditionnalité PAC (Télépac), même règle.
+docs/pac/*
+!docs/pac/rapport_pac.md
