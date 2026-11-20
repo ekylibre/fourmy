@@ -41,6 +41,15 @@ describe("menu principal", () => {
     expect(within(table).getByRole("button", { name: "Modifier Vigne" })).toBeInTheDocument();
   });
 
+  it("contrôle HVE : points de l'indicateur phytosanitaire, réglages du responsable", async () => {
+    const user = userEvent.setup();
+    renderApp(`/f/${FARM}/control/hve`);
+    expect(await screen.findByText("Stratégie phytosanitaire — 16 / 30 points (minimum 10)")).toBeInTheDocument();
+    expect(screen.getByText(/Surveillance active des bioagresseurs/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Réglages" }));
+    expect(await screen.findByRole("textbox", { name: /Début de la période/ })).toHaveValue("01/01");
+  });
+
   it("entrée active par segment de chemin", () => {
     expect(isActivePath("", "")).toBe(true);
     expect(isActivePath("/map", "")).toBe(false);

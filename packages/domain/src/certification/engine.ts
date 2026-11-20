@@ -11,6 +11,8 @@ import {
   type AbParcelInput,
   type AbProduction,
 } from "./ab.js";
+import { cmrInterventionFindings, hvePhytoFindings, type HvePhytoContext } from "./hve/phyto.js";
+import { HVE_INDICATOR_MIN } from "@fourmy/certification-refs";
 
 /**
  * Moteur des contrôles HVE et AB (claudedocs/conception_controle_hve_ab.md
@@ -49,6 +51,8 @@ export interface CertificationContext {
    * apportés depuis 7 ans (cuivre) jusqu'à la fin de la période.
    */
   ab?: { parcels: AbParcelInput[]; productions: AbProduction[]; applications: AbApplication[] };
+  /** HVE : SAU, traitements et IFT de la période (et des deux précédentes pour la moyenne), références. */
+  hve?: { phyto: HvePhytoContext };
 }
 
 export type CampaignRule = (ctx: CertificationContext) => ControlFinding[];
@@ -56,8 +60,8 @@ export type CampaignRule = (ctx: CertificationContext) => ControlFinding[];
 export interface RuleSection {
   id: string;
   label: string;
-  /** HVE : minimum et maximum de points de l'indicateur. */
-  points?: { min: number; max: number };
+  /** HVE : minimum de points de l'indicateur (maximum : somme des items). */
+  points?: { min: number; max?: number };
   rules: CampaignRule[];
 }
 
@@ -98,9 +102,12 @@ export function abStatuses(ctx: CertificationContext) {
   return ctx.ab ? abParcelStatuses(ctx.ab.parcels, ctx.ab.productions, ctx.ab.applications, ctx.period.to) : [];
 }
 
-/** Sections de chaque contrôle ; HVE arrive avec les lots CT3 et CT4. */
+/** Sections de chaque contrôle ; fertilisation, irrigation (CT3) et biodiversité (CT4) à venir. */
 export const CAMPAIGN_SECTIONS: Record<ControlKind, RuleSection[]> = {
-  hve: [{ id: "perimeter", label: "Périmètre", rules: [perimeter] }],
+  hve: [
+    { id: "perimeter", label: "Périmètre", rules: [perimeter] },
+    { id: "phyto", label: "Stratégie phytosanitaire", points: { min: HVE_INDICATOR_MIN }, rules: [(ctx) => (ctx.hve ? hvePhytoFindings(ctx.hve.phyto) : [])] },
+  ],
   ab: [
     { id: "perimeter", label: "Périmètre", rules: [perimeter] },
     { id: "conversion", label: "Conversion", rules: [(ctx) => conversionFindings(abStatuses(ctx))] },
@@ -142,6 +149,8 @@ export interface InterventionCertificationInput {
    * cuivre sur 7 ans et de l'azote sur l'année).
    */
   ab?: { parcels: { id: string; name: string }[]; current: AbApplication[]; history: AbApplication[] };
+  /** HVE : produits phytopharmaceutiques saisis (n° d'autorisation), pour le classement CMR à la date. */
+  hve?: { products: { articleId: string; product: string; authorization: string | null }[] };
 }
 
 export type InterventionRule = (input: InterventionCertificationInput) => ControlFinding[];
@@ -163,8 +172,11 @@ const abIntervention: InterventionRule = (input) => {
   ];
 };
 
-/** Règles de saisie, par contrôle ; HVE arrive avec le lot CT3. */
-export const INTERVENTION_RULES: Record<ControlKind, InterventionRule[]> = { hve: [], ab: [abIntervention] };
+/** Règles de saisie, par contrôle. */
+export const INTERVENTION_RULES: Record<ControlKind, InterventionRule[]> = {
+  hve: [(input) => (input.hve ? cmrInterventionFindings(input.day, input.hve.products) : [])],
+  ab: [abIntervention],
+};
 
 /**
  * Constats de certification d'une intervention ; `null` si aucune de ses

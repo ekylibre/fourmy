@@ -109,6 +109,10 @@ export const certificationSettings = z
       .default("01-01"),
     /** IFT et bilan azoté : campagne seule, ou moyenne pluriannuelle. */
     hveMethod: z.enum(["campaign", "average"]).default("campaign"),
+    /** Références IFT des grandes cultures : notation « en cours » ou « ancienne » (admise jusqu'à la campagne 2025). */
+    hveIftScale: z.enum(["current", "old"]).default("current"),
+    /** Rhône et Saône-et-Loire : siège dans le périmètre de l'AOC Beaujolais (bassin viticole des références IFT). */
+    hveBeaujolais: z.boolean().nullable().default(null),
     /** Rotation AB (D12) : légumineuse sur N campagnes, même espèce au plus K années de suite. */
     rotationYears: z.number().int().min(2).max(10).default(5),
     rotationSameSpeciesMax: z.number().int().min(1).max(5).default(2),

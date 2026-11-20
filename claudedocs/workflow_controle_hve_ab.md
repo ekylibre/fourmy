@@ -111,6 +111,12 @@ rouge, motif, constat dans « Contrôle AB »).
 Branche `feat/control-ct3-hve`. Dépend de CT1. Peut avancer **en parallèle
 de CT2** (fichiers distincts ; seule la migration est commune, dans CT1).
 
+**Découpage (20/11/2026)** : trois PR successives pour rester relisibles.
+CT3a phyto (3.1 sauf la table des exportations d'azote, 3.2, 3.5) ; CT3b
+fertilisation (table des exportations, 3.3) ; CT3c irrigation (3.4).
+L'API IFT renvoie bien une signature : variante `/ift/traitement/certifie`
+(identifiant et jeton signé), désormais utilisée et conservée par ligne.
+
 3.1 **Référentiels** : `hve/grid-v1.15.ts` (items, barèmes, maxima, prorata,
 4 bornes de la grille, D6) ; `hve/cmr/*.json` par
 `scripts/extract-cmr.mjs` (3 versions) ; `hve/ift-references.ts` par script

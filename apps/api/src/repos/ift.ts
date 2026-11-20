@@ -50,7 +50,7 @@ export function treatmentType(natures: string[]): string {
 
 interface IftApiResult {
   ift?: number;
-  segment?: { libelle?: string };
+  segment?: { idMetier?: string; libelle?: string };
   doseReference?: number;
   avertissement?: { libelle?: string } | null;
 }
@@ -142,7 +142,17 @@ export async function computeInterventionIft(db: Database, farmId: string, inter
   if (cultures) {
     for (const input of context.inputs) {
       for (const parcel of context.parcels) {
-        const line = { articleId: input.article_id, parcelId: parcel.id, ift: null as number | null, segment: null as string | null, doseReference: null as number | null, warning: null as string | null };
+        const line = {
+          articleId: input.article_id,
+          parcelId: parcel.id,
+          ift: null as number | null,
+          segment: null as string | null,
+          doseReference: null as number | null,
+          warning: null as string | null,
+          segmentCode: null as string | null,
+          certifiedId: null as string | null,
+          signature: null as string | null,
+        };
         lines.push(line);
         // Culture IFT : celle de l'activité (Lexicon), sinon par le libellé de la culture et de ses ancêtres.
         const culture = parcel.ift_code ?? (parcel.labels ?? []).map((l) => (l ? cultures!.get(normalize(l)) : undefined)).find(Boolean);
@@ -176,9 +186,14 @@ export async function computeInterventionIft(db: Database, farmId: string, inter
           ...(pfi?.target ? { cibleIdMetier: String(pfi.target) } : {}),
         });
         try {
-          const res = await fetchImpl(`${IFT_API}/ift/traitement?${params}`, { signal: AbortSignal.timeout(30_000) });
+          // IFT certifié : même calcul, avec un identifiant et une signature vérifiables par l'auditeur HVE (PdC4 §5.3.4).
+          const res = await fetchImpl(`${IFT_API}/ift/traitement/certifie?${params}`, { signal: AbortSignal.timeout(30_000) });
           if (!res.ok) throw new Error(`API IFT : HTTP ${res.status}`);
-          const r = (await res.json()) as IftApiResult;
+          const body = (await res.json()) as IftApiResult & { id?: string; signature?: string; iftTraitement?: IftApiResult };
+          const r = body.iftTraitement ?? body;
+          line.certifiedId = body.iftTraitement ? (body.id ?? null) : null;
+          line.signature = body.iftTraitement ? (body.signature ?? null) : null;
+          line.segmentCode = r.segment?.idMetier ?? null;
           // Part de la parcelle réellement traitée (zone de travail partielle).
           const share = parcel.area && treated ? Math.min(treated / parcel.area, 1) : 1;
           line.ift = typeof r.ift === "number" ? Math.round(r.ift * share * 10_000) / 10_000 : null;
