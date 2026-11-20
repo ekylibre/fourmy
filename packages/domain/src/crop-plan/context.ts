@@ -23,5 +23,6 @@ export function cropPlanCheckInput(context: CropPlanContext, draft: CropPlanDraf
       hve: context.certification.hve,
       abRotation: context.certification.abRotation,
     },
+    zones: context.zones ?? {},
   };
 }

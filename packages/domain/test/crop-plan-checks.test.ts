@@ -7,6 +7,7 @@ import {
   cropPlanCheckInput,
   defaultEffectiveOn,
   operationBlockers,
+  regulatoryFindings,
   emptyDraft,
   hvePlanFindings,
   resolveParcels,
@@ -153,10 +154,10 @@ describe("checkCropPlan", () => {
   it("sections PAC, Agronomie ; Certifications seulement si la ferme est certifiée", () => {
     const draft: CropPlanDraft = { ...emptyDraft(2027), assignments: [assign("p:a", 1), assign("p:b", 2), assign("p:c", 3)] };
     const r = checkCropPlan({ base, draft, activities, history: new Map(), settings: { bcae7Preferred: "rotation", alsaceRhinePlain: false, returnIntervals: {} }, certification: noCert });
-    expect(r.sections.map((s) => s.id)).toEqual(["pac", "agronomy"]);
+    expect(r.sections.map((s) => s.id)).toEqual(["pac", "agronomy", "regulatory"]);
     expect(r.sections[1]!.level).toBe("na");
     const hve = checkCropPlan({ base, draft, activities, history: new Map(), settings: { bcae7Preferred: "rotation", alsaceRhinePlain: false, returnIntervals: {} }, certification: { ...noCert, hve: true } });
-    expect(hve.sections.map((s) => s.id)).toEqual(["pac", "agronomy", "certification"]);
+    expect(hve.sections.map((s) => s.id)).toEqual(["pac", "agronomy", "certification", "regulatory"]);
   });
 
   it("300 parcelles avec 5 ans d'historique : moins de 200 ms par geste", () => {
@@ -233,5 +234,40 @@ describe("découpes et fusions : date d'effet", () => {
     expect(check({ ...emptyDraft(2027), operations: [split("p:a", "2025-12-01")] }).join(" ")).toContain("hors de la campagne");
     const early = { ...emptyDraft(2027), operations: [split("p:a", "2026-09-01")], assignments: [assign("n:x1", 1, { startedOn: "2026-08-25" })] };
     expect(check(early)[0]).toContain("Ouest : culture prévue à partir du 2026-08-25, avant la date d'effet (2026-09-01)");
+  });
+});
+
+describe("Réglementaire : ZNT, captages, Natura 2000", () => {
+  const draft: CropPlanDraft = { ...emptyDraft(2027), assignments: [assign("p:a", 1), assign("p:b", 3), assign("p:c", 4)] };
+  const zones = {
+    a: { catchments: [{ name: "BAC du Moulin", share: 0.4 }], natura2000: [], water: { name: "Le Ruisseau", distanceM: 2 } },
+    b: { catchments: [{ name: "BAC du Moulin", share: 0.005 }], natura2000: [{ name: "Vallée de la Garonne", nature: "sic", share: 1 }], water: { name: null, distanceM: 30 } },
+    c: { catchments: [{ name: "BAC du Moulin", share: 1 }], natura2000: [{ name: "Vallée de la Garonne", nature: "sic", share: 1 }], water: { name: null, distanceM: 1 } },
+  };
+
+  it("ZNT et captage pour une culture traitée ; rien pour une prairie ; recoupement de moins de 1 % ignoré", () => {
+    const fs = regulatoryFindings({ plan: resolveParcels(base, draft), draft, activities, history: new Map(), zones });
+    expect(fs.map((f) => [f.ruleId, f.refs.parcelIds?.[0]])).toEqual([
+      ["reg.znt", "p:a"],
+      ["reg.catchment", "p:a"],
+      ["reg.natura2000", "p:b"],
+    ]);
+    expect(fs[0]!.message).toBe("Le Champ : blé tendre à 2 m d'un point d'eau (Le Ruisseau) : zone non traitée d'au moins 5 m, plus selon le produit.");
+    expect(fs[1]!.message).toContain("40 % en aire d'alimentation de captage « BAC du Moulin »");
+    // Le Bas (prairie permanente) n'appelle ni ZNT ni captage ; La Côte et Le Bas sont en site Natura 2000 : cités en information.
+    expect(fs[2]!.message).toContain("La Côte (Vallée de la Garonne, SIC)");
+    expect(fs[2]!.refs.parcelIds).toEqual(["p:b", "p:c"]);
+  });
+
+  it("prairie permanente retournée en site Natura 2000 : à vérifier", () => {
+    const history = new Map([["b", { 2026: { main: "PPH", secondary: false } }]]);
+    const fs = regulatoryFindings({ plan: resolveParcels(base, draft), draft, activities, history, zones });
+    expect(fs.find((f) => f.ruleId === "reg.natura2000.grassland")!.message).toContain("La Côte : prairie permanente retournée pour maïs en site Natura 2000");
+  });
+
+  it("checkCropPlan : section Réglementaire", () => {
+    const r = checkCropPlan({ base, draft, activities, history: new Map(), settings: { bcae7Preferred: "rotation", alsaceRhinePlain: false, returnIntervals: {} }, certification: noCert, zones });
+    expect(r.sections.map((s) => s.id)).toEqual(["pac", "agronomy", "regulatory"]);
+    expect(r.sections[2]!.level).toBe("warning");
   });
 });

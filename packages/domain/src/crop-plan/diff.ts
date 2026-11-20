@@ -16,6 +16,17 @@ export interface ExistingProduction extends CropPlanProductionFields {
   hasDoneInterventions: boolean;
 }
 
+/** Couvert d'interculture en base, après la culture principale de la campagne (cover_crops, campagne suivante). */
+export interface ExistingCover {
+  id: string;
+  landParcelId: string;
+  kind: string;
+  family: string | null;
+  species: string;
+  sownOn: string;
+  destroyedOn: string | null;
+}
+
 export interface CropPlanDiff {
   changes: CropPlanChange[];
   blockers: CropPlanBlocker[];
@@ -35,6 +46,7 @@ export function diffCropPlan(
   resolved: ResolvedPlan,
   existing: ExistingProduction[],
   opts: { campaignExists: boolean },
+  existingCovers: ExistingCover[] = [],
 ): CropPlanDiff {
   const changes: CropPlanChange[] = [];
   const blockers: CropPlanBlocker[] = [];
@@ -111,6 +123,31 @@ export function diffCropPlan(
       message: `${blocked.length} production(s) retirée(s) de l'assolement portent des interventions réalisées : gardez-les, ou avancez leur date de fin.`,
       keys: [...new Set(blocked)],
     });
+  }
+
+  // Couverts d'interculture : un par parcelle (comme le cahier de fertilisation).
+  const coversById = new Map(existingCovers.map((c) => [c.id, c]));
+  const keptCovers = new Set<string>();
+  const coverKeys = new Map<string, number>();
+  for (const c of draft.covers) {
+    if (!resolved.byKey.has(c.key)) {
+      blockers.push({ code: "unknown-parcel", message: `Couvert « ${c.species} » sur une parcelle découpée, fusionnée ou inconnue.`, keys: [c.key] });
+      continue;
+    }
+    coverKeys.set(c.key, (coverKeys.get(c.key) ?? 0) + 1);
+    const before = c.coverId ? coversById.get(c.coverId) : undefined;
+    if (before && parcelKeyOf(before.landParcelId) === c.key) {
+      keptCovers.add(before.id);
+      const same = before.kind === c.kind && before.family === c.family && before.species === c.species && before.sownOn === c.sownOn && before.destroyedOn === c.destroyedOn;
+      if (!same) changes.push({ kind: "cover.update", coverId: before.id, key: c.key, species: c.species });
+    } else {
+      changes.push({ kind: "cover.create", coverKey: c.id, key: c.key, species: c.species });
+    }
+  }
+  const doubled = [...coverKeys].filter(([, n]) => n > 1).map(([k]) => k);
+  if (doubled.length) blockers.push({ code: "duplicate-production", message: "Un seul couvert d'interculture par parcelle.", keys: doubled });
+  for (const c of existingCovers) {
+    if (!keptCovers.has(c.id)) changes.push({ kind: "cover.delete", coverId: c.id, key: parcelKeyOf(c.landParcelId), species: c.species });
   }
 
   return { changes, blockers };

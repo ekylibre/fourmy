@@ -23,6 +23,7 @@ const context: CropPlanContext = {
   // 2026 : blé sur Les Rouffiats ; un blé en 2027 revient au bout d'un an.
   history: { [R!.id]: { "2026": { main: "BTH", secondary: false, label: "Blé tendre" } } },
   previousByActivity: { [WHEAT]: R!.version.areaM2 },
+  zones: {},
   certification: { abParcels: {}, hve: false, abRotation: { years: 5, sameSpeciesMax: 2 } },
   settings: { bcae7Preferred: "rotation", alsaceRhinePlain: false, returnIntervals: {} },
   refsVersion: "test",
@@ -33,6 +34,7 @@ function cropPlanServer() {
   let plan: CropPlanView | null = null;
   const saves: CropPlanDraft[] = [];
   const validations: { dryRun: boolean; body: unknown }[] = [];
+  const settingsSaved: Record<string, unknown>[] = [];
   const result = (draft: CropPlanDraft, dryRun: boolean): CropPlanValidation => {
     const { changes, blockers } = diffCropPlan(draft, resolveParcels(context.parcels, draft), [], { campaignExists: false });
     return { dryRun, changes, blockers, sections: checkCropPlan(cropPlanCheckInput(context, draft)).sections, version: dryRun || blockers.length ? null : 1 };
@@ -52,6 +54,10 @@ function cropPlanServer() {
       plan = { ...plan, draft: body.draft, revision: plan.revision + 1 };
       return HttpResponse.json(plan);
     }),
+    http.put("*/settings/crop-plan", async ({ request }) => {
+      settingsSaved.push((await request.json()) as Record<string, unknown>);
+      return HttpResponse.json(settingsSaved.at(-1));
+    }),
     http.post("*/crop-plans/2027/validate", async ({ request }) => {
       const dryRun = new URL(request.url).searchParams.get("dryRun") === "1";
       const body = await request.json();
@@ -61,7 +67,7 @@ function cropPlanServer() {
       return HttpResponse.json(r);
     }),
   );
-  return { saves, validations };
+  return { saves, validations, settingsSaved };
 }
 
 async function choose(user: ReturnType<typeof userEvent.setup>, name: string, option: string) {
@@ -99,6 +105,30 @@ describe("assolement", () => {
     expect(screen.getByText(/Tracez une ligne qui commence et finit hors de la parcelle/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Annuler la découpe" }));
     expect(screen.getByRole("button", { name: "Découper" })).toBeInTheDocument();
+  });
+
+  it("couvert d'interculture et réglages de l'assolement", async () => {
+    const user = userEvent.setup();
+    const { saves, settingsSaved } = cropPlanServer();
+    renderApp(`/f/${FARM}/crop-plan/2027`);
+    await user.click(await screen.findByRole("button", { name: "Préparer l'assolement 2027" }));
+    const table = await screen.findByRole("table", { name: "Parcelles de l'assolement" });
+    await user.click(within(table).getByRole("checkbox", { name: `Choisir ${R!.name}` }));
+    const cover = screen.getByLabelText("Couvert d'interculture");
+    expect(within(cover).getByRole("button", { name: "Ajouter le couvert" })).toBeDisabled();
+    await user.click(within(cover).getByRole("combobox", { name: "Famille" }));
+    await user.click(await screen.findByRole("option", { name: /Crucifères/ }));
+    await user.type(within(cover).getByRole("textbox", { name: "Espèces" }), "moutarde");
+    await user.type(within(cover).getByLabelText("Semis"), "2027-08-20");
+    await user.click(within(cover).getByRole("button", { name: "Ajouter le couvert" }));
+    const row = within(table).getByRole("checkbox", { name: `Choisir ${R!.name}` }).closest("tr")!;
+    expect(row.cells[4]!.textContent).toBe("— + couvert moutarde");
+    await vi.waitFor(() => expect(saves.at(-1)?.covers).toEqual([expect.objectContaining({ key: `p:${R!.id}`, kind: "sown", family: "cruciferes", species: "moutarde", sownOn: "2027-08-20", destroyedOn: null })]), { timeout: 3000 });
+
+    await user.click(screen.getByRole("tab", { name: "Réglages" }));
+    await user.type(screen.getByRole("spinbutton", { name: "Délai de retour : Blé" }), "3");
+    await user.click(screen.getByRole("button", { name: "Enregistrer les réglages" }));
+    await vi.waitFor(() => expect(settingsSaved).toEqual([{ bcae7Preferred: "rotation", alsaceRhinePlain: false, returnIntervals: { ble: 3 } }]));
   });
 
   it("préparer 2027, affecter, voir les contrôles, valider", async () => {

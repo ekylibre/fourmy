@@ -3,12 +3,13 @@ import { Alert, Badge, Button, Checkbox, Group, Modal, Paper, ScrollArea, Segmen
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
 import { Ban, Crosshair, Eraser, Plus, Sprout } from "lucide-react";
-import { ACTIVITY_FAMILY_LABELS, type ActivityFamily, type ControlFinding, type ControlSection, type CropPlanChange, type CropPlanContext, type CropPlanParcelKey, type CropPlanValidation } from "@fourmy/contracts";
+import { ACTIVITY_FAMILY_LABELS, COVER_FAMILY_LABELS, COVER_KIND_LABELS, type ActivityFamily, type ControlFinding, type ControlSection, type CropPlanChange, type CropPlanContext, type CropPlanParcelKey, type CropPlanValidation } from "@fourmy/contracts";
+import { RETURN_INTERVALS } from "@fourmy/certification-refs";
 import { useArea } from "../../app/prefs";
 import { api, farmPath } from "../../app/api";
 import { ControlLight } from "../certification/controls";
 import { cropPlanKeys, useCropPlanVersion } from "./queries";
-import { addSecondary, assignMain, clearParcels, markFallow, type CropPlanEditor } from "./useCropPlanEditor";
+import { addSecondary, assignMain, clearParcels, markFallow, setCover, type CropPlanEditor } from "./useCropPlanEditor";
 
 /** Panneaux de l'écran d'assolement (conception §7). */
 
@@ -19,9 +20,11 @@ export function plannedLabel(editor: CropPlanEditor, key: string): string {
   const main = editor.draft.assignments.filter((a) => a.key === key && a.role === "main").map((a) => editor.activities.get(a.activityId)?.name ?? "?");
   const second = editor.draft.assignments.filter((a) => a.key === key && a.role === "secondary").map((a) => editor.activities.get(a.activityId)?.name ?? "?");
   const fallow = editor.draft.fallow.some((f) => f.key === key);
-  if (!main.length && fallow) return "Sans culture";
-  if (!main.length) return "—";
-  return second.length ? `${main.join(" puis ")} + ${second.join(", ")}` : main.join(" puis ");
+  const cover = editor.draft.covers.find((c) => c.key === key);
+  const coverText = cover ? ` + couvert ${cover.species}` : "";
+  if (!main.length && fallow) return `Sans culture${coverText}`;
+  if (!main.length) return cover ? `—${coverText}` : "—";
+  return (second.length ? `${main.join(" puis ")} + ${second.join(", ")}` : main.join(" puis ")) + coverText;
 }
 
 /** Culture de l'an passé d'une parcelle de départ. */
@@ -48,6 +51,12 @@ export function AssignPanel({ editor, context, selected, onSelect, editable }: {
   const [secondaryId, setSecondaryId] = useState<string | null>(null);
   const [startedOn, setStartedOn] = useState("");
   const [stoppedOn, setStoppedOn] = useState("");
+  const [coverKind, setCoverKind] = useState<"sown" | "regrowth_cereal" | "regrowth_rapeseed">("sown");
+  const [coverFamily, setCoverFamily] = useState<string | null>(null);
+  const [coverSpecies, setCoverSpecies] = useState("");
+  const [coverSown, setCoverSown] = useState("");
+  const [coverDestroyed, setCoverDestroyed] = useState("");
+  const coverReady = !!selected.length && !!coverSpecies.trim() && !!coverSown && (coverKind !== "sown" || !!coverFamily);
   const sel = new Set<string>(selected);
   const todo = new Set<string>(editor.summary.unassigned.keys);
   const parcels = editor.plan.parcels.filter((p) => filter === "all" || todo.has(p.key));
@@ -133,6 +142,54 @@ export function AssignPanel({ editor, context, selected, onSelect, editable }: {
                 Ajouter
               </Button>
             </Group>
+            <Stack gap={4} aria-label="Couvert d'interculture">
+              <Text size="xs" fw={600}>
+                Couvert d'interculture (après la culture, au cahier de fertilisation {context.year + 1})
+              </Text>
+              <Group grow gap="xs">
+                <Select
+                  size="xs"
+                  label="Nature"
+                  data={Object.entries(COVER_KIND_LABELS).map(([value, label]) => ({ value, label }))}
+                  value={coverKind}
+                  onChange={(v) => {
+                    setCoverKind((v ?? "sown") as typeof coverKind);
+                    if (v !== "sown") setCoverFamily(null);
+                  }}
+                  allowDeselect={false}
+                />
+                <Select size="xs" label="Famille" data={Object.entries(COVER_FAMILY_LABELS).map(([value, label]) => ({ value, label }))} value={coverFamily} onChange={setCoverFamily} disabled={coverKind !== "sown"} />
+              </Group>
+              <Group grow gap="xs">
+                <TextInput size="xs" label="Espèces" placeholder="moutarde, phacélie…" value={coverSpecies} onChange={(e) => setCoverSpecies(e.currentTarget.value)} />
+                <TextInput size="xs" type="date" label="Semis" value={coverSown} onChange={(e) => setCoverSown(e.currentTarget.value)} />
+                <TextInput size="xs" type="date" label="Destruction" value={coverDestroyed} onChange={(e) => setCoverDestroyed(e.currentTarget.value)} />
+              </Group>
+              <Group gap="xs">
+                <Button
+                  size="xs"
+                  variant="light"
+                  leftSection={<Plus size={14} />}
+                  disabled={!coverReady}
+                  onClick={() =>
+                    editor.apply((d) =>
+                      setCover(d, selected, {
+                        kind: coverKind,
+                        family: coverKind === "sown" ? (coverFamily as CropPlanEditor["draft"]["covers"][number]["family"]) : null,
+                        species: coverSpecies.trim(),
+                        sownOn: coverSown,
+                        destroyedOn: coverDestroyed || null,
+                      }),
+                    )
+                  }
+                >
+                  Ajouter le couvert
+                </Button>
+                <Button size="xs" variant="subtle" color="brique" disabled={!selected.some((k) => editor.draft.covers.some((c) => c.key === k))} onClick={() => editor.apply((d) => ({ ...d, covers: d.covers.filter((c) => !sel.has(c.key)) }))}>
+                  Retirer le couvert
+                </Button>
+              </Group>
+            </Stack>
           </Stack>
         </Paper>
       )}
@@ -268,6 +325,12 @@ function changeLabel(c: CropPlanChange, names: (key: string) => string, activity
       return `${names(c.source)} découpée en ${c.pieces.map((p) => p.name).join(", ")}`;
     case "parcel.merge":
       return `${c.sources.map(names).join(", ")} fusionnées en ${c.result.name}`;
+    case "cover.create":
+      return `${names(c.key)} : couvert ${c.species}`;
+    case "cover.update":
+      return `${names(c.key)} : couvert ${c.species} modifié`;
+    case "cover.delete":
+      return `${names(c.key)} : couvert ${c.species} retiré`;
   }
 }
 
@@ -403,6 +466,86 @@ export function HistoryPanel({ farmId, year, versions, editor, context }: { farm
           <ChangeList changes={v.data.changes} editor={editor} context={context} />
         </Paper>
       )}
+    </Stack>
+  );
+}
+
+/** Réglages de l'assolement (responsable) : critère BCAE 7, plaine du Rhin, délais de retour propres à la ferme. */
+export function SettingsPanel({ farmId, year, context }: { farmId: string; year: number; context: CropPlanContext }) {
+  const qc = useQueryClient();
+  const [settings, setSettings] = useState(context.settings);
+  const save = useMutation({
+    mutationFn: (s: CropPlanContext["settings"]) => api.put<CropPlanContext["settings"]>(farmPath(farmId, "/settings/crop-plan"), s),
+    onSuccess: async () => {
+      notifications.show({ color: "lichen", message: "Réglages de l'assolement enregistrés." });
+      await qc.invalidateQueries({ queryKey: cropPlanKeys.context(farmId, year) });
+    },
+  });
+  const setReturnInterval = (id: string, value: string) => {
+    const n = Number(value);
+    const next = { ...settings.returnIntervals };
+    if (!value || !Number.isInteger(n) || n < 1) delete next[id];
+    else next[id] = Math.min(n, 15);
+    setSettings({ ...settings, returnIntervals: next });
+  };
+  return (
+    <Stack gap="sm" aria-label="Réglages de l'assolement">
+      <Select
+        label="Critère BCAE 7 mis en avant"
+        description="Les deux critères sont toujours calculés ; le verdict retient celui qui est respecté."
+        data={[
+          { value: "rotation", label: "Rotation des cultures" },
+          { value: "diversification", label: "Diversification des cultures" },
+        ]}
+        value={settings.bcae7Preferred}
+        onChange={(v) => setSettings({ ...settings, bcae7Preferred: (v ?? "rotation") as "rotation" | "diversification" })}
+        allowDeselect={false}
+      />
+      <Checkbox
+        label="Au moins une parcelle dans la plaine du Rhin (diversification à points de l'arrêté BCAE)"
+        checked={settings.alsaceRhinePlain}
+        onChange={(e) => setSettings({ ...settings, alsaceRhinePlain: e.currentTarget.checked })}
+      />
+      <div>
+        <Text fw={600} size="sm">
+          Délais de retour (années)
+        </Text>
+        <Text size="xs" c="dimmed" mb="xs">
+          Repères d'après Triple Performance, à adapter à la ferme ; vide : repère par défaut.
+        </Text>
+        <Table aria-label="Délais de retour">
+          <Table.Tbody>
+            {RETURN_INTERVALS.map((r) => (
+              <Table.Tr key={r.id}>
+                <Table.Td>{r.label}</Table.Td>
+                <Table.Td w={110}>
+                  <TextInput
+                    size="xs"
+                    type="number"
+                    min={1}
+                    max={15}
+                    aria-label={`Délai de retour : ${r.label}`}
+                    placeholder={String(r.minYears)}
+                    value={settings.returnIntervals[r.id]?.toString() ?? ""}
+                    onChange={(e) => setReturnInterval(r.id, e.currentTarget.value)}
+                  />
+                </Table.Td>
+                <Table.Td>
+                  <Text size="xs" c="dimmed" component="a" href={r.source.url} target="_blank" rel="noreferrer">
+                    source
+                  </Text>
+                </Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      </div>
+      {save.error && <Alert color="brique">{(save.error as Error).message}</Alert>}
+      <Group justify="flex-end">
+        <Button onClick={() => save.mutate(settings)} loading={save.isPending}>
+          Enregistrer les réglages
+        </Button>
+      </Group>
     </Stack>
   );
 }

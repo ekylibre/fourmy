@@ -17,7 +17,7 @@ import {
   type CropPlanView,
   type CropPlanYearCrop,
 } from "@fourmy/contracts";
-import { checkCropPlan, cropPlanCheckInput, diffCropPlan, emptyDraft, operationBlockers, parcelKeyOf, resolveParcels, type ExistingProduction } from "@fourmy/domain";
+import { checkCropPlan, cropPlanCheckInput, diffCropPlan, emptyDraft, operationBlockers, parcelKeyOf, resolveParcels, type ExistingCover, type ExistingProduction } from "@fourmy/domain";
 import { Conflict, NotFound } from "../routes/helpers.js";
 import { natureOf } from "./activities.js";
 import { getCertificationSettings } from "./certification-controls.js";
@@ -25,8 +25,8 @@ import { getCertificationSettings } from "./certification-controls.js";
 /**
  * Assolement prévisionnel, lot AS2a (claudedocs/conception_assolement.md §3,
  * §5, §6) : brouillon d'une campagne, contexte des contrôles, validation
- * (productions, découpes et fusions de parcelles), réouverture, versions.
- * Couverts : lot AS4.
+ * (productions, découpes et fusions de parcelles, couverts d'interculture),
+ * réouverture, versions.
  */
 
 const rows = async <T>(tx: Tx, q: SQL) => (await tx.execute(q)) as unknown as T[];
@@ -199,6 +199,40 @@ async function inheritedHistory(tx: Tx, ids: string[], year: number, own: CropPl
   return out;
 }
 
+/**
+ * Zonages des parcelles de la campagne (lot AS4) : part en aire de captage et
+ * en site Natura 2000 (Lexicon), point d'eau le plus proche à moins de 50 m.
+ */
+async function parcelZones(tx: Tx, year: number): Promise<CropPlanContext["zones"]> {
+  const list = await rows<{ id: string; catchments: { name: string; share: number }[] | null; natura: { name: string; nature: string; share: number }[] | null; water_name: string | null; water_m: number | null }>(
+    tx,
+    sql`SELECT lp.id,
+               (SELECT json_agg(json_build_object('name', coalesce(w.name, w.basin, ''), 'share', ST_Area(ST_Intersection(w.shape, v.shape)::geography) / nullif(ST_Area(v.shape::geography), 0)))
+                FROM lexicon_water_catchments w WHERE ST_Intersects(w.shape, v.shape)) AS catchments,
+               (SELECT json_agg(json_build_object('name', coalesce(n.name, n.id), 'nature', n.nature, 'share', ST_Area(ST_Intersection(n.shape, v.shape)::geography) / nullif(ST_Area(v.shape::geography), 0)))
+                FROM lexicon_natura2000 n WHERE ST_Intersects(n.shape, v.shape)) AS natura,
+               w.name AS water_name, w.distance AS water_m
+        FROM land_parcels lp
+        JOIN LATERAL (
+          SELECT v.shape FROM land_parcel_versions v
+          WHERE v.land_parcel_id = lp.id AND v.valid && tstzrange(make_date(${year}, 1, 1)::timestamptz, make_date(${year + 1}, 1, 1)::timestamptz)
+          ORDER BY upper(v.valid) DESC NULLS FIRST LIMIT 1) v ON true
+        LEFT JOIN LATERAL (
+          SELECT wi.name, ST_Distance(wi.geom::geography, v.shape::geography)::float8 AS distance FROM water_items wi
+          WHERE ST_DWithin(wi.geom::geography, v.shape::geography, 50) ORDER BY 2 LIMIT 1) w ON true`,
+  );
+  const out: CropPlanContext["zones"] = {};
+  for (const r of list) {
+    if (!r.catchments && !r.natura && r.water_m === null) continue;
+    out[r.id] = {
+      catchments: r.catchments ?? [],
+      natura2000: r.natura ?? [],
+      water: r.water_m === null ? null : { name: r.water_name, distanceM: r.water_m },
+    };
+  }
+  return out;
+}
+
 async function loadContext(tx: Tx, year: number, abRotation: CropPlanContext["certification"]["abRotation"]): Promise<CropPlanContext> {
   const parcels = await baseParcels(tx, year);
   const ids = parcels.map((p) => p.id);
@@ -221,6 +255,7 @@ async function loadContext(tx: Tx, year: number, abRotation: CropPlanContext["ce
           GROUP BY land_parcel_id, kind`,
   );
   const settings = await settingsOf(tx);
+  const zones = await parcelZones(tx, year);
   return {
     year,
     parcels: parcels.map((p) => ({
@@ -234,6 +269,7 @@ async function loadContext(tx: Tx, year: number, abRotation: CropPlanContext["ce
     activities,
     history: hist,
     previousByActivity: Object.fromEntries(previous.map((r) => [r.activity_id, r.m2])),
+    zones,
     certification: {
       abParcels: Object.fromEntries(certs.filter((c) => c.kind === "organic").map((c) => [c.land_parcel_id, { conversionStart: c.started_on }])),
       hve: certs.some((c) => c.kind === "hve"),
@@ -294,11 +330,31 @@ async function existingProductions(tx: Tx, year: number): Promise<ExistingProduc
   }));
 }
 
+/** Couverts d'interculture qui suivent la culture principale de la campagne (cahier : campagne suivante). */
+async function existingCovers(tx: Tx, year: number): Promise<ExistingCover[]> {
+  const list = await rows<{ id: string; land_parcel_id: string; kind: string; family: string | null; species: string; sown_on: string; destroyed_on: string | null }>(
+    tx,
+    sql`SELECT id, land_parcel_id, kind, family, species, sown_on::text, destroyed_on::text FROM cover_crops WHERE campaign = ${year + 1} ORDER BY sown_on`,
+  );
+  return list.map((c) => ({ id: c.id, landParcelId: c.land_parcel_id, kind: c.kind, family: c.family, species: c.species, sownOn: c.sown_on, destroyedOn: c.destroyed_on }));
+}
+
 /** État actuel de la campagne sous forme de brouillon (création, réouverture, assolement validé). */
 async function liveDraft(tx: Tx, year: number): Promise<CropPlanDraft> {
   const prods = await existingProductions(tx, year);
+  const covers = await existingCovers(tx, year);
   return {
     ...emptyDraft(year),
+    covers: covers.map((c) => ({
+      id: c.id,
+      key: parcelKeyOf(c.landParcelId),
+      kind: c.kind as CropPlanDraft["covers"][number]["kind"],
+      family: c.family as CropPlanDraft["covers"][number]["family"],
+      species: c.species,
+      sownOn: c.sownOn,
+      destroyedOn: c.destroyedOn,
+      coverId: c.id,
+    })),
     assignments: prods.map((p) => ({
       id: p.id,
       key: parcelKeyOf(p.landParcelId),
@@ -447,7 +503,7 @@ export async function validateCropPlan(
     const resolved = resolveParcels(context.parcels, draft);
     const campaign = await campaignOf(tx, year);
     const existing = campaign ? await existingProductions(tx, year) : [];
-    const { changes, blockers } = diffCropPlan(draft, resolved, existing, { campaignExists: !!campaign });
+    const { changes, blockers } = diffCropPlan(draft, resolved, existing, { campaignExists: !!campaign }, await existingCovers(tx, year));
     const activityIds = new Set(context.activities.map((a) => a.id));
     const unknownActivities = draft.assignments.filter((a) => !activityIds.has(a.activityId));
     if (unknownActivities.length) {
@@ -598,12 +654,32 @@ async function applyChanges(tx: Tx, farmId: string, year: number, changes: CropP
       await tx.execute(sql`UPDATE productions SET ${fields(c.after)} WHERE id = ${id}`);
     }
   }
+  // Couverts d'interculture : cahier de fertilisation, campagne de la culture qui suit.
+  const coverOf = new Map(draft.covers.map((c) => [c.id, c]));
+  const coverByCoverId = new Map(draft.covers.filter((c) => c.coverId).map((c) => [c.coverId!, c]));
+  const createdCovers = new Map<string, string>();
+  for (const c of changes) {
+    if (c.kind === "cover.delete") {
+      await tx.execute(sql`DELETE FROM cover_crops WHERE id = ${c.coverId}`);
+    } else if (c.kind === "cover.update" || c.kind === "cover.create") {
+      const cv = c.kind === "cover.update" ? coverByCoverId.get(c.coverId)! : coverOf.get(c.coverKey)!;
+      const id = c.kind === "cover.update" ? c.coverId : crypto.randomUUID();
+      if (c.kind === "cover.create") createdCovers.set(cv.id, id);
+      // Un couvert par parcelle et par campagne : celui du brouillon remplace l'éventuel existant.
+      await tx.execute(sql`
+        INSERT INTO cover_crops (id, farm_id, land_parcel_id, campaign, kind, family, species, sown_on, destroyed_on)
+        VALUES (${id}, ${farmId}, ${parcelId(c.key)}, ${year + 1}, ${cv.kind}, ${cv.family}, ${cv.species}, ${cv.sownOn}::date, ${cv.destroyedOn}::date)
+        ON CONFLICT (land_parcel_id, campaign) DO UPDATE SET kind = excluded.kind, family = excluded.family, species = excluded.species,
+          sown_on = excluded.sown_on, destroyed_on = excluded.destroyed_on, updated_at = now()`);
+    }
+  }
+
   // Instantané : clés définitives des nouvelles parcelles, productions créées.
   const real = (key: string) => (keyMap.has(key) ? (`p:${keyMap.get(key)}` as const) : (key as `p:${string}`));
   return {
     ...draft,
     assignments: draft.assignments.map((a) => ({ ...a, key: real(a.key), ...(created.has(a.id) ? { productionId: created.get(a.id)! } : {}) })),
-    covers: draft.covers.map((c) => ({ ...c, key: real(c.key) })),
+    covers: draft.covers.map((c) => ({ ...c, key: real(c.key), ...(createdCovers.has(c.id) ? { coverId: createdCovers.get(c.id)! } : {}) })),
     fallow: draft.fallow.map((f) => ({ ...f, key: real(f.key) })),
   };
 }

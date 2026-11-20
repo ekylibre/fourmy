@@ -59,15 +59,26 @@ export const cropPlanAssignment = z
   .refine((a) => !a.startedOn || !a.stoppedOn || a.startedOn <= a.stoppedOn, { message: "La fin précède le début", path: ["stoppedOn"] });
 export type CropPlanAssignment = z.infer<typeof cropPlanAssignment>;
 
-/** Couvert d'interculture saisi dans l'assolement (décision A7). */
-export const cropPlanCover = z.object({
-  id: z.string().min(1),
-  key: cropPlanParcelKey,
-  species: z.array(z.string()).min(1),
-  kind: z.enum(["sown", "regrowth"]),
-  sownOn: isoDate.nullable(),
-  destroyedOn: isoDate.nullable(),
-});
+/**
+ * Couvert d'interculture saisi dans l'assolement (décision A7), après la
+ * culture principale : enregistré à la validation dans le cahier de
+ * fertilisation (cover_crops, campagne de la culture suivante). Mêmes
+ * familles et natures que le cahier.
+ */
+export const cropPlanCover = z
+  .object({
+    id: z.string().min(1),
+    key: cropPlanParcelKey,
+    kind: z.enum(["sown", "regrowth_cereal", "regrowth_rapeseed"]),
+    family: z.enum(["cruciferes", "graminees_seigle_avoine", "graminees_ray_grass", "legumineuses", "hydrophyllacees", "melange_graminees_legumineuses", "melange_cruciferes_legumineuses"]).nullable(),
+    species: z.string().trim().min(1).max(200),
+    sownOn: isoDate,
+    destroyedOn: isoDate.nullable(),
+    /** Couvert existant repris (cahier de fertilisation). */
+    coverId: z.string().uuid().optional(),
+  })
+  .refine((c) => (c.kind === "sown") === (c.family !== null), { message: "Famille requise pour un couvert semé, et seulement pour lui", path: ["family"] })
+  .refine((c) => !c.destroyedOn || c.destroyedOn >= c.sownOn, { message: "La destruction précède le semis", path: ["destroyedOn"] });
 export type CropPlanCover = z.infer<typeof cropPlanCover>;
 
 export const cropPlanDraft = z.object({
@@ -128,6 +139,9 @@ export const cropPlanChange = z.discriminatedUnion("kind", [
     after: cropPlanProductionFields,
   }),
   z.object({ kind: z.literal("production.delete"), productionId: z.string(), key: cropPlanParcelKey, before: cropPlanProductionFields }),
+  z.object({ kind: z.literal("cover.create"), coverKey: z.string(), key: cropPlanParcelKey, species: z.string() }),
+  z.object({ kind: z.literal("cover.update"), coverId: z.string(), key: cropPlanParcelKey, species: z.string() }),
+  z.object({ kind: z.literal("cover.delete"), coverId: z.string(), key: cropPlanParcelKey, species: z.string() }),
 ]);
 export type CropPlanChange = z.infer<typeof cropPlanChange>;
 
@@ -216,6 +230,18 @@ export interface CropPlanContext {
   history: Record<string, Record<string, CropPlanYearCrop>>;
   /** Surface (m²) par activité à la campagne précédente. */
   previousByActivity: Record<string, number>;
+  /**
+   * Zonages des parcelles de départ (lot AS4) : part en aire d'alimentation
+   * de captage et en site Natura 2000, point d'eau le plus proche.
+   */
+  zones: Record<
+    string,
+    {
+      catchments: { name: string; share: number }[];
+      natura2000: { name: string; nature: string; share: number }[];
+      water: { name: string | null; distanceM: number } | null;
+    }
+  >;
   certification: {
     /** Parcelles certifiées AB pendant la campagne : début de la conversion. */
     abParcels: Record<string, { conversionStart: string }>;

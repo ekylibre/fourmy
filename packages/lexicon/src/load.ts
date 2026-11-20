@@ -11,7 +11,9 @@ import { fetchIndex, fetchManifest, fetchStructure, packageUrl, parseStructure, 
  * cultures, cibles PFI), `taxonomy` (parenté des espèces), `productions`
  * (activités de référence, culture IFT) et `agricultural_pictures` (images) ;
  * `agroedi` (dictionnaire AgroEDI, réservé aux adhérents : seulement avec une
- * clé, ignoré s'il manque à l'index). Une version déjà chargée n'est pas
+ * clé, ignoré s'il manque à l'index) ; `protected_water_zones` et
+ * `protected_natural_zones` (aires de captage, Natura 2000 : assolement,
+ * ignorés s'ils manquent à l'index). Une version déjà chargée n'est pas
  * retéléchargée ; une nouvelle version remplace l'ancienne d'un bloc, dans
  * une transaction (tout ou rien). Chaque fichier est vérifié par son sha256
  * quand le manifeste le donne.
@@ -34,15 +36,22 @@ const REQUIRED: Record<string, string[]> = {
   master_crop_production_cap_codes: ["cap_code", "cap_label", "production", "is_seed", "year"],
   registered_agroedi_codes: ["repository_id", "reference_id", "reference_code", "reference_label", "ekylibre_scope", "ekylibre_value"],
   registered_agroedi_crops: ["agroedi_code", "agroedi_name", "production"],
+  registered_protected_water_zones: ["id", "administrative_zone", "name", "updated_on", "shape"],
+  registered_natural_zones: ["id", "name", "nature", "shape"],
 };
 
-/** `optional` : jeu réservé aux adhérents, chargé seulement avec une clé (sinon « absent »). */
-const PACKAGES: { name: string; tables: string[]; optional?: true }[] = [
+/**
+ * `optional` : jeu réservé aux adhérents, chargé seulement avec une clé (sinon « absent »).
+ * `ifPublished` : jeu ouvert chargé s'il figure à l'index (zonages de l'assolement), « absent » sinon.
+ */
+const PACKAGES: { name: string; tables: string[]; optional?: true; ifPublished?: true }[] = [
   { name: "phytosanitary", tables: ["registered_phytosanitary_products", "registered_phytosanitary_usages", "registered_phytosanitary_cropsets", "registered_phytosanitary_target_name_to_pfi_targets", "registered_phytosanitary_risks", "registered_phytosanitary_symbols"] },
   { name: "taxonomy", tables: ["master_taxonomy", "taxonomy__translations"] },
   { name: "productions", tables: ["master_productions", "productions__translations", "master_crop_production_tfi_codes", "master_crop_production_cap_codes"] },
   { name: "agricultural_pictures", tables: ["master_agricultural_pictures"] },
   { name: "agroedi", tables: ["registered_agroedi_codes", "registered_agroedi_crops"], optional: true },
+  { name: "protected_water_zones", tables: ["registered_protected_water_zones"], ifPublished: true },
+  { name: "protected_natural_zones", tables: ["registered_natural_zones"], ifPublished: true },
 ];
 
 /** Passage des tables temporaires (texte) aux tables de Fourmy, typées. */
@@ -118,8 +127,22 @@ const TRANSFORMS: Record<string, string[]> = {
   ],
   // Dictionnaire AgroEDI : libellés par table (codes et libellés nettoyés de
   // leurs espaces : « ZKM » est publié « ZKM »), cultures → production.
+  // Zonages de l'assolement (lot AS4) : formes en WKB hexadécimal (texte PostGIS).
+  protected_water_zones: [
+    `TRUNCATE lexicon_water_catchments`,
+    `INSERT INTO lexicon_water_catchments (id, basin, name, updated_on, shape)
+     SELECT id, nullif(btrim(administrative_zone), ''), nullif(btrim(name), ''), nullif(updated_on, '')::date, ST_Multi(shape::geometry)
+     FROM lx_registered_protected_water_zones WHERE coalesce(shape, '') <> ''
+     ON CONFLICT (id) DO NOTHING`,
+  ],
+  protected_natural_zones: [
+    `TRUNCATE lexicon_natura2000`,
+    `INSERT INTO lexicon_natura2000 (id, name, nature, shape)
+     SELECT id, nullif(btrim(name), ''), nature, ST_Multi(shape::geometry)
+     FROM lx_registered_natural_zones WHERE coalesce(shape, '') <> ''
+     ON CONFLICT (id) DO NOTHING`,
+  ],
   agroedi: [
-    `TRUNCATE lexicon_agroedi_codes, lexicon_agroedi_crops`,
     `INSERT INTO lexicon_agroedi_codes (table_id, reference_id, code, label, ekylibre_scope, ekylibre_value)
      SELECT repository_id::int, reference_id::int, btrim(reference_code), btrim(reference_label),
             nullif(btrim(ekylibre_scope), ''), nullif(btrim(ekylibre_value), '')
@@ -155,6 +178,7 @@ export interface SyncOptions {
 const REFERENTIAL_TABLES = [
   "phyto_products", "phyto_usages", "phyto_cropsets", "phyto_target_pfi", "phyto_risks", "phyto_hazard_symbols", "taxonomy",
   "lexicon_productions", "lexicon_production_ift", "lexicon_cap_codes", "lexicon_pictures", "lexicon_agroedi_codes", "lexicon_agroedi_crops",
+  "lexicon_water_catchments", "lexicon_natura2000",
 ];
 
 /**
@@ -191,6 +215,10 @@ export async function syncLexiconIn(tx: TransactionSql, { base, apiKey, force = 
     const version = index.datasources[pkg.name]?.current;
     // Jeu réservé : le dépôt public en publie le nom, pas les fichiers (403) ; il faut une clé.
     if (pkg.optional && (!version || !apiKey)) {
+      reports.push({ name: pkg.name, version: "", status: "absent", rows: 0 });
+      continue;
+    }
+    if (!version && pkg.ifPublished) {
       reports.push({ name: pkg.name, version: "", status: "absent", rows: 0 });
       continue;
     }
