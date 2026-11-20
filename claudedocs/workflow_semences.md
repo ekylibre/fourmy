@@ -224,3 +224,13 @@ flowchart LR
   - contrat : 4 (`packages/contracts/test/seeds.test.ts`) ;
   - intégration : 4 (`apps/api/test/seeds.integration.test.ts`), dont RLS entre deux fermes, contraintes, cascade et couvert ;
   - turbo : 82 tâches vertes.
+
+### SE2 — Référentiels (20/11/2026)
+
+- Migration `0076_lexicon_seed_varieties.sql` : table `lexicon_seed_varieties` (code GNIS, taxon, espèce, variété, date d'inscription, clé `search` en minuscules sans accents, index `text_pattern_ops`).
+- `packages/lexicon/src/load.ts` : paquet `seed_varieties` (`ifPublished`) ; une ligne sans variété est écartée. Chargé en local : 21 592 variétés ; « thermidor » trouvé en 2 ms.
+- `apps/api/src/repos/taxonomy.ts` : `legumeOf` (fragment SQL, déplacé de l'assolement) et `legumeSpecies`, avec repli sur le genre pour les 16 espèces du catalogue absentes de la taxonomie.
+- `certification-refs/src/agronomy/thousand-grain-weight.ts` : 14 repères (Arvalis : blé tendre, blé dur, orge, maïs, sorgho ; Terres Inovia : lin, colza, pois, féverole, soja, lentille, pois chiche, lupin, chanvre), chacun avec sa page, sa citation et l'indication « valeur écrite » ou « milieu de la plage » ; alias du catalogue (`lupinus`, `sorghum`) ; pas de repli sur l'espèce parente (maïs doux, pop-corn). `REFS_VERSION` 2026-11-20.12.
+- Sans repère publié sur ces deux sites : avoine, triticale, seigle, épeautre, tournesol, espèces de couverts. Leur PMG se saisit.
+- Tests : chargement du catalogue (fixtures, accents), légumineuses et recherche (intégration), repères (sources, plages, alias) ; turbo : 82 tâches vertes.
+

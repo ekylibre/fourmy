@@ -61,7 +61,7 @@ const url = process.env.DATABASE_URL;
 /** Petit triangle (WKB hexadécimal, comme les CSV des zonages Lexicon). */
 const WKB = "0106000020e61000000100000001030000000100000004000000000000000000e03f666666666666464052b81e85eb51e03f666666666666464052b81e85eb51e03f48e17a14ae674640000000000000e03f6666666666664640";
 
-function fakeServer(phytoVersion: string, { agroedi = false, zones = false, apiKey }: { agroedi?: boolean; zones?: boolean; apiKey?: string } = {}) {
+function fakeServer(phytoVersion: string, { agroedi = false, zones = false, seeds = false, apiKey }: { agroedi?: boolean; zones?: boolean; seeds?: boolean; apiKey?: string } = {}) {
   const csv = (lines: string[]) => gzipSync(lines.join("\n") + "\n");
   const files: Record<string, string | Buffer> = {
     "index.json": JSON.stringify({
@@ -72,6 +72,7 @@ function fakeServer(phytoVersion: string, { agroedi = false, zones = false, apiK
         agricultural_pictures: { current: "pi1", versions: ["pi1"] },
         ...(agroedi ? { agroedi: { current: "a1", versions: ["a1"] } } : {}),
         ...(zones ? { protected_water_zones: { current: "w1", versions: ["w1"] }, protected_natural_zones: { current: "n1", versions: ["n1"] } } : {}),
+        ...(seeds ? { seed_varieties: { current: "sv1", versions: ["sv1"] } } : {}),
       },
     }),
     [`phytosanitary/${phytoVersion}/manifest.json`]: JSON.stringify({
@@ -198,6 +199,17 @@ function fakeServer(phytoVersion: string, { agroedi = false, zones = false, apiK
     files["protected_natural_zones/n1/data/n_0.csv.gz"] = csv([`FR7200700,Vallée de la Garonne,sic,${WKB},`]);
     files["protected_natural_zones/n1/manifest.json"] = JSON.stringify({ name: "protected_natural_zones", version: "n1", tables: [{ name: "registered_natural_zones", rows: 1, files: [{ path: "data/n_0.csv.gz" }] }] });
   }
+  if (seeds) {
+    files["seed_varieties/sv1/structure.sql"] = `CREATE TABLE registered_seed_varieties (id character varying PRIMARY KEY NOT NULL, id_specie character varying NOT NULL,
+      specie_name jsonb, specie_name_fra character varying, variety_name character varying, registration_date date);`;
+    files["seed_varieties/sv1/data/sv_0.csv.gz"] = csv([
+      `512E492,triticum_aestivum,"{""fra"": ""BLE TENDRE""}",BLE TENDRE,THERMIDOR,2023-12-27`,
+      `510A387,avena_sativa,"{""fra"": ""AVOINE""}",AVOINE,KWS PURSANT,`,
+      `5219021,trifolium_incarnatum,"{""fra"": ""TRÈFLE INCARNAT""}",TRÈFLE INCARNAT,CONTEA,`,
+      `0000000,zea_mays,,,,`,
+    ]);
+    files["seed_varieties/sv1/manifest.json"] = JSON.stringify({ name: "seed_varieties", version: "sv1", tables: [{ name: "registered_seed_varieties", rows: 4, files: [{ path: "data/sv_0.csv.gz" }] }] });
+  }
   const fetchImpl = (async (input: string | URL, init?: RequestInit) => {
     const path = String(input).replace("http://lexicon.test/", "");
     requested.push(path);
@@ -237,6 +249,24 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", { timeout: 150_
       });
   });
 
+  it("catalogue des variétés de semences, s'il est publié : clé de recherche sans accents", async () => {
+    await sql
+      .begin(async (tx) => {
+        const reports = await syncLexiconIn(tx, { base: "http://lexicon.test", fetchImpl: fakeServer("v1", { seeds: true }).fetchImpl, force: true });
+        expect(reports.find((r) => r.name === "seed_varieties")).toEqual({ name: "seed_varieties", version: "sv1", status: "loaded", rows: 4 });
+        // Une ligne sans nom de variété est écartée.
+        expect(await tx`SELECT gnis_code, species, species_label, variety_name, registered_on::text, search FROM lexicon_seed_varieties ORDER BY 1`).toEqual([
+          { gnis_code: "510A387", species: "avena_sativa", species_label: "AVOINE", variety_name: "KWS PURSANT", registered_on: null, search: "kws pursant avoine" },
+          { gnis_code: "512E492", species: "triticum_aestivum", species_label: "BLE TENDRE", variety_name: "THERMIDOR", registered_on: "2023-12-27", search: "thermidor ble tendre" },
+          { gnis_code: "5219021", species: "trifolium_incarnatum", species_label: "TRÈFLE INCARNAT", variety_name: "CONTEA", registered_on: null, search: "contea trefle incarnat" },
+        ]);
+        throw new Rollback();
+      })
+      .catch((e) => {
+        if (!(e instanceof Rollback)) throw e;
+      });
+  });
+
   it("charge produits, usages, ensembles et taxonomie ; une version connue n'est pas retéléchargée", async () => {
     await sql
       .begin(async (tx) => {
@@ -250,6 +280,7 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", { timeout: 150_
           { name: "agroedi", version: "", status: "absent", rows: 0 },
           { name: "protected_water_zones", version: "", status: "absent", rows: 0 },
           { name: "protected_natural_zones", version: "", status: "absent", rows: 0 },
+          { name: "seed_varieties", version: "", status: "absent", rows: 0 },
         ]);
         expect(await tx`SELECT reference_name, started_on::text, stopped_on::text FROM lexicon_productions ORDER BY 1`).toEqual([
           { reference_name: "grain_corn", started_on: "2000-03-01", stopped_on: "2000-11-30" },
@@ -291,7 +322,7 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", { timeout: 150_
         // Même version : rien n'est retéléchargé.
         const again = fakeServer("v1");
         const second = await syncLexiconIn(tx, { base: "http://lexicon.test", fetchImpl: again.fetchImpl });
-        expect(second.map((r) => r.status)).toEqual(["up-to-date", "up-to-date", "up-to-date", "up-to-date", "absent", "absent", "absent"]);
+        expect(second.map((r) => r.status)).toEqual(["up-to-date", "up-to-date", "up-to-date", "up-to-date", "absent", "absent", "absent", "absent"]);
         expect(again.requested).toEqual(["index.json"]);
         throw new Rollback();
       })
