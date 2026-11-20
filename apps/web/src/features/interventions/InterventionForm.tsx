@@ -458,7 +458,8 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   if (code) {
     try {
       const full = body();
-      if (full.targets.some((t) => t.kind === "land_parcel")) certDraft = { ...full, periods: flatPeriods(full), ...(justification.trim() ? { justification: justification.trim() } : {}) };
+      // Même corps que la planification (procédure comprise), sinon l'API le refuse (400).
+      if (full.targets.some((t) => t.kind === "land_parcel")) certDraft = { procedure: code, ...full, periods: flatPeriods(full), ...(justification.trim() ? { justification: justification.trim() } : {}) };
     } catch {
       certDraft = null; // date en cours de saisie
     }
