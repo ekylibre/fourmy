@@ -41,6 +41,9 @@ importers:
       '@fourmy/agrirouter':
         specifier: workspace:*
         version: link:../../packages/agrirouter
+      '@fourmy/certification-refs':
+        specifier: workspace:*
+        version: link:../../packages/certification-refs
       '@fourmy/connector-traccar':
         specifier: workspace:*
         version: link:../../packages/connector-traccar
@@ -342,6 +345,12 @@ importers:
       '@types/geojson':
         specifier: 7946.0.16
         version: 7946.0.16
+      vitest:
+        specifier: 4.1.12
+        version: 4.1.12(@types/node@24.19.2)(jsdom@29.1.1(@noble/hashes@2.4.0))(msw@2.7.0(@types/node@24.19.2)(typescript@5.7.3))(vite@8.3.4(@types/node@24.19.2)(sugarss@5.0.2(postcss@8.5.32))(yaml@2.9.1))
+
+  packages/certification-refs:
+    devDependencies:
       vitest:
         specifier: 4.1.12
         version: 4.1.12(@types/node@24.19.2)(jsdom@29.1.1(@noble/hashes@2.4.0))(msw@2.7.0(@types/node@24.19.2)(typescript@5.7.3))(vite@8.3.4(@types/node@24.19.2)(sugarss@5.0.2(postcss@8.5.32))(yaml@2.9.1))

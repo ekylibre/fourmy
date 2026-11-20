@@ -22,3 +22,10 @@ apps/site/.astro/
 
 # Sources de la fertilisation (documents COMIFER sous droits), gardées sur le poste
 claudedocs/PPF/
+
+# Pièces officielles HVE et AB (PDF, tableurs) : gardées en local, hors du
+# dépôt ; seuls les rapports qui les citent sont versionnés.
+docs/hve/*
+!docs/hve/rapport_hve.md
+docs/ab/*
+!docs/ab/rapport_ab.md

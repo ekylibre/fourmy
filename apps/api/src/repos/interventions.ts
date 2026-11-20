@@ -44,6 +44,7 @@ import {
 import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
 import { checkCompliance, type CheckableBody } from "./phyto.js";
 import { checkApplicationTx } from "./fertilization-record.js";
+import { recordCertificationCheck } from "./certification-controls.js";
 import { addReadingInTx } from "./equipments.js";
 import { buildTrackDraft, linkTrackSessions } from "./track-sessions.js";
 
@@ -166,6 +167,8 @@ function toIntervention(r: Record<string, unknown>): Intervention {
     clientId: (r.client_id as string | null) ?? null,
     compliance: (r.compliance as Intervention["compliance"]) ?? null,
     nitrateCheck: (r.nitrate_check as Intervention["nitrateCheck"]) ?? null,
+    certificationCheck: (r.certification_check as Intervention["certificationCheck"]) ?? null,
+    justification: (r.justification as string | null) ?? null,
     ift: (r.ift as Intervention["ift"]) ?? null,
     weather: (r.weather as Intervention["weather"]) ?? null,
     irrigation: r.irrigation ? { depthMm: Number((r.irrigation as { depthMm: number }).depthMm), method: (r.irrigation as { method?: IrrigationMethod | null }).method ?? null } : null,
@@ -216,7 +219,7 @@ async function readInterventions(tx: Tx, where: SQL, limit = 1000): Promise<Inte
     tx,
     sql`
       SELECT i.id, i.farm_id, i.procedure, i.status, i.started_at, i.stopped_at, i.origin, i.client_id, i.staffing,
-             i.purposes, i.notes, i.bbch, (SELECT st.label FROM ref_bbch_stages st WHERE st.code = i.bbch) AS bbch_label, i.compliance, i.nitrate_check, i.ift, i.weather, i.maintenance, i.irrigation,
+             i.purposes, i.notes, i.bbch, (SELECT st.label FROM ref_bbch_stages st WHERE st.code = i.bbch) AS bbch_label, i.compliance, i.nitrate_check, i.certification_check, i.justification, i.ift, i.weather, i.maintenance, i.irrigation,
              i.sowing, i.period_precision, i.affects_stock, i.created_at, i.updated_at,
              (SELECT coalesce(json_agg(json_build_object('equipment_id', m.equipment_id, 'value', m.value, 'correction', m.correction,
                                                          'correction_reason', m.correction_reason)), '[]')
@@ -631,6 +634,8 @@ async function recordCompliance(tx: Tx, ctx: DomainCtx, interventionId: string, 
   }
   await tx.execute(sql`UPDATE interventions SET compliance = ${JSON.stringify(result)}::jsonb WHERE id = ${interventionId}`);
   await recordNitrateCheck(tx, ctx, interventionId, body, mode);
+  // Contrôles HVE et AB (lot CT1) : seulement sur une parcelle certifiée à la date.
+  await recordCertificationCheck(tx, ctx, interventionId, body, mode);
   return result;
 }
 
@@ -706,10 +711,10 @@ export async function planInTx(
   const bounds = periodBounds(body.periods);
   await tx.execute(sql`
     INSERT INTO interventions (id, farm_id, procedure, status, started_at, stopped_at, origin, client_id, purposes, notes, staffing, bbch,
-                               affects_stock, period_precision)
+                               affects_stock, period_precision, justification)
     VALUES (${id}, ${farmId}, ${input.procedure}, 'planned', ${bounds.startedAt ?? input.plannedAt ?? null}, ${bounds.stoppedAt},
             ${ctx.origin}, ${clientId}, ${sql`ARRAY[${sql.join(input.purposes.map((p) => sql`${p}`), sql`, `)}]::text[]`}, ${input.notes ?? null},
-            ${input.staffing ?? "free"}, ${input.bbch ?? null}, ${ctx.origin !== "import"}, ${options.periodPrecision ?? "time"})`);
+            ${input.staffing ?? "free"}, ${input.bbch ?? null}, ${ctx.origin !== "import"}, ${options.periodPrecision ?? "time"}, ${input.justification ?? null})`);
   await writeBody(tx, id, input, articles);
   await writeMaintenance(tx, farmId, ctx, id, body, false, null);
   await writeIrrigation(tx, id, body);
@@ -912,7 +917,7 @@ async function applyCompletion(
     UPDATE interventions SET status = 'done', procedure = ${procedure},
       started_at = ${startedAt}::timestamptz, stopped_at = ${stoppedAt}::timestamptz,
       purposes = ${sql`ARRAY[${sql.join(input.purposes.map((p) => sql`${p}`), sql`, `)}]::text[]`},
-      notes = ${input.notes ?? null}, bbch = ${input.bbch === undefined ? sql`bbch` : input.bbch}, updated_at = now()
+      notes = ${input.notes ?? null}, justification = ${input.justification ?? null}, bbch = ${input.bbch === undefined ? sql`bbch` : input.bbch}, updated_at = now()
     WHERE id = ${interventionId}`);
   return { plan, areaHa, warnings };
 }
@@ -1014,7 +1019,7 @@ export async function updateIntervention(
         UPDATE interventions SET procedure = ${input.procedure},
           started_at = ${bounds.startedAt ?? input.plannedAt ?? before.startedAt}, stopped_at = ${bounds.stoppedAt},
           purposes = ${sql`ARRAY[${sql.join(input.purposes.map((p) => sql`${p}`), sql`, `)}]::text[]`},
-          notes = ${input.notes ?? null}, bbch = ${input.bbch === undefined ? sql`bbch` : input.bbch}, updated_at = now()
+          notes = ${input.notes ?? null}, justification = ${input.justification ?? null}, bbch = ${input.bbch === undefined ? sql`bbch` : input.bbch}, updated_at = now()
         WHERE id = ${interventionId}`);
       warnings.push(...(await crewOverlapWarnings(tx, interventionId, input)));
       warnings.push(...(await productionOverlapWarnings(tx, { ...input, plannedAt: input.plannedAt })));

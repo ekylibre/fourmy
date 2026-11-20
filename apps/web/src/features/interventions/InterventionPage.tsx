@@ -31,6 +31,7 @@ import { LIGHTS, TrafficLight } from "../../components/TrafficLight";
 import { actionLabel, changeLines, interventionDay, STATUS, targetName, type Names } from "./presenters";
 import { ComplianceSection, IftSection } from "./RegulatorySections";
 import { NitrateCheckSection } from "../fertilization/FertilizationChecks";
+import { CertificationCheckSection } from "../certification/controls";
 import { SprayingConditions, WeatherLine } from "../weather/Weather";
 import { irrigationVolumeM3 } from "./IrrigationFields";
 import { IRRIGATION_METHOD_LABELS, SOWING_TECHNIQUE_LABELS } from "@fourmy/contracts";
@@ -553,6 +554,7 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
             {!narrow && map}
             <ComplianceSection farmId={farm.id} intervention={i} />
             <NitrateCheckSection check={i.nitrateCheck} />
+            <CertificationCheckSection check={i.certificationCheck} stored />
             <IftSection farmId={farm.id} intervention={i} names={names} />
             <HistoryPanel intervention={i} names={names} />
           </Stack>

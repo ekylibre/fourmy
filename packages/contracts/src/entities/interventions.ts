@@ -204,6 +204,8 @@ const interventionBody = z.object({
   doers: z.array(interventionDoer).default([]),
   purposes: z.array(treatmentPurpose).default([]),
   notes: z.string().trim().max(2000).optional(),
+  /** Justification d'un traitement ou d'un apport (Agriculture biologique, annexe II partie I 1.10.2). */
+  justification: z.string().trim().max(2000).optional(),
   /** Stade BBCH (référentiel du ministère, ex. SP_55501_15) ; absent : inchangé, null : effacé. */
   bbch: z.string().trim().max(20).nullable().optional(),
   /** Contrôle réglementaire : cible choisie par produit, motif d'un passage outre un feu rouge. */
@@ -306,6 +308,9 @@ export const intervention = z
     compliance: complianceResult.nullable().optional(),
     /** Contrôle nitrates à l'enregistrement (lot AI) : calendrier, plan, premier apport ; motif d'un passage outre. */
     nitrateCheck: z.custom<import("../fertilization.js").NitrateCheckRecord>().nullable().optional(),
+    /** Contrôles HVE et AB à l'enregistrement (parcelles certifiées), motif d'un passage outre. */
+    certificationCheck: z.custom<import("../certification.js").CertificationCheck>().nullable().optional(),
+    justification: z.string().nullable().optional(),
     /** IFT (traitements réalisés). */
     ift: iftResult.nullable().optional(),
     /** Météo pendant l'intervention. */

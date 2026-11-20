@@ -1,0 +1,28 @@
+{
+  "name": "@fourmy/certification-refs",
+  "version": "0.1.0",
+  "description": "Référentiels des contrôles HVE et Agriculture biologique : grille d'audit HVE, liste CMR, références IFT, règlement (UE) 2021/1165, catalogue des manquements INAO ; données versionnées et sourcées",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "vitest": "4.1.12"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false
+}

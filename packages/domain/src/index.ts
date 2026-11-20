@@ -33,3 +33,4 @@ export * from "./itinerary.js";
 export * from "./tika.js";
 export * from "./landscape3d.js";
 export * from "./spraying-conditions.js";
+export * from "./certification/index.js";

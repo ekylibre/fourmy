@@ -49,6 +49,7 @@ const PrintPage = lazy(() => import("../features/fertilization/PrintPage").then(
 const PlanPage = lazy(() => import("../features/fertilization/PlanPage").then((m) => ({ default: m.PlanPage })));
 const PrescriptionNewPage = lazy(() => import("../features/modulation/PrescriptionNewPage").then((m) => ({ default: m.PrescriptionNewPage })));
 const PrescriptionPage = lazy(() => import("../features/modulation/PrescriptionPage").then((m) => ({ default: m.PrescriptionPage })));
+const ControlPage = lazy(() => import("../features/certification/ControlPage").then((m) => ({ default: m.ControlPage })));
 const Plan3DPage = lazy(() => import("../3d/Plan3DPage").then((m) => ({ default: m.Plan3DPage })));
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -190,6 +191,7 @@ const pages = [
       { path: "stocks", element: <StockPage /> },
       { path: "cellar", element: <CellarPage /> },
       { path: "register", element: <RegisterPage /> },
+      { path: "control/:kind", element: <Suspense fallback={<Loading />}><ControlPage /></Suspense> },
       { path: "phyto", element: <PhytoProductsPage /> },
       { path: "fertilizers", element: <FertilizersPage /> },
       { path: "fertilization", element: <FertilizationPage /> },

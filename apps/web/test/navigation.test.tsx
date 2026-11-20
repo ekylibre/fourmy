@@ -22,6 +22,15 @@ describe("menu principal", () => {
     expect(router.state.location.pathname).toBe(`/f/${FARM}/map`);
   });
 
+  it("contrôle AB affiché quand une parcelle est certifiée pendant la campagne, pas le contrôle HVE", async () => {
+    renderApp(`/f/${FARM}/control/ab`);
+    const nav = await screen.findByRole("navigation", { name: "Menu principal" });
+    expect(await within(nav).findByRole("link", { name: "Contrôle AB" })).toBeVisible();
+    expect(within(nav).queryByRole("link", { name: "Contrôle HVE" })).toBeNull();
+    expect(await screen.findByRole("heading", { name: "Contrôle AB" })).toBeInTheDocument();
+    expect(await screen.findByText(/1 parcelle\(s\) en conversion ou certifiée\(s\) AB/)).toBeInTheDocument();
+  });
+
   it("entrée active par segment de chemin", () => {
     expect(isActivePath("", "")).toBe(true);
     expect(isActivePath("/map", "")).toBe(false);

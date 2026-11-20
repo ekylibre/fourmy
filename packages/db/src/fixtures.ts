@@ -38,14 +38,18 @@ export async function loadFixture(sql: Sql, fixture: FixtureFile): Promise<void>
       // Fixture antérieure à la fiche personne (0045) : identifiants externes vides.
       // Fixture antérieure aux imports de fichiers (0062) : interventions saisies
       // (stock suivi, heures connues), productions non déclarées.
+      // Fixture antérieure aux contrôles HVE/AB (0067) : productions en plein champ,
+      // éléments du paysage non mitoyens.
       const rows =
         table === "interventions"
           ? given.map((r) => ({ staffing: "free", affects_stock: true, period_precision: "time", ...r }))
           : table === "people"
             ? given.map((r) => (r.external_ids ? r : { ...r, external_ids: {} }))
             : table === "productions"
-              ? given.map((r) => ({ declared: false, ...r }))
-              : given;
+              ? given.map((r) => ({ declared: false, cultivation_mode: "open_field", ...r }))
+              : table === "farm_landscape_features"
+                ? given.map((r) => ({ hve_shared: false, ...r }))
+                : given;
       if (!/^[a-z_]+$/.test(table)) throw new Error(`table invalide : ${table}`);
       if (rows.length === 0) continue;
       const cols = await tx<{ c: string }[]>`

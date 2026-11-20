@@ -2,14 +2,17 @@ import { Anchor, AppShell, Box as MBox, Burger, Group, NavLink, Stack, Text } fr
 import { useDisclosure } from "@mantine/hooks";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Box, Boxes, Grid3x3, Leaf, ClipboardList, Database, FileText, LayoutDashboard, Map, Plug, Scale, Wine, FlaskConical, Sprout, Tractor, type LucideIcon } from "lucide-react";
+import { BadgeCheck, Box, Boxes, Grid3x3, Leaf, ClipboardList, Database, FileText, LayoutDashboard, Map, Plug, Scale, Wine, FlaskConical, Sprout, Tractor, type LucideIcon } from "lucide-react";
 import { Link, Outlet, useLocation } from "react-router";
 import { Wordmark } from "@fourmy/ui-lyvre";
 import { useFarm } from "../app/farm";
+import { useAt } from "../app/at";
+import { useControlAvailability } from "../features/certification/controls";
 import { Timeline } from "./Timeline";
 import { UserMenu } from "./UserMenu";
 
-type NavItem = { path: string; label: string; icon: LucideIcon; ownerOnly?: boolean };
+/** `when` : entrée affichée seulement si une parcelle porte cette certification pendant la campagne de la frise (D2). */
+type NavItem = { path: string; label: string; icon: LucideIcon; ownerOnly?: boolean; when?: "hve" | "ab" };
 type NavGroup = { label: string; icon: LucideIcon; ownerOnly?: boolean; children: NavItem[] };
 type NavEntry = NavItem | NavGroup;
 
@@ -49,6 +52,8 @@ export const NAVIGATION: NavEntry[] = [
     children: [
       { path: "/register", label: "Registre phyto", icon: FileText },
       { path: "/fertilization", label: "Fertilisation azotée", icon: Leaf },
+      { path: "/control/hve", label: "Contrôle HVE", icon: BadgeCheck, when: "hve" },
+      { path: "/control/ab", label: "Contrôle AB", icon: BadgeCheck, when: "ab" },
     ],
   },
   {
@@ -73,6 +78,9 @@ export function isActivePath(current: string, path: string): boolean {
 export function Layout() {
   const farm = useFarm();
   const [opened, { toggle, close }] = useDisclosure();
+  const { day } = useAt();
+  const availability = useControlAvailability(farm.id, Number(day.slice(0, 4))).data;
+  const visible = (e: NavItem) => (!e.ownerOnly || farm.role === "owner") && (!e.when || !!availability?.[e.when]);
   const location = useLocation();
   const base = `/f/${farm.id}`;
   const current = location.pathname.slice(base.length);
@@ -126,7 +134,7 @@ export function Layout() {
                 onChange={(o) => setToggled((t) => ({ ...t, [entry.label]: o }))}
                 childrenOffset={18}
               >
-                {entry.children.filter((c) => !c.ownerOnly || farm.role === "owner").map(item)}
+                {entry.children.filter(visible).map(item)}
               </NavLink>
             );
           })}
