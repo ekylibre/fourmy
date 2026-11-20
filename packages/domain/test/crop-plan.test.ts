@@ -325,6 +325,21 @@ describe("BCAE 7 : diversification et verdict", () => {
     expect(bcae7Findings(pp, farm)[0]!.message).toContain("prairies permanentes");
   });
 
+  it("ferme viticole avec des parcelles sans culture prévue : exemptée (10 ha de terres arables au plus)", () => {
+    const ps = [parcel("V1", 2, "VRC", {}), parcel("V2", 1, null, {}), parcel("V3", 0.5, null, {})];
+    const fs = bcae7Findings(ps, farm);
+    expect(fs).toHaveLength(1);
+    expect(fs[0]).toMatchObject({ level: "na" });
+    expect(fs[0]!.message).toContain("1,50 ha au plus");
+  });
+
+  it("terres arables connues sous 10 ha mais codes manquants au-delà : données manquantes, pas de rouge", () => {
+    const ps = [parcel("A", 6, "BTH", varied("ORH")), parcel("X", 8, null, {})];
+    const fs = bcae7Findings(ps, farm);
+    expect(fs[0]!.level).toBe("missing");
+    expect(fs[0]!.message).toContain("1 parcelle(s) sans culture prévue ou sans code PAC (X)");
+  });
+
   it("plaine du Rhin : diversification à points, à vérifier", () => {
     const ps = [parcel("A", 60, "BTH", varied("ORH")), parcel("B", 40, "CZH", varied("BTH"))];
     const fs = bcae7Findings(ps, { ...farm, alsaceRhinePlain: true });

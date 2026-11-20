@@ -1,11 +1,11 @@
 import { useArea } from "../../app/prefs";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
-import { Alert, Badge, Button, ColorInput, Group, Modal, MultiSelect, Paper, Select, SimpleGrid, Stack, Switch, Text, TextInput, Title } from "@mantine/core";
+import { Alert, Badge, Button, ColorInput, Group, Menu, Modal, MultiSelect, Paper, Select, SimpleGrid, Stack, Switch, Text, TextInput, Title } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChartGantt, Map as MapIcon, Pencil, Plus } from "lucide-react";
+import { ChartGantt, LayoutGrid, Map as MapIcon, Pencil, Plus } from "lucide-react";
 import { ACTIVITY_FAMILIES, ACTIVITY_FAMILY_LABELS, PARCEL_FAMILIES, PLANT_FAMILIES, type Activity, type ActivityFamily, type ReferenceProduction } from "@fourmy/contracts";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useAt } from "../../app/at";
@@ -13,8 +13,40 @@ import { useFarm } from "../../app/farm";
 import { useActivities, useCertifications, useSnapshot } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
 import { ActivityPicture } from "./ActivityBadge";
+import { useCropPlans } from "../crop-plan/queries";
 import { usePhytoCrops } from "../reference/phyto-reference";
 import { activeDuring, CertificationBadges, CertificationRecap, ParcelCertificationsModal } from "../certifications/Certifications";
+
+/**
+ * Assolement (lot AS2b, FR-AS-1) : la campagne de la frise et la suivante,
+ * avec leur état (à préparer, brouillon, validé).
+ */
+function CropPlanMenu({ farmId, year, owner }: { farmId: string; year: number; owner: boolean }) {
+  const plans = useCropPlans(farmId);
+  const state = (y: number) => plans.data?.find((p) => p.year === y);
+  const label = (y: number) => {
+    const p = state(y);
+    if (!p) return owner ? `Préparer l'assolement ${y}` : `Assolement ${y} (pas encore préparé)`;
+    if (p.status === "draft") return `Assolement ${y} : brouillon`;
+    return `Assolement ${y} : validé (version ${p.currentVersion})`;
+  };
+  return (
+    <Menu position="bottom-end">
+      <Menu.Target>
+        <Button variant="light" leftSection={<LayoutGrid size={16} />}>
+          Assolement
+        </Button>
+      </Menu.Target>
+      <Menu.Dropdown>
+        {[year, year + 1].map((y) => (
+          <Menu.Item key={y} component={Link} to={`/f/${farmId}/crop-plan/${y}`}>
+            {label(y)}
+          </Menu.Item>
+        ))}
+      </Menu.Dropdown>
+    </Menu>
+  );
+}
 
 /**
  * Activités de la ferme (lot C des retours du 08/11/2026) : comme dans
@@ -60,6 +92,7 @@ export function ActivitiesPage() {
             checked={activeOnly}
             onChange={(e) => setActiveOnly(e.currentTarget.checked)}
           />
+          <CropPlanMenu farmId={farm.id} year={year} owner={owner} />
           {owner && (
             <Button leftSection={<Plus size={16} />} onClick={() => setEditing("new")}>
               Nouvelle activité
