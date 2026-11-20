@@ -181,6 +181,24 @@ describe.skipIf(!url)("contrôle HVE phyto (intégration)", () => {
     expect((await json("GET", "/control/hve?campaign=2026")).exportedAt).toBeTruthy();
   });
 
+  it("6.7 couverture des sols calculée : interculture inconnue → données manquantes ; blé d'hiver semé en octobre → couvert continu, 4 points", async () => {
+    const item = async () =>
+      (await json("GET", "/control/hve?campaign=2026")).sections
+        .find((s: { id: string }) => s.id === "fertilization")
+        .findings.find((f: { ruleId: string }) => f.ruleId === "hve.6.7");
+    const before = await item();
+    expect(before.level).toBe("missing");
+    expect(before.missing.map((m: { what: string }) => m.what).join(" ")).toMatch(/couverture de Champ traité/);
+    for (const parcel of [treated, untreated]) {
+      const sow = crypto.randomUUID();
+      await sql`INSERT INTO interventions (id, farm_id, procedure, status, origin, started_at, stopped_at) VALUES (${sow}, ${farmId}, 'sowing', 'done', 'web', '2025-10-15T08:00:00Z', '2025-10-15T12:00:00Z')`;
+      await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id) VALUES (${crypto.randomUUID()}, ${sow}, 'target', 'land_parcel', ${parcel})`;
+    }
+    const after = await item();
+    expect(after).toMatchObject({ level: "ok", points: { got: 4, max: 4 } });
+    expect(after.message).toMatch(/cahier de fertilisation/);
+  });
+
   it("réglage : notation IFT « ancienne » ; saisie : herbicide CMR2 en orange", async () => {
     await json("PUT", "/settings/certification", { hveIftScale: "old", hveLivestock: false });
     const phyto = (await json("GET", "/control/hve?campaign=2026")).sections.find((s: { id: string }) => s.id === "phyto");

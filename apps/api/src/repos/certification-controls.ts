@@ -36,6 +36,7 @@ import {
 import type { CheckableBody } from "./phyto.js";
 import { abApplications, abDraftApplications, abParcelInputs, abProductions, equipmentEvents, nonAbProductions, rotationHistory, uncleanedEquipment } from "./certification-ab.js";
 import { loadHveBiodiversity, loadHveFertilization, loadHveIrrigation, loadHvePhyto } from "./certification-hve.js";
+import { fertilizationRecord } from "./fertilization-record.js";
 import { untreatedIaeM2 } from "@fourmy/domain";
 import { abStatuses, type AbParcelStatus } from "@fourmy/domain";
 
@@ -107,7 +108,13 @@ export async function controlAvailability(db: Database, farmId: string, campaign
 // --- Contexte et rapport d'une campagne -----------------------------------------------
 
 /** Données d'une campagne pour les règles (complété par les lots CT2 à CT5). */
-export async function loadCertificationContext(tx: Tx, kind: ControlKind, campaign: number): Promise<CertificationContext> {
+export async function loadCertificationContext(
+  tx: Tx,
+  kind: ControlKind,
+  campaign: number,
+  /** Rapport complet : le cahier de fertilisation de la campagne (6.7, couverture des sols). */
+  deps?: { db: Database; farmId: string },
+): Promise<CertificationContext> {
   const settings = await settingsOf(tx);
   const period = controlPeriod(kind, campaign, settings);
   const parcels = await rows<{ id: string; name: string; area_m2: number }>(
@@ -137,7 +144,8 @@ export async function loadCertificationContext(tx: Tx, kind: ControlKind, campai
   }
   if (kind === "hve") {
     const phyto = await loadHvePhyto(tx, campaign, period, settings);
-    const fertilization = await loadHveFertilization(tx, campaign, period, settings, phyto.years[0]?.parcels ?? []);
+    const record = deps ? await fertilizationRecord(deps.db, deps.farmId, campaign) : undefined;
+    const fertilization = await loadHveFertilization(tx, campaign, period, settings, phyto.years[0]?.parcels ?? [], record);
     const biodiversity = await loadHveBiodiversity(tx, campaign, period, fertilization.parcels);
     // Questionnaire annuel (lot CT4b) : items déclaratifs des quatre indicateurs.
     const answers = (await questionnaireOf(tx, campaign)).answers;
@@ -258,7 +266,9 @@ async function dataHash(tx: Tx): Promise<string> {
           (SELECT coalesce(certification::text, '') FROM farm_settings),
           -- IFT calculés après coup (le worker n'avance pas updated_at) ; siège (références IFT).
           (SELECT count(*) || ':' || coalesce(max(ift->>'computedAt'), '') FROM interventions WHERE ift IS NOT NULL),
-          (SELECT coalesce(max(updated_at)::text, '') FROM farm_sites))) AS h`,
+          (SELECT coalesce(max(updated_at)::text, '') FROM farm_sites),
+          -- Zonage nitrates (6.7, couverture des sols en zone vulnérable).
+          (SELECT coalesce(md5(string_agg(land_parcel_id::text || status, ',' ORDER BY land_parcel_id)), '') FROM parcel_nitrate_zones))) AS h`,
   );
   return r!.h;
 }
@@ -285,7 +295,7 @@ export async function controlReport(db: Database, farmId: string, kind: ControlK
     );
     let run = latest && latest.data_hash === hash && latest.refs_version === REFS_VERSION ? latest : null;
     if (!run) {
-      const result = { ...evaluateCampaign(await loadCertificationContext(tx, kind, campaign)), refsVersion: REFS_VERSION };
+      const result = { ...evaluateCampaign(await loadCertificationContext(tx, kind, campaign, { db, farmId })), refsVersion: REFS_VERSION };
       const id = randomUUID();
       const [inserted] = await rows<{ computed_at: string }>(
         tx,
