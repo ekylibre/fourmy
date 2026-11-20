@@ -158,7 +158,12 @@ export type CropPlanBlocker = z.infer<typeof cropPlanBlocker>;
 
 // --- API (lot AS2a, conception §5) ---------------------------------------
 
-export const cropPlanStatus = z.enum(["draft", "validated"]);
+/**
+ * draft : brouillon en cours ; validated : validé ; current : pas d'assolement,
+ * mais des cultures déjà saisies ou importées pour la campagne (affichées
+ * telles quelles, « Modifier » crée l'assolement).
+ */
+export const cropPlanStatus = z.enum(["draft", "validated", "current"]);
 export type CropPlanStatus = z.infer<typeof cropPlanStatus>;
 
 export interface CropPlanVersionSummary {
@@ -242,6 +247,11 @@ export interface CropPlanContext {
     cycle: "annual" | "semi_perennial" | "perennial";
     legume: boolean;
     vegetable: boolean;
+    /** Image de l'activité (légende de la carte). */
+    pictureUrl: string | null;
+    /** Dates types de semis et de récolte pour la campagne (Lexicon), pour pré-remplir. */
+    defaultStartedOn: string | null;
+    defaultStoppedOn: string | null;
   }[];
   /** Historique : land_parcel_id → année → culture (Y-5 à Y-1). */
   history: Record<string, Record<string, CropPlanYearCrop>>;

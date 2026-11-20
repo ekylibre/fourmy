@@ -186,3 +186,11 @@ Lot ajouté le 20/11/2026, avant l'essai sur la ferme de l'exploitant testeur : 
 - Validation : changement `parcel.carry` ; nouvelle parcelle à la suite de l'ancienne, filiation `carry` (migration 0073), certifications reprises ; découpe ou fusion d'une parcelle à reconduire refusée.
 - Historique par recoupement géographique (au moins 50 % de la parcelle) pour les années sans culture connue, après l'historique propre et la filiation.
 - Vérifié sur la ferme de l'exploitant testeur en local : 12 parcelles proposées pour 2027, 5 ans d'historique.
+
+### Retours de l'essai du 20/11 (`docs/assolement/retour_test.md`, hors dépôt)
+
+- Menu Assolement : « Modifier l'assolement » pour une campagne qui a déjà des cultures ou un assolement validé, « Reprendre » un brouillon, « Préparer » sinon.
+- Campagne déjà saisie sans assolement : affichée telle quelle (statut `current`), « Modifier l'assolement » crée le brouillon.
+- Carte : parcelles à affecter en pointillés rouges, contour et remplissage à la couleur de l'activité, sans culture en gris ; légende en haut à gauche (image de l'activité, surface).
+- Dates de semis et de récolte pré-remplies d'après Lexicon (`lexicon_productions.started_on/stopped_on`, migration 0074, chargement des productions) pour une culture annuelle.
+- Formulaire d'affectation sous la carte ; sélection vidée après un geste ; filtre « Sans culture prévue » appliqué à la carte ; bandeau du bas retiré (légende) ; contrôles repliés par défaut.

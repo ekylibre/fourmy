@@ -90,7 +90,17 @@ describe.skipIf(!url)("assolement (intégration)", () => {
     expect(plan).toMatchObject({ year: 2027, status: "draft", revision: 0, currentVersion: null, versions: [] });
     expect(plan.draft.assignments).toEqual([]);
     expect((await send("POST", "/crop-plans/2027")).status).toBe(409);
-    expect((await json<{ year: number }[]>(send("GET", "/crop-plans", undefined, worker))).map((p) => p.year)).toEqual([2027]);
+    // Liste : l'assolement 2027, et les campagnes 2026 et 2025 déjà saisies (sans assolement).
+    expect((await json<{ year: number; status: string }[]>(send("GET", "/crop-plans", undefined, worker))).map((p) => [p.year, p.status])).toEqual([
+      [2027, "draft"],
+      [2026, "current"],
+      [2025, "current"],
+    ]);
+    // Campagne 2026 sans assolement : affichée telle quelle (cultures saisies).
+    const current = await json<CropPlanView>(send("GET", "/crop-plans/2026", undefined, worker));
+    expect(current).toMatchObject({ year: 2026, status: "current", currentVersion: null });
+    expect(current.draft.assignments).toHaveLength(3);
+    expect((await send("GET", "/crop-plans/2030", undefined, worker)).status).toBe(404);
     // Autre ferme : rien à voir.
     expect((await app.request(`/api/v1/farms/${other.farmId}/crop-plans/2027`, { headers: other.headers })).status).toBe(404);
   });
@@ -350,7 +360,9 @@ describe.skipIf(!url)("assolement : reconduction d'un parcellaire repris d'Ekyli
     headers = owner.headers;
     users = [owner.userId];
     base = `/api/v1/farms/${farmId}`;
-    await sql`INSERT INTO activities (id, farm_id, name, family, cap_code) VALUES (${maize}, ${farmId}, 'Maïs', 'plant_farming', 'MIS'), (${triticale}, ${farmId}, 'Triticale', 'plant_farming', 'TTH')`;
+    await sql`INSERT INTO lexicon_productions (reference_name, family, specie, label, started_on, stopped_on)
+              VALUES ('fourmy_test_triticale', 'plant_farming', 'x_triticosecale', 'Triticale d''essai', '2000-09-01', '2001-07-31') ON CONFLICT DO NOTHING`;
+    await sql`INSERT INTO activities (id, farm_id, name, family, cap_code, reference) VALUES (${maize}, ${farmId}, 'Maïs', 'plant_farming', 'MIS', NULL), (${triticale}, ${farmId}, 'Triticale', 'plant_farming', 'TTH', 'fourmy_test_triticale')`;
     const parcels: [string, string, string, string, string][] = [
       [ids.b25, "Braquet Maïs 2025", BRAQUET, "2024-12-31", "2025-12-30"],
       [ids.b26, "Braquet Maïs 2026", BRAQUET, "2025-12-31", "2026-12-30"],
@@ -372,6 +384,7 @@ describe.skipIf(!url)("assolement : reconduction d'un parcellaire repris d'Ekyli
   });
   afterAll(async () => {
     await teardown(sql, farmId, users);
+    await sql`DELETE FROM lexicon_productions WHERE reference_name = 'fourmy_test_triticale'`;
     await sql.end();
   });
 
@@ -390,6 +403,9 @@ describe.skipIf(!url)("assolement : reconduction d'un parcellaire repris d'Ekyli
     expect(carriedName("Cazala Triticale 2026", ["Triticale", "Triticale d'hiver"])).toBe("Cazala");
     expect(carriedName("Monassut Chisné Maïs 2026", ["Maïs", "Maïs grain"])).toBe("Monassut Chisné");
     expect(carriedName("Le Champ", ["Blé"])).toBe("Le Champ");
+    // Dates types de Lexicon ramenées à la campagne 2027 : semis en 2026, récolte en 2027.
+    expect(ctx.activities.find((a) => a.id === triticale)).toMatchObject({ defaultStartedOn: "2026-09-01", defaultStoppedOn: "2027-07-31" });
+    expect(ctx.activities.find((a) => a.id === maize)).toMatchObject({ defaultStartedOn: null, defaultStoppedOn: null });
     // 2026 : sa propre culture ; 2025 : celle de « Braquet Maïs 2025 », au même endroit.
     expect(ctx.history[ids.b26]).toMatchObject({ "2025": { main: "MIS" }, "2026": { main: "MIS" } });
   });

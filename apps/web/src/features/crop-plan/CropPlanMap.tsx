@@ -19,6 +19,8 @@ export interface CropPlanMapParcel extends ParcelShape {
 
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 const NONE = "#FFF8E7";
+/** Parcelles sans culture prévue (contour en pointillés). */
+export const TODO = "#E03131";
 
 function bounds(parcels: ParcelShape[]): LngLatBoundsLike | null {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -81,14 +83,22 @@ export function CropPlanMap({
             id: "parcels-fill",
             type: "fill",
             source: "parcels",
-            paint: { "fill-color": ["get", "color"], "fill-opacity": ["case", ["get", "planned"], 0.55, 0.12] },
+            paint: { "fill-color": ["case", ["get", "planned"], ["get", "color"], TODO], "fill-opacity": ["case", ["get", "planned"], 0.45, 0.12] },
           },
+          // Sans culture prévue : contour rouge en pointillés ; affectées : contour de la couleur de l'activité.
           {
             id: "parcels-line",
             type: "line",
             source: "parcels",
-            filter: ["!", ["get", "selected"]],
-            paint: { "line-color": ["case", ["get", "planned"], ["get", "color"], NONE], "line-width": 1.5, "line-dasharray": ["case", ["get", "planned"], ["literal", [1, 0]], ["literal", [2, 2]]] },
+            filter: ["all", ["!", ["get", "selected"]], ["get", "planned"]],
+            paint: { "line-color": ["get", "color"], "line-width": 3 },
+          },
+          {
+            id: "parcels-todo",
+            type: "line",
+            source: "parcels",
+            filter: ["all", ["!", ["get", "selected"]], ["!", ["get", "planned"]]],
+            paint: { "line-color": TODO, "line-width": 3, "line-dasharray": [2, 1.5] },
           },
           { id: "parcels-selected", type: "line", source: "parcels", filter: ["get", "selected"], paint: { "line-color": "#FFFFFF", "line-width": 4 } },
         ],

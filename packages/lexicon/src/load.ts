@@ -29,7 +29,7 @@ const REQUIRED: Record<string, string[]> = {
   registered_phytosanitary_symbols: ["id", "symbol_name"],
   master_taxonomy: ["reference_name", "parent", "taxonomic_rank", "translation_id"],
   taxonomy__translations: ["id", "fra"],
-  master_productions: ["reference_name", "activity_family", "specie", "usage", "life_duration", "support_unit", "color", "translation_id", "agroedi_crop_code", "season"],
+  master_productions: ["reference_name", "activity_family", "specie", "usage", "life_duration", "support_unit", "color", "translation_id", "agroedi_crop_code", "season", "started_on", "stopped_on"],
   productions__translations: ["id", "fra", "eng"],
   master_crop_production_tfi_codes: ["tfi_code", "tfi_label", "production", "tfi_crop_group", "campaign"],
   master_agricultural_pictures: ["domain", "name", "extension", "picture"],
@@ -104,11 +104,12 @@ const TRANSFORMS: Record<string, string[]> = {
   // Productions de référence (activités) et leur culture IFT (migration 0011).
   productions: [
     `TRUNCATE lexicon_productions, lexicon_production_ift, lexicon_cap_codes`,
-    `INSERT INTO lexicon_productions (reference_name, family, specie, usage, label, label_en, color, life_years, support_unit, agroedi_crop_code, season)
+    `INSERT INTO lexicon_productions (reference_name, family, specie, usage, label, label_en, color, life_years, support_unit, agroedi_crop_code, season, started_on, stopped_on)
      SELECT p.reference_name, p.activity_family, nullif(p.specie, ''), nullif(p.usage, ''),
             coalesce(tr.fra, p.reference_name), tr.eng, nullif(p.color, ''),
             round((extract(epoch FROM nullif(p.life_duration, '')::interval) / 31557600)::numeric, 1), p.support_unit,
-            nullif(btrim(p.agroedi_crop_code), ''), nullif(btrim(p.season), '')
+            nullif(btrim(p.agroedi_crop_code), ''), nullif(btrim(p.season), ''),
+            nullif(p.started_on, '')::date, nullif(p.stopped_on, '')::date
      FROM lx_master_productions p LEFT JOIN lx_productions__translations tr ON tr.id = p.translation_id`,
     `INSERT INTO lexicon_production_ift (production, ift_culture, ift_label, crop_group, campaign)
      SELECT production, tfi_code, tfi_label, tfi_crop_group, campaign::int

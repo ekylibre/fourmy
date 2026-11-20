@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Alert, Badge, Button, Checkbox, Group, Modal, Paper, ScrollArea, SegmentedControl, Select, Stack, Table, Text, TextInput, Textarea, Title } from "@mantine/core";
+import { Accordion, Alert, Badge, Button, Checkbox, Group, Modal, Paper, ScrollArea, SegmentedControl, Select, Stack, Table, Text, TextInput, Textarea } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
 import { Ban, Crosshair, Eraser, Plus, Sprout } from "lucide-react";
@@ -43,31 +43,33 @@ const activityOptions = (context: CropPlanContext) => {
 
 const touches = (f: ControlFinding, keys: Set<string>) => (f.refs.parcelIds ?? []).some((k) => keys.has(k));
 
-/** Choix des parcelles (liste accessible, en plus de la carte) et affectation des cultures. */
-export function AssignPanel({ editor, context, selected, onSelect, editable }: { editor: CropPlanEditor; context: CropPlanContext; selected: CropPlanParcelKey[]; onSelect: (keys: CropPlanParcelKey[]) => void; editable: boolean }) {
+export type ParcelFilter = "all" | "todo";
+
+/** Parcelles de l'assolement (liste accessible, en plus de la carte) : précédent, culture prévue, filtre. */
+export function ParcelsPanel({
+  editor,
+  context,
+  selected,
+  onSelect,
+  filter,
+  onFilter,
+  editable,
+}: {
+  editor: CropPlanEditor;
+  context: CropPlanContext;
+  selected: CropPlanParcelKey[];
+  onSelect: (keys: CropPlanParcelKey[]) => void;
+  filter: ParcelFilter;
+  onFilter: (f: ParcelFilter) => void;
+  editable: boolean;
+}) {
   const area = useArea();
-  const [filter, setFilter] = useState<"all" | "todo">("all");
-  const [activityId, setActivityId] = useState<string | null>(null);
-  const [secondaryId, setSecondaryId] = useState<string | null>(null);
-  const [startedOn, setStartedOn] = useState("");
-  const [stoppedOn, setStoppedOn] = useState("");
-  const [coverKind, setCoverKind] = useState<"sown" | "regrowth_cereal" | "regrowth_rapeseed">("sown");
-  const [coverFamily, setCoverFamily] = useState<string | null>(null);
-  const [coverSpecies, setCoverSpecies] = useState("");
-  const [coverSown, setCoverSown] = useState("");
-  const [coverDestroyed, setCoverDestroyed] = useState("");
-  const coverReady = !!selected.length && !!coverSpecies.trim() && !!coverSown && (coverKind !== "sown" || !!coverFamily);
   const sel = new Set<string>(selected);
   const todo = new Set<string>(editor.summary.unassigned.keys);
   const parcels = editor.plan.parcels.filter((p) => filter === "all" || todo.has(p.key));
-  const selectedArea = editor.plan.parcels.filter((p) => sel.has(p.key)).reduce((s, p) => s + p.areaM2, 0);
-  const options = useMemo(() => activityOptions(context), [context]);
-  const dates = { startedOn: startedOn || null, stoppedOn: stoppedOn || null };
-  const findings = editor.sections.flatMap((s) => s.findings).filter((f) => f.level !== "ok" && f.level !== "na" && touches(f, sel));
   const toggle = (key: CropPlanParcelKey) => onSelect(sel.has(key) ? selected.filter((k) => k !== key) : [...selected, key]);
   // Reconduction (lot AS5) : parcelles de l'an passé proposées pour la campagne.
   const carried = new Map(context.parcels.filter((p) => p.carryOver).map((p) => [`p:${p.id}`, p.sourceName ?? p.name]));
-  const selectedCarried = selected.filter((k) => carried.has(k));
   const excluded = editor.draft.excluded ?? [];
   const excludedNames = excluded.map((k) => context.parcels.find((p) => `p:${p.id}` === k)?.name ?? k);
 
@@ -77,7 +79,7 @@ export function AssignPanel({ editor, context, selected, onSelect, editable }: {
         <SegmentedControl
           size="xs"
           value={filter}
-          onChange={(v) => setFilter(v as "all" | "todo")}
+          onChange={(v) => onFilter(v as ParcelFilter)}
           data={[
             { value: "all", label: `Toutes (${editor.plan.parcels.length})` },
             { value: "todo", label: `Sans culture prévue (${todo.size})` },
@@ -106,7 +108,7 @@ export function AssignPanel({ editor, context, selected, onSelect, editable }: {
           </Group>
         </Paper>
       )}
-      <ScrollArea.Autosize mah={260}>
+      <ScrollArea.Autosize mah={560}>
         <Table striped highlightOnHover aria-label="Parcelles de l'assolement">
           <Table.Thead>
             <Table.Tr>
@@ -131,7 +133,9 @@ export function AssignPanel({ editor, context, selected, onSelect, editable }: {
                     </Badge>
                   )}
                 </Table.Td>
-                <Table.Td className="lv-num">{area(p.areaM2)}</Table.Td>
+                <Table.Td className="lv-num" style={{ whiteSpace: "nowrap" }}>
+                  {area(p.areaM2)}
+                </Table.Td>
                 <Table.Td>{p.origins.length === 1 ? previousLabel(context, p.origins[0]!.parcelId) : "plusieurs"}</Table.Td>
                 <Table.Td>{plannedLabel(editor, p.key)}</Table.Td>
               </Table.Tr>
@@ -139,111 +143,146 @@ export function AssignPanel({ editor, context, selected, onSelect, editable }: {
           </Table.Tbody>
         </Table>
       </ScrollArea.Autosize>
-
-      {editable && (
-        <Paper withBorder p="sm" aria-label="Affecter une culture">
-          <Text fw={600} size="sm" mb="xs">
-            {selected.length ? `${selected.length} parcelle(s) · ${area(selectedArea)}` : "Choisissez des parcelles sur la carte ou dans la liste"}
-          </Text>
-          <Stack gap="xs">
-            <Select label="Activité" placeholder="Culture principale" data={options} value={activityId} onChange={setActivityId} searchable />
-            <Group grow>
-              <TextInput type="date" label="Semis (prévu)" value={startedOn} onChange={(e) => setStartedOn(e.currentTarget.value)} />
-              <TextInput type="date" label="Récolte (prévue)" value={stoppedOn} onChange={(e) => setStoppedOn(e.currentTarget.value)} />
-            </Group>
-            <Group gap="xs">
-              <Button size="xs" leftSection={<Sprout size={14} />} disabled={!selected.length || !activityId} onClick={() => editor.apply((d) => assignMain(d, selected, activityId!, dates))}>
-                Affecter
-              </Button>
-              <Button size="xs" variant="light" leftSection={<Ban size={14} />} disabled={!selected.length} onClick={() => editor.apply((d) => markFallow(d, selected))}>
-                Sans culture
-              </Button>
-              <Button size="xs" variant="subtle" color="brique" leftSection={<Eraser size={14} />} disabled={!selected.length} onClick={() => editor.apply((d) => clearParcels(d, selected))}>
-                Retirer
-              </Button>
-              {selectedCarried.length > 0 && (
-                <Button
-                  size="xs"
-                  variant="subtle"
-                  color="brique"
-                  onClick={() => {
-                    editor.apply((d) => ({ ...clearParcels(d, selectedCarried), excluded: [...new Set([...(d.excluded ?? []), ...selectedCarried])] }));
-                    onSelect(selected.filter((k) => !carried.has(k)));
-                  }}
-                >
-                  Ne pas reconduire
-                </Button>
-              )}
-            </Group>
-            <Group gap="xs" align="flex-end">
-              <Select size="xs" label="Culture dérobée" placeholder="Après la principale" data={options} value={secondaryId} onChange={setSecondaryId} searchable style={{ flex: 1 }} />
-              <Button size="xs" variant="light" leftSection={<Plus size={14} />} disabled={!selected.length || !secondaryId} onClick={() => editor.apply((d) => addSecondary(d, selected, secondaryId!, { startedOn: null, stoppedOn: null }))}>
-                Ajouter
-              </Button>
-            </Group>
-            <Stack gap={4} aria-label="Couvert d'interculture">
-              <Text size="xs" fw={600}>
-                Couvert d'interculture (après la culture, au cahier de fertilisation {context.year + 1})
-              </Text>
-              <Group grow gap="xs">
-                <Select
-                  size="xs"
-                  label="Nature"
-                  data={Object.entries(COVER_KIND_LABELS).map(([value, label]) => ({ value, label }))}
-                  value={coverKind}
-                  onChange={(v) => {
-                    setCoverKind((v ?? "sown") as typeof coverKind);
-                    if (v !== "sown") setCoverFamily(null);
-                  }}
-                  allowDeselect={false}
-                />
-                <Select size="xs" label="Famille" data={Object.entries(COVER_FAMILY_LABELS).map(([value, label]) => ({ value, label }))} value={coverFamily} onChange={setCoverFamily} disabled={coverKind !== "sown"} />
-              </Group>
-              <Group grow gap="xs">
-                <TextInput size="xs" label="Espèces" placeholder="moutarde, phacélie…" value={coverSpecies} onChange={(e) => setCoverSpecies(e.currentTarget.value)} />
-                <TextInput size="xs" type="date" label="Semis" value={coverSown} onChange={(e) => setCoverSown(e.currentTarget.value)} />
-                <TextInput size="xs" type="date" label="Destruction" value={coverDestroyed} onChange={(e) => setCoverDestroyed(e.currentTarget.value)} />
-              </Group>
-              <Group gap="xs">
-                <Button
-                  size="xs"
-                  variant="light"
-                  leftSection={<Plus size={14} />}
-                  disabled={!coverReady}
-                  onClick={() =>
-                    editor.apply((d) =>
-                      setCover(d, selected, {
-                        kind: coverKind,
-                        family: coverKind === "sown" ? (coverFamily as CropPlanEditor["draft"]["covers"][number]["family"]) : null,
-                        species: coverSpecies.trim(),
-                        sownOn: coverSown,
-                        destroyedOn: coverDestroyed || null,
-                      }),
-                    )
-                  }
-                >
-                  Ajouter le couvert
-                </Button>
-                <Button size="xs" variant="subtle" color="brique" disabled={!selected.some((k) => editor.draft.covers.some((c) => c.key === k))} onClick={() => editor.apply((d) => ({ ...d, covers: d.covers.filter((c) => !sel.has(c.key)) }))}>
-                  Retirer le couvert
-                </Button>
-              </Group>
-            </Stack>
-          </Stack>
-        </Paper>
-      )}
-
-      {findings.length > 0 && (
-        <Stack gap={4} aria-label="Constats des parcelles choisies">
-          {findings.map((f, i) => (
-            <Group key={`${f.ruleId}-${i}`} gap="xs" wrap="nowrap" align="flex-start">
-              <ControlLight level={f.level} variant="inline" />
-              <Text size="sm">{f.message}</Text>
-            </Group>
-          ))}
-        </Stack>
-      )}
     </Stack>
+  );
+}
+
+/**
+ * Affectation des cultures aux parcelles choisies (sous la carte) : activité et
+ * dates prévues (pré-remplies d'après Lexicon), culture dérobée, couvert,
+ * sans culture, retirer. La sélection est vidée après un geste, pour voir les
+ * parcelles prendre leur couleur.
+ */
+export function AssignForm({ editor, context, selected, onSelect }: { editor: CropPlanEditor; context: CropPlanContext; selected: CropPlanParcelKey[]; onSelect: (keys: CropPlanParcelKey[]) => void }) {
+  const area = useArea();
+  const [activityId, setActivityId] = useState<string | null>(null);
+  const [secondaryId, setSecondaryId] = useState<string | null>(null);
+  const [startedOn, setStartedOn] = useState("");
+  const [stoppedOn, setStoppedOn] = useState("");
+  const [coverKind, setCoverKind] = useState<"sown" | "regrowth_cereal" | "regrowth_rapeseed">("sown");
+  const [coverFamily, setCoverFamily] = useState<string | null>(null);
+  const [coverSpecies, setCoverSpecies] = useState("");
+  const [coverSown, setCoverSown] = useState("");
+  const [coverDestroyed, setCoverDestroyed] = useState("");
+  const coverReady = !!selected.length && !!coverSpecies.trim() && !!coverSown && (coverKind !== "sown" || !!coverFamily);
+  const sel = new Set<string>(selected);
+  const selectedArea = editor.plan.parcels.filter((p) => sel.has(p.key)).reduce((s, p) => s + p.areaM2, 0);
+  const options = useMemo(() => activityOptions(context), [context]);
+  const dates = { startedOn: startedOn || null, stoppedOn: stoppedOn || null };
+  const findings = editor.sections.flatMap((s) => s.findings).filter((f) => f.level !== "ok" && f.level !== "na" && touches(f, sel));
+  const carried = new Set(context.parcels.filter((p) => p.carryOver).map((p) => `p:${p.id}`));
+  const selectedCarried = selected.filter((k) => carried.has(k));
+  /** Geste sur la sélection, puis sélection vidée. */
+  const act = (change: Parameters<CropPlanEditor["apply"]>[0]) => {
+    editor.apply(change);
+    onSelect([]);
+  };
+  const chooseActivity = (id: string | null) => {
+    setActivityId(id);
+    const a = context.activities.find((x) => x.id === id);
+    // Dates types de la production de référence (Lexicon), ramenées à la campagne ; pas pour une culture
+    // pérenne (vigne, verger, prairie), qui n'a ni semis ni récolte de fin de cycle.
+    const annual = a?.cycle === "annual";
+    setStartedOn(annual ? (a?.defaultStartedOn ?? "") : "");
+    setStoppedOn(annual ? (a?.defaultStoppedOn ?? "") : "");
+  };
+
+  return (
+    <Paper withBorder p="sm" aria-label="Affecter une culture">
+      <Text fw={600} size="sm" mb="xs">
+        {selected.length ? `${selected.length} parcelle(s) · ${area(selectedArea)}` : "Choisissez des parcelles sur la carte ou dans la liste"}
+      </Text>
+      <Stack gap="xs">
+        <Group gap="xs" align="flex-end" wrap="wrap">
+          <Select label="Activité" placeholder="Culture principale" data={options} value={activityId} onChange={chooseActivity} searchable style={{ flex: 2, minWidth: 200 }} />
+          <TextInput type="date" label="Semis (prévu)" value={startedOn} onChange={(e) => setStartedOn(e.currentTarget.value)} style={{ flex: 1, minWidth: 140 }} />
+          <TextInput type="date" label="Récolte (prévue)" value={stoppedOn} onChange={(e) => setStoppedOn(e.currentTarget.value)} style={{ flex: 1, minWidth: 140 }} />
+        </Group>
+        <Group gap="xs">
+          <Button size="xs" leftSection={<Sprout size={14} />} disabled={!selected.length || !activityId} onClick={() => act((d) => assignMain(d, selected, activityId!, dates))}>
+            Affecter
+          </Button>
+          <Button size="xs" variant="light" leftSection={<Ban size={14} />} disabled={!selected.length} onClick={() => act((d) => markFallow(d, selected))}>
+            Sans culture
+          </Button>
+          <Button size="xs" variant="subtle" color="brique" leftSection={<Eraser size={14} />} disabled={!selected.length} onClick={() => act((d) => clearParcels(d, selected))}>
+            Retirer
+          </Button>
+          {selectedCarried.length > 0 && (
+            <Button
+              size="xs"
+              variant="subtle"
+              color="brique"
+              onClick={() => act((d) => ({ ...clearParcels(d, selectedCarried), excluded: [...new Set([...(d.excluded ?? []), ...selectedCarried])] }))}
+            >
+              Ne pas reconduire
+            </Button>
+          )}
+        </Group>
+        <Group gap="xs" align="flex-end">
+          <Select size="xs" label="Culture dérobée" placeholder="Après la principale" data={options} value={secondaryId} onChange={setSecondaryId} searchable style={{ flex: 1 }} />
+          <Button size="xs" variant="light" leftSection={<Plus size={14} />} disabled={!selected.length || !secondaryId} onClick={() => act((d) => addSecondary(d, selected, secondaryId!, { startedOn: null, stoppedOn: null }))}>
+            Ajouter
+          </Button>
+        </Group>
+        <Stack gap={4} aria-label="Couvert d'interculture">
+          <Text size="xs" fw={600}>
+            Couvert d'interculture (après la culture, au cahier de fertilisation {context.year + 1})
+          </Text>
+          <Group grow gap="xs">
+            <Select
+              size="xs"
+              label="Nature"
+              data={Object.entries(COVER_KIND_LABELS).map(([value, label]) => ({ value, label }))}
+              value={coverKind}
+              onChange={(v) => {
+                setCoverKind((v ?? "sown") as typeof coverKind);
+                if (v !== "sown") setCoverFamily(null);
+              }}
+              allowDeselect={false}
+            />
+            <Select size="xs" label="Famille" data={Object.entries(COVER_FAMILY_LABELS).map(([value, label]) => ({ value, label }))} value={coverFamily} onChange={setCoverFamily} disabled={coverKind !== "sown"} />
+            <TextInput size="xs" label="Espèces" placeholder="moutarde, phacélie…" value={coverSpecies} onChange={(e) => setCoverSpecies(e.currentTarget.value)} />
+            <TextInput size="xs" type="date" label="Semis" value={coverSown} onChange={(e) => setCoverSown(e.currentTarget.value)} />
+            <TextInput size="xs" type="date" label="Destruction" value={coverDestroyed} onChange={(e) => setCoverDestroyed(e.currentTarget.value)} />
+          </Group>
+          <Group gap="xs">
+            <Button
+              size="xs"
+              variant="light"
+              leftSection={<Plus size={14} />}
+              disabled={!coverReady}
+              onClick={() =>
+                act((d) =>
+                  setCover(d, selected, {
+                    kind: coverKind,
+                    family: coverKind === "sown" ? (coverFamily as CropPlanEditor["draft"]["covers"][number]["family"]) : null,
+                    species: coverSpecies.trim(),
+                    sownOn: coverSown,
+                    destroyedOn: coverDestroyed || null,
+                  }),
+                )
+              }
+            >
+              Ajouter le couvert
+            </Button>
+            <Button size="xs" variant="subtle" color="brique" disabled={!selected.some((k) => editor.draft.covers.some((c) => c.key === k))} onClick={() => act((d) => ({ ...d, covers: d.covers.filter((c) => !sel.has(c.key)) }))}>
+              Retirer le couvert
+            </Button>
+          </Group>
+        </Stack>
+        {findings.length > 0 && (
+          <Stack gap={4} aria-label="Constats des parcelles choisies">
+            {findings.map((f, i) => (
+              <Group key={`${f.ruleId}-${i}`} gap="xs" wrap="nowrap" align="flex-start">
+                <ControlLight level={f.level} variant="inline" />
+                <Text size="sm">{f.message}</Text>
+              </Group>
+            ))}
+          </Stack>
+        )}
+      </Stack>
+    </Paper>
   );
 }
 
@@ -302,49 +341,60 @@ export function SummaryPanel({ editor, context }: { editor: CropPlanEditor; cont
   );
 }
 
-/** Contrôles en direct (FR-AS-9) : un clic sur « Voir » choisit les parcelles en cause. */
+/** Contrôles en direct (FR-AS-9), repliés par défaut ; un clic sur « Voir » choisit les parcelles en cause. */
 export function ChecksPanel({ sections, onSelect }: { sections: ControlSection[]; onSelect: (keys: CropPlanParcelKey[]) => void }) {
   const ordered = [...sections].sort((a, b) => SECTION_ORDER.indexOf(a.id) - SECTION_ORDER.indexOf(b.id));
   return (
-    <Stack gap="md">
+    <Accordion multiple variant="separated" defaultValue={[]} chevronPosition="left">
       {ordered.map((s) => (
-        <Paper key={s.id} withBorder p="sm" aria-label={`Contrôles ${s.label}`}>
-          <Group justify="space-between" mb="xs">
-            <Title order={4}>{s.label}</Title>
-            <ControlLight level={s.level} />
-          </Group>
-          {s.findings.length === 0 && (
-            <Text size="sm" c="dimmed">
-              Rien à signaler.
-            </Text>
-          )}
-          <Stack gap={6}>
-            {s.findings.map((f, i) => (
-              <Group key={`${f.ruleId}-${i}`} gap="xs" wrap="nowrap" align="flex-start">
-                <ControlLight level={f.level} variant="inline" />
-                <div style={{ flex: 1 }}>
-                  <Text size="sm">{f.message}</Text>
-                  {f.missing?.length ? (
-                    <Text size="xs" c="dimmed">
-                      À compléter : {f.missing.slice(0, 5).map((m) => m.what).join(", ")}
-                      {f.missing.length > 5 ? ` et ${f.missing.length - 5} autre(s)` : ""}
-                    </Text>
-                  ) : null}
-                  <Text size="xs" c="dimmed">
-                    {f.source}
-                  </Text>
-                </div>
-                {f.refs.parcelIds?.length ? (
-                  <Button size="compact-xs" variant="subtle" leftSection={<Crosshair size={12} />} onClick={() => onSelect(f.refs.parcelIds as CropPlanParcelKey[])}>
-                    Voir
-                  </Button>
-                ) : null}
+        <Accordion.Item key={s.id} value={s.id} aria-label={`Contrôles ${s.label}`}>
+          <Accordion.Control>
+            <Group justify="space-between" wrap="nowrap" pr="xs">
+              <Text fw={700}>{s.label}</Text>
+              <Group gap="xs" wrap="nowrap">
+                {s.findings.filter((f) => f.level === "danger" || f.level === "warning").length > 0 && (
+                  <Badge size="xs" variant="light" color="gray">
+                    {s.findings.filter((f) => f.level === "danger" || f.level === "warning").length}
+                  </Badge>
+                )}
+                <ControlLight level={s.level} />
               </Group>
-            ))}
-          </Stack>
-        </Paper>
+            </Group>
+          </Accordion.Control>
+          <Accordion.Panel>
+            {s.findings.length === 0 && (
+              <Text size="sm" c="dimmed">
+                Rien à signaler.
+              </Text>
+            )}
+            <Stack gap={6}>
+              {s.findings.map((f, i) => (
+                <Group key={`${f.ruleId}-${i}`} gap="xs" wrap="nowrap" align="flex-start">
+                  <ControlLight level={f.level} variant="inline" />
+                  <div style={{ flex: 1 }}>
+                    <Text size="sm">{f.message}</Text>
+                    {f.missing?.length ? (
+                      <Text size="xs" c="dimmed">
+                        À compléter : {f.missing.slice(0, 5).map((m) => m.what).join(", ")}
+                        {f.missing.length > 5 ? ` et ${f.missing.length - 5} autre(s)` : ""}
+                      </Text>
+                    ) : null}
+                    <Text size="xs" c="dimmed">
+                      {f.source}
+                    </Text>
+                  </div>
+                  {f.refs.parcelIds?.length ? (
+                    <Button size="compact-xs" variant="subtle" leftSection={<Crosshair size={12} />} onClick={() => onSelect(f.refs.parcelIds as CropPlanParcelKey[])}>
+                      Voir
+                    </Button>
+                  ) : null}
+                </Group>
+              ))}
+            </Stack>
+          </Accordion.Panel>
+        </Accordion.Item>
       ))}
-    </Stack>
+    </Accordion>
   );
 }
 

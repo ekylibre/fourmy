@@ -13,7 +13,8 @@ Lecture de la fiche de conditionnalité BCAE 7 : [`docs/pac/rapport_pac.md`](pac
 
 ## Où le trouver
 
-- **Activités** → bouton **Assolement** : la campagne de la frise et la suivante, avec leur état (à préparer, brouillon, validé).
+- **Activités** → bouton **Assolement** : la campagne de la frise et la suivante. « Préparer l'assolement » si la campagne n'a encore rien ; « Modifier l'assolement » si elle a déjà des cultures saisies ou importées, ou un assolement validé ; « Reprendre » un brouillon.
+- Une campagne qui a déjà des cultures mais pas d'assolement s'affiche telle quelle (« cultures saisies ») ; « Modifier l'assolement » ouvre un brouillon à partir d'elles.
 - Page `/f/:ferme/crop-plan/:année` ; flèches vers les années voisines.
 - Le responsable prépare et valide ; les autres membres consultent.
 
@@ -31,8 +32,10 @@ L'historique d'une parcelle se retrouve aussi par **recoupement géographique** 
 ## Préparer
 
 1. **Préparer l'assolement** : le brouillon part des cultures déjà saisies ou importées pour l'année. Rien ne change dans les productions avant la validation.
-2. **Choisir des parcelles** : clic sur la carte, Maj + glisser, ou cases de la liste (filtre « sans culture prévue »). La liste montre la culture de l'an passé et celle prévue.
-3. **Affecter** une activité (culture principale) avec ses dates prévues ; ajouter une **culture dérobée** ; marquer **sans culture** (jachère) ; **retirer**.
+2. **Choisir des parcelles** : clic sur la carte, Maj + glisser, ou cases de l'onglet **Parcelles** (culture de l'an passé et culture prévue). Le filtre « Sans culture prévue » ne garde que celles-là, sur la liste comme sur la carte.
+3. **Affecter** (formulaire sous la carte) une activité avec ses dates prévues, pré-remplies d'après les dates types de Lexicon pour une culture annuelle ; ajouter une **culture dérobée** ; marquer **sans culture** (jachère) ; **retirer**. La sélection se vide après le geste : les parcelles prennent la couleur de leur activité.
+
+Sur la carte : parcelles affectées à la couleur de leur activité, sans culture en gris, encore à affecter en pointillés rouges ; légende en haut à gauche (activités avec leur image et leur surface, parcelles à affecter).
 4. **Couvert d'interculture** (après la culture) : nature, famille, espèces, dates. Il est enregistré à la validation dans le cahier de fertilisation de la campagne suivante (un couvert par parcelle).
 5. **Découper** une parcelle (ligne tracée sur la carte) ou **fusionner** des parcelles qui se touchent. Les nouvelles parcelles existent à partir de la **date d'effet**, proposée le lendemain de la dernière récolte de la parcelle d'origine (sinon le 1er janvier de la campagne) et modifiable ; la parcelle d'origine reste telle quelle avant. Noms modifiables ; « Retirer la dernière » annule une opération en attente.
 
@@ -40,8 +43,8 @@ Le brouillon s'enregistre au fil de l'eau ; **Annuler** et **Rétablir** revienn
 
 ## Récapitulatif et contrôles
 
-- **Récapitulatif** : surface par activité et par famille, part de la surface, écart avec l'an passé, parcelles à affecter. Bandeau des surfaces sous la carte.
-- **Contrôles**, recalculés à chaque geste ; « Voir » choisit les parcelles en cause :
+- **Récapitulatif** : surface par activité et par famille, part de la surface, écart avec l'an passé, parcelles à affecter.
+- **Contrôles**, recalculés à chaque geste, par section repliée (feu et nombre de points à vérifier) ; « Voir » choisit les parcelles en cause :
 
 | Section | Contrôles | Source |
 |---|---|---|

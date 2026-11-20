@@ -19,7 +19,7 @@ import {
 } from "@fourmy/contracts";
 import { checkCropPlan, cropPlanCheckInput, diffCropPlan, emptyDraft, operationBlockers, parcelKeyOf, resolveParcels, type ExistingCover, type ExistingProduction } from "@fourmy/domain";
 import { Conflict, NotFound } from "../routes/helpers.js";
-import { natureOf } from "./activities.js";
+import { natureOf, pictureUrl } from "./activities.js";
 import { getCertificationSettings } from "./certification-controls.js";
 
 /**
@@ -149,11 +149,18 @@ async function contextActivities(tx: Tx, year: number): Promise<CropPlanContext[
     life_years: number | null;
     usage: string | null;
     legume: boolean;
+    picture: string | null;
+    default_started_on: string | null;
+    default_stopped_on: string | null;
   }>(
     tx,
     sql`SELECT a.id, a.name, a.family, a.color, ${activityCapCode(year)} AS cap_code,
                coalesce(a.cultivation, lx.specie) AS species, lx.life_years::float8 AS life_years, lx.usage,
-               ${legumeOf(sql`coalesce(a.cultivation, lx.specie)`)} AS legume
+               ${legumeOf(sql`coalesce(a.cultivation, lx.specie)`)} AS legume,
+               fourmy_activity_picture(coalesce(a.cultivation, lx.specie), a.family, a.reference) AS picture,
+               -- Dates types de Lexicon (2000/2001) ramenées à la campagne : la récolte tombe l'année de la campagne.
+               (lx.started_on + make_interval(years => ${year} - extract(year FROM lx.stopped_on)::int))::date::text AS default_started_on,
+               (lx.stopped_on + make_interval(years => ${year} - extract(year FROM lx.stopped_on)::int))::date::text AS default_stopped_on
         FROM activities a LEFT JOIN lexicon_productions lx ON lx.reference_name = a.reference
         ORDER BY a.suspended, a.family, a.name`,
   );
@@ -169,6 +176,9 @@ async function contextActivities(tx: Tx, year: number): Promise<CropPlanContext[
       cycle: cycleFromLexicon(a.life_years, a.usage) as CropCycle,
       legume: a.legume,
       vegetable: a.usage === "vegetable",
+      pictureUrl: pictureUrl(a.picture),
+      defaultStartedOn: a.default_started_on,
+      defaultStoppedOn: a.default_stopped_on,
     }));
 }
 
@@ -461,7 +471,7 @@ async function liveDraft(tx: Tx, year: number): Promise<CropPlanDraft> {
 type PlanRow = {
   id: string;
   year: number;
-  status: "draft" | "validated";
+  status: "draft" | "validated" | "current";
   draft: CropPlanDraft | null;
   revision: number;
   current_version: number | null;
@@ -492,9 +502,18 @@ async function view(tx: Tx, p: PlanRow): Promise<CropPlanView> {
   };
 }
 
+/** Assolements, et campagnes qui ont déjà des cultures sans assolement (« current »). */
 export async function listCropPlans(db: Database, farmId: string): Promise<CropPlanListItem[]> {
   return withFarm(db, farmId, async (tx) => {
-    const list = await rows<PlanRow>(tx, sql`SELECT year, status, current_version, updated_at::text FROM crop_plans ORDER BY year DESC`);
+    const list = await rows<{ year: number; status: CropPlanListItem["status"]; current_version: number | null; updated_at: string }>(
+      tx,
+      sql`SELECT year, status, current_version, updated_at::text FROM crop_plans
+          UNION ALL
+          SELECT c.year, 'current', NULL, max(p.updated_at)::text FROM campaigns c JOIN productions p ON p.campaign_id = c.id
+          WHERE p.activity_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM crop_plans cp WHERE cp.year = c.year)
+          GROUP BY c.year
+          ORDER BY year DESC`,
+    );
     return list.map((p) => ({ year: p.year, status: p.status, currentVersion: p.current_version, updatedAt: p.updated_at }));
   });
 }
@@ -502,8 +521,11 @@ export async function listCropPlans(db: Database, farmId: string): Promise<CropP
 export async function getCropPlan(db: Database, farmId: string, year: number): Promise<CropPlanView> {
   return withFarm(db, farmId, async (tx) => {
     const p = await planRow(tx, year);
-    if (!p) throw new NotFound(`Pas d'assolement ${year}`);
-    return view(tx, p);
+    if (p) return view(tx, p);
+    // Pas d'assolement, mais des cultures saisies ou importées : affichées telles quelles.
+    const draft = await liveDraft(tx, year);
+    if (!draft.assignments.length) throw new NotFound(`Pas d'assolement ${year}`);
+    return { year, status: "current", revision: 0, draft, currentVersion: null, versions: [], updatedAt: new Date().toISOString() };
   });
 }
 

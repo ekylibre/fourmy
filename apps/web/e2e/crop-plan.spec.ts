@@ -33,7 +33,7 @@ test("préparer l'assolement 2031 depuis Activités, affecter, valider, rouvrir"
     const activity = (await option.textContent())!.trim();
     await option.click();
     await page.getByRole("button", { name: "Affecter", exact: true }).click();
-    await expect(page.getByLabel("Surfaces prévues")).toContainText(activity);
+    await expect(page.getByLabel("Légende de la carte")).toContainText(activity);
     await expect(page.getByText("Enregistré", { exact: true })).toBeVisible({ timeout: 10_000 });
 
     await page.getByRole("button", { name: "Valider…" }).click();

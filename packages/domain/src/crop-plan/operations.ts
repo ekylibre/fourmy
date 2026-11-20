@@ -57,7 +57,11 @@ export function operationBlockers(draft: CropPlanDraft, resolved: ResolvedPlan, 
       if (!resolved.byKey.has(piece.key)) continue;
       const early = draft.assignments.find((a) => a.key === piece.key && a.startedOn && a.startedOn < op.effectiveOn);
       if (early) {
-        out.push({ code: "effective-date", message: `${piece.name} : culture prévue à partir du ${early.startedOn}, avant la date d'effet (${op.effectiveOn}).`, keys: [piece.key] });
+        out.push({
+          code: "effective-date",
+          message: `${piece.name} : culture prévue à partir du ${early.startedOn}, avant la date d'effet (${op.effectiveOn}) : avancez la date d'effet ou la date de semis.`,
+          keys: [piece.key],
+        });
       }
     }
   }
