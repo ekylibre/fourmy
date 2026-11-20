@@ -30,7 +30,7 @@ export interface AbApplication {
   parcelId: string;
   articleId: string;
   product: string;
-  kind: "phyto" | "fertilizer";
+  kind: "phyto" | "fertilizer" | "seed";
   /** Phyto : utilisable en AB (mention E-Phy ou statut de l'article) ; null : inconnu. */
   organicAllowed?: boolean | null;
   /** Cuivre métal (kg/ha) ; null : produit cuprique, teneur ou dose inconnue ; absent : pas de cuivre. */
@@ -42,12 +42,23 @@ export interface AbApplication {
   syntheticNitrogen?: boolean;
   /** Azote total (kg/ha) ; null : inconnu. */
   nTotalKgHa?: number | null;
+  /** Phyto : justification de la nécessité saisie sur l'intervention (R20). */
+  justified?: boolean;
+  /** Semence ou plant (R24, R25) : statut bio, traité, plant (repiquage), dérogation obtenue pour la saison. */
+  organicStatus?: "organic" | "conversion" | "conventional" | null;
+  seedTreated?: boolean | null;
+  plant?: boolean;
+  derogation?: { grantedOn: string; reference: string | null } | null;
 }
 
 export interface AbProduction {
   id: string;
   parcelId: string;
   label: string;
+  /** Espèce (taxonomie) et variété, pour la mixité (R7) ; mode de culture (R10, R13). */
+  species?: string | null;
+  variety?: string | null;
+  cultivationMode?: string | null;
   cycle: CropCycle;
   /** Semis ou plantation (AAAA-MM-JJ). */
   sownOn: string | null;
@@ -350,4 +361,123 @@ export function nitrogenFindings(parcels: { id: string; name: string }[], applic
       }),
     ];
   });
+}
+
+// --- Lot CT5a : semences, justification, hors-sol et serres, mixité --------------------------
+
+/** R24, R25 : semences et plants semés sur une parcelle AB. */
+export function seedFindings(applications: AbApplication[], names: Map<string, string>): ControlFinding[] {
+  const source = "Règlement (UE) 2018/848, annexe II partie I 1.8.1 à 1.8.5, p. 58-59";
+  return applications
+    .filter((a) => a.kind === "seed" && a.organicStatus !== "organic")
+    .map((a) => {
+      const where = `${names.get(a.parcelId) ?? "parcelle"}, ${fr(a.day)}`;
+      const refs = { parcelIds: [a.parcelId], interventionIds: [a.interventionId], articleIds: [a.articleId] };
+      if (a.organicStatus === null || a.organicStatus === undefined) {
+        return finding({ ruleId: "ab.R24", level: "missing", message: `${where} : ${a.product} — statut biologique de la semence à renseigner sur l'article.`, missing: [missing("statut biologique de la semence", "article", a.articleId)], refs, source });
+      }
+      const status = a.organicStatus === "conversion" ? "en conversion" : "non biologique";
+      if (a.plant) {
+        const b = breach("R24");
+        return finding({ ruleId: "ab.R24", level: b.level, message: `${where} : plants ${status} (${a.product}) : les plants doivent être biologiques, sans dérogation possible.`, breach: b.breach, refs, source });
+      }
+      if (a.seedTreated === null || a.seedTreated === undefined) {
+        return finding({ ruleId: "ab.R24", level: "missing", message: `${where} : ${a.product} (${status}) — traitement de la semence à renseigner sur l'article.`, missing: [missing("semence traitée ou non", "article", a.articleId)], refs, source });
+      }
+      if (a.seedTreated) {
+        const b = breach("R24");
+        return finding({ ruleId: "ab.R24", level: b.level, message: `${where} : semence ${status} traitée (${a.product}), interdite en AB.`, breach: b.breach, refs, source });
+      }
+      if (!a.derogation) {
+        const b = breach("R25_none");
+        return finding({ ruleId: "ab.R25", level: b.level, message: `${where} : semence ${status} (${a.product}) sans dérogation pour la saison.`, breach: b.breach, refs, source });
+      }
+      if (a.derogation.grantedOn > a.day) {
+        const b = breach("R25");
+        return finding({
+          ruleId: "ab.R25",
+          level: b.level,
+          message: `${where} : semence ${status} (${a.product}), dérogation obtenue après le semis (le ${fr(a.derogation.grantedOn)}).`,
+          breach: b.breach,
+          refs,
+          source,
+        });
+      }
+      return finding({
+        ruleId: "ab.R25",
+        level: "ok",
+        message: `${where} : semence ${status} non traitée (${a.product}) sous dérogation${a.derogation.reference ? ` n° ${a.derogation.reference}` : ""} du ${fr(a.derogation.grantedOn)}.`,
+        refs,
+        source,
+      });
+    });
+}
+
+/** R20 : traitement autorisé en AB sans justification de sa nécessité (orange : n° 44, mineur). */
+export function justificationFindings(applications: AbApplication[], names: Map<string, string>): ControlFinding[] {
+  const unjustified = applications.filter((a) => a.kind === "phyto" && a.organicAllowed === true && a.justified === false);
+  const byIntervention = new Map<string, AbApplication[]>();
+  for (const a of unjustified) byIntervention.set(a.interventionId, [...(byIntervention.get(a.interventionId) ?? []), a]);
+  return [...byIntervention.values()].map((apps) => {
+    const a = apps[0]!;
+    const b = breach("R20");
+    return finding({
+      ruleId: "ab.R20",
+      level: b.level,
+      message: `${names.get(a.parcelId) ?? "parcelle"}, ${fr(a.day)} : traitement (${[...new Set(apps.map((x) => x.product))].join(", ")}) sans justification de sa nécessité (observation, risque, échec des mesures préventives).`,
+      breach: b.breach,
+      refs: { parcelIds: [...new Set(apps.map((x) => x.parcelId))], interventionIds: [a.interventionId] },
+      source: "Règlement (UE) 2018/848, annexe II partie I 1.10.2",
+    });
+  });
+}
+
+/** R10, R13 : culture hors sol, en pot ou en conteneur, serre chauffée, sur une parcelle AB. */
+export function growingModeFindings(productions: AbProduction[], names: Map<string, string>): ControlFinding[] {
+  return productions.flatMap((p) => {
+    const where = `${names.get(p.parcelId) ?? "parcelle"} (${p.label})`;
+    const refs = { parcelIds: [p.parcelId] };
+    if (p.cultivationMode === "soilless") {
+      const b = breach("R10_hydroponic");
+      return [finding({ ruleId: "ab.R10", level: b.level, message: `${where} : culture hors sol, interdite en AB (sauf exceptions du point 1.4).`, breach: b.breach, refs, source: "Règlement (UE) 2018/848, annexe II partie I 1.1 et 1.4" })];
+    }
+    if (p.cultivationMode === "pot" || p.cultivationMode === "container") {
+      return [finding({ ruleId: "ab.R10", level: "warning", message: `${where} : culture en pot ou en conteneur, admise seulement dans les cas du point 1.4 (plants, plantes ornementales et aromatiques vendues en pot) : à vérifier.`, refs, source: "Règlement (UE) 2018/848, annexe II partie I 1.4" })];
+    }
+    if (p.cultivationMode === "heated_shelter") {
+      return [finding({ ruleId: "ab.R13", level: "warning", message: `${where} : serre chauffée : le chauffage doit être d'origine renouvelable (sauf plants), à justifier.`, refs, source: "Règlement (UE) 2018/848, annexe II partie I 1.6.6 ; INAO n° 362" })];
+    }
+    return [];
+  });
+}
+
+/**
+ * R7 : mixité, même espèce cultivée en AB et hors AB la même campagne. Variétés
+ * différentes : admis (à distinguer) ; même variété : non conforme (n° 31) ;
+ * variété inconnue : à renseigner.
+ */
+export function mixityFindings(abProductions: AbProduction[], others: { species: string; label: string; variety: string | null }[]): ControlFinding[] {
+  const out: ControlFinding[] = [];
+  const bySpecies = new Map<string, AbProduction[]>();
+  for (const p of abProductions) if (p.species) bySpecies.set(p.species, [...(bySpecies.get(p.species) ?? []), p]);
+  for (const [species, ab] of bySpecies) {
+    const non = others.filter((o) => o.species === species);
+    if (!non.length) continue;
+    const label = ab[0]!.label;
+    const abVarieties = ab.map((p) => p.variety?.trim().toLowerCase() ?? null);
+    const nonVarieties = non.map((o) => o.variety?.trim().toLowerCase() ?? null);
+    const source = "Règlement (UE) 2018/848, art. 9.7 et 9.8";
+    if ([...abVarieties, ...nonVarieties].includes(null)) {
+      out.push(finding({ ruleId: "ab.R7", level: "missing", message: `${label} cultivé(e) en AB et hors AB : variétés à renseigner (critère de distinction).`, missing: ab.filter((p) => !p.variety).map((p) => missing(`variété (${p.label})`, "production", p.id)), refs: { parcelIds: ab.map((p) => p.parcelId) }, source }));
+      continue;
+    }
+    const shared = abVarieties.filter((v) => nonVarieties.includes(v));
+    if (shared.length) {
+      const b = breach("R7");
+      out.push(finding({ ruleId: "ab.R7", level: b.level, message: `${label} : même variété (${[...new Set(shared)].join(", ")}) en AB et hors AB la même campagne : mixité non autorisée.`, breach: b.breach, refs: { parcelIds: ab.map((p) => p.parcelId) }, source }));
+    } else {
+      out.push(finding({ ruleId: "ab.R7", level: "ok", message: `${label} : cultivé(e) en AB et hors AB avec des variétés différentes, facilement distinguables : séparation et registre à tenir.`, refs: { parcelIds: ab.map((p) => p.parcelId) }, source }));
+    }
+  }
+  return out;
 }

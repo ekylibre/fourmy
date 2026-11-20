@@ -189,6 +189,10 @@ sans irrigation).
 
 Branche `feat/control-ct5-ab`. Dépend de CT2.
 
+**Découpage (20/11/2026)** : CT5a semences et dérogations (5.1), mixité
+(5.2), hors-sol et serres, justification (5.5) ; CT5b matériel et
+nettoyage (5.3), rotation (5.4), et un constat pour chaque règle R1 à R34.
+
 5.1 **Semences** (R24, R25) : statut bio et semence traitée sur l'article ;
 dérogations (`seed_derogations`, onglet Semences) ; feu rouge semence non bio
 sans dérogation antérieure au semis, plant non bio.

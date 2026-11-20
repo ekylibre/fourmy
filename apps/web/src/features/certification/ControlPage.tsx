@@ -9,6 +9,7 @@ import { useFarm } from "../../app/farm";
 import { ErrorAlert, Loading } from "../../components/states";
 import { ControlLight, FindingList, useControlReport } from "./controls";
 import { AbParcels } from "./AbParcels";
+import { AbSeeds } from "./AbSeeds";
 import { HveIrrigated } from "./HveIrrigated";
 import { HveIae } from "./HveIae";
 import { HveQuestionnaireForm } from "./HveQuestionnaire";
@@ -50,7 +51,10 @@ export function ControlPage() {
         <Tabs.List>
           <Tabs.Tab value="rules">{kind === "ab" ? "Règles" : "Indicateurs"}</Tabs.Tab>
           {kind === "ab" ? (
-            <Tabs.Tab value="parcels">Parcelles</Tabs.Tab>
+            <>
+              <Tabs.Tab value="parcels">Parcelles</Tabs.Tab>
+              <Tabs.Tab value="seeds">Semences</Tabs.Tab>
+            </>
           ) : (
             <>
               <Tabs.Tab value="questionnaire">Questionnaire</Tabs.Tab>
@@ -61,6 +65,7 @@ export function ControlPage() {
         </Tabs.List>
       </Tabs>
       {kind === "ab" && tab === "parcels" && <AbParcels campaign={campaign} />}
+      {kind === "ab" && tab === "seeds" && <AbSeeds campaign={campaign} />}
       {kind === "hve" && tab === "irrigation" && <HveIrrigated campaign={campaign} />}
       {kind === "hve" && tab === "iae" && <HveIae campaign={campaign} />}
       {kind === "hve" && tab === "questionnaire" && <HveQuestionnaireForm key={campaign} campaign={campaign} />}

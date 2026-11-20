@@ -1,10 +1,25 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { articleCopperWrite, certificationSettings, controlKind, hveAnswers, interventionPlanWrite, landscapeFeatureHveWrite, productionCertificationWrite } from "@fourmy/contracts";
+import {
+  articleCopperWrite,
+  articleOrganicWrite,
+  certificationSettings,
+  controlKind,
+  hveAnswers,
+  interventionPlanWrite,
+  landscapeFeatureHveWrite,
+  productionCertificationWrite,
+  seedDerogationWrite,
+} from "@fourmy/contracts";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import {
   abParcelStatuses,
+  abSeedUses,
+  addSeedDerogation,
+  deleteSeedDerogation,
+  listSeedDerogations,
+  putArticleOrganic,
   checkInterventionCertificationFor,
   getHveQuestionnaire,
   hveIaeList,
@@ -76,6 +91,24 @@ export const certificationControlRoutes = new Hono<Env>()
   })
   // Parcelles irriguées de la campagne HVE (onglet Irrigation).
   .get("/control/hve/irrigated", async (c) => c.json(await hveIrrigatedParcels(db(), c.get("farmId"), campaignOf(c.req.query("campaign")))))
+  // Semences AB (lot CT5a) : statut bio et traitement de l'article, dérogations, semences utilisées.
+  .put("/articles/:id/organic", requireOwner, async (c) => {
+    const parsed = articleOrganicWrite.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.issues[0]?.message);
+    await putArticleOrganic(db(), c.get("farmId"), uuidParam(c, "id"), parsed.data);
+    return c.body(null, 204);
+  })
+  .get("/seed-derogations", async (c) => c.json({ items: await listSeedDerogations(db(), c.get("farmId")) }))
+  .post("/seed-derogations", requireOwner, async (c) => {
+    const parsed = seedDerogationWrite.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.issues.map((i) => `${i.path.join(".")} : ${i.message}`).join(" "));
+    return c.json(await addSeedDerogation(db(), c.get("farmId"), parsed.data), 201);
+  })
+  .delete("/seed-derogations/:id", requireOwner, async (c) => {
+    await deleteSeedDerogation(db(), c.get("farmId"), uuidParam(c, "id"));
+    return c.body(null, 204);
+  })
+  .get("/control/ab/seeds", async (c) => c.json(await abSeedUses(db(), c.get("farmId"), campaignOf(c.req.query("campaign")))))
   // Statut de conversion des parcelles AB (onglet Parcelles).
   .get("/control/ab/parcels", async (c) => c.json(await abParcelStatuses(db(), c.get("farmId"), campaignOf(c.req.query("campaign")))))
   // Rapport d'une campagne : `hve` ou `ab`.

@@ -100,6 +100,8 @@ export const RULE_BREACH: Record<string, string> = {
   R21: "328",
   R24: "37",
   R25: "38",
+  /** Semence non bio sans dérogation demandée. */
+  R25_none: "349",
   R27: "350",
   R28: "366",
 };
