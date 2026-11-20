@@ -193,12 +193,16 @@ describe.skipIf(!url)("réglementation phyto (intégration)", () => {
       const u = String(input);
       calls.push(u);
       if (u.endsWith("/cultures/csv")) return new Response("Code_culture\tLabel_culture\tCode_groupe_culture\n1112\tMaïs\tGCU1\n");
-      return Response.json({ ift: 0.6667, segment: { libelle: "Herbicides" }, doseReference: 3, avertissement: null });
+      return Response.json({ id: "ift-1", signature: "jwt.signe", iftTraitement: { ift: 0.6667, segment: { idMetier: "S3", libelle: "Herbicides" }, doseReference: 3, avertissement: null } });
     }) as typeof fetch;
     const db = createDb(url);
     const r = await computeInterventionIft(db, farmId, id, fakeIft);
-    expect(r).toMatchObject({ status: "ok", total: 0.667, lines: [expect.objectContaining({ ift: 0.6667, segment: "Herbicides", doseReference: 3 })] });
-    const call = new URL(calls.find((c) => c.includes("/ift/traitement"))!);
+    expect(r).toMatchObject({
+      status: "ok",
+      total: 0.667,
+      lines: [expect.objectContaining({ ift: 0.6667, segment: "Herbicides", segmentCode: "S3", doseReference: 3, certifiedId: "ift-1", signature: "jwt.signe" })],
+    });
+    const call = new URL(calls.find((c) => c.includes("/ift/traitement/certifie"))!);
     expect(Object.fromEntries(call.searchParams)).toMatchObject({ campagneIdMetier: "2025", numeroAmmIdMetier: AMM, cultureIdMetier: "1112", typeTraitementIdMetier: "T21", uniteIdMetier: "U3", dose: "2" });
 
     const down = (async () => new Response("indisponible", { status: 503 })) as unknown as typeof fetch;

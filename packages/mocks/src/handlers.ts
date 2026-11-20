@@ -345,6 +345,9 @@ export const handlers = [
   // Contrôles HVE et AB (lot CT1) : une parcelle de démo est certifiée AB depuis 2020.
   http.get(`*${base}/control/availability`, () => HttpResponse.json({ hve: false, ab: true })),
   http.post(`*${base}/control/check`, () => HttpResponse.json({ check: null })),
+  http.get(`*${base}/settings/certification`, () =>
+    HttpResponse.json({ hveCampaignStartMd: "01-01", hveMethod: "campaign", hveIftScale: "current", hveBeaujolais: null, rotationYears: 5, rotationSameSpeciesMax: 2, organicNitrogenPeriod: "calendar", abNotifiedOn: null, abCommittedOn: null }),
+  ),
   http.get(`*${base}/control/ab/parcels`, ({ request }) => {
     const campaign = Number(new URL(request.url).searchParams.get("campaign"));
     return HttpResponse.json({
@@ -379,6 +382,20 @@ export const handlers = [
           level: "ok",
           findings: [{ ruleId: "ab.perimeter", level: "ok", message: "1 parcelle(s) en conversion ou certifiée(s) AB, 2,5 ha sur 12 ha.", refs: {}, source: "Règlement (UE) 2018/848, art. 9.2 et 9.7" }],
         },
+        ...(params.kind === "hve"
+          ? [
+              {
+                id: "phyto",
+                label: "Stratégie phytosanitaire",
+                level: "warning",
+                points: { got: 16, max: 30, min: 10 },
+                findings: [
+                  { ruleId: "hve.5.1", level: "ok", message: "1 point(s) : herbicide(s) CMR2 : SULTAN.", points: { got: 1, max: 2 }, refs: {}, source: "Plan de contrôle HVE niveau 3 V4.4 (2024), §5.1" },
+                  { ruleId: "hve.5.5", level: "missing", message: "5.5 Surveillance active des bioagresseurs : à déclarer.", points: { got: 0, max: 3 }, refs: {}, source: "Plan de contrôle HVE niveau 3 V4.4 (2024), §5.5" },
+                ],
+              },
+            ]
+          : []),
       ],
       refsVersion: "2026-11-19.1",
       computedAt: "2026-11-19T08:00:00.000Z",

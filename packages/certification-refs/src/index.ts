@@ -11,6 +11,11 @@ export * from "./ab/inao-catalogue.js";
 export * from "./ab/copper.js";
 export * from "./ab/copper-ephy.js";
 export * from "./ab/annex-ii.js";
+export * from "./hve/grid.js";
+export * from "./hve/cmr/index.js";
+export * from "./hve/ift-references.js";
+export * from "./hve/regions.js";
+export * from "./hve/lookup.js";
 
 /** Version des référentiels, gardée avec chaque calcul de contrôle. */
-export const REFS_VERSION = "2026-11-20.1";
+export const REFS_VERSION = "2026-11-20.2";

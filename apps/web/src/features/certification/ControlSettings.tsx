@@ -1,0 +1,86 @@
+import { useState } from "react";
+import { Button, Group, Modal, Select, Stack, TextInput } from "@mantine/core";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { CertificationSettings } from "@fourmy/contracts";
+import { api, farmPath } from "../../app/api";
+import { useFarm } from "../../app/farm";
+import { ErrorAlert, Loading } from "../../components/states";
+
+/** Réglages du contrôle HVE (responsable) : période, méthode, références IFT. */
+export function ControlSettingsModal({ onClose }: { onClose: () => void }) {
+  const farm = useFarm();
+  const q = useQuery({ queryKey: ["certification-settings", farm.id], queryFn: () => api.get<CertificationSettings>(farmPath(farm.id, "/settings/certification")) });
+  return (
+    <Modal opened onClose={onClose} title="Réglages du contrôle HVE">
+      {q.isLoading && <Loading />}
+      {q.error && <ErrorAlert error={q.error} />}
+      {q.data && <SettingsForm initial={q.data} onClose={onClose} />}
+    </Modal>
+  );
+}
+
+function SettingsForm({ initial, onClose }: { initial: CertificationSettings; onClose: () => void }) {
+  const farm = useFarm();
+  const client = useQueryClient();
+  const [s, setS] = useState(initial);
+  const save = useMutation({
+    mutationFn: (w: CertificationSettings) => api.put(farmPath(farm.id, "/settings/certification"), w),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["certification-settings"] });
+      void client.invalidateQueries({ queryKey: ["certifications"] });
+      onClose();
+    },
+  });
+  return (
+    <Stack>
+      <TextInput
+        label="Début de la période de 12 mois (JJ/MM)"
+        description="Exercice comptable ou campagne culturale ; le 1er janvier par défaut"
+        value={`${s.hveCampaignStartMd.slice(3, 5)}/${s.hveCampaignStartMd.slice(0, 2)}`}
+        onChange={(e) => {
+          const m = /^(\d{2})\/(\d{2})$/.exec(e.currentTarget.value);
+          if (m) setS({ ...s, hveCampaignStartMd: `${m[2]}-${m[1]}` });
+        }}
+      />
+      <Select
+        label="IFT et bilan azoté"
+        data={[
+          { value: "campaign", label: "Campagne contrôlée seule" },
+          { value: "average", label: "Moyenne des trois dernières campagnes" },
+        ]}
+        value={s.hveMethod}
+        onChange={(v) => v && setS({ ...s, hveMethod: v as CertificationSettings["hveMethod"] })}
+        allowDeselect={false}
+      />
+      <Select
+        label="Références IFT des grandes cultures"
+        description="L'ancienne notation est admise jusqu'à la campagne 2025 pour les exploitations déjà certifiées V4"
+        data={[
+          { value: "current", label: "Notation en cours (enquêtes 2014, 2017, 2021)" },
+          { value: "old", label: "Ancienne notation" },
+        ]}
+        value={s.hveIftScale}
+        onChange={(v) => v && setS({ ...s, hveIftScale: v as CertificationSettings["hveIftScale"] })}
+        allowDeselect={false}
+      />
+      <Select
+        label="Vigne dans le Rhône ou la Saône-et-Loire"
+        description="Siège dans le périmètre de l'AOC Beaujolais (bassin viticole des références IFT)"
+        data={[
+          { value: "", label: "Non concerné" },
+          { value: "yes", label: "Dans le périmètre de l'AOC Beaujolais" },
+          { value: "no", label: "Hors du périmètre" },
+        ]}
+        value={s.hveBeaujolais === null ? "" : s.hveBeaujolais ? "yes" : "no"}
+        onChange={(v) => setS({ ...s, hveBeaujolais: v === "yes" ? true : v === "no" ? false : null })}
+        allowDeselect={false}
+      />
+      {save.error && <ErrorAlert error={save.error} />}
+      <Group>
+        <Button loading={save.isPending} onClick={() => save.mutate(s)}>
+          Enregistrer
+        </Button>
+      </Group>
+    </Stack>
+  );
+}

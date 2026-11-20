@@ -97,6 +97,11 @@ export const iftLine = z.object({
   segment: z.string().nullable(),
   doseReference: z.number().nullable(),
   warning: z.string().nullable(),
+  /** Segment de l'API (S1 semences, S2 biocontrôle, S3 herbicides, S4-S6 hors herbicides) : barème HVE 5.3. */
+  segmentCode: z.string().nullable().optional(),
+  /** IFT certifié par l'API (HVE 5.3.4 : accepté sans recalcul si la signature est valide). */
+  certifiedId: z.string().nullable().optional(),
+  signature: z.string().nullable().optional(),
 });
 export const iftResult = z.object({
   status: z.enum(["ok", "pending", "unavailable"]),

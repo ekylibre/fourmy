@@ -19,7 +19,8 @@ export function worstControlLevel(levels: ControlLevel[]): ControlLevel {
  * peut pas être conforme (elle passe en `missing`) ; un constat non
  * conforme le reste.
  */
-export function finding(f: ControlFinding): ControlFinding {
+export function finding(input: Omit<ControlFinding, "refs"> & { refs?: ControlFinding["refs"] }): ControlFinding {
+  const f: ControlFinding = { ...input, refs: input.refs ?? {} };
   const missing = f.missing?.filter(Boolean) ?? [];
   if (missing.length && (f.level === "ok" || f.level === "na")) return { ...f, level: "missing", missing };
   return missing.length ? { ...f, missing } : { ...f, missing: undefined };
@@ -42,7 +43,8 @@ export function section(
   id: string,
   label: string,
   findings: ControlFinding[],
-  points?: { min: number; max: number },
+  /** Seuil de l'indicateur ; maximum : somme des maxima des items s'il n'est pas donné. */
+  points?: { min: number; max?: number },
 ): ControlSection {
   if (!points) return { id, label, level: worstControlLevel(findings.map((f) => f.level)), findings };
   const got = Math.round(findings.reduce((sum, f) => sum + (f.points?.got ?? 0), 0) * 100) / 100;
@@ -51,7 +53,8 @@ export function section(
   if (levels.includes("danger")) level = "danger";
   else if (got < points.min) level = levels.includes("missing") ? "missing" : "danger";
   else level = levels.some((l) => l === "warning" || l === "missing") ? "warning" : "ok";
-  return { id, label, level, points: { got, max: points.max, min: points.min }, findings };
+  const max = points.max ?? Math.round(findings.reduce((sum, f) => sum + (f.points?.max ?? 0), 0) * 100) / 100;
+  return { id, label, level, points: { got, max, min: points.min }, findings };
 }
 
 /** Verdict d'un rapport : la pire section ; sans section, « sans objet ». */

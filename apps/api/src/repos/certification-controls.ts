@@ -24,6 +24,7 @@ import {
 } from "@fourmy/domain";
 import type { CheckableBody } from "./phyto.js";
 import { abApplications, abDraftApplications, abParcelInputs, abProductions } from "./certification-ab.js";
+import { loadHvePhyto } from "./certification-hve.js";
 import { abStatuses, type AbParcelStatus } from "@fourmy/domain";
 
 /**
@@ -114,6 +115,7 @@ export async function loadCertificationContext(tx: Tx, kind: ControlKind, campai
     const since = [`${campaign - 7}-01-01`, ...abParcels.map((p) => p.startedOn)].sort()[0]!;
     ctx.ab = { parcels: abParcels, productions: await abProductions(tx, ids, period.from, period.to), applications: await abApplications(tx, ids, since, period.to) };
   }
+  if (kind === "hve") ctx.hve = { phyto: await loadHvePhyto(tx, campaign, period, settings) };
   return ctx;
 }
 
@@ -144,7 +146,10 @@ async function dataHash(tx: Tx): Promise<string> {
           (SELECT count(*) || ':' || coalesce(max(created_at)::text, '') || ':' || coalesce(max(hve_validated_at)::text, '') FROM farm_landscape_features),
           (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM hve_questionnaires),
           (SELECT count(*) || ':' || coalesce(max(created_at)::text, '') FROM seed_derogations),
-          (SELECT coalesce(certification::text, '') FROM farm_settings))) AS h`,
+          (SELECT coalesce(certification::text, '') FROM farm_settings),
+          -- IFT calculés après coup (le worker n'avance pas updated_at) ; siège (références IFT).
+          (SELECT count(*) || ':' || coalesce(max(ift->>'computedAt'), '') FROM interventions WHERE ift IS NOT NULL),
+          (SELECT coalesce(max(updated_at)::text, '') FROM farm_sites))) AS h`,
   );
   return r!.h;
 }
@@ -224,6 +229,16 @@ export async function checkInterventionCertification(
     const history = await abApplications(tx, abParcelIds, `${Number(day.slice(0, 4)) - 7}-01-01`, `${day.slice(0, 4)}-12-31`, interventionId);
     ab = { parcels: areas.filter((a) => abParcelIds.includes(a.id)).map((a) => ({ id: a.id, name: a.name })), current, history };
   }
+  // HVE (lot CT3) : produits phytopharmaceutiques saisis, pour le classement CMR à la date.
+  let hve: Parameters<typeof evaluateIntervention>[0]["hve"];
+  if (certifications.some((c) => c.kind === "hve") && body.inputs.length) {
+    const ids = [...new Set(body.inputs.map((i) => i.articleId))];
+    const products = await rows<{ id: string; name: string; amm: string | null }>(
+      tx,
+      sql`SELECT id, name, nullif(btrim(amm), '') AS amm FROM articles WHERE kind = 'phyto' AND id IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`,
+    );
+    hve = { products: products.map((p) => ({ articleId: p.id, product: p.name, authorization: p.amm })) };
+  }
   const result = evaluateIntervention({
     procedure: body.procedure,
     day,
@@ -233,6 +248,7 @@ export async function checkInterventionCertification(
     equipmentIds: ((body as { tools?: { equipmentId: string }[] }).tools ?? []).map((t) => t.equipmentId),
     justification: body.justification ?? null,
     ...(ab ? { ab } : {}),
+    ...(hve ? { hve } : {}),
   });
   return result ? { ...result, checkedAt: new Date().toISOString() } : null;
 }

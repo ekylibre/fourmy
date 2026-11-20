@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Alert, Group, Paper, Select, Stack, Tabs, Text, Title } from "@mantine/core";
+import { Alert, Button, Group, Paper, Select, Stack, Tabs, Text, Title } from "@mantine/core";
+import { Settings } from "lucide-react";
+import { ControlSettingsModal } from "./ControlSettings";
 import { useParams } from "react-router";
 import { CONTROL_KIND_LABELS, type ControlKind } from "@fourmy/contracts";
 import { useAt } from "../../app/at";
@@ -21,6 +23,7 @@ export function ControlPage() {
   const [campaign, setCampaign] = useState(Number(day.slice(0, 4)));
   const report = useControlReport(farm.id, kind, campaign);
   const [tab, setTab] = useState<string>("rules");
+  const [settings, setSettings] = useState(false);
   const thisYear = new Date().getFullYear();
   const years = Array.from({ length: thisYear + 2 - 2015 }, (_, i) => String(thisYear + 1 - i));
   const fmt = (d: string) => new Date(d).toLocaleDateString("fr-FR");
@@ -29,8 +32,16 @@ export function ControlPage() {
     <Stack>
       <Group justify="space-between" align="flex-end">
         <Title order={1}>Contrôle {kind === "hve" ? "HVE" : "AB"}</Title>
-        <Select label="Campagne" data={years} value={String(campaign)} onChange={(v) => v && setCampaign(Number(v))} w={120} allowDeselect={false} />
+        <Group align="flex-end">
+          {kind === "hve" && farm.role === "owner" && (
+            <Button variant="default" leftSection={<Settings size={16} />} onClick={() => setSettings(true)}>
+              Réglages
+            </Button>
+          )}
+          <Select label="Campagne" data={years} value={String(campaign)} onChange={(v) => v && setCampaign(Number(v))} w={120} allowDeselect={false} />
+        </Group>
       </Group>
+      {settings && <ControlSettingsModal onClose={() => setSettings(false)} />}
       <Text c="dimmed">{CONTROL_KIND_LABELS[kind]} : contrôle calculé à partir de vos saisies, pour préparer l'audit. Il ne remplace pas la décision de l'organisme certificateur.</Text>
       {kind === "ab" && (
         <Tabs value={tab} onChange={(v) => v && setTab(v)}>
