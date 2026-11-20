@@ -2,6 +2,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import type { ComplianceResult } from "@fourmy/contracts";
+import { interventionPlanWrite } from "@fourmy/contracts";
 import { demoInterventions } from "@fourmy/mocks";
 import { server } from "./setup";
 import { FARM, renderApp } from "./render";
@@ -49,6 +50,35 @@ async function treatmentForm(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("contrôle réglementaire dans le formulaire", () => {
+  it("contrôle HVE et AB : le brouillon envoyé porte la procédure et passe le schéma de l'API", async () => {
+    const user = userEvent.setup();
+    const bodies: { procedure?: string; inputs?: { quantity: unknown }[] }[] = [];
+    server.use(
+      http.post("*/control/check", async ({ request }) => {
+        bodies.push((await request.json()) as (typeof bodies)[number]);
+        return HttpResponse.json({ check: null });
+      }),
+    );
+    renderApp(`/f/${FARM}/interventions?at=2026-06-10`);
+    const button = await screen.findByRole("button", { name: "Nouvelle intervention" });
+    await vi.waitFor(() => expect(button).toBeEnabled());
+    await user.click(button);
+    const form = await screen.findByRole("form", { name: "Saisie de l'intervention" });
+    await user.click(within(form).getByRole("combobox", { name: "Intervention" }));
+    await user.click(await screen.findByRole("option", { name: "Pulvérisation" }));
+    await user.click(within(form).getByRole("combobox", { name: "Parcelles" }));
+    await user.click(await screen.findByRole("option", { name: /Les Rouffiats/ }));
+    await user.click(within(form).getByRole("combobox", { name: "Produit" }));
+    await user.click(await screen.findByRole("option", { name: /Fongicide X/ }));
+    await user.type(within(form).getByRole("textbox", { name: "Quantité" }), "4");
+    await vi.waitFor(() => expect(bodies.some((b) => b.inputs?.[0]?.quantity === 4)).toBe(true), { timeout: 3000 });
+    // Corps accepté par la route (même schéma que POST /interventions) : plus de 400 pendant la saisie.
+    for (const body of bodies) {
+      expect(body.procedure).toBeTruthy();
+      expect(interventionPlanWrite.safeParse(body).success).toBe(true);
+    }
+  });
+
   it("affiche les feux en direct et propose la cible du traitement", async () => {
     const user = userEvent.setup();
     const bodies: Record<string, unknown>[] = [];

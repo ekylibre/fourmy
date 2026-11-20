@@ -2,6 +2,7 @@ import { Alert, Group, List, Paper, Text } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
 import type { CertificationCheck, ControlAvailability, ControlFinding, ControlLevel, ControlReport } from "@fourmy/contracts";
+import { interventionPlanWrite } from "@fourmy/contracts";
 import type { Light } from "@fourmy/domain";
 import { api, farmPath } from "../../app/api";
 import { TrafficLight } from "../../components/TrafficLight";
@@ -43,9 +44,14 @@ export function useControlReport(farmId: string, kind: "hve" | "ab", campaign: n
   });
 }
 
-/** Constats de certification d'un brouillon (debounced), `null` hors parcelle certifiée. */
+/**
+ * Constats de certification d'un brouillon (debounced), `null` hors parcelle
+ * certifiée. Un brouillon que l'API refuserait (même schéma) n'est pas
+ * envoyé : pas de requête en erreur pendant la saisie.
+ */
 export function useCertificationCheck(farmId: string, draft: object | null) {
-  const [debounced] = useDebouncedValue(draft ? JSON.stringify(draft) : null, 400);
+  const sendable = draft && interventionPlanWrite.safeParse(draft).success ? draft : null;
+  const [debounced] = useDebouncedValue(sendable ? JSON.stringify(sendable) : null, 400);
   const query = useQuery({
     queryKey: ["certification-check", farmId, debounced],
     enabled: !!debounced,
