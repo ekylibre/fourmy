@@ -9,7 +9,10 @@ import {
   type ControlAvailability,
   type ControlKind,
   type ControlReport,
+  type ArticleCopperWrite,
+  type ProductionCertificationWrite,
 } from "@fourmy/contracts";
+import { NotFound } from "../routes/helpers.js";
 import { REFS_VERSION } from "@fourmy/certification-refs";
 import {
   DomainError,
@@ -20,6 +23,8 @@ import {
   type ParcelCertificationRef,
 } from "@fourmy/domain";
 import type { CheckableBody } from "./phyto.js";
+import { abApplications, abDraftApplications, abParcelInputs, abProductions } from "./certification-ab.js";
+import { abStatuses, type AbParcelStatus } from "@fourmy/domain";
 
 /**
  * Contrôles HVE et Agriculture biologique, lot CT1
@@ -99,14 +104,25 @@ export async function loadCertificationContext(tx: Tx, kind: ControlKind, campai
         WHERE v.valid && tstzrange(${period.from}::date, (${period.to}::date + 1))
         ORDER BY lp.id, upper(v.valid) DESC NULLS FIRST`,
   );
-  return {
-    kind,
-    campaign,
-    period,
-    parcels: parcels.map((p) => ({ id: p.id, name: p.name, areaM2: p.area_m2 })),
-    certifications: await certificationsBetween(tx, period.from, period.to),
-    settings,
-  };
+  const certifications = await certificationsBetween(tx, period.from, period.to);
+  const list = parcels.map((p) => ({ id: p.id, name: p.name, areaM2: p.area_m2 }));
+  const ctx: CertificationContext = { kind, campaign, period, parcels: list, certifications, settings };
+  if (kind === "ab") {
+    const abParcels = abParcelInputs(list, certifications);
+    const ids = abParcels.map((p) => p.id);
+    // Cuivre : 7 ans glissants ; conversion : depuis le début de la certification la plus ancienne.
+    const since = [`${campaign - 7}-01-01`, ...abParcels.map((p) => p.startedOn)].sort()[0]!;
+    ctx.ab = { parcels: abParcels, productions: await abProductions(tx, ids, period.from, period.to), applications: await abApplications(tx, ids, since, period.to) };
+  }
+  return ctx;
+}
+
+/** Statut de conversion des parcelles AB d'une campagne (onglet Parcelles). */
+export async function abParcelStatuses(db: Database, farmId: string, campaign: number): Promise<{ campaign: number; period: { from: string; to: string }; items: AbParcelStatus[] }> {
+  return withFarm(db, farmId, async (tx) => {
+    const ctx = await loadCertificationContext(tx, "ab", campaign);
+    return { campaign, period: ctx.period, items: abStatuses(ctx) };
+  });
 }
 
 /**
@@ -177,13 +193,37 @@ export async function controlReport(db: Database, farmId: string, kind: ControlK
 // --- Saisie d'une intervention -----------------------------------------------------
 
 /** Constats de certification d'un brouillon d'intervention, ou `null` (aucune certification, aucune règle). */
-export async function checkInterventionCertification(tx: Tx, body: CheckableBody & { justification?: string | null }): Promise<CertificationCheck | null> {
+export async function checkInterventionCertification(
+  tx: Tx,
+  body: CheckableBody & { justification?: string | null },
+  interventionId: string | null = null,
+): Promise<CertificationCheck | null> {
   const at = body.periods[0]?.startedAt ?? body.plannedAt;
   const parcelIds = body.targets.filter((t) => t.kind === "land_parcel").map((t) => t.id);
   if (!at || !parcelIds.length) return null;
   const day = new Date(at).toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" });
   const certifications = (await certificationsBetween(tx, day, day)).filter((c) => parcelIds.includes(c.parcelId));
   if (!certifications.length) return null;
+  const abParcelIds = [...new Set(certifications.filter((c) => c.kind === "ab").map((c) => c.parcelId))];
+  let ab: Parameters<typeof evaluateIntervention>[0]["ab"];
+  if (abParcelIds.length) {
+    const areas = await rows<{ id: string; name: string; area_m2: number }>(
+      tx,
+      sql`SELECT lp.id, lp.name, v.area_m2::float8 AS area_m2 FROM land_parcels lp
+          JOIN land_parcel_versions v ON v.land_parcel_id = lp.id AND v.valid @> ${day}::date::timestamptz
+          WHERE lp.id IN (${sql.join(parcelIds.map((id) => sql`${id}`), sql`, `)})`,
+    );
+    const worked = new Map(body.targets.filter((t) => t.kind === "land_parcel").map((t) => [t.id, (t as { workedAreaM2?: number }).workedAreaM2]));
+    const current = await abDraftApplications(tx, {
+      day,
+      interventionId: interventionId ?? "draft",
+      parcels: areas.map((a) => ({ id: a.id, areaM2: worked.get(a.id) ?? a.area_m2 })),
+      abParcelIds,
+      inputs: body.inputs,
+    });
+    const history = await abApplications(tx, abParcelIds, `${Number(day.slice(0, 4)) - 7}-01-01`, `${day.slice(0, 4)}-12-31`, interventionId);
+    ab = { parcels: areas.filter((a) => abParcelIds.includes(a.id)).map((a) => ({ id: a.id, name: a.name })), current, history };
+  }
   const result = evaluateIntervention({
     procedure: body.procedure,
     day,
@@ -192,12 +232,13 @@ export async function checkInterventionCertification(tx: Tx, body: CheckableBody
     inputs: body.inputs.map(({ articleId, quantity, per, unit }) => ({ articleId, quantity, per, ...(unit ? { unit } : {}) })),
     equipmentIds: ((body as { tools?: { equipmentId: string }[] }).tools ?? []).map((t) => t.equipmentId),
     justification: body.justification ?? null,
+    ...(ab ? { ab } : {}),
   });
   return result ? { ...result, checkedAt: new Date().toISOString() } : null;
 }
 
-export async function checkInterventionCertificationFor(db: Database, farmId: string, body: CheckableBody & { justification?: string | null }) {
-  return withFarm(db, farmId, (tx) => checkInterventionCertification(tx, body));
+export async function checkInterventionCertificationFor(db: Database, farmId: string, body: CheckableBody & { justification?: string | null }, interventionId: string | null = null) {
+  return withFarm(db, farmId, (tx) => checkInterventionCertification(tx, body, interventionId));
 }
 
 /**
@@ -212,7 +253,7 @@ export async function recordCertificationCheck(
   body: CheckableBody & { justification?: string | null; compliance?: { reason?: string | null } },
   mode: "plan" | "done",
 ): Promise<void> {
-  const check = await checkInterventionCertification(tx, body);
+  const check = await checkInterventionCertification(tx, body, interventionId);
   if (!check) {
     await tx.execute(sql`UPDATE interventions SET certification_check = NULL WHERE id = ${interventionId}`);
     return;
@@ -226,3 +267,34 @@ export async function recordCertificationCheck(
 }
 
 export { CERT_KINDS };
+
+// --- Saisies propres aux contrôles AB (lot CT2) ---------------------------------------
+
+/** Teneur en cuivre métal d'un produit phytopharmaceutique (null : effacée, retour à E-Phy). */
+export async function putArticleCopper(db: Database, farmId: string, articleId: string, w: ArticleCopperWrite): Promise<void> {
+  await withFarm(db, farmId, async (tx) => {
+    const [a] = await rows<{ id: string }>(
+      tx,
+      sql`UPDATE articles SET copper_metal_g = ${w.g}, copper_metal_per = ${w.g === null ? null : w.per}, updated_at = now()
+          WHERE id = ${articleId} AND kind = 'phyto' RETURNING id`,
+    );
+    if (!a) throw new NotFound("Produit phytopharmaceutique introuvable.");
+  });
+}
+
+/** Cycle, date de plantation et mode de culture d'une production. */
+export async function putProductionCertification(db: Database, farmId: string, productionId: string, w: ProductionCertificationWrite) {
+  return withFarm(db, farmId, async (tx) => {
+    const [p] = await rows<{ id: string; cycle: string | null; planted_on: string | null; cultivation_mode: string }>(
+      tx,
+      sql`UPDATE productions SET
+            cycle = ${w.cycle === undefined ? sql`cycle` : w.cycle},
+            planted_on = ${w.plantedOn === undefined ? sql`planted_on` : sql`${w.plantedOn}::date`},
+            cultivation_mode = ${w.cultivationMode === undefined ? sql`cultivation_mode` : w.cultivationMode},
+            updated_at = now()
+          WHERE id = ${productionId} RETURNING id, cycle, planted_on::text, cultivation_mode`,
+    );
+    if (!p) throw new NotFound("Production introuvable.");
+    return { id: p.id, cycle: p.cycle, plantedOn: p.planted_on, cultivationMode: p.cultivation_mode };
+  });
+}

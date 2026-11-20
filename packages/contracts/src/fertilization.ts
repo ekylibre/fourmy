@@ -69,7 +69,26 @@ export const fertilizerComposition = z.object({
 export type FertilizerComposition = z.infer<typeof fertilizerComposition>;
 
 /** Saisie d'une composition (confirmée par l'utilisateur), avec la source de l'information. */
-export const fertilizerWrite = fertilizerComposition.extend({ source: z.string().trim().max(200).nullable().default(null) });
+/** Provenance d'un effluent d'élevage (Agriculture biologique : élevage industriel interdit). */
+export const effluentOrigin = z.enum(["organic", "conventional", "industrial", "unknown"]);
+export type EffluentOrigin = z.infer<typeof effluentOrigin>;
+export const EFFLUENT_ORIGIN_LABELS: Record<EffluentOrigin, string> = {
+  organic: "Élevage biologique",
+  conventional: "Élevage conventionnel non industriel",
+  industrial: "Élevage industriel",
+  unknown: "Provenance inconnue",
+};
+
+export const fertilizerWrite = fertilizerComposition.extend({
+  source: z.string().trim().max(200).nullable().default(null),
+  /**
+   * Agriculture biologique : catégories de matières de l'annexe II du
+   * règlement 2021/1165 (codes de @fourmy/certification-refs, « outside » :
+   * matière hors annexe) et provenance de l'effluent. Absent : inchangé.
+   */
+  abCategories: z.array(z.string().trim().min(1).max(60)).max(20).nullable().optional(),
+  effluentOrigin: effluentOrigin.nullable().optional(),
+});
 export type FertilizerWrite = z.infer<typeof fertilizerWrite>;
 
 /** Analyse d'un produit organique : remplace les valeurs de référence pendant 5 ans. */
@@ -103,6 +122,9 @@ export interface FertilizerArticle {
   analyses: ProductAnalysis[];
   /** Interventions réalisées qui l'utilisent. */
   usage: number;
+  /** Agriculture biologique : catégories de l'annexe II et provenance (null : non renseignées). */
+  abCategories: string[] | null;
+  effluentOrigin: EffluentOrigin | null;
 }
 
 

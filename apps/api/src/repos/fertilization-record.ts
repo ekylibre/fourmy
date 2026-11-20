@@ -86,7 +86,7 @@ function contentLabel(c: FertilizerComposition): string {
   return `${f(c.nTotal)} kg N/${c.basis === "kg_per_t" ? "t" : "m³"}`;
 }
 
-function nitrogen(f: FertilizerArticle | undefined, day: string, quantity: number, unit: string | null, areaHa: number | null) {
+export function nitrogen(f: FertilizerArticle | undefined, day: string, quantity: number, unit: string | null, areaHa: number | null) {
   if (!f) return { missing: "produit inconnu" } as const;
   const eff = effectiveComposition(f, day);
   if (!eff) return { missing: "teneur en azote inconnue" } as const;

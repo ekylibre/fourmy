@@ -78,6 +78,8 @@ export interface FarmPhytoArticle {
   mixCodes: number[];
   organic: boolean;
   biocontrol: boolean;
+  /** Cuivre métal d'un produit cuprique (contrôle AB) ; absent : pas de cuivre. */
+  copper?: import("./certification.js").ArticleCopper;
 }
 
 /** Eau autour d'une intervention (carte de la fiche) : bande de ZNT (GeoJSON) et cours d'eau proches. */

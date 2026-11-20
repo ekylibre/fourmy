@@ -1,4 +1,5 @@
 import { sql, type SQL } from "drizzle-orm";
+import { copperOfAmm } from "@fourmy/certification-refs";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
 import {
   applicatorsOf,
@@ -542,6 +543,14 @@ export async function bufferAround(db: Database, farmId: string, targets: Interv
 // ---------------------------------------------------------------------------
 
 /** Articles phyto avec leur produit E-Phy (rattachement par n° AMM). */
+/** Cuivre d'un article : saisi, sinon déduit d'E-Phy ; rien si le produit n'est pas cuprique. */
+function copperView(amm: string | null, g: number | null, per: "kg" | "L" | null): { copper?: FarmPhytoArticle["copper"] } {
+  if (g && per) return { copper: { g, per, from: "article" } };
+  const c = copperOfAmm(amm);
+  if (c === undefined) return {};
+  return { copper: c ? { ...c, from: "ephy" } : { from: "unknown" } };
+}
+
 export async function phytoArticles(db: Database, farmId: string) {
   return withFarm(db, farmId, async (tx) => {
     const list = await rows<{
@@ -560,9 +569,11 @@ export async function phytoArticles(db: Database, farmId: string) {
       mix_codes: number[] | null;
       organic: boolean | null;
       biocontrol: boolean | null;
+      copper_g: number | null;
+      copper_per: "kg" | "L" | null;
     }>(
       tx,
-      sql`SELECT a.id, a.name, a.unit, nullif(btrim(a.amm), '') AS amm, p.name AS product_name, p.state, p.stopped_on::text,
+      sql`SELECT a.id, a.name, a.unit, nullif(btrim(a.amm), '') AS amm, a.copper_metal_g::float8 AS copper_g, a.copper_metal_per AS copper_per, p.name AS product_name, p.state, p.stopped_on::text,
                  p.reentry_delay_hours AS reentry, p.operator_protection, p.restricted_mentions, p.mix_codes, p.organic, p.biocontrol,
                  (SELECT json_agg(json_build_object('code', r.code, 'phrase', r.phrase) ORDER BY r.code) FROM phyto_risks r WHERE r.product_id = p.id) AS risks,
                  (SELECT array_agg(DISTINCT s.symbol) FROM phyto_risks r
@@ -588,6 +599,7 @@ export async function phytoArticles(db: Database, farmId: string) {
         mixCodes: a.mix_codes ?? [],
         organic: a.organic ?? false,
         biocontrol: a.biocontrol ?? false,
+        ...copperView(a.amm, a.copper_g, a.copper_per),
       }),
     );
   });

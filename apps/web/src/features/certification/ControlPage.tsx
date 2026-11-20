@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Alert, Group, Paper, Select, Stack, Text, Title } from "@mantine/core";
+import { Alert, Group, Paper, Select, Stack, Tabs, Text, Title } from "@mantine/core";
 import { useParams } from "react-router";
 import { CONTROL_KIND_LABELS, type ControlKind } from "@fourmy/contracts";
 import { useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
 import { ErrorAlert, Loading } from "../../components/states";
 import { ControlLight, FindingList, useControlReport } from "./controls";
+import { AbParcels } from "./AbParcels";
 
 /**
  * Tableau de bord d'un contrôle HVE ou AB pour une campagne (lot CT1) :
@@ -19,6 +20,7 @@ export function ControlPage() {
   const { day } = useAt();
   const [campaign, setCampaign] = useState(Number(day.slice(0, 4)));
   const report = useControlReport(farm.id, kind, campaign);
+  const [tab, setTab] = useState<string>("rules");
   const thisYear = new Date().getFullYear();
   const years = Array.from({ length: thisYear + 2 - 2015 }, (_, i) => String(thisYear + 1 - i));
   const fmt = (d: string) => new Date(d).toLocaleDateString("fr-FR");
@@ -30,9 +32,18 @@ export function ControlPage() {
         <Select label="Campagne" data={years} value={String(campaign)} onChange={(v) => v && setCampaign(Number(v))} w={120} allowDeselect={false} />
       </Group>
       <Text c="dimmed">{CONTROL_KIND_LABELS[kind]} : contrôle calculé à partir de vos saisies, pour préparer l'audit. Il ne remplace pas la décision de l'organisme certificateur.</Text>
-      {report.isLoading && <Loading />}
-      {report.error && <ErrorAlert error={report.error} />}
-      {report.data && (
+      {kind === "ab" && (
+        <Tabs value={tab} onChange={(v) => v && setTab(v)}>
+          <Tabs.List>
+            <Tabs.Tab value="rules">Règles</Tabs.Tab>
+            <Tabs.Tab value="parcels">Parcelles</Tabs.Tab>
+          </Tabs.List>
+        </Tabs>
+      )}
+      {kind === "ab" && tab === "parcels" && <AbParcels campaign={campaign} />}
+      {(kind !== "ab" || tab === "rules") && report.isLoading && <Loading />}
+      {(kind !== "ab" || tab === "rules") && report.error && <ErrorAlert error={report.error} />}
+      {(kind !== "ab" || tab === "rules") && report.data && (
         <>
           <Paper withBorder p="md" aria-label="Verdict">
             <Group justify="space-between">
