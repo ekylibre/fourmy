@@ -23,7 +23,7 @@ Du 17 au 20/11 : imports et assistant de premier démarrage, puis contrôles HVE
 - **Restent** (thème 16) : export de la grille HVE officielle remplie (118), grille de référence remplie à la main (119), confirmations d'un organisme certificateur (120), recette des imports (121).
 - **Qualité** : le test `lexicon`, instable en CI (délai de 5 s face au verrou du référentiel), est corrigé (PR #97).
 - **Projet GitHub** : nouvelles issues #100 (point 118), #101 (119), #102 (120), #103 (121), jalon « Fin 2026 ».
-- **Assolement prévisionnel, temps 1 (AS1a à AS4, PR #105, #106, #108 à #111)** : retour de l'exploitant testeur « je ne trouve pas comment créer l'assolement 2027 ». Menu Assolement dans Activités, écran carte et liste, affectation, dérobées, couverts, découpe et fusion datées, contrôles en direct (BCAE 7, délais de retour Triple Performance, AB et HVE, ZNT, captages, Natura 2000), validation et versions (`docs/assolement.md`). Restent les points 122 à 128 (thème 17) ; correctif du contrôle HVE et AB en direct (PR #107).
+- **Assolement prévisionnel, temps 1 (AS1a à AS4, PR #105, #106, #108 à #111)** : retour de l'exploitant testeur « je ne trouve pas comment créer l'assolement 2027 ». Menu Assolement dans Activités, écran carte et liste, affectation, dérobées, couverts, découpe et fusion datées, contrôles en direct (BCAE 7, délais de retour Triple Performance, AB et HVE, ZNT, captages, Natura 2000), validation et versions (`docs/assolement.md`). Restent les points 122 à 128 (thème 17, issues #112 à #118) ; correctif du contrôle HVE et AB en direct (PR #107).
 
 ## Mise à jour du 2026-11-16
 
@@ -316,10 +316,10 @@ Besoins, conception et plans : `claudedocs/besoins_import_onboarding.md`, `claud
 
 ## 17. Assolement prévisionnel
 
-122. **Essai de l'écran d'assolement avec l'exploitant testeur** : préparer 2027 sur sa ferme, retours à intégrer. *donnée · P2 · workflow_assolement Q5*
-123. **Relecture des repères agronomiques** (délais de retour, précédents) par un agronome ; soja (2 ans ou 4 à 6 ans) et pomme de terre en priorité. *donnée · P2 · workflow_assolement Q3*
-124. **Temps 2 : itinéraires techniques** à l'affectation (catalogue Lexicon, ITK de la ferme), interventions proposées puis confirmées, temps de travaux (OSRM), besoins en intrants. *évolution · P2 · besoins_assolement §5*
-125. **Temps 3 : module économique** (prix des intrants par la clé d'adhérent Lexicon, prix de vente par l'API agrifood de la Commission, rendements et marges). *évolution · P3 · besoins_assolement §6*
-126. **Découpe : report des interventions prévues** sur les morceaux et annulation d'une découpe validée. *évolution · P3 · workflow_assolement AS3*
-127. **Mobile : parcellaire à la date d'effet d'une découpe** (synchronisation qui ne voit le changement qu'à la synchronisation complète suivante). *dette · P3 · workflow_assolement AS3*
-128. **BCAE 7 : barème à points de la plaine du Rhin** (liste des communes de l'arrêté BCAE) et liste des légumineuses de l'exemption à vérifier sur la notice Télépac 2026. *donnée · P3 · docs/pac/rapport_pac.md*
+122. **Essai de l'écran d'assolement avec l'exploitant testeur** : préparer 2027 sur sa ferme, retours à intégrer. *donnée · P2 · workflow_assolement Q5* — issue #112
+123. **Relecture des repères agronomiques** (délais de retour, précédents) par un agronome ; soja (2 ans ou 4 à 6 ans) et pomme de terre en priorité. *donnée · P2 · workflow_assolement Q3* — issue #113
+124. **Temps 2 : itinéraires techniques** à l'affectation (catalogue Lexicon, ITK de la ferme), interventions proposées puis confirmées, temps de travaux (OSRM), besoins en intrants. *évolution · P2 · besoins_assolement §5* — issue #114
+125. **Temps 3 : module économique** (prix des intrants par la clé d'adhérent Lexicon, prix de vente par l'API agrifood de la Commission, rendements et marges). *évolution · P3 · besoins_assolement §6* — issue #115
+126. **Découpe : report des interventions prévues** sur les morceaux et annulation d'une découpe validée. *évolution · P3 · workflow_assolement AS3* — issue #116
+127. **Mobile : parcellaire à la date d'effet d'une découpe** (synchronisation qui ne voit le changement qu'à la synchronisation complète suivante). *dette · P3 · workflow_assolement AS3* — issue #117
+128. **BCAE 7 : barème à points de la plaine du Rhin** (liste des communes de l'arrêté BCAE) et liste des légumineuses de l'exemption à vérifier sur la notice Télépac 2026. *donnée · P3 · docs/pac/rapport_pac.md* — issue #118
