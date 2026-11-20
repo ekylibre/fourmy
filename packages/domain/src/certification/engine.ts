@@ -12,6 +12,7 @@ import {
   type AbProduction,
 } from "./ab.js";
 import { cmrInterventionFindings, hvePhytoFindings, type HvePhytoContext } from "./hve/phyto.js";
+import { hveFertilizationFindings, type HveFertilizationContext } from "./hve/fertilization.js";
 import { HVE_INDICATOR_MIN } from "@fourmy/certification-refs";
 
 /**
@@ -52,7 +53,7 @@ export interface CertificationContext {
    */
   ab?: { parcels: AbParcelInput[]; productions: AbProduction[]; applications: AbApplication[] };
   /** HVE : SAU, traitements et IFT de la période (et des deux précédentes pour la moyenne), références. */
-  hve?: { phyto: HvePhytoContext };
+  hve?: { phyto: HvePhytoContext; fertilization?: HveFertilizationContext };
 }
 
 export type CampaignRule = (ctx: CertificationContext) => ControlFinding[];
@@ -107,6 +108,12 @@ export const CAMPAIGN_SECTIONS: Record<ControlKind, RuleSection[]> = {
   hve: [
     { id: "perimeter", label: "Périmètre", rules: [perimeter] },
     { id: "phyto", label: "Stratégie phytosanitaire", points: { min: HVE_INDICATOR_MIN }, rules: [(ctx) => (ctx.hve ? hvePhytoFindings(ctx.hve.phyto) : [])] },
+    {
+      id: "fertilization",
+      label: "Gestion de la fertilisation",
+      points: { min: HVE_INDICATOR_MIN },
+      rules: [(ctx) => (ctx.hve?.fertilization ? hveFertilizationFindings(ctx.hve.fertilization) : [])],
+    },
   ],
   ab: [
     { id: "perimeter", label: "Périmètre", rules: [perimeter] },

@@ -62,3 +62,30 @@ export function speciesDiversityPoints(varietiesBySpecies: number[]): number {
   const n3 = varietiesBySpecies.filter((n) => n >= 3).length;
   return Math.min(n2 + 2 * n3, 6);
 }
+
+/**
+ * 6.1 : bilan azoté B (kg N/ha de SAU) → points. Bilan apparent d'une OTEX
+ * herbivore : B > 90 : 0 ; ]70,90] : 2 ; ]50,70] : 4 ; ]30,50] : 6 ; ≤ 30 : 8.
+ * Tous les autres cas (dont la BGA) : B > 50 : 0 ; ]40,50] : 2 ; ]30,40] : 5 ;
+ * ]20,30] : 7 ; ≤ 20 : 8. (PdC4 §6.1 ; Grille!AD55, AF55.)
+ */
+export function nitrogenBalancePoints(b: number, apparentHerbivore = false): number {
+  const v = Math.round(b * 1e6) / 1e6;
+  if (apparentHerbivore) return v > 90 ? 0 : v > 70 ? 2 : v > 50 ? 4 : v > 30 ? 6 : 8;
+  return v > 50 ? 0 : v > 40 ? 2 : v > 30 ? 5 : v > 20 ? 7 : 8;
+}
+
+/** 6.3 : part de l'azote organique (%) : < 25 : 0 ; [25,35[ : 1 ; [35,45[ : 2 ; [45,55[ : 3 ; ≥ 55 : 4. */
+export function organicNitrogenPoints(sharePercent: number): number {
+  const s = Math.round(sharePercent * 1e6) / 1e6;
+  return s < 25 ? 0 : s < 35 ? 1 : s < 45 ? 2 : s < 55 ? 3 : 4;
+}
+
+/** 6.6 : part de légumineuses (%) : < 5 : 0 ; [5,10[ : 2 ; [10,15[ : 3 ; ≥ 15 : 4. */
+export function legumePoints(sharePercent: number): number {
+  const s = Math.round(sharePercent * 1e6) / 1e6;
+  return s < 5 ? 0 : s < 10 ? 2 : s < 15 ? 3 : 4;
+}
+
+/** 6.1 et 6.4 : correction des cultures mineures à partir de 5 % de la SAU. */
+export const MINOR_CROPS_THRESHOLD = 5;

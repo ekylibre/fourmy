@@ -16,6 +16,7 @@ export * from "./hve/cmr/index.js";
 export * from "./hve/ift-references.js";
 export * from "./hve/regions.js";
 export * from "./hve/lookup.js";
+export * from "./hve/nitrogen-exports-2026.js";
 
 /** Version des référentiels, gardée avec chaque calcul de contrôle. */
-export const REFS_VERSION = "2026-11-20.2";
+export const REFS_VERSION = "2026-11-20.3";

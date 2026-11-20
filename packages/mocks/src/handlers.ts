@@ -346,7 +346,7 @@ export const handlers = [
   http.get(`*${base}/control/availability`, () => HttpResponse.json({ hve: false, ab: true })),
   http.post(`*${base}/control/check`, () => HttpResponse.json({ check: null })),
   http.get(`*${base}/settings/certification`, () =>
-    HttpResponse.json({ hveCampaignStartMd: "01-01", hveMethod: "campaign", hveIftScale: "current", hveBeaujolais: null, rotationYears: 5, rotationSameSpeciesMax: 2, organicNitrogenPeriod: "calendar", abNotifiedOn: null, abCommittedOn: null }),
+    HttpResponse.json({ hveCampaignStartMd: "01-01", hveMethod: "campaign", hveIftScale: "current", hveBeaujolais: null, hveLivestock: null, rotationYears: 5, rotationSameSpeciesMax: 2, organicNitrogenPeriod: "calendar", abNotifiedOn: null, abCommittedOn: null }),
   ),
   http.get(`*${base}/control/ab/parcels`, ({ request }) => {
     const campaign = Number(new URL(request.url).searchParams.get("campaign"));

@@ -113,6 +113,8 @@ export const certificationSettings = z
     hveIftScale: z.enum(["current", "old"]).default("current"),
     /** Rhône et Saône-et-Loire : siège dans le périmètre de l'AOC Beaujolais (bassin viticole des références IFT). */
     hveBeaujolais: z.boolean().nullable().default(null),
+    /** Élevage sur l'exploitation (bilan azoté : rejets des animaux, pâturage) ; null : non déclaré. */
+    hveLivestock: z.boolean().nullable().default(null),
     /** Rotation AB (D12) : légumineuse sur N campagnes, même espèce au plus K années de suite. */
     rotationYears: z.number().int().min(2).max(10).default(5),
     rotationSameSpeciesMax: z.number().int().min(1).max(5).default(2),
