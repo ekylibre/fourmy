@@ -250,3 +250,20 @@ flowchart LR
 - Tests : API 7 (`seeds-page.integration.test.ts` : liste, fiche, PMG de lot, repère estimé, unité, mélange, autre ferme), web 2 (`test/seeds.test.tsx`), e2e 1 (`e2e/seeds.spec.ts`) ; turbo : 82 tâches vertes.
 - Reporté : rattachement de l'espèce importée en un geste (SE4) ; le tiroir n'a pas de nom accessible (Drawer Mantine), à reprendre avec SE4.
 
+### SE4 — Catalogue GNIS et rattachement (20/11/2026)
+
+- API (`repos/seed-catalog.ts`, `routes/seeds.ts`) :
+  - `GET /seeds/catalog?q=&species=` : 20 variétés (sans accents, débuts de nom d'abord), espèce, légumineuse, repère de PMG, unité proposée (doses de 50 000 grains pour le maïs, de 150 000 pour le tournesol, kg sinon) ;
+  - `POST /seeds` (responsable) : article et fiche, depuis le catalogue ou en saisie libre ;
+  - `GET /seeds/attach` : rattachements proposés ; `POST /seeds/attach` (responsable) : applique ceux qui sont choisis (espèce, variété et code GNIS sans écraser ce qui est saisi, ou mélange ; PMG non touché).
+- Propositions, dans l'ordre : code GNIS trouvé au catalogue (« sûr », sauf si le fichier nomme une autre espèce) ; mélange (espèce importée « Mélange », ou nom) ; espèce du fichier, référence Lexicon (`triticale_seed`), ou variété unique au catalogue d'après le nom. « Approché » : libellé proche (« Colza oléagineux » → colza), contradiction, ou mélange deviné d'après le nom.
+- Le catalogue range parfois plusieurs espèces sous un taxon (toutes les fétuques sous `festuca`) : les libellés sont comparés aussi, et celui de la variété est affiché.
+- Import d'un fichier : les semences créées sont rattachées d'office si la proposition est sûre ou exacte, jamais si elle est approchée.
+- CLI `seeds:attach --farm <id> [--all] [--dry-run]` : par défaut, les rattachements sûrs seulement.
+- Ferme de test des imports (42 semences) : 42 propositions, dont 23 sûres et 3 approchées.
+- Web :
+  - « Ajouter une semence » (`AddSeedModal`) : catalogue officiel (recherche, choix, unité, grains par dose, PMG de l'étiquette ; attribution SEMAE) ou saisie libre ; la fiche s'ouvre ensuite ;
+  - bandeau « Rattacher au référentiel » et fenêtre de rattachement (`AttachModal`) : sûres et exactes cochées, approchées décochées ;
+  - fiche : « Rattachement proposé », avec « Reprendre » ; tiroir avec un nom accessible.
+- Tests : API 4 (`seeds-catalog.integration.test.ts`, variétés fictives ZZ…), import Geofolia (fiches créées), web 2 de plus ; turbo vert.
+

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { SeedDetail, SeedListItem, SeedSpeciesOption } from "@fourmy/contracts";
+import type { SeedAttachProposal, SeedCatalogItem, SeedDetail, SeedListItem, SeedSpeciesOption } from "@fourmy/contracts";
 import { api, farmPath } from "../../app/api";
 
 /** Semences (lot SE3) : liste à la date de la frise, fiche, espèces proposées. */
@@ -25,6 +25,23 @@ export function useSeedSpecies(farmId: string, enabled: boolean) {
     queryKey: [...seedsKey(farmId), "species"],
     queryFn: () => api.get<{ items: SeedSpeciesOption[] }>(farmPath(farmId, "/seeds/species")),
     enabled,
+    staleTime: 60 * 60_000,
+  });
+}
+
+export function useSeedAttach(farmId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...seedsKey(farmId), "attach"],
+    queryFn: () => api.get<{ items: SeedAttachProposal[] }>(farmPath(farmId, "/seeds/attach")),
+    enabled,
+  });
+}
+
+export function useSeedCatalog(farmId: string, q: string) {
+  return useQuery({
+    queryKey: ["seed-catalog", farmId, q],
+    queryFn: () => api.get<{ items: SeedCatalogItem[] }>(farmPath(farmId, `/seeds/catalog?q=${encodeURIComponent(q)}`)),
+    enabled: q.trim().length >= 2,
     staleTime: 60 * 60_000,
   });
 }

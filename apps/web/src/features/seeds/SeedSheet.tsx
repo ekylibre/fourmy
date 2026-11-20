@@ -10,6 +10,7 @@ import {
   type ArticleOrganicWrite,
   type LotSeed,
   type SeedDetail,
+  type SeedAttachProposal,
   type SeedLotView,
   type SeedSheetSave,
   type SeedSheetWrite,
@@ -21,6 +22,7 @@ import { useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
 import { formatDate, formatNumber } from "../../app/labels";
 import { ErrorAlert, Loading } from "../../components/states";
+import { ProposalBadge, proposalLabel } from "./AttachModal";
 import { fmt, ORGANIC_LABELS, stockUnitLabel } from "./labels";
 import { seedsKey, useSeed, useSeedSpecies } from "./queries";
 
@@ -47,20 +49,27 @@ const optNum = (v: string | number) => (v === "" ? null : Number(v));
  * PMG et repère de l'espèce, statut bio, lots et leur PMG, interventions.
  * Modifiable par le responsable ; consultation pour les autres membres.
  */
-export function SeedSheet({ articleId, onClose }: { articleId: string | null; onClose: () => void }) {
+export function SeedSheet({ articleId, onClose, proposal = null }: { articleId: string | null; onClose: () => void; proposal?: SeedAttachProposal | null }) {
   const farm = useFarm();
   const { at } = useAt();
   const seed = useSeed(farm.id, articleId, at);
   return (
-    <Drawer opened={!!articleId} onClose={onClose} position="right" size="xl" title={seed.data?.name ?? "Semence"}>
+    <Drawer
+      opened={!!articleId}
+      onClose={onClose}
+      position="right"
+      size="xl"
+      title={seed.data?.name ?? "Semence"}
+      aria-label={seed.data ? `Fiche de ${seed.data.name}` : "Fiche de la semence"}
+    >
       {seed.isLoading && <Loading />}
       {seed.error && <ErrorAlert error={seed.error} />}
-      {seed.data && <SheetBody key={seed.data.articleId + seed.data.sheet?.updatedAt} detail={seed.data} />}
+      {seed.data && <SheetBody key={seed.data.articleId + seed.data.sheet?.updatedAt} detail={seed.data} proposal={proposal} />}
     </Drawer>
   );
 }
 
-function SheetBody({ detail }: { detail: SeedDetail }) {
+function SheetBody({ detail, proposal }: { detail: SeedDetail; proposal: SeedAttachProposal | null }) {
   const farm = useFarm();
   const { at } = useAt();
   const owner = farm.role === "owner";
@@ -94,7 +103,32 @@ function SheetBody({ detail }: { detail: SeedDetail }) {
 
   return (
     <Stack>
-      {detail.importedSpecies && !detail.sheet?.species && !w.isMixture && (
+      {proposal && owner && !w.species && !w.isMixture && (
+        <Alert color="lichen" title="Rattachement proposé">
+          <Group justify="space-between" gap="xs">
+            <Group gap={6}>
+              <Text size="sm">
+                {proposalLabel(proposal)}, d'après {proposal.reason}.
+              </Text>
+              <ProposalBadge p={proposal} />
+            </Group>
+            <Button
+              size="compact-sm"
+              variant="light"
+              onClick={() =>
+                pick(
+                  proposal.isMixture
+                    ? { isMixture: true, species: null, tgwG: null, tgwOrigin: null, tgwOn: null }
+                    : { species: proposal.species, varietyName: w.varietyName ?? proposal.varietyName, gnisCode: w.gnisCode ?? proposal.gnisCode },
+                )
+              }
+            >
+              Reprendre
+            </Button>
+          </Group>
+        </Alert>
+      )}
+      {!proposal && detail.importedSpecies && !detail.sheet?.species && !w.isMixture && (
         <Alert color="paille">
           Espèce lue dans le fichier importé : « {detail.importedSpecies} »{detail.importedGnis ? `, code GNIS ${detail.importedGnis}` : ""}. Choisissez-la dans la liste
           pour la rattacher.

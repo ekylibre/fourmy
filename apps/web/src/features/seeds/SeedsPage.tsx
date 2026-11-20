@@ -9,9 +9,11 @@ import { formatNumber } from "../../app/labels";
 import { useColumns, type ColumnDef } from "../../app/columns";
 import { ColumnPicker, pickColumns } from "../../components/ColumnPicker";
 import { ErrorAlert, Loading } from "../../components/states";
+import { AddSeedModal } from "./AddSeedModal";
+import { AttachModal } from "./AttachModal";
 import { SeedSheet } from "./SeedSheet";
 import { ORGANIC_LABELS, stockUnitLabel, tgwLabel } from "./labels";
-import { useSeeds } from "./queries";
+import { useSeedAttach, useSeeds } from "./queries";
 
 const COLUMNS: ColumnDef[] = [
   { key: "name", label: "Semence", required: true },
@@ -44,6 +46,10 @@ export function SeedsPage() {
   const list = useSeeds(farm.id, at);
   const columns = useColumns("seeds", COLUMNS);
   const [selected, setSelected] = useState<string | null>(null);
+  const owner = farm.role === "owner";
+  const proposals = useSeedAttach(farm.id, owner);
+  const [adding, setAdding] = useState(false);
+  const [attaching, setAttaching] = useState(false);
   const [query, setQuery] = useState("");
   const [species, setSpecies] = useState<string | null>(null);
   const [filters, setFilters] = useState<string[]>([]);
@@ -84,8 +90,24 @@ export function SeedsPage() {
             doses. Il se lit sur l'étiquette du sac ; à défaut, Fourmy propose un repère par espèce d'après Arvalis ou Terres Inovia, à confirmer.
           </Text>
         </div>
-        <ColumnPicker columns={columns} />
+        <Group gap="xs">
+          {owner && <Button onClick={() => setAdding(true)}>Ajouter une semence</Button>}
+          <ColumnPicker columns={columns} />
+        </Group>
       </Group>
+      {owner && !!proposals.data?.items.length && (
+        <Alert color="lichen" title="Rattacher au référentiel">
+          <Group justify="space-between" gap="xs">
+            <Text size="sm">
+              {proposals.data.items.length} semence{proposals.data.items.length > 1 ? "s" : ""} peu{proposals.data.items.length > 1 ? "vent" : "t"} être rattachée
+              {proposals.data.items.length > 1 ? "s" : ""} à leur espèce et à leur variété, dont {proposals.data.items.filter((p) => p.sure).length} par leur code GNIS.
+            </Text>
+            <Button size="compact-sm" variant="light" onClick={() => setAttaching(true)}>
+              Voir et rattacher
+            </Button>
+          </Group>
+        </Alert>
+      )}
       {toComplete > 0 && (
         <Alert color="paille">
           {toComplete} semence{toComplete > 1 ? "s" : ""} utilisée{toComplete > 1 ? "s" : ""} en {year} {toComplete > 1 ? "ont" : "a"} une fiche à compléter : les
@@ -211,7 +233,7 @@ export function SeedsPage() {
                       Mélange ?
                     </Badge>
                   )}
-                  {(s.flags.length > 0 || s.looksLikeMixture) && farm.role === "owner" && (
+                  {(s.flags.length > 0 || s.looksLikeMixture) && owner && (
                     <Button
                       size="compact-xs"
                       variant="subtle"
@@ -230,7 +252,17 @@ export function SeedsPage() {
           columns,
         )}
       />
-      <SeedSheet articleId={selected} onClose={() => setSelected(null)} />
+      <SeedSheet articleId={selected} onClose={() => setSelected(null)} proposal={proposals.data?.items.find((p) => p.articleId === selected) ?? null} />
+      {adding && (
+        <AddSeedModal
+          onClose={() => setAdding(false)}
+          onCreated={(id) => {
+            setAdding(false);
+            setSelected(id);
+          }}
+        />
+      )}
+      {attaching && proposals.data && <AttachModal proposals={proposals.data.items} onClose={() => setAttaching(false)} />}
     </Stack>
   );
 }

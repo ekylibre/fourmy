@@ -12,6 +12,7 @@
     "start": "node dist/server.js",
     "user:create": "node dist/cli/create-user.js",
     "seed:dev": "node dist/cli/seed-dev.js",
+    "seeds:attach": "node dist/cli/seeds-attach.js",
     "worker": "node dist/worker.js"
   },
   "dependencies": {
