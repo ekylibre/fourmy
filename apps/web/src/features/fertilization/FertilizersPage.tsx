@@ -26,7 +26,7 @@ import { formatDate } from "../../app/labels";
 import { ErrorAlert, Loading } from "../../components/states";
 import { compositionLabel } from "./fertilization";
 
-const ORIGIN_COLOR: Record<CompositionOrigin, string> = { proposed: "paille", migrated: "ardoise", confirmed: "lichen", analysis: "lichen" };
+const ORIGIN_COLOR: Record<CompositionOrigin, string> = { proposed: "paille", migrated: "ardoise", confirmed: "lichen", analysis: "lichen", imported: "ardoise" };
 
 /**
  * Fertilisants de la ferme (lot AE, FR-FERT-5 à 7) : composition (N, P2O5,

@@ -15,7 +15,8 @@ export function useFertilizers(farmId: string, enabled = true) {
   });
 }
 
-const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+/** Première lettre en minuscule ; une origine inconnue de l'interface ne fait pas planter la fiche. */
+const lowerFirst = (s: string | undefined) => (s ? s.charAt(0).toLowerCase() + s.slice(1) : "origine inconnue");
 
 const MISSING: Record<NitrogenMissing, string> = {
   composition: "teneur en azote inconnue",
