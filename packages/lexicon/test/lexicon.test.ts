@@ -58,7 +58,10 @@ describe("source des paquets", () => {
 const url = process.env.DATABASE_URL;
 
 /** Faux serveur de paquets : deux versions, de petits CSV gzip. */
-function fakeServer(phytoVersion: string, { agroedi = false, apiKey }: { agroedi?: boolean; apiKey?: string } = {}) {
+/** Petit triangle (WKB hexadécimal, comme les CSV des zonages Lexicon). */
+const WKB = "0106000020e61000000100000001030000000100000004000000000000000000e03f666666666666464052b81e85eb51e03f666666666666464052b81e85eb51e03f48e17a14ae674640000000000000e03f6666666666664640";
+
+function fakeServer(phytoVersion: string, { agroedi = false, zones = false, apiKey }: { agroedi?: boolean; zones?: boolean; apiKey?: string } = {}) {
   const csv = (lines: string[]) => gzipSync(lines.join("\n") + "\n");
   const files: Record<string, string | Buffer> = {
     "index.json": JSON.stringify({
@@ -68,6 +71,7 @@ function fakeServer(phytoVersion: string, { agroedi = false, apiKey }: { agroedi
         productions: { current: "pr1", versions: ["pr1"] },
         agricultural_pictures: { current: "pi1", versions: ["pi1"] },
         ...(agroedi ? { agroedi: { current: "a1", versions: ["a1"] } } : {}),
+        ...(zones ? { protected_water_zones: { current: "w1", versions: ["w1"] }, protected_natural_zones: { current: "n1", versions: ["n1"] } } : {}),
       },
     }),
     [`phytosanitary/${phytoVersion}/manifest.json`]: JSON.stringify({
@@ -184,6 +188,16 @@ function fakeServer(phytoVersion: string, { agroedi = false, apiKey }: { agroedi
     ],
   });
   const requested: string[] = [];
+  if (zones) {
+    files["protected_water_zones/w1/structure.sql"] = `CREATE TABLE registered_protected_water_zones (id character varying NOT NULL, administrative_zone character varying,
+      creator_name character varying, name character varying, updated_on date, shape postgis.geometry(MultiPolygon, 4326) NOT NULL, centroid postgis.geometry(Point, 4326));`;
+    files["protected_water_zones/w1/data/w_0.csv.gz"] = csv([`16,ADOUR-GARONNE,,BAC du Moulin,2024-08-23,${WKB},`]);
+    files["protected_water_zones/w1/manifest.json"] = JSON.stringify({ name: "protected_water_zones", version: "w1", tables: [{ name: "registered_protected_water_zones", rows: 1, files: [{ path: "data/w_0.csv.gz" }] }] });
+    files["protected_natural_zones/n1/structure.sql"] = `CREATE TABLE registered_natural_zones (id character varying NOT NULL, name character varying, nature character varying NOT NULL,
+      shape postgis.geometry(MultiPolygon, 4326) NOT NULL, centroid postgis.geometry(Point, 4326));`;
+    files["protected_natural_zones/n1/data/n_0.csv.gz"] = csv([`FR7200700,Vallée de la Garonne,sic,${WKB},`]);
+    files["protected_natural_zones/n1/manifest.json"] = JSON.stringify({ name: "protected_natural_zones", version: "n1", tables: [{ name: "registered_natural_zones", rows: 1, files: [{ path: "data/n_0.csv.gz" }] }] });
+  }
   const fetchImpl = (async (input: string | URL, init?: RequestInit) => {
     const path = String(input).replace("http://lexicon.test/", "");
     requested.push(path);
@@ -204,6 +218,25 @@ class Rollback extends Error {}
 describe.skipIf(!url)("synchro du référentiel (intégration)", { timeout: 150_000 }, () => {
   const sql = postgres(url!, { max: 1, onnotice: () => {} });
 
+  it("zonages de l'assolement : aires de captage et Natura 2000, s'ils sont publiés", async () => {
+    await sql
+      .begin(async (tx) => {
+        const reports = await syncLexiconIn(tx, { base: "http://lexicon.test", fetchImpl: fakeServer("v1", { zones: true }).fetchImpl, force: true });
+        expect(reports.filter((r) => r.name.startsWith("protected_"))).toEqual([
+          { name: "protected_water_zones", version: "w1", status: "loaded", rows: 1 },
+          { name: "protected_natural_zones", version: "n1", status: "loaded", rows: 1 },
+        ]);
+        expect(await tx`SELECT id, basin, name, updated_on::text, ST_GeometryType(shape) AS t FROM lexicon_water_catchments`).toEqual([
+          { id: "16", basin: "ADOUR-GARONNE", name: "BAC du Moulin", updated_on: "2024-08-23", t: "ST_MultiPolygon" },
+        ]);
+        expect(await tx`SELECT id, name, nature FROM lexicon_natura2000`).toEqual([{ id: "FR7200700", name: "Vallée de la Garonne", nature: "sic" }]);
+        throw new Rollback();
+      })
+      .catch((e) => {
+        if (!(e instanceof Rollback)) throw e;
+      });
+  });
+
   it("charge produits, usages, ensembles et taxonomie ; une version connue n'est pas retéléchargée", async () => {
     await sql
       .begin(async (tx) => {
@@ -215,6 +248,8 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", { timeout: 150_
           { name: "productions", version: "pr1", status: "loaded", rows: 6 },
           { name: "agricultural_pictures", version: "pi1", status: "loaded", rows: 2 },
           { name: "agroedi", version: "", status: "absent", rows: 0 },
+          { name: "protected_water_zones", version: "", status: "absent", rows: 0 },
+          { name: "protected_natural_zones", version: "", status: "absent", rows: 0 },
         ]);
         expect(await tx`SELECT reference_name, agroedi_crop_code FROM lexicon_productions ORDER BY 1`).toEqual([
           { reference_name: "grain_corn", agroedi_crop_code: "ZMA" },
@@ -252,7 +287,7 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", { timeout: 150_
         // Même version : rien n'est retéléchargé.
         const again = fakeServer("v1");
         const second = await syncLexiconIn(tx, { base: "http://lexicon.test", fetchImpl: again.fetchImpl });
-        expect(second.map((r) => r.status)).toEqual(["up-to-date", "up-to-date", "up-to-date", "up-to-date", "absent"]);
+        expect(second.map((r) => r.status)).toEqual(["up-to-date", "up-to-date", "up-to-date", "up-to-date", "absent", "absent", "absent"]);
         expect(again.requested).toEqual(["index.json"]);
         throw new Rollback();
       })

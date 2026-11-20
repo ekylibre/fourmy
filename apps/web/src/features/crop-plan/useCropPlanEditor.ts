@@ -54,10 +54,28 @@ export function markFallow(draft: CropPlanDraft, keys: CropPlanParcelKey[]): Cro
   };
 }
 
-/** Retire toutes les cultures prévues des parcelles. */
+/** Retire toutes les cultures prévues des parcelles, couverts compris. */
 export function clearParcels(draft: CropPlanDraft, keys: CropPlanParcelKey[]): CropPlanDraft {
   const set = new Set<string>(keys);
-  return { ...draft, assignments: draft.assignments.filter((a) => !set.has(a.key)), fallow: draft.fallow.filter((f) => !set.has(f.key)) };
+  return {
+    ...draft,
+    assignments: draft.assignments.filter((a) => !set.has(a.key)),
+    fallow: draft.fallow.filter((f) => !set.has(f.key)),
+    covers: draft.covers.filter((c) => !set.has(c.key)),
+  };
+}
+
+export type CoverInput = Omit<CropPlanDraft["covers"][number], "id" | "key" | "coverId">;
+
+/** Couvert d'interculture après la culture : un par parcelle, il remplace l'éventuel précédent (sa fiche du cahier est gardée). */
+export function setCover(draft: CropPlanDraft, keys: CropPlanParcelKey[], cover: CoverInput): CropPlanDraft {
+  const set = new Set<string>(keys);
+  const kept = draft.covers.filter((c) => !set.has(c.key));
+  const replaced = keys.map((key) => {
+    const before = draft.covers.find((c) => c.key === key);
+    return { ...cover, id: before?.id ?? newId(), key, ...(before?.coverId ? { coverId: before.coverId } : {}) };
+  });
+  return { ...draft, covers: [...kept, ...replaced] };
 }
 
 export function useCropPlanEditor(farmId: string, year: number, plan: CropPlanView, context: CropPlanContext, editable: boolean) {

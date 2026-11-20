@@ -122,7 +122,7 @@ describe.skipIf(!url)("assolement (intégration)", () => {
     expect(preview.version).toBeNull();
     expect(preview.blockers.map((b) => b.code)).toEqual(["unassigned"]);
     expect(preview.changes.map((c) => c.kind)).toEqual(["campaign.create", "production.create"]);
-    expect(preview.sections.map((s) => s.id)).toEqual(["pac", "agronomy", "certification"]);
+    expect(preview.sections.map((s) => s.id)).toEqual(["pac", "agronomy", "certification", "regulatory"]);
     const agro = preview.sections.find((s) => s.id === "agronomy")!;
     expect(agro.findings[0]!.message).toContain("Le Champ : crucifères");
     // Sans dryRun, des bloquants : rien n'est appliqué.
@@ -273,6 +273,49 @@ describe.skipIf(!url)("assolement (intégration)", () => {
     const west = ctx.parcels.find((p) => p.name === "Le Champ ouest")!;
     expect(west).toMatchObject({ validFrom: "2026-08-01", lastStoppedOn: "2027-07-05" });
     expect(ctx.history[west.id]).toMatchObject({ "2025": { main: "CZH" }, "2026": { main: "BTH" }, "2027": { main: "CZH" } });
+  });
+
+  it("zonages : aire de captage et site Natura 2000 de Lexicon, point d'eau", async () => {
+    // Le Bas (c) : x 0,504 à 0,5053 ; captage sur sa moitié ouest, Natura 2000 sur toute la parcelle.
+    await sql`INSERT INTO lexicon_water_catchments (id, basin, name, shape)
+              VALUES ('fourmy-test-bac', 'ADOUR-GARONNE', 'BAC d''essai', ST_GeomFromText('MULTIPOLYGON(((0.504 44.799,0.50465 44.799,0.50465 44.802,0.504 44.802,0.504 44.799)))', 4326))`;
+    await sql`INSERT INTO lexicon_natura2000 (id, name, nature, shape)
+              VALUES ('fourmy-test-n2000', 'Vallée d''essai', 'zps', ST_GeomFromText('MULTIPOLYGON(((0.5035 44.799,0.506 44.799,0.506 44.802,0.5035 44.802,0.5035 44.799)))', 4326))`;
+    try {
+      const ctx = await json<CropPlanContext>(send("GET", "/crop-plans/2027/context"));
+      const z = ctx.zones[parcels.c]!;
+      expect(z.catchments).toHaveLength(1);
+      expect(z.catchments[0]!.name).toBe("BAC d'essai");
+      expect(z.catchments[0]!.share).toBeCloseTo(0.5, 1);
+      expect(z.natura2000).toEqual([{ name: "Vallée d'essai", nature: "zps", share: expect.closeTo(1, 2) }]);
+      // Contrôles : le blé ou le maïs prévu sur Le Bas est en aire de captage.
+      const reopened = await json<CropPlanView>(send("POST", "/crop-plans/2027/reopen"));
+      const preview = await json<CropPlanValidation>(send("POST", "/crop-plans/2027/validate?dryRun=1", { revision: reopened.revision }));
+      const reg = preview.sections.find((s) => s.id === "regulatory")!;
+      expect(reg.findings.map((f) => f.ruleId)).toEqual(["reg.catchment", "reg.natura2000"]);
+      await send("DELETE", "/crop-plans/2027/draft");
+    } finally {
+      await sql`DELETE FROM lexicon_water_catchments WHERE id = 'fourmy-test-bac'`;
+      await sql`DELETE FROM lexicon_natura2000 WHERE id = 'fourmy-test-n2000'`;
+    }
+  });
+
+  it("couverts d'interculture : enregistrés dans le cahier de fertilisation (campagne suivante), repris à la réouverture, retirés", async () => {
+    const reopened = await json<CropPlanView>(send("POST", "/crop-plans/2027/reopen"));
+    const cover = { id: "cv1", key: `p:${parcels.c}`, kind: "sown", family: "cruciferes", species: "moutarde blanche", sownOn: "2027-08-20", destroyedOn: "2028-02-20" };
+    const saved = await json<CropPlanView>(send("PUT", "/crop-plans/2027/draft", { revision: reopened.revision, draft: { ...reopened.draft, covers: [cover] } }));
+    const done = await json<CropPlanValidation>(send("POST", "/crop-plans/2027/validate", { revision: saved.revision }));
+    expect(done.blockers).toEqual([]);
+    expect(done.changes.map((c) => c.kind)).toEqual(["cover.create"]);
+    const rows1 = await sql`SELECT campaign, kind, family, species, sown_on::text FROM cover_crops WHERE land_parcel_id = ${parcels.c}`;
+    expect(rows1).toEqual([{ campaign: 2028, kind: "sown", family: "cruciferes", species: "moutarde blanche", sown_on: "2027-08-20" }]);
+
+    const again = await json<CropPlanView>(send("POST", "/crop-plans/2027/reopen"));
+    expect(again.draft.covers).toEqual([expect.objectContaining({ key: `p:${parcels.c}`, species: "moutarde blanche", coverId: expect.any(String) })]);
+    const s2 = await json<CropPlanView>(send("PUT", "/crop-plans/2027/draft", { revision: again.revision, draft: { ...again.draft, covers: [] } }));
+    const removed = await json<CropPlanValidation>(send("POST", "/crop-plans/2027/validate", { revision: s2.revision }));
+    expect(removed.changes.map((c) => c.kind)).toEqual(["cover.delete"]);
+    expect(await sql`SELECT id FROM cover_crops WHERE land_parcel_id = ${parcels.c}`).toEqual([]);
   });
 
   it("assolement jamais validé : l'abandon le supprime", async () => {

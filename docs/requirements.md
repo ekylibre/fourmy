@@ -223,6 +223,9 @@ conception : [`teledetection-design.md`](teledetection-design.md).
   interventions.
   *Réalisé ; format réglementaire (OEPP, BBCH, SIRET) le 2026-11-10 ; export PDF à venir.*
 - **FR-REG-2 (M)** **PAC** : parcellaire et assolement déclaratifs.
+  *Assolement prévisionnel réalisé le 2026-11-20 (temps 1) : préparation,
+  découpe et fusion datées, contrôle BCAE 7 de la campagne préparée,
+  validation des productions (`docs/assolement.md`).*
 - **FR-REG-3 (M)** **Fertilisation** : plan prévisionnel et cahier
   d'enregistrement, notamment en zone vulnérable nitrates.
   Exigences détaillées (2026-11-11) :

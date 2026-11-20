@@ -13,7 +13,7 @@ import { ErrorAlert, Loading } from "../../components/states";
 import { MapBoundary } from "../../components/MapBoundary";
 import { ControlLight } from "../certification/controls";
 import { CropPlanMap, type CropPlanMapParcel } from "./CropPlanMap";
-import { AssignPanel, ChecksPanel, HistoryPanel, SummaryPanel, ValidateModal } from "./panels";
+import { AssignPanel, ChecksPanel, HistoryPanel, SettingsPanel, SummaryPanel, ValidateModal } from "./panels";
 import { draftShapes, ParcelTools, PendingOperations, splitOperation } from "./operations";
 import { cropPlanKeys, useCropPlan, useCropPlanContext } from "./queries";
 import { useCropPlanEditor, type SaveState } from "./useCropPlanEditor";
@@ -249,6 +249,7 @@ function Editor({ farmId, year, plan, context, owner, nav }: { farmId: string; y
                 Contrôles
               </Tabs.Tab>
               <Tabs.Tab value="history">Historique</Tabs.Tab>
+              {owner && <Tabs.Tab value="settings">Réglages</Tabs.Tab>}
             </Tabs.List>
             <Tabs.Panel value="assign" pt="sm">
               <AssignPanel editor={editor} context={context} selected={selected} onSelect={setSelected} editable={editable} />
@@ -272,6 +273,11 @@ function Editor({ farmId, year, plan, context, owner, nav }: { farmId: string; y
             <Tabs.Panel value="history" pt="sm">
               <HistoryPanel farmId={farmId} year={year} versions={plan.versions} editor={editor} context={context} />
             </Tabs.Panel>
+            {owner && (
+              <Tabs.Panel value="settings" pt="sm">
+                <SettingsPanel farmId={farmId} year={year} context={context} />
+              </Tabs.Panel>
+            )}
           </Tabs>
         </Grid.Col>
       </Grid>

@@ -131,6 +131,15 @@ Branche `feat/crop-plan-as4-regulatory`. Dépend d'AS3 (zones des morceaux).
 5. **Documentation** : `docs/assolement.md` (mode d'emploi), README (état), `docs/requirements.md`, `claudedocs/points_ouverts.md` (temps 2 et 3, repères à relire).
 6. **Tests** : captage et Natura 2000 sur des formes de test ; couvert créé à la validation et vu dans le cahier ; réglages appliqués aux contrôles ; e2e complet.
 
+*Réalisé le 20/11/2026* :
+- Lexicon : jeux `protected_water_zones` (aires d'alimentation de captage des agences de l'eau, 1 585) et `protected_natural_zones` (Natura 2000, SIC et ZPS, 1 762) dans `lexicon_water_catchments` et `lexicon_natura2000` (migration 0072), chargés s'ils figurent à l'index ; chargement réel vérifié en local.
+- Contexte : part de chaque parcelle en captage et en Natura 2000, point d'eau le plus proche (BD TOPO, 50 m) ; les morceaux d'une découpe reprennent les zonages de leur parcelle d'origine.
+- Constats (jamais bloquants) : ZNT (culture traitée à moins de 5 m d'un point d'eau), captage (culture traitée en aire d'alimentation), Natura 2000 (prairie permanente retournée : à vérifier ; sinon information). Pas de liste de « cultures à risque » faute de source.
+- Couverts d'interculture : au format du cahier de fertilisation (nature, famille, espèces, dates), un par parcelle, enregistrés à la validation pour la campagne suivante ; repris à la réouverture.
+- Réglages : onglet de l'écran (responsable).
+- Documentation : `docs/assolement.md`, README, `docs/requirements.md` (FR-REG-2), `claudedocs/points_ouverts.md` (thème 17, points 122 à 128).
+- e2e : pas de nouveau parcours (zonages absents de la ferme pilote) ; couverts et réglages couverts par les tests web et API.
+
 ## Ordonnancement
 
 ```mermaid

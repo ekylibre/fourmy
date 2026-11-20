@@ -111,6 +111,36 @@ describe("summarizeCropPlan", () => {
   });
 });
 
+describe("diffCropPlan : couverts d'interculture", () => {
+  const cover = (id: string, key: string, extra: Partial<CropPlanDraft["covers"][number]> = {}): CropPlanDraft["covers"][number] => ({
+    id,
+    key: key as `p:${string}`,
+    kind: "sown",
+    family: "cruciferes",
+    species: "moutarde",
+    sownOn: "2027-08-20",
+    destroyedOn: "2028-02-20",
+    ...extra,
+  });
+  const existing = [{ id: uuid(201), landParcelId: "b", kind: "sown", family: "cruciferes", species: "moutarde", sownOn: "2027-08-20", destroyedOn: "2028-02-20" }];
+
+  it("crée, garde, modifie, supprime ; un seul couvert par parcelle", () => {
+    const draft: CropPlanDraft = {
+      ...emptyDraft(2027),
+      assignments: [assign("1", "p:a", 1), assign("2", "p:b", 1), assign("3", "p:c", 1)],
+      covers: [cover("x", "p:a"), cover("y", "p:b", { coverId: uuid(201) })],
+    };
+    const d = diffCropPlan(draft, resolveParcels(base, draft), [], { campaignExists: true }, existing);
+    expect(d.changes.filter((c) => c.kind.startsWith("cover"))).toEqual([{ kind: "cover.create", coverKey: "x", key: "p:a", species: "moutarde" }]);
+    const changed = { ...draft, covers: [cover("y", "p:b", { coverId: uuid(201), species: "moutarde blanche" })] };
+    expect(diffCropPlan(changed, resolveParcels(base, changed), [], { campaignExists: true }, existing).changes.filter((c) => c.kind.startsWith("cover")).map((c) => c.kind)).toEqual(["cover.update"]);
+    const removed = { ...draft, covers: [] };
+    expect(diffCropPlan(removed, resolveParcels(base, removed), [], { campaignExists: true }, existing).changes.filter((c) => c.kind.startsWith("cover")).map((c) => c.kind)).toEqual(["cover.delete"]);
+    const twice = { ...draft, covers: [cover("x", "p:a"), cover("z", "p:a")] };
+    expect(diffCropPlan(twice, resolveParcels(base, twice), [], { campaignExists: true }).blockers.map((b) => b.message)).toContain("Un seul couvert d'interculture par parcelle.");
+  });
+});
+
 describe("diffCropPlan", () => {
   const existing: ExistingProduction[] = [
     { id: uuid(101), landParcelId: "a", activityId: uuid(1), role: "main", startedOn: null, stoppedOn: null, hasDoneInterventions: false },
@@ -366,8 +396,8 @@ describe("bcae7Parcels", () => {
       ],
       fallow: [{ key: "p:c" }],
       covers: [
-        { id: "c1", key: "p:b", species: ["moutarde"], kind: "sown", sownOn: "2027-10-20", destroyedOn: "2028-02-20" },
-        { id: "c2", key: "p:a", species: ["phacélie"], kind: "sown", sownOn: "2027-11-30", destroyedOn: null },
+        { id: "c1", key: "p:b", species: "moutarde", kind: "sown", family: "cruciferes", sownOn: "2027-10-20", destroyedOn: "2028-02-20" },
+        { id: "c2", key: "p:a", species: "phacélie", kind: "sown", family: "hydrophyllacees", sownOn: "2027-11-30", destroyedOn: null },
       ],
     };
     const history = new Map([["a", { 2026: y("BTH") }]]);
