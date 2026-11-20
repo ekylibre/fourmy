@@ -5,3 +5,4 @@ export * from "./diff.js";
 export * from "./history.js";
 export * from "./checks/index.js";
 export * from "./context.js";
+export * from "./operations.js";

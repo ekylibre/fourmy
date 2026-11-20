@@ -192,18 +192,6 @@ describe.skipIf(!url)("assolement (intégration)", () => {
     expect(list.versions.map((v) => [v.version, v.reason])).toEqual([[2, "sortie d'hiver"], [1, null]]);
   });
 
-  it("découpes et fusions : pas encore appliquées (bloquant)", async () => {
-    const reopened = await json<CropPlanView>(send("POST", "/crop-plans/2027/reopen"));
-    const square = { type: "Polygon", coordinates: [[[0.5, 44.8], [0.5013, 44.8], [0.5013, 44.8009], [0.5, 44.8]]] };
-    const draft = {
-      ...reopened.draft,
-      operations: [{ kind: "split", source: `p:${parcels.a}`, effectiveOn: "2026-08-01", pieces: [{ key: "n:a1", name: "A1", shape: square, areaM2: 50000 }, { key: "n:a2", name: "A2", shape: square, areaM2: 50000 }] }],
-    };
-    const saved = await json<CropPlanView>(send("PUT", "/crop-plans/2027/draft", { revision: reopened.revision, draft }));
-    const preview = await json<CropPlanValidation>(send("POST", "/crop-plans/2027/validate?dryRun=1", { revision: saved.revision }));
-    expect(preview.blockers.map((b) => b.code)).toContain("operation");
-  });
-
   it("abandon du brouillon : retour à la version validée ; réglages de l'assolement", async () => {
     const back = await json<CropPlanView>(send("DELETE", "/crop-plans/2027/draft"));
     expect(back).toMatchObject({ status: "validated", currentVersion: 2 });
@@ -213,6 +201,78 @@ describe.skipIf(!url)("assolement (intégration)", () => {
     expect((await send("PUT", "/settings/crop-plan", { returnIntervals: { cruciferes: 3 } }, worker)).status).toBe(403);
     expect(await json(send("PUT", "/settings/crop-plan", { returnIntervals: { cruciferes: 3 } }))).toMatchObject({ returnIntervals: { cruciferes: 3 } });
     expect((await json<CropPlanContext>(send("GET", "/crop-plans/2027/context"))).settings.returnIntervals).toEqual({ cruciferes: 3 });
+  });
+
+  // Le Champ (a) : x 0,5 à 0,5013 ; coupé en deux à x = 0,50065.
+  const half = (x0: number, x1: number) => ({ type: "Polygon", coordinates: [[[x0, 44.8], [x1, 44.8], [x1, 44.8009], [x0, 44.8009], [x0, 44.8]]] });
+
+  it("découpe : date d'effet après une intervention réalisée refusée ; fusion AB et non AB refusée", async () => {
+    const reopened = await json<CropPlanView>(send("POST", "/crop-plans/2027/reopen"));
+    // La Côte (b) porte un semis réalisé le 20/04/2027 : découpe au 01/01/2027 refusée.
+    const bx = 0.502;
+    const draft = {
+      ...reopened.draft,
+      operations: [
+        { kind: "split", source: `p:${parcels.b}`, effectiveOn: "2027-01-01", pieces: [{ key: "n:b1", name: "La Côte haut", shape: half(bx, bx + 0.00065), areaM2: 50000 }, { key: "n:b2", name: "La Côte bas", shape: half(bx + 0.00065, bx + 0.0013), areaM2: 50000 }] },
+        { kind: "merge", sources: [`p:${parcels.a}`, `p:${parcels.c}`], effectiveOn: "2026-08-01", result: { key: "n:ac", name: "Grande pièce", shape: half(0.5, 0.5053), areaM2: 200000 } },
+      ],
+    };
+    const saved = await json<CropPlanView>(send("PUT", "/crop-plans/2027/draft", { revision: reopened.revision, draft }));
+    const preview = await json<CropPlanValidation>(send("POST", "/crop-plans/2027/validate?dryRun=1", { revision: saved.revision }));
+    const codes = preview.blockers.map((b) => b.code);
+    expect(codes).toContain("effective-date"); // semis réalisé sur La Côte après le 01/01/2027
+    expect(codes).toContain("certification"); // Le Bas est AB, Le Champ non
+    expect(codes).toContain("geometry"); // Le Champ et Le Bas ne se touchent pas : la forme fusionnée ne colle pas
+    expect(preview.blockers.find((b) => b.code === "effective-date")!.message).toContain("1 intervention(s) réalisée(s)");
+    await send("DELETE", "/crop-plans/2027/draft");
+  });
+
+  it("découpe validée : nouvelles parcelles datées, filiation, productions sur les morceaux, historique hérité", async () => {
+    const reopened = await json<CropPlanView>(send("POST", "/crop-plans/2027/reopen"));
+    const draft = {
+      ...reopened.draft,
+      operations: [{ kind: "split", source: `p:${parcels.a}`, effectiveOn: "2026-08-01", pieces: [{ key: "n:a1", name: "Le Champ ouest", shape: half(0.5, 0.50065), areaM2: 50000 }, { key: "n:a2", name: "Le Champ est", shape: half(0.50065, 0.5013), areaM2: 50000 }] }],
+      // Les cultures de Le Champ passent sur les morceaux : colza à l'ouest, maïs à l'est.
+      assignments: [
+        ...reopened.draft.assignments.filter((a) => a.key !== `p:${parcels.a}`),
+        assign("n:a1", rapeseed, { startedOn: "2026-08-25", stoppedOn: "2027-07-05" }),
+        assign("n:a2", maize, { startedOn: "2027-04-20" }),
+      ],
+    };
+    const saved = await json<CropPlanView>(send("PUT", "/crop-plans/2027/draft", { revision: reopened.revision, draft }));
+    // Une culture qui commence avant la date d'effet est refusée.
+    const early = { ...draft, operations: [{ ...draft.operations[0]!, effectiveOn: "2026-09-01" }] };
+    const saved2 = await json<CropPlanView>(send("PUT", "/crop-plans/2027/draft", { revision: saved.revision, draft: early }));
+    const refused = await json<CropPlanValidation>(send("POST", "/crop-plans/2027/validate?dryRun=1", { revision: saved2.revision }));
+    expect(refused.blockers.map((b) => b.message).join(" ")).toContain("avant la date d'effet");
+
+    const ok = await json<CropPlanView>(send("PUT", "/crop-plans/2027/draft", { revision: saved2.revision, draft }));
+    const done = await json<CropPlanValidation>(send("POST", "/crop-plans/2027/validate", { revision: ok.revision, reason: "découpe de Le Champ" }));
+    expect(done.blockers).toEqual([]);
+    expect(done.version).toBe(3);
+
+    const pieces = await sql`SELECT lp.id, lp.name, lower(v.valid)::date::text AS from_day, round(v.area_m2) AS area
+                             FROM land_parcels lp JOIN land_parcel_versions v ON v.land_parcel_id = lp.id
+                             WHERE lp.farm_id = ${farmId} AND lp.name LIKE 'Le Champ %' ORDER BY lp.name`;
+    expect(pieces.map((p) => [p.name, p.from_day])).toEqual([["Le Champ est", "2026-08-01"], ["Le Champ ouest", "2026-08-01"]]);
+    const [parent] = await sql`SELECT upper(valid)::date::text AS until FROM land_parcel_versions WHERE land_parcel_id = ${parcels.a}`;
+    expect(parent!.until).toBe("2026-08-01");
+    const lineage = await sql`SELECT parent_id, kind, round(share::numeric, 2)::float8 AS share FROM land_parcel_lineage WHERE farm_id = ${farmId}`;
+    expect(lineage).toHaveLength(2);
+    expect(lineage.every((l) => l.parent_id === parcels.a && l.kind === "split" && l.share === 1)).toBe(true);
+    const prods = await sql`SELECT lp.name, p.activity_id FROM productions p JOIN campaigns c ON c.id = p.campaign_id JOIN land_parcels lp ON lp.id = p.land_parcel_id
+                            WHERE c.farm_id = ${farmId} AND c.year = 2027 AND lp.name LIKE 'Le Champ%' ORDER BY lp.name`;
+    expect(prods.map((p) => [p.name, p.activity_id])).toEqual([["Le Champ est", maize], ["Le Champ ouest", rapeseed]]);
+    // Instantané : les morceaux portent leur identifiant définitif.
+    const v3 = await json<CropPlanVersionView>(send("GET", "/crop-plans/2027/versions/3"));
+    expect(v3.snapshot.assignments.some((a) => a.key.startsWith("n:"))).toBe(false);
+
+    // Campagne 2028 : les morceaux remplacent Le Champ et héritent de son historique.
+    const ctx = await json<CropPlanContext>(send("GET", "/crop-plans/2028/context"));
+    expect(ctx.parcels.map((p) => p.name)).toEqual(["La Côte", "Le Bas", "Le Champ est", "Le Champ ouest"]);
+    const west = ctx.parcels.find((p) => p.name === "Le Champ ouest")!;
+    expect(west).toMatchObject({ validFrom: "2026-08-01", lastStoppedOn: "2027-07-05" });
+    expect(ctx.history[west.id]).toMatchObject({ "2025": { main: "CZH" }, "2026": { main: "BTH" }, "2027": { main: "CZH" } });
   });
 
   it("assolement jamais validé : l'abandon le supprime", async () => {

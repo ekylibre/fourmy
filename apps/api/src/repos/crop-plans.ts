@@ -17,7 +17,7 @@ import {
   type CropPlanView,
   type CropPlanYearCrop,
 } from "@fourmy/contracts";
-import { checkCropPlan, cropPlanCheckInput, diffCropPlan, emptyDraft, parcelKeyOf, resolveParcels, type ExistingProduction } from "@fourmy/domain";
+import { checkCropPlan, cropPlanCheckInput, diffCropPlan, emptyDraft, operationBlockers, parcelKeyOf, resolveParcels, type ExistingProduction } from "@fourmy/domain";
 import { Conflict, NotFound } from "../routes/helpers.js";
 import { natureOf } from "./activities.js";
 import { getCertificationSettings } from "./certification-controls.js";
@@ -25,8 +25,8 @@ import { getCertificationSettings } from "./certification-controls.js";
 /**
  * Assolement prévisionnel, lot AS2a (claudedocs/conception_assolement.md §3,
  * §5, §6) : brouillon d'une campagne, contexte des contrôles, validation
- * (productions), réouverture, versions. Découpes et fusions : lot AS3 ;
- * couverts : lot AS4.
+ * (productions, découpes et fusions de parcelles), réouverture, versions.
+ * Couverts : lot AS4.
  */
 
 const rows = async <T>(tx: Tx, q: SQL) => (await tx.execute(q)) as unknown as T[];
@@ -71,12 +71,14 @@ export async function putCropPlanSettings(db: Database, farmId: string, body: Cr
 
 /** Parcellaire de la campagne : chaque parcelle dans sa dernière version qui recouvre l'année. */
 async function baseParcels(tx: Tx, year: number) {
-  return rows<{ id: string; name: string; area_m2: number; shape: string }>(
+  return rows<{ id: string; name: string; area_m2: number; shape: string; valid_from: string; last_stopped_on: string | null }>(
     tx,
-    sql`SELECT lp.id, lp.name, v.area_m2::float8 AS area_m2, ST_AsGeoJSON(v.shape) AS shape
+    sql`SELECT lp.id, lp.name, v.area_m2::float8 AS area_m2, ST_AsGeoJSON(v.shape) AS shape, v.valid_from,
+               (SELECT max(p.stopped_on)::text FROM productions p JOIN campaigns c ON c.id = p.campaign_id
+                WHERE p.land_parcel_id = lp.id AND c.year < ${year}) AS last_stopped_on
         FROM land_parcels lp
         JOIN LATERAL (
-          SELECT v.area_m2, v.shape FROM land_parcel_versions v
+          SELECT v.area_m2, v.shape, (lower(v.valid) AT TIME ZONE 'Europe/Paris')::date::text AS valid_from FROM land_parcel_versions v
           WHERE v.land_parcel_id = lp.id AND v.valid && tstzrange(make_date(${year}, 1, 1)::timestamptz, make_date(${year + 1}, 1, 1)::timestamptz)
           ORDER BY upper(v.valid) DESC NULLS FIRST LIMIT 1) v ON true
         ORDER BY lp.name`,
@@ -175,11 +177,33 @@ async function history(tx: Tx, parcelIds: string[], year: number): Promise<CropP
   return out;
 }
 
+/**
+ * Historique hérité (§4.6) : une parcelle née d'une découpe ou d'une fusion
+ * reprend, pour les années d'avant sa création, l'historique de sa parcelle
+ * d'origine (la plus grande part pour une fusion).
+ */
+async function inheritedHistory(tx: Tx, ids: string[], year: number, own: CropPlanContext["history"]): Promise<CropPlanContext["history"]> {
+  if (!ids.length) return own;
+  const links = await rows<{ child_id: string; parent_id: string }>(
+    tx,
+    sql`SELECT DISTINCT ON (child_id) child_id, parent_id FROM land_parcel_lineage
+        WHERE child_id = ANY(${uuids(ids)}) ORDER BY child_id, share DESC`,
+  );
+  if (!links.length) return own;
+  const parents = await history(tx, [...new Set(links.map((l) => l.parent_id))], year);
+  const out = { ...own };
+  for (const l of links) {
+    const inherited = parents[l.parent_id] ?? {};
+    out[l.child_id] = { ...inherited, ...(own[l.child_id] ?? {}) };
+  }
+  return out;
+}
+
 async function loadContext(tx: Tx, year: number, abRotation: CropPlanContext["certification"]["abRotation"]): Promise<CropPlanContext> {
   const parcels = await baseParcels(tx, year);
   const ids = parcels.map((p) => p.id);
   const activities = await contextActivities(tx, year);
-  const hist = await history(tx, ids, year);
+  const hist = await inheritedHistory(tx, ids, year, await history(tx, ids, year));
   const previous = await rows<{ activity_id: string; m2: number }>(
       tx,
       sql`SELECT p.activity_id, sum(v.area_m2)::float8 AS m2
@@ -199,7 +223,14 @@ async function loadContext(tx: Tx, year: number, abRotation: CropPlanContext["ce
   const settings = await settingsOf(tx);
   return {
     year,
-    parcels: parcels.map((p) => ({ id: p.id, name: p.name, areaM2: p.area_m2, shape: JSON.parse(p.shape) as unknown })),
+    parcels: parcels.map((p) => ({
+      id: p.id,
+      name: p.name,
+      areaM2: p.area_m2,
+      shape: JSON.parse(p.shape) as unknown,
+      validFrom: p.valid_from,
+      lastStoppedOn: p.last_stopped_on,
+    })),
     activities,
     history: hist,
     previousByActivity: Object.fromEntries(previous.map((r) => [r.activity_id, r.m2])),
@@ -422,13 +453,11 @@ export async function validateCropPlan(
     if (unknownActivities.length) {
       blockers.push({ code: "unknown-parcel", message: `${unknownActivities.length} culture(s) prévue(s) avec une activité inconnue ou sans parcelles.`, keys: unknownActivities.map((a) => a.key) });
     }
-    if (draft.operations.length) {
-      blockers.push({ code: "operation", message: "Les découpes et fusions de parcelles ne sont pas encore appliquées par la validation (prochaine version).", keys: [] });
-    }
+    blockers.push(...operationBlockers(draft, resolved, context), ...(await serverOperationBlockers(tx, draft, context)));
 
     if (opts.dryRun || blockers.length) return { dryRun: opts.dryRun, changes, blockers, sections, version: null };
 
-    const applied = await applyChanges(tx, farmId, year, changes, draft);
+    const applied = await applyChanges(tx, farmId, year, changes, draft, p.id);
     const version = (p.current_version ?? 0) + 1;
     await tx.execute(sql`INSERT INTO crop_plan_versions (plan_id, version, farm_id, validated_by, reason, snapshot, changes, findings, refs_version)
                          VALUES (${p.id}, ${version}, ${farmId}, ${opts.userId}, ${body.reason ?? null}, ${JSON.stringify(applied)}::jsonb,
@@ -440,7 +469,107 @@ export async function validateCropPlan(
 }
 
 /** Applique les changements ; rend le brouillon avec les productions créées (instantané de la version). */
-async function applyChanges(tx: Tx, farmId: string, year: number, changes: CropPlanChange[], draft: CropPlanDraft): Promise<CropPlanDraft> {
+/**
+ * Vérifications des découpes et fusions qui demandent la base : formes
+ * (validité, recouvrement de la parcelle d'origine), interventions de la
+ * parcelle d'origine après la date d'effet, fusion de surfaces AB et non AB.
+ */
+async function serverOperationBlockers(tx: Tx, draft: CropPlanDraft, context: CropPlanContext) {
+  const out: CropPlanValidation["blockers"] = [];
+  const base = new Set(context.parcels.map((p) => p.id));
+  const shapes = new Map<string, string>(); // morceaux du brouillon (n:) → GeoJSON
+  for (const op of draft.operations) {
+    const sources = (op.kind === "split" ? [op.source] : op.sources).filter((k) => k.startsWith("p:") && base.has(k.slice(2))).map((k) => k.slice(2));
+    const pieces = op.kind === "split" ? op.pieces : [op.result];
+    const names = pieces.map((p) => p.name).join(", ");
+    const piecesJson = JSON.stringify(pieces.map((p) => p.shape));
+    for (const piece of pieces) shapes.set(piece.key, JSON.stringify(piece.shape));
+    // Sources du brouillon (morceaux découpés puis fusionnés) : formes prises dans le brouillon.
+    const draftSources = (op.kind === "split" ? [op.source] : op.sources).filter((k) => k.startsWith("n:")).map((k) => shapes.get(k)).filter((x): x is string => !!x);
+    const draftJson = JSON.stringify(draftSources.map((d) => JSON.parse(d) as unknown));
+    const [geo] = await rows<{ invalid: number; overlap: number; gap: number }>(
+      tx,
+      sql`WITH raw AS (SELECT n, ST_SetSRID(ST_GeomFromGeoJSON(g::text), 4326) AS g FROM jsonb_array_elements(${piecesJson}::jsonb) WITH ORDINALITY AS x(g, n)),
+               pieces AS (SELECT n, ST_MakeValid(g) AS g, ST_IsValid(g) AS ok FROM raw),
+               src AS (SELECT ST_Union(g) AS g FROM (
+                         SELECT v.shape AS g FROM land_parcel_versions v
+                         WHERE v.land_parcel_id = ANY(${uuids(sources)}) AND v.valid @> (${op.effectiveOn}::date - 1)::timestamptz
+                         UNION ALL
+                         SELECT ST_SetSRID(ST_GeomFromGeoJSON(d::text), 4326) FROM jsonb_array_elements(${draftJson}::jsonb) d) s),
+               u AS (SELECT ST_Union(g) AS g FROM pieces)
+          SELECT (SELECT count(*) FROM pieces WHERE NOT ok)::int AS invalid,
+                 coalesce((SELECT sum(ST_Area(ST_Intersection(a.g, b.g)::geography)) FROM pieces a JOIN pieces b ON a.n < b.n AND ST_Intersects(a.g, b.g)), 0)::float8 AS overlap,
+                 coalesce(ST_Area(ST_SymDifference((SELECT g FROM src), (SELECT g FROM u))::geography), 0)::float8 AS gap`,
+    );
+    if (geo && (geo.invalid > 0 || geo.overlap > 1 || geo.gap > 1)) {
+      out.push({ code: "geometry", message: `${names} : les nouvelles parcelles ne recouvrent pas exactement la surface d'origine (écart ${Math.round(geo.gap)} m², chevauchement ${Math.round(geo.overlap)} m²${geo.invalid ? ", contour invalide" : ""}).`, keys: pieces.map((p) => p.key) });
+    }
+    if (!sources.length) continue;
+    const ivs = await rows<{ status: string; n: number }>(
+      tx,
+      sql`SELECT i.status, count(DISTINCT i.id)::int AS n FROM interventions i
+          JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_type = 'land_parcel'
+          WHERE t.ref_id = ANY(${uuids(sources)}) AND i.status IN ('done', 'planned') AND i.started_at >= ${op.effectiveOn}::date::timestamptz
+          GROUP BY i.status`,
+    );
+    const srcKeys = sources.map((id) => `p:${id}`);
+    const done = ivs.find((r) => r.status === "done")?.n ?? 0;
+    const planned = ivs.find((r) => r.status === "planned")?.n ?? 0;
+    if (done) out.push({ code: "effective-date", message: `${names} : ${done} intervention(s) réalisée(s) sur la parcelle d'origine après le ${op.effectiveOn} ; choisissez une date d'effet plus tardive.`, keys: srcKeys });
+    if (planned) out.push({ code: "planned-interventions", message: `${names} : ${planned} intervention(s) prévue(s) sur la parcelle d'origine après le ${op.effectiveOn} : reportez-les sur les nouvelles parcelles ou annulez-les avant de valider.`, keys: srcKeys });
+    if (op.kind === "merge") {
+      const ab = sources.filter((id) => context.certification.abParcels[id]);
+      if (ab.length && ab.length !== op.sources.length) {
+        out.push({ code: "certification", message: `${op.result.name} : réunit des surfaces certifiées AB et non certifiées ; fusion refusée.`, keys: op.sources });
+      }
+    }
+  }
+  return out;
+}
+
+/** Applique une découpe ou une fusion : versions d'origine closes, nouvelles parcelles, filiation, certifications. */
+async function applyOperation(tx: Tx, farmId: string, planId: string, sources: string[], pieces: { key: string; name: string; shape: unknown }[], effectiveOn: string, kind: "split" | "merge", keyMap: Map<string, string>) {
+  const ids = sources.map((k) => keyMap.get(k) ?? k.slice(2));
+  const eff = sql`${effectiveOn}::date::timestamptz`;
+  const [ref] = await rows<{ pac_islet: string | null; viti: unknown; area: number }>(
+    tx,
+    sql`SELECT (array_agg(v.pac_islet))[1] AS pac_islet, (array_agg(v.viti))[1] AS viti, sum(v.area_m2)::float8 AS area
+        FROM land_parcel_versions v WHERE v.land_parcel_id = ANY(${uuids(ids)}) AND v.valid @> ${eff}`,
+  );
+  await tx.execute(sql`UPDATE land_parcel_versions SET valid = tstzrange(lower(valid), ${eff})
+                       WHERE land_parcel_id = ANY(${uuids(ids)}) AND valid @> ${eff}`);
+  await tx.execute(sql`UPDATE land_parcels SET updated_at = now() WHERE id = ANY(${uuids(ids)})`);
+  for (const piece of pieces) {
+    const id = crypto.randomUUID();
+    keyMap.set(piece.key, id);
+    const geo = JSON.stringify(piece.shape);
+    await tx.execute(sql`INSERT INTO land_parcels (id, farm_id, name) VALUES (${id}, ${farmId}, ${piece.name})`);
+    await tx.execute(sql`INSERT INTO land_parcel_versions (id, land_parcel_id, shape, area_m2, pac_islet, viti, valid)
+      SELECT ${crypto.randomUUID()}, ${id}, g, ST_Area(g::geography), ${ref?.pac_islet ?? null}, ${ref?.viti ? JSON.stringify(ref.viti) : null}::jsonb, tstzrange(${eff}, NULL)
+      FROM (SELECT ST_Multi(ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(${geo}), 4326))) AS g) x`);
+    // Filiation : part de la surface du morceau venue de chaque parcelle d'origine.
+    await tx.execute(sql`INSERT INTO land_parcel_lineage (child_id, parent_id, farm_id, kind, effective_at, share, plan_id)
+      SELECT ${id}, v.land_parcel_id, ${farmId}, ${kind}, ${eff},
+             greatest(least(ST_Area(ST_Intersection(v.shape, c.shape)::geography) / nullif(ST_Area(c.shape::geography), 0), 1), 0.000001), ${planId}
+      FROM land_parcel_versions v, land_parcel_versions c
+      WHERE v.land_parcel_id = ANY(${uuids(ids)}) AND upper(v.valid) = ${eff}
+        AND c.land_parcel_id = ${id} AND ST_Intersects(v.shape, c.shape)`);
+    // Certifications de la parcelle d'origine encore en cours à la date d'effet.
+    await tx.execute(sql`INSERT INTO parcel_certifications (id, farm_id, land_parcel_id, kind, level, label, certifier, reference, started_on, stopped_on)
+      SELECT DISTINCT ON (kind) gen_random_uuid(), farm_id, ${id}, kind, level, label, certifier, reference, started_on, stopped_on
+      FROM parcel_certifications
+      WHERE land_parcel_id = ANY(${uuids(ids)}) AND (stopped_on IS NULL OR stopped_on >= ${effectiveOn}::date)
+      ORDER BY kind, started_on`);
+  }
+}
+
+async function applyChanges(tx: Tx, farmId: string, year: number, changes: CropPlanChange[], draft: CropPlanDraft, planId: string): Promise<CropPlanDraft> {
+  // Découpes et fusions d'abord : les productions des morceaux en dépendent.
+  const keyMap = new Map<string, string>();
+  for (const op of draft.operations) {
+    if (op.kind === "split") await applyOperation(tx, farmId, planId, [op.source], op.pieces, op.effectiveOn, "split", keyMap);
+    else await applyOperation(tx, farmId, planId, op.sources, [op.result], op.effectiveOn, "merge", keyMap);
+  }
   let campaign = await campaignOf(tx, year);
   if (!campaign) {
     campaign = { id: crypto.randomUUID() };
@@ -448,7 +577,7 @@ async function applyChanges(tx: Tx, farmId: string, year: number, changes: CropP
                          VALUES (${campaign.id}, ${farmId}, ${year}, make_date(${year}, 1, 1), make_date(${year}, 12, 31))`);
   }
   const created = new Map<string, string>();
-  const parcelId = (key: string) => key.slice(2);
+  const parcelId = (key: string) => keyMap.get(key) ?? key.slice(2);
   const fields = (f: { activityId: string; role: string; startedOn: string | null; stoppedOn: string | null }) => sql`
     activity_id = ${f.activityId},
     nature = (SELECT CASE a.family WHEN 'vine_farming' THEN 'vine' WHEN 'animal_farming' THEN 'grassland' ELSE 'field_crop' END FROM activities a WHERE a.id = ${f.activityId}),
@@ -469,7 +598,14 @@ async function applyChanges(tx: Tx, farmId: string, year: number, changes: CropP
       await tx.execute(sql`UPDATE productions SET ${fields(c.after)} WHERE id = ${id}`);
     }
   }
-  return { ...draft, assignments: draft.assignments.map((a) => (created.has(a.id) ? { ...a, productionId: created.get(a.id)! } : a)) };
+  // Instantané : clés définitives des nouvelles parcelles, productions créées.
+  const real = (key: string) => (keyMap.has(key) ? (`p:${keyMap.get(key)}` as const) : (key as `p:${string}`));
+  return {
+    ...draft,
+    assignments: draft.assignments.map((a) => ({ ...a, key: real(a.key), ...(created.has(a.id) ? { productionId: created.get(a.id)! } : {}) })),
+    covers: draft.covers.map((c) => ({ ...c, key: real(c.key) })),
+    fallow: draft.fallow.map((f) => ({ ...f, key: real(f.key) })),
+  };
 }
 
 export async function getCropPlanVersion(db: Database, farmId: string, year: number, version: number): Promise<CropPlanVersionView> {

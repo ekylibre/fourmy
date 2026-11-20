@@ -15,7 +15,7 @@ const [R, G] = demoLandParcelsAt;
 
 const context: CropPlanContext = {
   year: 2027,
-  parcels: demoLandParcelsAt.map((p) => ({ id: p.id, name: p.name, areaM2: p.version.areaM2, shape: p.version.shape })),
+  parcels: demoLandParcelsAt.map((p) => ({ id: p.id, name: p.name, areaM2: p.version.areaM2, shape: p.version.shape, validFrom: "2020-01-01", lastStoppedOn: "2026-07-20" })),
   activities: [
     { id: WHEAT, name: "Blé tendre", family: "plant_farming", color: "#E8B500", capCode: "BTH", species: "triticum_aestivum", cycle: "annual", legume: false, vegetable: false },
     { id: MAIZE, name: "Maïs", family: "plant_farming", color: "#6A994E", capCode: "MIS", species: "zea_mays", cycle: "annual", legume: false, vegetable: false },
@@ -76,6 +76,29 @@ describe("assolement", () => {
     await user.click(await screen.findByRole("button", { name: "Assolement" }));
     expect(await screen.findByRole("menuitem", { name: "Préparer l'assolement 2026" })).toHaveAttribute("href", `/f/${FARM}/crop-plan/2026`);
     expect(screen.getByRole("menuitem", { name: "Préparer l'assolement 2027" })).toBeInTheDocument();
+  });
+
+  it("fusion de parcelles qui ne se touchent pas : refusée, rien ne change ; découpe d'une seule parcelle", async () => {
+    const user = userEvent.setup();
+    cropPlanServer();
+    renderApp(`/f/${FARM}/crop-plan/2027`);
+    await user.click(await screen.findByRole("button", { name: "Préparer l'assolement 2027" }));
+    const table = await screen.findByRole("table", { name: "Parcelles de l'assolement" });
+    expect(screen.getByRole("button", { name: "Découper" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Fusionner" })).toBeDisabled();
+    await user.click(within(table).getByRole("checkbox", { name: `Choisir ${R!.name}` }));
+    expect(screen.getByRole("button", { name: "Découper" })).toBeEnabled();
+    await user.click(within(table).getByRole("checkbox", { name: `Choisir ${G!.name}` }));
+    expect(screen.getByRole("button", { name: "Découper" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Fusionner" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("ne se touchent pas");
+    expect(screen.queryByLabelText("Découpes et fusions")).not.toBeInTheDocument();
+    // Découper : consigne de tracé, puis abandon.
+    await user.click(within(table).getByRole("checkbox", { name: `Choisir ${G!.name}` }));
+    await user.click(screen.getByRole("button", { name: "Découper" }));
+    expect(screen.getByText(/Tracez une ligne qui commence et finit hors de la parcelle/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Annuler la découpe" }));
+    expect(screen.getByRole("button", { name: "Découper" })).toBeInTheDocument();
   });
 
   it("préparer 2027, affecter, voir les contrôles, valider", async () => {

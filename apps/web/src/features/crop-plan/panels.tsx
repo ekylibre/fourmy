@@ -272,7 +272,11 @@ function changeLabel(c: CropPlanChange, names: (key: string) => string, activity
 }
 
 export function ChangeList({ changes, editor, context }: { changes: CropPlanChange[]; editor: CropPlanEditor; context: CropPlanContext }) {
-  const names = (key: string) => editor.plan.byKey.get(key as CropPlanParcelKey)?.name ?? context.parcels.find((p) => `p:${p.id}` === key)?.name ?? key;
+  const names = (key: string) =>
+    editor.plan.byKey.get(key as CropPlanParcelKey)?.name ??
+    context.parcels.find((p) => `p:${p.id}` === key)?.name ??
+    editor.draft.operations.flatMap((o) => (o.kind === "split" ? o.pieces : [o.result])).find((p) => p.key === key)?.name ??
+    key;
   const activity = (id: string) => editor.activities.get(id)?.name ?? "activité inconnue";
   if (!changes.length) return <Text size="sm">Aucun changement.</Text>;
   return (

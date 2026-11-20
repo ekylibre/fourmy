@@ -110,6 +110,16 @@ Branche `feat/crop-plan-as3-split`. Dépend d'AS2b et de Q1.
 6. **Vérification mobile** : parcellaire daté après une découpe dans la synchronisation (pas de parcelle d'origine fantôme).
 7. **Tests** : découpe d'un colza semé l'année précédente (date d'effet en août) ; intervention réalisée après la date d'effet refusée ; intervention prévue reportée ; fusion AB / non AB refusée ; annulation ; historique hérité ; e2e « découper une parcelle et affecter deux cultures ».
 
+*Réalisé le 20/11/2026* (Q1 tranchée : lendemain de la dernière fin de production, sinon 1er janvier de la campagne, modifiable) :
+- Découper (outil carto, parcelle d'un seul tenant) et Fusionner (parcelles qui se touchent) au-dessus de la carte ; liste des découpes et fusions en attente : date d'effet, noms, « Retirer la dernière ».
+- Pas de route `POST …/geometry` : surfaces calculées au dessin (`@fourmy/carto`, géodésique) et formes vérifiées par PostGIS à la validation (validité, recouvrement de l'origine à 1 m² près, chevauchement des morceaux).
+- Bloquants : date d'effet avant la fin d'une culture de l'origine, avant le début de sa version, hors campagne ; culture d'un morceau qui commence avant la date d'effet ; intervention réalisée ou prévue sur l'origine après la date d'effet ; fusion AB / non AB.
+- Interventions prévues sur l'origine après la date d'effet : bloquant à corriger à la main (pas de report automatique dans cette version).
+- Annulation d'une découpe validée : non faite ; on rouvre l'assolement et on fusionne les morceaux (nouvelle parcelle).
+- Historique hérité de la parcelle d'origine (la plus grande part pour une fusion) dans le contexte des campagnes suivantes.
+- Mobile : la synchronisation lit les parcelles en cours à l'instant ; une découpe à date d'effet future y apparaît à la première synchronisation complète après cette date.
+- e2e : fusion de deux parcelles voisines de la ferme pilote (campagne 2032), parcelles d'origine restaurées à la fin. La découpe (tracé sur la carte) est couverte par les tests de l'API et des outils carto, pas par un e2e.
+
 ## AS4 — Réglementaire, cultures secondaires, réglages
 
 Branche `feat/crop-plan-as4-regulatory`. Dépend d'AS3 (zones des morceaux).
