@@ -39,7 +39,7 @@ export const ROUTE_ESTIMATE = { detour: 1.3, speedKmh: 25 };
 
 const rateInfo = (id: string): ItkMachineryRateInfo | null => {
   const r = machineryRate(id);
-  return r ? { id: r.id, label: r.label, family: r.family, widthM: r.widthM, haH: hectareRate(r) } : null;
+  return r ? { id: r.id, label: r.label, family: r.family, widthM: r.widthM, haH: hectareRate(r), unit: r.unit, costPerUnit: r.costPerUnit, costPerHour: r.costPerHour } : null;
 };
 
 /** Matériels de la ferme : largeur résolue (comme l'avatar), rattachement au barème, proposition. */
@@ -258,7 +258,7 @@ export function searchMachineryRates(procedure: string | null, q: string, limit 
   return machineryRatesFor(procedure)
     .filter((r) => words.every((w) => plain(`${r.family} ${r.label}`).includes(w)))
     .slice(0, limit)
-    .map((r) => ({ id: r.id, label: r.label, family: r.family, widthM: r.widthM, haH: hectareRate(r) }));
+    .map((r) => ({ id: r.id, label: r.label, family: r.family, widthM: r.widthM, haH: hectareRate(r), unit: r.unit, costPerUnit: r.costPerUnit, costPerHour: r.costPerHour }));
 }
 
 /** Rattache (ou détache) un matériel à une ligne du barème. */

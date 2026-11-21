@@ -1,0 +1,84 @@
+import { z } from "zod";
+import { uuid } from "./primitives.js";
+
+/**
+ * Module économique de l'assolement (temps 3, claudedocs/conception_assolement_eco.md).
+ * Lot E1 : prix de la ferme, datés et sourcés (principe E1).
+ */
+
+export const priceKind = z.enum(["article", "labour", "equipment", "service", "product"]);
+export type PriceKind = z.infer<typeof priceKind>;
+export const priceSource = z.enum(["farm", "lexicon", "bcma", "agrifood", "purchase"]);
+export type PriceSource = z.infer<typeof priceSource>;
+
+export const PRICE_KIND_LABELS: Record<PriceKind, string> = {
+  article: "Intrants",
+  equipment: "Matériels",
+  labour: "Main-d'œuvre",
+  service: "Services",
+  product: "Produits",
+};
+export const PRICE_SOURCE_LABELS: Record<PriceSource, string> = {
+  farm: "saisi",
+  lexicon: "Lexicon",
+  bcma: "barème BCMA",
+  agrifood: "Commission européenne (agrifood)",
+  purchase: "achat",
+};
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date au format AAAA-MM-JJ");
+
+/** Unités d'un montant : celles du stock (codes ou libellés repris) et l'heure, l'hectare. */
+export const PRICE_UNITS = ["kilogram", "ton", "quintal", "liter", "hectoliter", "cubic_meter", "unity", "dose", "thousand", "hour", "hectare"] as const;
+
+/** Ajout d'un prix (une ligne datée). */
+export const priceWrite = z
+  .object({
+    id: uuid.optional(),
+    kind: priceKind,
+    articleId: uuid.nullable().default(null),
+    equipmentId: uuid.nullable().default(null),
+    activityId: uuid.nullable().default(null),
+    product: z.string().trim().min(1).max(60).nullable().default(null),
+    procedure: z.string().max(80).nullable().default(null),
+    unit: z.string().trim().min(1, "Unité obligatoire.").max(40),
+    amount: z.number().min(0, "Montant positif.").max(99_999_999),
+    validFrom: isoDate,
+    source: priceSource.default("farm"),
+    sourceRef: z.string().max(200).nullable().default(null),
+    sourceDate: isoDate.nullable().default(null),
+    note: z.string().trim().max(500).nullable().default(null),
+  })
+  .superRefine((p, ctx) => {
+    const need = (ok: boolean, path: string, message: string) => !ok && ctx.addIssue({ code: "custom", path: [path], message });
+    need((p.kind === "article") === !!p.articleId, "articleId", "Un prix d'intrant désigne un article, et lui seul.");
+    need((p.kind === "equipment") === !!p.equipmentId, "equipmentId", "Un prix de matériel désigne un matériel, et lui seul.");
+    need((p.kind === "product") === !!(p.activityId && p.product), "product", "Un prix de produit désigne une activité et un produit.");
+    need((p.kind === "service") === !!p.procedure, "procedure", "Un prix de prestation désigne une procédure.");
+  });
+export type PriceWrite = z.input<typeof priceWrite>;
+
+export const pricesWrite = z.object({ items: z.array(priceWrite).min(1).max(2000) });
+export type PricesWrite = z.input<typeof pricesWrite>;
+
+export interface Price {
+  id: string;
+  kind: PriceKind;
+  articleId: string | null;
+  equipmentId: string | null;
+  activityId: string | null;
+  product: string | null;
+  procedure: string | null;
+  unit: string;
+  amount: number;
+  validFrom: string;
+  source: PriceSource;
+  sourceRef: string | null;
+  sourceDate: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
+/** Clé d'un prix : ce dont il est le prix. */
+export const priceKey = (p: Pick<Price, "kind" | "articleId" | "equipmentId" | "activityId" | "product" | "procedure">) =>
+  [p.kind, p.articleId ?? "", p.equipmentId ?? "", p.activityId ?? "", p.product ?? "", p.procedure ?? ""].join("|");
