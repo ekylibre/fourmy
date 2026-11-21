@@ -214,7 +214,7 @@ describe("plan de fumure", () => {
   });
 
   it("plan d'un couvert exporté : couvert, dose par défaut, sans bilan détaillé (lot AQ)", async () => {
-    const cover = { id: "c1", parcelId: plan().parcel.id, campaign: 2026, kind: "sown" as const, family: "graminees_seigle_avoine" as const, species: "Seigle", sownOn: "2025-10-18", destroyedOn: "2026-04-20", exported: true, biomass: null, destructionMode: "harvest" as const, notes: null };
+    const cover = { id: "c1", parcelId: plan().parcel.id, campaign: 2026, kind: "sown" as const, family: "graminees_seigle_avoine" as const, species: "Seigle", sownOn: "2025-10-18", destroyedOn: "2026-04-20", exported: true, biomass: null, destructionMode: "harvest" as const, notes: null, sowingInterventionId: null, components: null };
     server.use(
       http.get("*/fertilization/plans/:id", () =>
         HttpResponse.json(
@@ -238,7 +238,7 @@ describe("plan de fumure", () => {
 
   it("retirer un couvert demande une confirmation (recette du 11/11)", async () => {
     let deleted = false;
-    const cover = { id: "c1", parcelId: plan().parcel.id, campaign: 2026, kind: "sown" as const, family: "cruciferes" as const, species: "Moutarde", sownOn: "2025-09-01", destroyedOn: null, exported: false, biomass: null, destructionMode: null, notes: null };
+    const cover = { id: "c1", parcelId: plan().parcel.id, campaign: 2026, kind: "sown" as const, family: "cruciferes" as const, species: "Moutarde", sownOn: "2025-09-01", destroyedOn: null, exported: false, biomass: null, destructionMode: null, notes: null, sowingInterventionId: null, components: null };
     server.use(
       http.get("*/fertilization/plans/:id", () => HttpResponse.json(plan({ context: { ...plan().context, cover } }))),
       http.get("*/fertilizers", () => HttpResponse.json({ items: [] })),
@@ -258,6 +258,38 @@ describe("plan de fumure", () => {
     await user.click(within(section).getByRole("button", { name: "Retirer" }));
     await user.click(within(await screen.findByRole("dialog", { name: "Retirer le couvert" })).getByRole("button", { name: "Retirer" }));
     await waitFor(() => expect(deleted).toBe(true));
+  });
+
+  it("couvert : reprendre le semis de l'interculture, ses espèces et la famille déduite (lot SE6)", async () => {
+    let cover: Record<string, unknown> | null = null;
+    const SOWING = "00000000-0000-7000-8000-00000000f501";
+    const components = [
+      { label: "Avoine rude", species: "avena_strigosa", kgHa: 25 },
+      { label: "Vesce commune", species: "vicia_sativa", kgHa: 15 },
+    ];
+    server.use(
+      http.get("*/fertilization/plans/:id", () => HttpResponse.json(plan())),
+      http.get("*/fertilizers", () => HttpResponse.json({ items: [] })),
+      http.get("*/land-parcels/:id/cover-crop/sowings", () =>
+        HttpResponse.json({ items: [{ interventionId: SOWING, startedAt: "2025-08-12", components, family: "melange_graminees_legumineuses", legumes: 1 }] }),
+      ),
+      http.put("*/land-parcels/:id/cover-crop", async ({ request }) => {
+        cover = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: "c1", parcelId: plan().parcel.id, ...cover });
+      }),
+    );
+    renderApp(`/f/${FARM}/fertilization/plans/${PLAN}`);
+    const section = await screen.findByLabelText("Couvert d'interculture");
+    const user = userEvent.setup();
+    const take = await within(section).findByRole("button", { name: "Reprendre le semis du 12/08/2025" });
+    expect(within(section).getByText(/Avoine rude, Vesce commune · 1 légumineuse/)).toBeInTheDocument();
+    await user.click(take);
+    expect(within(section).getByText(/Repris du semis : espèces Avoine rude \(25 kg\/ha\), Vesce commune \(15 kg\/ha\)/)).toBeInTheDocument();
+    expect(within(section).getByRole("textbox", { name: "Espèces" })).toHaveValue("Avoine rude, Vesce commune");
+    await user.click(within(section).getByRole("button", { name: "Enregistrer le couvert" }));
+    await waitFor(() =>
+      expect(cover).toMatchObject({ family: "melange_graminees_legumineuses", sownOn: "2025-08-12", sowingInterventionId: SOWING, components, species: "Avoine rude, Vesce commune" }),
+    );
   });
 
   it("ouverture du bilan, période d'implantation et couvert d'interculture", async () => {
@@ -324,7 +356,7 @@ describe("éditions de la directive nitrates", () => {
               soilCover: { level: "warning", situation: "long", messages: ["Couverture implantée le 05/10/2025, après la date limite du 30/09/2025."] },
               aplsh: { from: "2025-09-20", to: "2025-12-10", kgNHa: 90, ceiling: 70, over: true, missing: [] },
               steering: [{ id: "s1", planId: "p", measuredOn: "2026-06-10", stage: "10 feuilles", tool: "N-Tester", value: "580", advisedKgNHa: 40, notes: null, createdAt: "2026-06-10T08:00:00Z" }],
-              cover: { id: "c1", parcelId: "00000000-0000-7000-8000-0000000000a1", campaign: 2026, kind: "sown", family: "cruciferes", species: "Moutarde blanche", sownOn: "2025-09-05", destroyedOn: "2025-12-10", exported: false, biomass: "1_3", destructionMode: "mechanical", notes: null },
+              cover: { id: "c1", parcelId: "00000000-0000-7000-8000-0000000000a1", campaign: 2026, kind: "sown", family: "cruciferes", species: "Moutarde blanche", sownOn: "2025-09-05", destroyedOn: "2025-12-10", exported: false, biomass: "1_3", destructionMode: "mechanical", notes: null, sowingInterventionId: null, components: null },
               totalNKgHa: 69,
               plannedDose: 180,
               planVersion: 3,

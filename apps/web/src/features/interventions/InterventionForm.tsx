@@ -44,6 +44,7 @@ import { kgN, nitrogenNote, useFertilizers } from "../fertilization/fertilizatio
 import type { FertilizationCheckRequest } from "@fourmy/contracts";
 import { NitrogenLine } from "../fertilization/NitrogenLine";
 import { isAreaRate, SeedLine, seedInputUnits } from "../seeds/SeedLine";
+import { MixtureDoses } from "../seeds/MixtureDoses";
 import { useSeeds } from "../seeds/queries";
 import { FertilizationSummary, useFertilizationCheck, weatherExtremes } from "../fertilization/FertilizationChecks";
 import { api, ApiError, farmPath } from "../../app/api";
@@ -52,7 +53,7 @@ import { invalidateAfterIntervention, useActivities, useCrewTemplates, useEquipm
 import { useFarm } from "../../app/farm";
 import { RegulatoryPictos } from "../phyto/Hazards";
 import { PrecautionsPanel } from "../phyto/Precautions";
-import { crewRules, dangerMessages, inputUnitChoices, mergePeriods, storedUnit, toFree } from "@fourmy/domain";
+import { crewRules, dangerMessages, inputUnitChoices, mergePeriods, mixtureTotal, parseSeedUnit, storedUnit, toFree } from "@fourmy/domain";
 import { ActivityBadge, activityOfParcel } from "../activities/ActivityBadge";
 import { MapBoundary } from "../../components/MapBoundary";
 import { ProcedureIcon } from "../../components/ProcedureIcon";
@@ -62,7 +63,7 @@ import { bbchOptionLabel, useBbchStages } from "../reference/phyto-reference";
 import { CrewsEditor, CrewsSummary, PeriodsEditor, crewRowsOf, crewsBody, newCrew, toLocal, type CrewRow } from "./Crews";
 import { ComplianceSummary, TreatmentCheckView, useComplianceCheck, type ComplianceDraft } from "./CompliancePanel";
 import { CertificationCheckSection, useCertificationCheck } from "../certification/controls";
-import type { Activity, InterventionWeather } from "@fourmy/contracts";
+import type { Activity, InterventionWeather, MixtureDose } from "@fourmy/contracts";
 import type { FeatureCollection, Geometry } from "geojson";
 import { SprayingConditions, WeatherFields, type WeatherRequestDraft } from "../weather/Weather";
 
@@ -80,6 +81,8 @@ type QuantityRow = {
   keep?: { lotId?: string; from?: InterventionInput["from"] };
   /** Entretien : matériel qui reçoit la pièce ou le fluide. */
   equipmentId?: string;
+  /** Mélange de semences : dose de chaque espèce en kg/ha (lot SE6). */
+  mixture?: MixtureDose[];
 };
 type PeriodRow = { startedAt: string; stoppedAt: string };
 
@@ -232,7 +235,16 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       .values(),
   ];
   const [inputs, setInputs] = useState<QuantityRow[]>(
-    planned?.inputs.map((i) => ({ articleId: i.articleId, quantity: i.quantity, per: i.per, unit: i.unit, to: null, keep: { lotId: i.lotId, from: i.from }, equipmentId: i.equipmentId })) ?? [],
+    planned?.inputs.map((i) => ({
+      articleId: i.articleId,
+      quantity: i.quantity,
+      per: i.per,
+      unit: i.unit,
+      to: null,
+      keep: { lotId: i.lotId, from: i.from },
+      equipmentId: i.equipmentId,
+      ...(i.mixture ? { mixture: i.mixture } : {}),
+    })) ?? [],
   );
   const [outputs, setOutputs] = useState<QuantityRow[]>(
     planned?.outputs.map((o) => ({
@@ -303,6 +315,15 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         : a
           ? [a.unit]
           : [];
+  // Mélange stocké en masse (lot SE6) : la dose se saisit espèce par espèce, en kg/ha. Rend les kg d'une unité de stock.
+  const dosedMixture = (a: NonNullable<ReturnType<typeof article>>) => {
+    const u = parseSeedUnit(a.unit);
+    return a.kind === "seed" && seedOf(a.id)?.sheet?.isMixture && u?.dim === "mass" ? u.kg : null;
+  };
+  const mixtureOf = (r: QuantityRow) => {
+    const a = article(r.articleId);
+    return a && dosedMixture(a) ? r.mixture?.filter((d) => d.kgHa > 0) : undefined;
+  };
   const nitrogenTotal = inputs.reduce((s, r) => {
     const n = nitrogenOf(r);
     return n?.ok ? s + n.totalKgHa : s;
@@ -385,6 +406,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         ...(r.keep?.lotId ? { lotId: r.keep.lotId } : {}),
         ...(r.keep?.from ? { from: r.keep.from } : {}),
         ...(shape === "maintenance" && r.equipmentId && maintained.includes(r.equipmentId) ? { equipmentId: r.equipmentId } : {}),
+        ...(mixtureOf(r)?.length ? { mixture: mixtureOf(r) } : {}),
       })),
       outputs: quantity(outputs).map((r) => ({
         articleId: r.articleId!,
@@ -561,7 +583,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               style={{ flex: 2 }}
               data={options}
               value={row.articleId}
-              onChange={(v) => update({ articleId: v, unit: undefined })}
+              onChange={(v) => update({ articleId: v, unit: undefined, mixture: undefined })}
             />
             <NumberInput
               label={i === 0 ? "Quantité" : undefined}
@@ -571,6 +593,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               decimalSeparator=","
               style={{ flex: 1 }}
               value={row.quantity}
+              readOnly={!!mixtureOf(row)?.length}
               onChange={(v) => update({ quantity: v === "" ? "" : Number(v) })}
             />
             {units.length > 1 && (
@@ -616,6 +639,17 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               seed={seedOf(a.id)}
               areaHa={treatedM2 > 0 ? treatedM2 / 10_000 : null}
               farmId={farmId}
+            />
+          )}
+          {kind === "input" && a && dosedMixture(a) && (
+            <MixtureDoses
+              farmId={farmId}
+              articleId={a.id}
+              value={row.mixture}
+              onChange={(mixture) => {
+                const total = mixtureTotal(mixture.filter((d) => d.kgHa > 0));
+                update({ mixture, per: "hectare", unit: undefined, quantity: total > 0 ? Math.round((total / dosedMixture(a)!) * 1000) / 1000 : "" });
+              }}
             />
           )}
           {kind === "input" && row.articleId && a?.kind === "phyto" && (

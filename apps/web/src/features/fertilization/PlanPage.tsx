@@ -35,6 +35,7 @@ import {
   type BalanceTerm,
   type CoverCrop,
   type CoverCropWrite,
+  type CoverSowingProposal,
   type FertilizationPlan,
   type PlanDraft,
   type PlannedApplication,
@@ -1257,6 +1258,8 @@ const BLANK_COVER = (campaign: number): CoverCropWrite => ({
   biomass: null,
   destructionMode: null,
   notes: null,
+  sowingInterventionId: null,
+  components: null,
 });
 const options = (labels: Record<string, string>) =>
   Object.entries(labels).map(([value, label]) => ({ value, label }));
@@ -1283,15 +1286,36 @@ function CoverSection({
 }) {
   const [form, setForm] = useState<CoverCropWrite | null>(null);
   const { confirm, element: confirmEl } = useConfirm();
+  const client = useQueryClient();
 
   const path = farmPath(farmId, `/land-parcels/${parcelId}/cover-crop`);
+  // Semis de l'interculture que le couvert peut reprendre (lot SE6, FR-SE-16).
+  const sowingsKey = ["cover-sowings", farmId, parcelId, campaign];
+  const sowings = useQuery({
+    queryKey: sowingsKey,
+    queryFn: () => api.get<{ items: CoverSowingProposal[] }>(`${path}/sowings?campaign=${campaign}`),
+    enabled: owner,
+  });
   const save = useMutation({
     mutationFn: (w: CoverCropWrite) => api.put<CoverCrop>(path, w),
     onSuccess: () => {
       setForm(null);
+      void client.invalidateQueries({ queryKey: sowingsKey });
       onSaved();
     },
   });
+  const takeSowing = (p: CoverSowingProposal) => {
+    const { id: _id, parcelId: _p, ...current } = cover ?? { id: "", parcelId: "", ...BLANK_COVER(campaign) };
+    setForm({
+      ...current,
+      kind: "sown",
+      family: p.family ?? current.family ?? "cruciferes",
+      species: p.components.map((c) => c.label).join(", ").slice(0, 200),
+      sownOn: p.startedAt,
+      sowingInterventionId: p.interventionId,
+      components: p.components,
+    });
+  };
   const remove = useMutation({
     mutationFn: () => api.delete(`${path}?campaign=${campaign}`),
     onSuccess: onSaved,
@@ -1358,6 +1382,17 @@ function CoverSection({
               </Anchor>
             )}
           </Text>
+          {cover.components && cover.components.length > 0 && (
+            <Text size="sm" aria-label="Espèces semées">
+              Espèces semées :{" "}
+              {cover.components.map((c) => (c.kgHa ? `${c.label} ${c.kgHa.toLocaleString("fr-FR")} kg/ha` : c.label)).join(", ")}
+              {cover.sowingInterventionId && (
+                <Anchor component={Link} to={`/f/${farmId}/interventions/${cover.sowingInterventionId}`} size="sm" ml="xs">
+                  Voir le semis
+                </Anchor>
+              )}
+            </Text>
+          )}
           <Documents
             farmId={farmId}
             ownerType="cover_crop"
@@ -1367,8 +1402,29 @@ function CoverSection({
           />
         </Stack>
       )}
+      {owner && !form && (sowings.data?.items ?? []).length > 0 && (
+        <Stack gap={4} mt="xs">
+          {sowings.data!.items.map((p) => (
+            <Group key={p.interventionId} gap="xs">
+              <Button size="compact-sm" variant="light" color="lichen" onClick={() => takeSowing(p)}>
+                Reprendre le semis du {formatDate(p.startedAt)}
+              </Button>
+              <Text size="xs" c="dimmed">
+                {p.components.map((c) => c.label).join(", ")}
+                {p.legumes ? ` · ${p.legumes} légumineuse${p.legumes > 1 ? "s" : ""}` : ""}
+              </Text>
+            </Group>
+          ))}
+        </Stack>
+      )}
       {form && (
         <Stack mt="xs">
+          {form.sowingInterventionId && (
+            <Text size="xs" c="dimmed">
+              Repris du semis : espèces {form.components?.map((c) => (c.kgHa ? `${c.label} (${c.kgHa.toLocaleString("fr-FR")} kg/ha)` : c.label)).join(", ")}. Vérifiez
+              la famille avant d'enregistrer.
+            </Text>
+          )}
           <SimpleGrid cols={{ base: 1, sm: 3 }}>
             <Select
               label="Couverture"

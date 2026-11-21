@@ -4,9 +4,12 @@ import { withFarm, type Database, type Tx } from "@fourmy/db";
 import type {
   LotSeed,
   MixtureComponent,
+  MixtureComponentWrite,
+  MixtureDose,
   SeedDetail,
   SeedInterventionUse,
   SeedListItem,
+  SeedMixture,
   SeedSheet,
   SeedSheetSave,
   SeedSpeciesOption,
@@ -156,10 +159,7 @@ export async function getSeedIn(tx: Tx, articleId: string, at: string): Promise<
   const r = await seedRow(tx, articleId, at);
   const usage = await usageOf(tx, articleId);
   const item = itemOf(r, usage.get(articleId) ?? []);
-  const components = await rows<{ id: string; species: string | null; label: string; variety_name: string | null; gnis_code: string | null; position: number }>(
-    tx,
-    sql`SELECT id, species, label, variety_name, gnis_code, position FROM seed_mixture_components WHERE article_id = ${articleId} ORDER BY position`,
-  );
+  const components = await componentsOf(tx, articleId);
   const lots = await rows<{ id: string; code: string; seed: LotSeed | null; stock: number }>(
     tx,
     sql`SELECT l.id, l.code, l.attrs->'seed' AS seed,
@@ -218,8 +218,64 @@ export async function getSeedIn(tx: Tx, articleId: string, at: string): Promise<
       estimated: usedTgw && (tgw?.estimated ?? false),
     };
   });
-  const comps: MixtureComponent[] = components.map((c) => ({ id: c.id, species: c.species, label: c.label, varietyName: c.variety_name, gnisCode: c.gnis_code, position: c.position }));
-  return { ...item, components: comps, lots: lots.map((l) => ({ id: l.id, code: l.code, stock: l.stock, seed: l.seed })), interventions };
+  return { ...item, components, lots: lots.map((l) => ({ id: l.id, code: l.code, stock: l.stock, seed: l.seed })), interventions };
+}
+
+/** Espèces d'un mélange, dans l'ordre, légumineuses repérées (FR-SE-13, 14). */
+async function componentsOf(tx: Tx, articleId: string): Promise<MixtureComponent[]> {
+  const list = await rows<{ id: string; species: string | null; label: string; variety_name: string | null; gnis_code: string | null; position: number; legume: boolean }>(
+    tx,
+    sql`SELECT id, species, label, variety_name, gnis_code, position, species IS NOT NULL AND ${legumeOf(sql`species`)} AS legume
+        FROM seed_mixture_components WHERE article_id = ${articleId} ORDER BY position`,
+  );
+  return list.map((c) => ({ id: c.id, species: c.species, label: c.label, varietyName: c.variety_name, gnisCode: c.gnis_code, position: c.position, legume: c.legume }));
+}
+
+/**
+ * Remplace les espèces d'un mélange (lot SE6, FR-SE-13). Une espèce gardée
+ * (même libellé) garde son identifiant : les doses des semis passés la
+ * désignent toujours.
+ */
+export async function saveMixtureComponents(db: Database, farmId: string, articleId: string, components: MixtureComponentWrite[], at: string): Promise<SeedDetail> {
+  return withFarm(db, farmId, async (tx) => {
+    const [s] = await rows<{ is_mixture: boolean }>(tx, sql`SELECT is_mixture FROM article_seeds WHERE article_id = ${articleId}`);
+    if (!s?.is_mixture) throw new BadRequest("La fiche de cette semence n'est pas celle d'un mélange : enregistrez-la d'abord comme mélange.");
+    const kept = await rows<{ id: string; label: string }>(tx, sql`SELECT id, label FROM seed_mixture_components WHERE article_id = ${articleId}`);
+    const idOf = new Map(kept.map((k) => [k.label.toLowerCase(), k.id]));
+    const keep = components.map((c) => idOf.get(c.label.toLowerCase())).filter((x): x is string => !!x);
+    await tx.execute(
+      keep.length
+        ? sql`DELETE FROM seed_mixture_components WHERE article_id = ${articleId} AND id NOT IN (${sql.join(keep.map((x) => sql`${x}`), sql`, `)})`
+        : sql`DELETE FROM seed_mixture_components WHERE article_id = ${articleId}`,
+    );
+    for (const [position, c] of components.entries()) {
+      const id = idOf.get(c.label.toLowerCase()) ?? crypto.randomUUID();
+      await tx.execute(sql`
+        INSERT INTO seed_mixture_components (id, farm_id, article_id, species, label, variety_name, gnis_code, position)
+        VALUES (${id}, ${farmId}, ${articleId}, ${c.species}, ${c.label}, ${c.varietyName}, ${c.gnisCode}, ${position})
+        ON CONFLICT (id) DO UPDATE SET species = EXCLUDED.species, label = EXCLUDED.label, variety_name = EXCLUDED.variety_name,
+          gnis_code = EXCLUDED.gnis_code, position = EXCLUDED.position`);
+    }
+    await tx.execute(sql`UPDATE articles SET updated_at = now() WHERE id = ${articleId}`);
+    return getSeedIn(tx, articleId, at);
+  });
+}
+
+/** Espèces d'un mélange et doses de son dernier semis, proposées à la saisie (FR-SE-13b). */
+export async function seedMixture(db: Database, farmId: string, articleId: string): Promise<SeedMixture> {
+  return withFarm(db, farmId, async (tx) => {
+    const [a] = await rows(tx, sql`SELECT 1 FROM articles WHERE id = ${articleId} AND kind = 'seed'`);
+    if (!a) throw new NotFound("Semence introuvable.");
+    const components = await componentsOf(tx, articleId);
+    const [last] = await rows<{ intervention_id: string; started_at: string; doses: MixtureDose[] }>(
+      tx,
+      sql`SELECT i.id AS intervention_id, i.started_at::date::text AS started_at, ip.attrs->'mixture' AS doses
+          FROM intervention_parameters ip JOIN interventions i ON i.id = ip.intervention_id
+          WHERE ip.role = 'input' AND ip.ref_id = ${articleId} AND jsonb_typeof(ip.attrs->'mixture') = 'array' AND i.status <> 'cancelled'
+          ORDER BY i.started_at DESC NULLS LAST LIMIT 1`,
+    );
+    return { articleId, components, last: last ? { interventionId: last.intervention_id, startedAt: last.started_at, doses: last.doses } : null };
+  });
 }
 
 export async function getSeed(db: Database, farmId: string, articleId: string, at: string): Promise<SeedDetail> {

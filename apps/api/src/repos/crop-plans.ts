@@ -17,7 +17,7 @@ import {
   type CropPlanView,
   type CropPlanYearCrop,
 } from "@fourmy/contracts";
-import { legumeOf } from "./taxonomy.js";
+import { coverHasLegume, legumeOf } from "./taxonomy.js";
 import { checkCropPlan, cropPlanCheckInput, diffCropPlan, emptyDraft, operationBlockers, parcelKeyOf, resolveParcels, type ExistingCover, type ExistingProduction } from "@fourmy/domain";
 import { Conflict, NotFound } from "../routes/helpers.js";
 import { natureOf, pictureUrl } from "./activities.js";
@@ -201,7 +201,7 @@ async function history(tx: Tx, parcelIds: string[], year: number): Promise<CropP
                coalesce(a.cultivation, lx.specie, p.cultivation) AS species, coalesce(a.name, lx.label, p.nature) AS label,
                lx.life_years::float8 AS life_years, lx.usage, p.cycle,
                ${legumeOf(sql`coalesce(a.cultivation, lx.specie, p.cultivation)`)} AS legume,
-               EXISTS (SELECT 1 FROM cover_crops cc WHERE cc.land_parcel_id = p.land_parcel_id AND cc.campaign = c.year AND cc.family LIKE '%legumineuses%') AS cover_legume,
+               EXISTS (SELECT 1 FROM cover_crops cc WHERE cc.land_parcel_id = p.land_parcel_id AND cc.campaign = c.year AND ${coverHasLegume("cc")}) AS cover_legume,
                -- Culture secondaire après la principale : dérobée de la campagne, ou couvert de la campagne suivante
                -- semé au plus tard le 15 novembre et en place jusqu'au 15 février (BCAE 7, §3 A).
                (EXISTS (SELECT 1 FROM productions p2 JOIN activities a2 ON a2.id = p2.activity_id

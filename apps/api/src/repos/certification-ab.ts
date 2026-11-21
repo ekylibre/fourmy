@@ -14,6 +14,7 @@ import {
 } from "@fourmy/domain";
 import { nitrogen } from "./fertilization-record.js";
 import { fertilizersInTx } from "./fertilizers.js";
+import { coverHasLegume } from "./taxonomy.js";
 
 /**
  * Données de l'Agriculture biologique pour les contrôles (lot CT2) : intrants
@@ -399,7 +400,7 @@ export async function rotationHistory(tx: Tx, parcels: { id: string; name: strin
                          SELECT reference_name, parent, 0 AS depth FROM taxonomy WHERE reference_name = coalesce(a.cultivation, lp.specie, p.cultivation)
                          UNION ALL SELECT x.reference_name, x.parent, l.depth + 1 FROM taxonomy x JOIN l ON x.reference_name = l.parent WHERE l.depth < 30)
                        SELECT 1 FROM l WHERE reference_name = 'fabaceae') AS legume,
-               EXISTS (SELECT 1 FROM cover_crops cc WHERE cc.land_parcel_id = p.land_parcel_id AND cc.campaign = c.year AND cc.family LIKE '%legumineuses%') AS cover_legume
+               EXISTS (SELECT 1 FROM cover_crops cc WHERE cc.land_parcel_id = p.land_parcel_id AND cc.campaign = c.year AND ${coverHasLegume("cc")}) AS cover_legume
         FROM productions p
         JOIN campaigns c ON c.id = p.campaign_id
         LEFT JOIN activities a ON a.id = p.activity_id

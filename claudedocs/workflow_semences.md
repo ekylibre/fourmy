@@ -283,3 +283,25 @@ flowchart LR
 - Tests : API 6 (`seeds-sowing.integration.test.ts` : 18 doses pour 9 grains/m² sur 10 ha, repère estimé, PMG du lot, conversion figée, refus, unité illisible), domaine 1, web 1 (formulaire) ; tests de stock existants verts ; turbo : 82 tâches vertes.
 - Pas de parcours e2e dédié : le formulaire est couvert par le test web, le stock par les tests d'API.
 
+
+### SE6 — Mélanges et couverts (21/11/2026)
+
+- API :
+  - `PUT /articles/:id/seed/components` remplace les espèces d'un mélange (refus si la fiche n'est pas un mélange) ; une espèce gardée (même libellé) garde son identifiant, pour que les doses des semis passés la désignent toujours ; légumineuses repérées par la taxonomie ;
+  - `GET /articles/:id/seed/mixture` : espèces et doses du dernier semis, proposées à la saisie ;
+  - intrant `mixture` (doses en kg/ha, rangées dans `attrs.mixture`) : la semence est un mélange, la dose se saisit en masse par hectare et vaut la somme des doses à 0,01 près, une espèce désignée appartient au mélange ; sinon 422 avec le motif ;
+  - à la réalisation ou la correction d'un semis : le couvert semé déjà saisi sur la parcelle, à 15 jours près, est rattaché ; il prend les espèces, leurs doses, la date et le libellé du semis ; rien n'est créé sans couvert ;
+  - `GET /land-parcels/:id/cover-crop/sowings?campaign=` : semis réalisés de juin à décembre de l'année d'avant, pas encore repris, avec la famille déduite et le nombre de légumineuses ;
+  - `PUT /land-parcels/:id/cover-crop` accepte `sowingInterventionId` (semis réalisé sur la parcelle) et `components`.
+- Les espèces semées servent :
+  - au couvert à légumineuses de l'assolement (rotation) et du contrôle AB, par `coverHasLegume` (famille, ou légumineuse parmi les espèces) ;
+  - à la diversité HVE (espèces du couvert d'après sa composition).
+- BCAE 7 : la règle codée (culture secondaire) dépend des dates du couvert, pas du nombre d'espèces ; rien à changer. Le nombre d'espèces reste affiché.
+- Domaine `seeds/mixture.ts` : `mixtureTotal`, `mixtureMatches`, `grainsPerM2`, `coverFamilyOf` (famille du référentiel déduite des groupes ; rien de deviné hors référentiel). SQL `coverGroupOf` dans `repos/taxonomy.ts` (légumineuse, crucifère, avoine-seigle, ray-grass, autre graminée, phacélie).
+- Web :
+  - fiche : `MixtureEditor` (espèce du référentiel ou libellé libre, variété, légumineuses, « 1 légumineuse sur 4 espèces ») ;
+  - formulaire : `MixtureDoses` sous un mélange stocké en masse, une dose par espèce, dose du mélange calculée (quantité en lecture seule), doses du dernier semis proposées, densité en grains/m² quand le repère de PMG de l'espèce existe ;
+  - fiche d'intervention : `MixtureLine` (dose de chaque espèce) ;
+  - page de la parcelle (plan de fumure) : « Reprendre le semis du … », espèces semées et lien vers le semis.
+- Tests : API 7 (`seeds-mixture.integration.test.ts` : 8 + 4 + 2 + 1 = 15 kg/ha et 150 kg sortis, 422, couvert rattaché avec ses quatre espèces, proposition et reprise, semence seule ; les contrôles de légumineuses ne tournent que si la taxonomie est chargée), domaine 3, web 3 ; e2e semences, parcours, correction, assolement et contrôle AB verts en local ; turbo : 82 tâches vertes.
+- Synchronisation mobile : les espèces d'un mélange ne sont pas encore envoyées au mobile (issue prévue en SE8).

@@ -23,6 +23,7 @@ import { useFarm } from "../../app/farm";
 import { formatDate, formatNumber } from "../../app/labels";
 import { ErrorAlert, Loading } from "../../components/states";
 import { ProposalBadge, proposalLabel } from "./AttachModal";
+import { MixtureEditor } from "./MixtureEditor";
 import { fmt, ORGANIC_LABELS, stockUnitLabel } from "./labels";
 import { seedsKey, useSeed, useSeedSpecies } from "./queries";
 
@@ -175,10 +176,12 @@ function SheetBody({ detail, proposal }: { detail: SeedDetail; proposal: SeedAtt
           disabled={!owner}
         />
       </SimpleGrid>
-      {w.isMixture && detail.components.length > 0 && (
-        <Text size="sm">
-          Espèces du mélange : {detail.components.map((c) => c.label).join(", ")}.
-        </Text>
+      {w.isMixture && (
+        <>
+          <Divider />
+          <Title order={4}>Espèces du mélange</Title>
+          <MixtureEditor key={detail.components.map((c) => c.id).join()} detail={detail} owner={owner} />
+        </>
       )}
 
       <Divider />

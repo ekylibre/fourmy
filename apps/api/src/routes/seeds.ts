@@ -1,9 +1,9 @@
 import { Hono } from "hono";
-import { lotSeedWrite, seedAttachWrite, seedCreate, seedSheetSave } from "@fourmy/contracts";
+import { lotSeedWrite, mixtureComponentsSave, seedAttachWrite, seedCreate, seedSheetSave } from "@fourmy/contracts";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import { attachSeeds, createSeed, searchCatalog, seedAttachProposals } from "../repos/seed-catalog.js";
-import { getSeed, listSeeds, saveLotSeed, saveSeed, seedSpecies } from "../repos/seeds.js";
+import { getSeed, listSeeds, saveLotSeed, saveMixtureComponents, saveSeed, seedMixture, seedSpecies } from "../repos/seeds.js";
 import { atOrNow, problem, uuidParam } from "./helpers.js";
 
 const invalid = (issues: { message: string; path: PropertyKey[] }[]) => issues.map((i) => `${i.path.join(".")} : ${i.message}`).join(" ");
@@ -35,6 +35,13 @@ export const seedRoutes = new Hono<Env>()
     if (!parsed.success) return problem(c, 400, "Corps invalide", invalid(parsed.error.issues));
     return c.json(await saveSeed(db(), c.get("farmId"), c.get("userId"), uuidParam(c, "id"), parsed.data, atOrNow(c)));
   })
+  // Mélanges (lot SE6) : espèces, et doses du dernier semis proposées à la saisie.
+  .put("/articles/:id/seed/components", requireOwner, async (c) => {
+    const parsed = mixtureComponentsSave.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", invalid(parsed.error.issues));
+    return c.json(await saveMixtureComponents(db(), c.get("farmId"), uuidParam(c, "id"), parsed.data.components, atOrNow(c)));
+  })
+  .get("/articles/:id/seed/mixture", async (c) => c.json(await seedMixture(db(), c.get("farmId"), uuidParam(c, "id"))))
   .put("/lots/:id/seed", requireOwner, async (c) => {
     const parsed = lotSeedWrite.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return problem(c, 400, "Corps invalide", invalid(parsed.error.issues));

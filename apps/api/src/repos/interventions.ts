@@ -9,6 +9,8 @@ import {
   unitScale,
   pickLot,
   parseSeedUnit,
+  mixtureMatches,
+  mixtureTotal,
   resolveTgw,
   seedConversionGap,
   seedRate,
@@ -55,6 +57,7 @@ import { checkApplicationTx } from "./fertilization-record.js";
 import { recordCertificationCheck } from "./certification-controls.js";
 import { addReadingInTx } from "./equipments.js";
 import { buildTrackDraft, linkTrackSessions } from "./track-sessions.js";
+import { attachSowingToCovers } from "./cover-crops.js";
 
 /**
  * Interventions (docs/interventions.md). L'API parle la forme structurée
@@ -149,6 +152,7 @@ function toIntervention(r: Record<string, unknown>): Intervention {
           ...(a(p).lotId ? { lotId: a(p).lotId as string } : {}),
           ...(a(p).from ? { from: a(p).from as never } : {}),
           ...(a(p).equipmentId ? { equipmentId: a(p).equipmentId as string } : {}),
+          ...(Array.isArray(a(p).mixture) ? { mixture: a(p).mixture as never } : {}),
         };
       }),
     outputs: of("output")
@@ -373,6 +377,10 @@ async function validate(tx: Tx, procedureCode: string, raw: Body, mode: "plan" |
     allowMissingDestination: origin === "import",
   });
   if (errors.length) throw new DomainError(errors.join(" "));
+  for (const i of body.inputs) {
+    const a = articles.get(i.articleId);
+    if (a && i.mixture) await assertMixture(tx, a, i);
+  }
   // Unité de saisie d'un intrant (fertilisants et semences) : convertible dans celle de l'article.
   for (const i of body.inputs) {
     const a = articles.get(i.articleId);
@@ -431,6 +439,31 @@ async function assertSeedUnit(tx: Tx, a: Article, unit: string, lotId: string | 
   const gap = seedConversionGap(base, a.unit, { tgwG: tgw?.tgwG ?? null, grainsPerDose: a.seed?.grainsPerDose ?? null });
   if (gap) throw new DomainError(SEED_UNIT_ERRORS[gap](a, unit));
 }
+
+/**
+ * Doses d'un mélange (lot SE6, FR-SE-13b) : la semence est un mélange, la
+ * quantité se saisit en masse par hectare et vaut la somme des doses, à
+ * 0,01 près ; une espèce désignée appartient au mélange.
+ */
+async function assertMixture(tx: Tx, a: Article, i: Body["inputs"][number]) {
+  const doses = i.mixture!;
+  if (a.kind !== "seed" || !a.seed?.isMixture) throw new DomainError(`${a.name} : n'est pas un mélange, les doses par espèce ne s'appliquent pas.`);
+  const unit = parseSeedUnit(i.unit ?? a.unit);
+  if (i.per !== "hectare" || unit?.dim !== "mass") throw new DomainError(`${a.name} : la dose d'un mélange se saisit en kg/ha.`);
+  const kgHa = i.quantity * unit.kg;
+  if (!mixtureMatches(kgHa, doses)) {
+    throw new DomainError(`${a.name} : la dose du mélange (${fmtKg(kgHa)} kg/ha) n'est pas la somme des doses de ses espèces (${fmtKg(mixtureTotal(doses))} kg/ha).`);
+  }
+  const ids = doses.map((d) => d.componentId).filter((x): x is string => !!x);
+  if (ids.length) {
+    const found = await rows<{ id: string }>(
+      tx,
+      sql`SELECT id FROM seed_mixture_components WHERE article_id = ${a.id} AND id IN (${sql.join(ids.map((x) => sql`${x}`), sql`, `)})`,
+    );
+    if (found.length !== new Set(ids).size) throw new DomainError(`${a.name} : une espèce dosée n'appartient pas au mélange.`);
+  }
+}
+const fmtKg = (n: number) => (Math.round(n * 100) / 100).toLocaleString("fr-FR");
 
 /** Noms des matériels et personnes des attelages, pour des messages lisibles. */
 async function crewNames(tx: Tx, body: Body) {
@@ -496,6 +529,7 @@ async function writeBody(tx: Tx, interventionId: string, body: Body, articles: M
       ...(i.lotId ? { lotId: i.lotId } : {}),
       ...(i.from ? { from: i.from } : {}),
       ...(i.equipmentId ? { equipmentId: i.equipmentId } : {}),
+      ...(i.mixture ? { mixture: i.mixture } : {}),
     });
   }
   for (const o of body.outputs) {
@@ -1007,6 +1041,10 @@ async function applyCompletion(
     lines.push({ role: "output", lotId, placeId: o.to?.placeId ?? null, containerId: o.to?.containerId ?? null, quantity, unit: article.unit });
   }
 
+  // Semis d'un couvert déjà saisi sur la parcelle : le couvert reprend ses espèces et leurs doses (lot SE6).
+  if (input.inputs.some((i) => articles.get(i.articleId)?.kind === "seed") && (await attachSowingToCovers(tx, interventionId, startedAt!.slice(0, 10)))) {
+    warnings.push("Couvert d'interculture de la parcelle rattaché à ce semis : il en reprend les espèces et leurs doses.");
+  }
   const plan = planInterventionCompletion(ctx, { farmId, interventionId, startedAt: startedAt!, stoppedAt: stoppedAt!, lines });
   await insertMovements(tx, farmId, interventionId, plan.movements);
   await tx.execute(sql`
