@@ -40,6 +40,10 @@ Dans Fourmy aujourd'hui :
 | A13 | (21/11) **Catalogue d'ITK** : les 62 itinéraires Lexicon (`technical_workflows`, 2021) sont repris dans l'esprit (production, système, cycle, étapes), pas dans leur contenu, qui est à refaire ; premiers ITK construits à partir des interventions des deux fermes de test. |
 | A14 | (21/11) **Interventions prévues créées campagne par campagne, sur demande**, pas à la validation de l'assolement (FR-AS-22 réécrit). |
 | A15 | (21/11) **Débit de chantier** calculé depuis le matériel (largeur × vitesse × rendement) **et saisissable dans l'ITK**. |
+| A16 | (21/11) **Prix de vente** : saisis par la ferme ; par défaut, les prix Lexicon des productions (cours MATIF, prix européens), avec leur source et leur date. L'API agrifood de la Commission reste l'objectif : interrogée avec un cache, elle remplacera la valeur par défaut dès qu'elle répondra (en erreur 500 depuis le 20/11). |
+| A17 | (21/11) **Prix des intrants** : un prix par article de la ferme, saisi par l'exploitant ; le prix Lexicon est proposé quand il existe (jeux réservés aux adhérents si le bundle « fourmy » les donne). |
+| A18 | (21/11) **Main-d'œuvre et matériels** : coût horaire de la main-d'œuvre dans les réglages ; matériels au coût BCMA « façons culturales » (coûts fixe et variable, carburant compris, sans le compter deux fois). |
+| A19 | (21/11) **Périmètre de la première version** : produit, charges opérationnelles, marge brute, charges de mécanisation et de main-d'œuvre, marge directe ; en prévu, comparé à la campagne précédente. Charges indirectes par clé de répartition et réalisé détaillé : plus tard. |
 
 ## 4. Exigences fonctionnelles — temps 1 (assolement)
 
