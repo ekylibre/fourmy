@@ -13,6 +13,11 @@ Chaque point se lit ainsi : **titre** : description. *nature · priorité · sou
 
 **Numérotation :** les points 1 à 94 gardent leur numéro du 12/11. Les points nouveaux commencent à 95 et sont rangés dans leur thème.
 
+## Mise à jour du 2026-11-21
+
+- **Semences (SE1 à SE8, PR #121 à #127, puis la PR de SE8)** : Stocks → Semences, fiche (espèce, variété, code GNIS, conditionnement, PMG avec repères Arvalis et Terres Inovia), PMG par lot, catalogue officiel des variétés, rattachement proposé (code GNIS, espèce importée, référence Lexicon, nom repris d'Ekylibre), semis en grains/m², kg/ha, milliers ou doses avec conversion figée, mélanges dosés par espèce, couverts repris du semis, utilisation par campagne et export CSV (`docs/semences.md`). Restent les points 129 à 134 (thème 18, issues #129 à #134).
+- **Recette locale (SE8)** : ferme pilote de grandes cultures reprise d'Ekylibre (26 semences, toutes les unités reconnues ; le rattachement proposé passe de 1 à 26 semences grâce aux noms « Semence de maïs - DKC5065 », dont 14 avec leur code GNIS) et ferme test des imports Geofolia (42 propositions, 23 sûres).
+
 ## Mise à jour du 2026-11-20
 
 Du 17 au 20/11 : imports et assistant de premier démarrage, puis contrôles HVE et Agriculture biologique.
@@ -323,3 +328,14 @@ Besoins, conception et plans : `claudedocs/besoins_import_onboarding.md`, `claud
 126. **Découpe : report des interventions prévues** sur les morceaux et annulation d'une découpe validée. *évolution · P3 · workflow_assolement AS3* — issue #116
 127. **Mobile : parcellaire à la date d'effet d'une découpe** (synchronisation qui ne voit le changement qu'à la synchronisation complète suivante). *dette · P3 · workflow_assolement AS3* — issue #117
 128. **BCAE 7 : barème à points de la plaine du Rhin** (liste des communes de l'arrêté BCAE) et liste des légumineuses de l'exemption à vérifier sur la notice Télépac 2026. *donnée · P3 · docs/pac/rapport_pac.md* — issue #118
+
+## 18. Semences
+
+Besoins, conception et plan : `claudedocs/besoins_semences.md`, `claudedocs/conception_semences.md`, `claudedocs/workflow_semences.md`. Mode d'emploi : `docs/semences.md`.
+
+129. **Faculté germinative et pertes à la levée** : faut-il les saisir pour passer d'une densité de plantes visée à une densité de semis ? Lié au temps 2 de l'assolement (124). *décision · P3 · besoins_semences §7 q1* — issue #129
+130. **Unités des semences reprises** : elles sont reconnues à la volée (« Sac de 50 000 grains », « Mille graines ») ; proposer aussi de réécrire l'unité des articles en unité canonique, sur confirmation ? *décision · P3 · besoins_semences §7 q2* — issue #130
+131. **Prix indicatifs des semences** (Germineo, réservé aux membres) : sur la fiche dès maintenant, ou avec le temps 3 de l'assolement (125) ? *décision · P3 · besoins_semences §7 q3* — issue #131
+132. **Semences de ferme** : suivre le triage à façon et la CVO (contribution volontaire obligatoire) ? *décision · P3 · besoins_semences §7 q4* — issue #132
+133. **Application mobile : semences** : unités de semis (grains/m², kg/ha, doses) avec le champ `seed` synchronisé, et espèces d'un mélange (non encore synchronisées) pour saisir la dose de chaque espèce. *évolution · P2 · conception_semences §6, workflow_semences SE8* — issue #133
+134. **Rattachement des semences de l'exploitant testeur** : 42 propositions sur la ferme test des imports (23 sûres par le code GNIS), à confirmer avec lui avant de les appliquer. *donnée · P2 · recette SE8* — issue #134

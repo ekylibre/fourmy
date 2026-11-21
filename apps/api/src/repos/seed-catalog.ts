@@ -164,6 +164,16 @@ function speciesFromLabel(idx: SpeciesIndex, label: string): { species: string; 
   return found.size === 1 ? { species: [...found][0]!, exact: false } : null;
 }
 
+/**
+ * Nom d'une semence reprise d'Ekylibre : « Semence(s) de maïs - DKC5065 »,
+ * « Semence d'avoine ». L'espèce, et la variété après le tiret.
+ */
+export function nameParts(name: string): { species: string; variety: string | null } | null {
+  const m = /^semences?\s+(?:de\s+|d['’]\s*)(.+?)(?:\s+-\s+(.+))?$/i.exec(name.replace(/\s+/g, " ").trim());
+  if (!m) return null;
+  return { species: m[1]!.trim(), variety: m[2]?.trim() || null };
+}
+
 /** Propositions de rattachement, pour les semences sans espèce ni mélange (ou pour celles demandées). */
 async function proposalsIn(tx: Tx, articleIds?: string[]): Promise<SeedAttachProposal[]> {
   const candidates = await rows<Candidate>(
@@ -188,7 +198,7 @@ async function proposalsIn(tx: Tx, articleIds?: string[]): Promise<SeedAttachPro
   );
   // Variété d'après le nom de l'article : seulement si le nom n'appartient qu'à une variété du catalogue.
   const plain = (v: string) => v.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
-  const names = [...new Set(candidates.map((c) => plain(c.name)))];
+  const names = [...new Set(candidates.flatMap((c) => [plain(c.name), ...(nameParts(c.name)?.variety ? [plain(nameParts(c.name)!.variety!)] : [])]))];
   const byName = new Map<string, { gnis_code: string; species: string; variety_name: string }[]>();
   for (const v of await rows<{ gnis_code: string; species: string; variety_name: string; key: string }>(
     tx,
@@ -239,23 +249,29 @@ async function proposalsIn(tx: Tx, articleIds?: string[]): Promise<SeedAttachPro
     const fromRef = refBase ? (idx.byRef.has(refBase) ? { species: refBase, exact: true } : speciesFromLabel(idx, refBase.replace(/_/g, " "))) : null;
     const variety = byName.get(plain(c.name));
     const fromVariety = variety && variety.length === 1 ? variety[0]! : null;
-    const species = fromImport ?? fromRef ?? (fromVariety ? { species: fromVariety.species, exact: true } : null);
+    // Nom repris d'Ekylibre : « Semence de maïs - DKC5065 » donne l'espèce, et la variété si le catalogue la connaît pour cette espèce.
+    const parts = nameParts(c.name);
+    const fromName = parts ? speciesFromLabel(idx, parts.species) : null;
+    const species = fromImport ?? fromRef ?? (fromVariety ? { species: fromVariety.species, exact: true } : null) ?? fromName;
     if (!species) continue;
-    const varietyMatch = fromVariety && fromVariety.species === species.species ? fromVariety : null;
+    const named = parts?.variety ? (byName.get(plain(parts.variety)) ?? []).filter((v) => v.species === species.species) : [];
+    const varietyMatch = fromVariety && fromVariety.species === species.species ? fromVariety : named.length === 1 ? named[0]! : null;
     out.push({
       ...base,
       species: species.species,
       speciesLabel: idx.labelOf.get(species.species) ?? null,
-      varietyName: c.sheet_variety ?? (varietyMatch ? displayVariety(varietyMatch.variety_name) : null),
+      varietyName: c.sheet_variety ?? (varietyMatch ? displayVariety(varietyMatch.variety_name) : species === fromName ? (parts?.variety ?? null) : null),
       gnisCode: code ?? varietyMatch?.gnis_code ?? null,
       isMixture: false,
       reason: fromImport
         ? `espèce importée « ${c.imported_species} »${fromImport.exact ? "" : " (libellé proche)"}`
         : fromRef
           ? `référence Lexicon ${c.lexicon_ref}`
-          : `variété ${displayVariety(fromVariety!.variety_name)} au catalogue`,
+          : fromVariety
+            ? `variété ${displayVariety(fromVariety.variety_name)} au catalogue`
+            : `nom « ${c.name} »${varietyMatch ? ", variété au catalogue" : ""}`,
       sure: false,
-      approximate: !species.exact || (!fromImport && !fromRef),
+      approximate: !species.exact || (!fromImport && !fromRef && species !== fromName),
     });
   }
   return out;
