@@ -88,6 +88,8 @@ Onglet **Intrants** : pour chaque semence, engrais, produit phyto ou autre intra
 - **Plan de fumure** établi : ses apports remplacent les engrais minéraux de l'itinéraire de la parcelle (quantité de produit calculée d'après la teneur en azote) ; un apport sans engrais choisi est compté en kg d'azote.
 - Une dose qui ne se convertit pas (PMG, densité ou unité à compléter) reste dans l'unité de la dose, signalée.
 
+Onglet **Économie** : marges prévues par activité et pour l'assolement (produit, charges opérationnelles, marge brute, mécanisation, main-d'œuvre, marge directe), en €/ha ou en total ; postes incomplets signalés avec ce qui manque (voir `docs/economie.md`).
+
 ## Réglages (responsable)
 
 Onglet **Réglages** : critère BCAE 7 mis en avant, ferme en plaine du Rhin (diversification à points, non calculée : « à vérifier »), délais de retour propres à la ferme, journée de travail et heures par personne et par semaine (onglet Travaux).
