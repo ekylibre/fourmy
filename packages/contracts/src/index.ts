@@ -38,3 +38,4 @@ export * from "./certification.js";
 export * from "./crop-plan.js";
 export * from "./seeds.js";
 export * from "./technical-itinerary.js";
+export * from "./economics.js";

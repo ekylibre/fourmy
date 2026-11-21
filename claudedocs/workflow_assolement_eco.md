@@ -77,4 +77,11 @@ flowchart LR
 
 ## 5. Réalisé
 
-*(rempli au fil des lots)*
+### E1 — fait (21/11)
+- Migration 0080 `prices` (RLS, clés exclusives par nature) ; contrat `economics.ts` (`priceWrite` avec contrôle de la clé, `priceKey`, libellés).
+- Domaine `economics/prices.ts` : `priceAt`, `currentPrices`, `convertPrice` (masse, volume par la densité, semences par le PMG).
+- API `GET /prices` (en vigueur à une date, `history=1`), `POST /prices` (masse, objets de la ferme vérifiés), `DELETE /prices/:id` ; coûts BCMA (`unit`, `costPerUnit`, `costPerHour`) dans les lignes du barème.
+- Web : menu « Économique », 5 onglets, tableau de prix commun (saisie, cases, « Prix à », « Variation (%) », date d'effet, historique), matériels au barème marqués « barème BCMA ».
+- Tests : domaine (2), API (2), web (1). Essai dans Chrome sur la ferme de l'exploitant testeur : coût horaire enregistré.
+- Corrigé en essai : saisie décimale « 22,5 » effacée à la virgule ; unité « hour » non traduite ; matériel au barème affiché « à saisir ».
+- Documentation : `docs/economie.md`.

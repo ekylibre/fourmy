@@ -37,3 +37,4 @@ export * from "./certification/index.js";
 export * from "./crop-plan/index.js";
 export * from "./seeds/index.js";
 export * from "./itk/index.js";
+export * from "./economics/index.js";

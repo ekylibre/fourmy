@@ -334,6 +334,10 @@ export interface ItkMachineryRateInfo {
   widthM: number | null;
   /** ha/h ; null si la ligne n'est pas à l'hectare. */
   haH: number | null;
+  /** Unité d'utilisation du barème (hectares, heures…) et coûts « façons culturales » (temps 3). */
+  unit?: string;
+  costPerUnit?: number;
+  costPerHour?: number;
 }
 
 export interface ItkEquipmentInfo {
