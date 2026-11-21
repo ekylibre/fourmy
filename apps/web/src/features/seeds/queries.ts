@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { SeedAttachProposal, SeedCatalogItem, SeedDetail, SeedListItem, SeedMixture, SeedSpeciesOption } from "@fourmy/contracts";
+import type { SeedAttachProposal, SeedCatalogItem, SeedDetail, SeedListItem, SeedMixture, SeedSpeciesOption, SeedUsage, SeedUsageBy } from "@fourmy/contracts";
 import { api, farmPath } from "../../app/api";
 
 /** Semences (lot SE3) : liste à la date de la frise, fiche, espèces proposées. */
@@ -53,5 +53,13 @@ export function useSeedMixture(farmId: string, articleId: string | null, enabled
     queryKey: [...seedsKey(farmId), "mixture", articleId],
     queryFn: () => api.get<SeedMixture>(farmPath(farmId, `/articles/${articleId}/seed/mixture`)),
     enabled: enabled && !!articleId,
+  });
+}
+
+/** Utilisation par campagne, par semence ou par espèce (lot SE7). */
+export function useSeedUsage(farmId: string, campaign: number, by: SeedUsageBy) {
+  return useQuery({
+    queryKey: [...seedsKey(farmId), "usage", campaign, by],
+    queryFn: () => api.get<SeedUsage>(farmPath(farmId, `/seeds/usage?campaign=${campaign}&by=${by}`)),
   });
 }

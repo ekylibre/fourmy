@@ -70,7 +70,7 @@ const SELECT = (at: string) => sql`
   WHERE a.kind = 'seed'`;
 
 /** Campagne d'une intervention : celle de la culture en place sur sa première parcelle, sinon l'année de début. */
-const CAMPAIGN_OF = sql`coalesce((
+export const CAMPAIGN_OF = sql`coalesce((
   SELECT c.year FROM intervention_parameters t
   JOIN productions p ON p.id = fourmy_production_at(t.ref_id, i.started_at::date)
   JOIN campaigns c ON c.id = p.campaign_id

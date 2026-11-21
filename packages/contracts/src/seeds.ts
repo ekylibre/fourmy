@@ -276,3 +276,52 @@ export interface CoverSowingProposal {
   family: CoverFamilyKey | null;
   legumes: number;
 }
+
+// --- Utilisation par campagne (lot SE7) ---------------------------------------------
+
+/** Moyenne pondérée par la surface, et écart entre parcelles (minimum, maximum). */
+export interface SeedDensityRange {
+  mean: number;
+  min: number;
+  max: number;
+}
+
+/** Utilisation réalisée ou prévue d'une semence (ou d'une espèce) sur une campagne (FR-SE-24). */
+export interface SeedUsageFigures {
+  interventions: number;
+  areaHa: number;
+  /** Quantité dans l'unité du stock (regroupement par semence seulement) ; null si rien n'est convertible. */
+  stockQuantity: number | null;
+  kg: number | null;
+  grains: number | null;
+  kgPerHa: SeedDensityRange | null;
+  grainsPerM2: SeedDensityRange | null;
+  /** Une valeur passe par un PMG repère. */
+  estimated: boolean;
+  /** Intrants dont la dose ne se convertit pas (PMG inconnu, unité illisible) : comptés, sans bloquer. */
+  unconvertible: number;
+}
+
+export const seedUsageBy = z.enum(["article", "species"]);
+export type SeedUsageBy = z.infer<typeof seedUsageBy>;
+
+export interface SeedUsageGroup {
+  /** Identifiant de la semence, ou taxon de l'espèce (`sans-espece` à défaut). */
+  key: string;
+  label: string;
+  species: string | null;
+  speciesLabel: string | null;
+  /** Unité du stock (par semence). */
+  unit: string | null;
+  /** Semences regroupées (par espèce : les variétés comparées, FR-SE-25). */
+  articles: { articleId: string; name: string }[];
+  activities: string[];
+  done: SeedUsageFigures;
+  planned: SeedUsageFigures;
+}
+
+export interface SeedUsage {
+  campaign: number;
+  by: SeedUsageBy;
+  groups: SeedUsageGroup[];
+}
