@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { priceKind, pricesWrite } from "@fourmy/contracts";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
-import { addPrices, deletePrice, listPrices, productSuggestions } from "../repos/prices.js";
+import { addPrices, deletePrice, ecoContext, listPrices, productSuggestions } from "../repos/prices.js";
 import { domainCtx, problem, uuidParam } from "./helpers.js";
 
 /** Prix de la ferme (temps 3, lot E1) : lecture pour les membres, saisie par le responsable. */
@@ -17,6 +17,12 @@ export const priceRoutes = new Hono<Env>()
   })
   // Repères Lexicon (lot E2) : prix de vente proposés et rendements Agreste, par activité.
   .get("/prices/suggestions/products", async (c) => c.json(await productSuggestions(db(), c.get("farmId"))))
+  // Contexte économique d'une campagne d'assolement (lot E3) : défauts de rendement et de prix par activité.
+  .get("/crop-plans/:year/eco-context", async (c) => {
+    const year = Number(c.req.param("year"));
+    if (!Number.isInteger(year) || year < 2000 || year > 2100) return problem(c, 400, "Campagne invalide");
+    return c.json(await ecoContext(db(), c.get("farmId"), year));
+  })
   .post("/prices", requireOwner, async (c) => {
     const parsed = pricesWrite.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.issues.map((i) => i.message).join(" "));

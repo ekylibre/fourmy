@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { CropPlanContext, CropPlanDraft, CropPlanParcelKey, CropPlanView } from "@fourmy/contracts";
+import type { CropPlanContext, CropPlanDraft, CropPlanForecast, CropPlanParcelKey, CropPlanView } from "@fourmy/contracts";
 import { checkCropPlan, cropPlanCheckInput, summarizeCropPlan, type CropPlanActivity } from "@fourmy/domain";
 import { api, ApiError, farmPath } from "../../app/api";
 import { cropPlanKeys } from "./queries";
@@ -21,6 +21,11 @@ export interface AssignOptions {
   stoppedOn: string | null;
   /** Itinéraire technique (lot IT3) ; null ou absent : aucun. */
   itineraryId?: string | null;
+  /**
+   * Prévisions de rendement et de prix (lot E3) : remplacent celles de l'affectation ;
+   * absentes, celles d'une affectation de la même activité sont gardées.
+   */
+  forecasts?: CropPlanForecast[] | null;
 }
 
 let seq = 0;
@@ -33,11 +38,16 @@ export function assignMain(draft: CropPlanDraft, keys: CropPlanParcelKey[], acti
   for (const key of keys) {
     const i = assignments.findIndex((a) => a.key === key && a.role === "main");
     const itk = opts.itineraryId ? { itineraryId: opts.itineraryId } : {};
+    const fc = (kept?: CropPlanForecast[]) => {
+      const list = opts.forecasts !== undefined ? opts.forecasts : kept;
+      return list?.length ? { forecasts: list } : {};
+    };
     if (i >= 0) {
-      const { itineraryId: _old, ...rest } = assignments[i]!;
+      const { itineraryId: _old, forecasts: oldForecasts, ...rest } = assignments[i]!;
       void _old;
-      assignments[i] = { ...rest, activityId, startedOn: opts.startedOn, stoppedOn: opts.stoppedOn, ...itk };
-    } else assignments.push({ id: newId(), key, role: "main", activityId, startedOn: opts.startedOn, stoppedOn: opts.stoppedOn, ...itk });
+      const kept = rest.activityId === activityId ? oldForecasts : undefined;
+      assignments[i] = { ...rest, activityId, startedOn: opts.startedOn, stoppedOn: opts.stoppedOn, ...itk, ...fc(kept) };
+    } else assignments.push({ id: newId(), key, role: "main", activityId, startedOn: opts.startedOn, stoppedOn: opts.stoppedOn, ...itk, ...fc() });
   }
   return { ...draft, assignments, fallow: draft.fallow.filter((f) => !set.has(f.key)) };
 }

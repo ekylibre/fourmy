@@ -71,6 +71,9 @@ describe.skipIf(!url)("prix de la ferme (intégration)", () => {
     await sql`INSERT INTO lexicon_market_prices (id, specie, product_code, label, unit, price, started_on) VALUES
       ('zz_1', 'zz_specie', 'ZZ', 'Test Bordeaux', 'ton', 200, '2026-04-06'), ('zz_2', 'zz_specie', 'ZZ', 'Test Bordeaux', 'ton', 201.5, '2026-04-13'),
       ('zz_3', 'zz_specie', 'ZZ', 'Test Dunkerque (en retard)', 'ton', 190, '2025-02-01'), ('zz_4', 'zz_specie', 'ZZ', 'Test Rouen (trop ancien)', 'ton', 150, '2019-02-01')`;
+    // Cache agrifood : prioritaire sur la copie Lexicon des mêmes prix.
+    await sql`INSERT INTO market_prices (id, product_code, specie, product_label, market, unit, price, started_on) VALUES
+      ('zz_agri', 'ZZ', 'zz_specie', 'Test Bordeaux', 'Bordeaux', 'ton', 205, '2026-04-20')`;
     await sql`INSERT INTO lexicon_production_yields (department, specie, production, yield_value, yield_unit, campaign) VALUES
       ('64', 'zz_specie', 'zz_grain', 95, 'quintal_per_hectare', 2024), ('64', 'zz_specie', 'zz_grain', 69, 'quintal_per_hectare', 2025)`;
     try {
@@ -82,11 +85,11 @@ describe.skipIf(!url)("prix de la ferme (intégration)", () => {
       const res = await (await send(worker, "GET", "/prices/suggestions/products")).json();
       expect(res.department).toBe("64");
       const g = res.items.find((i: { activityId: string }) => i.activityId === grain);
-      expect(g.suggestions.map((s: { scope: string; amount: number; date: string }) => [s.scope, s.amount, s.date])).toEqual([
-        ["department", 180, "2025-06-01"],
-        ["national", 175, "2025-06-01"],
-        ["matif", 250.5, "2025-12-01"],
-        ["market", 201.5, "2026-04-13"],
+      expect(g.suggestions.map((s: { scope: string; source: string; amount: number; date: string }) => [s.scope, s.source, s.amount, s.date])).toEqual([
+        ["department", "lexicon", 180, "2025-06-01"],
+        ["national", "lexicon", 175, "2025-06-01"],
+        ["matif", "lexicon", 250.5, "2025-12-01"],
+        ["market", "agrifood", 205, "2026-04-20"],
       ]);
       expect(g.yields).toEqual([
         { campaign: 2025, value: 69, unit: "quintal_per_hectare" },
@@ -94,9 +97,20 @@ describe.skipIf(!url)("prix de la ferme (intégration)", () => {
       ]);
       // Fourrage : pas de prix du grain.
       expect(res.items.find((i: { activityId: string }) => i.activityId === fodder).suggestions).toEqual([]);
+      // Contexte économique (lot E3) : Agreste sans historique, prix agrifood sans prix de la ferme, puis prix de la ferme.
+      const eco = await (await send(worker, "GET", "/crop-plans/2027/eco-context")).json();
+      const ge = eco.activities.find((i: { activityId: string }) => i.activityId === grain);
+      expect(ge.yield).toEqual({ value: 82, unit: "quintal_per_hectare", source: "agreste", label: "médiane Agreste 64 2024-2025" });
+      expect(ge.price).toMatchObject({ value: 205, unit: "ton", source: "agrifood" });
+      expect(eco.department).toBe("64");
+      await send(owner, "POST", "/prices", { items: [{ kind: "product", activityId: grain, product: "principal", unit: "ton", amount: 190, validFrom: "2026-09-01" }] });
+      const eco2 = await (await send(worker, "GET", "/crop-plans/2027/eco-context")).json();
+      expect(eco2.activities.find((i: { activityId: string }) => i.activityId === grain).price).toMatchObject({ value: 190, source: "farm", label: "prix de la ferme" });
+      expect((await send(worker, "GET", "/crop-plans/abc/eco-context")).status).toBe(400);
     } finally {
       await sql`DELETE FROM lexicon_production_prices WHERE specie = 'zz_specie'`;
       await sql`DELETE FROM lexicon_market_prices WHERE specie = 'zz_specie'`;
+      await sql`DELETE FROM market_prices WHERE specie = 'zz_specie'`;
       await sql`DELETE FROM lexicon_production_yields WHERE specie = 'zz_specie'`;
     }
   });

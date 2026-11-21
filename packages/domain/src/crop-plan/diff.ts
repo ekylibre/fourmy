@@ -39,9 +39,18 @@ const fields = (a: CropPlanProductionFields): CropPlanProductionFields => ({
   startedOn: a.startedOn,
   stoppedOn: a.stoppedOn,
   ...(a.itineraryId ? { itineraryId: a.itineraryId } : {}),
+  ...(a.forecasts?.length ? { forecasts: a.forecasts } : {}),
 });
+// Prévisions (lot E3) comparées par leur contenu, l'ordre des clés mis à part.
+export const forecastsKey = (f: CropPlanProductionFields["forecasts"]) =>
+  JSON.stringify((f ?? []).map((x) => [x.product, x.yield ?? null, x.unit, x.price ?? null, x.priceUnit ?? null]));
 const same = (a: CropPlanProductionFields, b: CropPlanProductionFields) =>
-  a.activityId === b.activityId && a.role === b.role && a.startedOn === b.startedOn && a.stoppedOn === b.stoppedOn && (a.itineraryId ?? null) === (b.itineraryId ?? null);
+  a.activityId === b.activityId &&
+  a.role === b.role &&
+  a.startedOn === b.startedOn &&
+  a.stoppedOn === b.stoppedOn &&
+  (a.itineraryId ?? null) === (b.itineraryId ?? null) &&
+  forecastsKey(a.forecasts) === forecastsKey(b.forecasts);
 
 export function diffCropPlan(
   draft: CropPlanDraft,

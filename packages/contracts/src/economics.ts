@@ -123,3 +123,47 @@ export const PRICE_SCOPE_LABELS: Record<PriceSuggestion["scope"], string> = {
   matif: "MATIF",
   market: "marché européen",
 };
+
+/** Origine d'une valeur prévue (rendement, prix) : saisie dans l'assolement ou défaut calculé. */
+export type ForecastSource = "plan" | "farm" | "agreste" | "agrifood" | "lexicon";
+
+export const FORECAST_SOURCE_LABELS: Record<ForecastSource, string> = {
+  plan: "saisi dans l'assolement",
+  farm: "ferme",
+  agreste: "Agreste",
+  agrifood: "Commission européenne (agrifood)",
+  lexicon: "Lexicon",
+};
+
+/** Valeur prévue et sa provenance, affichée à côté (« 112 q/ha, médiane 2024-2026 de la ferme »). */
+export interface ForecastValue {
+  value: number;
+  unit: string;
+  source: ForecastSource;
+  label: string;
+  date?: string | null;
+}
+
+/** Contexte économique d'une campagne d'assolement (lot E3), par activité. */
+export interface EcoContextActivity {
+  activityId: string;
+  production: string | null;
+  specie: string | null;
+  /** Rendements réalisés de la ferme (q/ha), par campagne. */
+  farmYields: { campaign: number; value: number }[];
+  agreste: YieldReference[];
+  suggestions: PriceSuggestion[];
+  /** Prix de vente du produit principal saisi dans le module Économique, en vigueur au début de la campagne. */
+  farmPrice: Price | null;
+  /** Défauts calculés (domaine `defaultYield`, `defaultPrice`). */
+  yield: ForecastValue | null;
+  price: ForecastValue | null;
+}
+
+export interface EcoContext {
+  year: number;
+  department: string | null;
+  activities: EcoContextActivity[];
+  /** Coût horaire de la main-d'œuvre en vigueur. */
+  labour: Price | null;
+}

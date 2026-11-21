@@ -117,7 +117,7 @@ function quintalsPerHa(quantity: number, unit: string | null, areaHa: number | n
 }
 
 /** Rendements réalisés (q/ha) par parcelle et par année, sur les interventions de récolte. */
-async function harvestYields(tx: Tx, farmId: string, from: number, to: number): Promise<{ parcelId: string; year: number; yieldQHa: number }[]> {
+export async function harvestYields(tx: Tx, farmId: string, from: number, to: number): Promise<{ parcelId: string; year: number; yieldQHa: number }[]> {
   const list = await rows<{ parcel_id: string; year: number; quantity: string; unit: string | null; area_m2: string | null; worked: string | null }>(
     tx,
     sql`SELECT t.ref_id AS parcel_id, extract(year FROM i.started_at)::int AS year, o.quantity, o.unit,

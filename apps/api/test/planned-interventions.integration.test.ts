@@ -68,21 +68,24 @@ describe.skipIf(!url)("interventions prévues d'après les ITK (intégration)", 
     await sql.end();
   });
 
-  it("l'ITK choisi dans l'assolement passe à la production à la validation", async () => {
+  it("l'ITK et les prévisions choisis dans l'assolement passent à la production à la validation", async () => {
+    const forecasts = [{ product: "principal", yield: 82.5, unit: "quintal_per_hectare", price: 205, priceUnit: "ton" }];
     const created = await (await send(owner, "POST", "/crop-plans/2027")).json();
     const draft = {
       ...created.draft,
-      assignments: [{ id: "a1", key: `p:${parcel}`, role: "main", activityId: wheat, startedOn: "2026-10-15", stoppedOn: "2027-07-10", itineraryId: itkA }],
+      assignments: [{ id: "a1", key: `p:${parcel}`, role: "main", activityId: wheat, startedOn: "2026-10-15", stoppedOn: "2027-07-10", itineraryId: itkA, forecasts }],
     };
     const saved = await send(owner, "PUT", "/crop-plans/2027/draft", { revision: created.revision, draft });
     expect(saved.status).toBe(200);
     const res = await send(owner, "POST", "/crop-plans/2027/validate", { revision: (await saved.json()).revision });
     expect(res.status).toBe(200);
-    const [p] = await sql`SELECT p.attrs->>'itineraryId' AS itk FROM productions p JOIN campaigns c ON c.id = p.campaign_id WHERE c.year = 2027 AND p.farm_id = ${farmId}`;
+    const [p] = await sql`SELECT p.attrs->>'itineraryId' AS itk, p.attrs->'forecasts' AS forecasts FROM productions p JOIN campaigns c ON c.id = p.campaign_id WHERE c.year = 2027 AND p.farm_id = ${farmId}`;
     expect(p!.itk).toBe(itkA);
+    expect(p!.forecasts).toEqual(forecasts);
     // Rouvert, l'assolement garde l'ITK de la production.
     const reopened = await (await send(owner, "POST", "/crop-plans/2027/reopen")).json();
     expect(reopened.draft.assignments[0].itineraryId).toBe(itkA);
+    expect(reopened.draft.assignments[0].forecasts).toEqual(forecasts);
     await send(owner, "DELETE", "/crop-plans/2027/draft");
   });
 

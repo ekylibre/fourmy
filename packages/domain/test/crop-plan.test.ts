@@ -148,6 +148,23 @@ describe("diffCropPlan", () => {
     { id: uuid(103), landParcelId: "c", activityId: uuid(3), role: "main", startedOn: null, stoppedOn: null, hasDoneInterventions: false },
   ];
 
+  it("prévisions (lot E3) : un changement de rendement ou de prix modifie la production ; l'ordre des clés ne compte pas", () => {
+    const withForecast: ExistingProduction[] = [
+      { ...existing[0]!, forecasts: [{ unit: "quintal_per_hectare", product: "principal", yield: 95, price: 200, priceUnit: "ton" }] },
+    ];
+    const draft = (f: CropPlanDraft["assignments"][number]["forecasts"]): CropPlanDraft => ({
+      ...emptyDraft(2027),
+      assignments: [{ ...assign("1", "p:a", 1, { productionId: uuid(101) }), ...(f ? { forecasts: f } : {}) }],
+    });
+    const kinds = (d: CropPlanDraft) => diffCropPlan(d, resolveParcels(base, d), withForecast, { campaignExists: true }).changes.map((c) => c.kind);
+    expect(kinds(draft([{ product: "principal", yield: 95, unit: "quintal_per_hectare", price: 200, priceUnit: "ton" }]))).toEqual([]);
+    const changed = draft([{ product: "principal", yield: 110, unit: "quintal_per_hectare", price: 200, priceUnit: "ton" }]);
+    expect(kinds(changed)).toEqual(["production.update"]);
+    const upd = diffCropPlan(changed, resolveParcels(base, changed), withForecast, { campaignExists: true }).changes[0]!;
+    expect(upd.kind === "production.update" && upd.after.forecasts).toEqual([{ product: "principal", yield: 110, unit: "quintal_per_hectare", price: 200, priceUnit: "ton" }]);
+    expect(kinds(draft(undefined))).toEqual(["production.update"]);
+  });
+
   it("crée, modifie, supprime ; campagne créée au besoin", () => {
     const draft: CropPlanDraft = {
       ...emptyDraft(2027),
