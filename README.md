@@ -90,12 +90,13 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | Navigation et compte (13/11) | ✅ menu du compte en haut à droite (profil, ferme, mot de passe, déconnexion), équipe et préférences dans « Ma ferme », version en pied de menu (`claudedocs/besoins_navigation_compte.md`) |
 | Imports et assistant (lots IM1 à IM6, 17-19/11) | ✅ DAPLOS, Geofolia et TelePAC de bout en bout, historique N-1 à N-5, annulation d'un import, assistant de premier démarrage et reprise d'une sauvegarde Ekylibre ; recette avec l'exploitant testeur à faire (IM7) (`docs/imports.md`) |
 | Assolement prévisionnel, temps 1 (lots AS1a à AS4, 20/11) | ✅ menu Assolement dans Activités ; carte et liste des parcelles, affectation des cultures, dérobées, couverts, découpe et fusion datées ; contrôles en direct (BCAE 7, délais de retour, AB et HVE, ZNT, captages, Natura 2000) ; validation qui crée productions, parcelles et couverts, versions ; essai avec l'exploitant testeur à faire. Temps 2 (itinéraires) et 3 (économique) à venir (`docs/assolement.md`) |
+| Semences (lots SE1 à SE8, 20-21/11) | ✅ Stocks → Semences : fiche (espèce, variété, code GNIS, PMG avec repères Arvalis et Terres Inovia), PMG par lot, catalogue officiel des variétés, rattachement proposé ; semis en grains/m², kg/ha, milliers ou doses, stock converti ; mélanges dosés par espèce, couverts repris du semis ; utilisation par campagne et export CSV (`docs/semences.md`) |
 | Contrôles HVE et AB (lots CT1 à CT6a, 19-20/11) | 🟡 menu Réglementaire selon les certifications ; HVE niveau 3 (quatre indicateurs, IAE, questionnaire, IFT certifié) ; AB (règles R1 à R34, conversion déduite, cuivre, annexe II consolidée au 01/01/2026, semences, rotation) ; feux à la saisie ; registre AB et liasse HVE. Reste l'export de la grille HVE officielle remplie, qui attend une grille de référence remplie à la main (`docs/controles-hve-ab.md`) |
 | Migration réelle et recette | ✅ trois fermes reprises (08/11) ; recettes des 11 et 12/11 sur la ferme pilote de grandes cultures (`claudedocs/plan_de_test_global.md`), spécification métier (`docs/specifications-metier.md`) |
 
 ### À reprendre
 
-La liste complète des points ouverts (125 au 20/11/2026, par thème et par
+La liste complète des points ouverts (134 au 21/11/2026, par thème et par
 priorité) est dans `claudedocs/points_ouverts.md` ; elle alimente la
 roadmap du projet GitHub [Fourmy — Roadmap](https://github.com/orgs/ekylibre/projects/2)
 (issues pour P1 et P2, brouillons pour P3). Avant l'envoi à la ferme pilote : sauvegardes,

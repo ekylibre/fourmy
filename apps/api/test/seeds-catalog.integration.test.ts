@@ -18,7 +18,7 @@ describe.skipIf(!url)("semences : catalogue et rattachement (intégration)", () 
   const users: string[] = [];
   let owner: Record<string, string> = {};
   let worker: Record<string, string> = {};
-  const ids = { byCode: crypto.randomUUID(), byLabel: crypto.randomUUID(), close: crypto.randomUUID(), mixture: crypto.randomUUID(), unknown: crypto.randomUUID() };
+  const ids = { byCode: crypto.randomUUID(), byLabel: crypto.randomUUID(), close: crypto.randomUUID(), mixture: crypto.randomUUID(), unknown: crypto.randomUUID(), named: crypto.randomUUID(), namedNew: crypto.randomUUID() };
   const send = (headers: Record<string, string>, method: string, path: string, body?: unknown) =>
     app.request(`/api/v1/farms/${farmId}${path}`, { method, headers, ...(body ? { body: JSON.stringify(body) } : {}) });
 
@@ -40,7 +40,9 @@ describe.skipIf(!url)("semences : catalogue et rattachement (intégration)", () 
       (${ids.byLabel}, ${farmId}, 'Une semence', 'seed', 'kilogram', '{"species": "Zzespèce test"}'::jsonb),
       (${ids.close}, ${farmId}, 'Une autre', 'seed', 'kilogram', '{"species": "Zzespèce test de printemps"}'::jsonb),
       (${ids.mixture}, ${farmId}, 'Couvert zz', 'seed', 'kilogram', '{"species": "Mélange"}'::jsonb),
-      (${ids.unknown}, ${farmId}, 'Inconnue', 'seed', 'kilogram', '{}'::jsonb)`;
+      (${ids.unknown}, ${farmId}, 'Inconnue', 'seed', 'kilogram', '{}'::jsonb),
+      (${ids.named}, ${farmId}, 'Semence de zzespèce test -  ZZCELEBRITY', 'seed', 'Sac de 50 000 grains', null),
+      (${ids.namedNew}, ${farmId}, 'Semences de zzespèce test - ZZ Nouvelle', 'seed', 'Mille grains', null)`;
   });
   afterAll(async () => {
     await teardown(sql, farmId, users);
@@ -76,6 +78,10 @@ describe.skipIf(!url)("semences : catalogue et rattachement (intégration)", () 
     expect(by.get(ids.close)).toMatchObject({ species: "zz_species_a", sure: false, approximate: true });
     expect(by.get(ids.mixture)).toMatchObject({ isMixture: true, species: null, approximate: false });
     expect(by.has(ids.unknown)).toBe(false);
+    // Nom repris d'Ekylibre : l'espèce, et la variété du catalogue pour cette espèce (sinon le nom après le tiret).
+    expect(by.get(ids.named)).toMatchObject({ species: "zz_species_a", varietyName: "Zzcelebrity", gnisCode: "ZZ00002", sure: false, approximate: false });
+    expect(by.get(ids.named)!.reason).toMatch(/variété au catalogue/);
+    expect(by.get(ids.namedNew)).toMatchObject({ species: "zz_species_a", varietyName: "ZZ Nouvelle", gnisCode: null, approximate: false });
   });
 
   it("rattacher les semences choisies ; elles sortent des propositions", async () => {
@@ -87,6 +93,6 @@ describe.skipIf(!url)("semences : catalogue et rattachement (intégration)", () 
     expect(rows.find((r) => r.article_id === ids.byCode)).toMatchObject({ species: "zz_species_a", variety_name: "Zzthermidor", gnis_code: "ZZ00001", is_mixture: false });
     expect(rows.find((r) => r.article_id === ids.mixture)).toMatchObject({ species: null, is_mixture: true });
     const { items } = (await (await send(owner, "GET", "/seeds/attach")).json()) as { items: SeedAttachProposal[] };
-    expect(items.map((p) => p.articleId).sort()).toEqual([ids.byLabel, ids.close].sort());
+    expect(items.map((p) => p.articleId).sort()).toEqual([ids.byLabel, ids.close, ids.named, ids.namedNew].sort());
   });
 });

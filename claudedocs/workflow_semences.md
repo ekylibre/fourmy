@@ -320,3 +320,13 @@ flowchart LR
 - Web : onglets **Semences** et **Utilisation** ; `UsagePanel` (campagne, par semence ou par espèce, réalisé et prévu, export CSV) ; le nom d'une semence ouvre sa fiche.
 - Tests : API 4 (`seeds-usage.integration.test.ts` : 170 kg/ha de moyenne pour 180 × 10 ha et 150 × 5 ha, 340 grains/m², repère estimé, unité illisible, par espèce, CSV, paramètres), domaine 3, web 1 ; e2e semences et parcours verts en local ; turbo : 82 tâches vertes.
 - Données importées de la ferme test : le calcul passe ; les semences n'y sont pas encore rattachées à leur espèce, d'où un seul groupe « Espèce non renseignée » dans le regroupement par espèce.
+
+### SE8 — Recette et documentation (21/11/2026)
+
+- Recette locale, en lecture seule :
+  - **ferme pilote de grandes cultures** (reprise d'Ekylibre) : 26 semences, toutes les unités reconnues (13 doses, 11 en grains ou milliers, 2 en kg) ; une seule proposition de rattachement (référence Lexicon), car les noms « Semence de maïs - DKC5065 » n'étaient pas lus ;
+  - **ferme test des imports Geofolia** : 42 semences, 42 propositions dont 23 sûres par le code GNIS, 4 approchées ; utilisation 2025 (71 semis) et 2026 (14) calculée sans erreur ; rien n'a été appliqué.
+- Correctif tiré de la recette : `nameParts` lit l'espèce et la variété d'un nom « Semence(s) de <espèce> - <variété> » ; la variété est cherchée au catalogue pour cette espèce (code GNIS repris). Ferme pilote : 26 propositions, dont 14 avec leur code GNIS.
+- Documentation : `docs/semences.md` (guide), ligne du README, `claudedocs/points_ouverts.md` (mise à jour du 21/11, thème 18, points 129 à 134).
+- Tests : API 1 fichier unitaire (`seed-names.test.ts`) et 2 cas dans `seeds-catalog.integration.test.ts`.
+- Issues GitHub des points 129 à 134 : à créer après accord.
