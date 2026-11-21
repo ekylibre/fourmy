@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import type { SeedAttachProposal, SeedCatalogItem, SeedDetail, SeedListItem } from "@fourmy/contracts";
+import type { SeedAttachProposal, SeedCatalogItem, SeedDetail, SeedListItem, SeedUsageFigures } from "@fourmy/contracts";
 import { server } from "./setup";
 import { FARM, renderApp } from "./render";
 
@@ -176,6 +176,68 @@ describe("semences", () => {
         { species: null, label: "Radis", varietyName: null, gnisCode: null },
       ]),
     );
+  });
+
+  it("utilisation de la campagne : par semence puis par espèce, réalisé et prévu, export CSV (lot SE7)", async () => {
+    const figures = (o: Partial<SeedUsageFigures>): SeedUsageFigures => ({
+      interventions: 0,
+      areaHa: 0,
+      stockQuantity: null,
+      kg: null,
+      grains: null,
+      kgPerHa: null,
+      grainsPerM2: null,
+      estimated: false,
+      unconvertible: 0,
+      ...o,
+    });
+    const asked: string[] = [];
+    server.use(
+      http.get("*/seeds", () => HttpResponse.json({ items: [maize] })),
+      http.get("*/seeds/attach", () => HttpResponse.json({ items: [] })),
+      http.get("*/seeds/usage", ({ request }) => {
+        const u = new URL(request.url);
+        asked.push(u.search);
+        if (u.searchParams.get("format") === "csv") return new HttpResponse("Campagne", { headers: { "content-type": "text/csv" } });
+        const species = u.searchParams.get("by") === "species";
+        return HttpResponse.json({
+          campaign: year,
+          by: species ? "species" : "article",
+          groups: [
+            {
+              key: species ? "zea_mays" : MAIZE,
+              label: species ? "Maïs" : "Semence de maïs - P0573",
+              species: "zea_mays",
+              speciesLabel: "Maïs",
+              unit: species ? null : "Sac de 50 000 grains",
+              articles: [{ articleId: MAIZE, name: "Semence de maïs - P0573" }],
+              activities: ["Maïs grain"],
+              done: figures({ interventions: 2, areaHa: 15, stockQuantity: 27, kg: 432, kgPerHa: { mean: 28.8, min: 27, max: 32 }, grainsPerM2: { mean: 9, min: 9, max: 9 }, estimated: true }),
+              planned: figures({ interventions: 1, areaHa: 5, stockQuantity: 9, kg: 144, kgPerHa: { mean: 28.8, min: 28.8, max: 28.8 } }),
+            },
+          ],
+        });
+      }),
+    );
+    URL.createObjectURL = vi.fn(() => "blob:x");
+    URL.revokeObjectURL = vi.fn();
+    renderApp(`/f/${FARM}/seeds`);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("tab", { name: "Utilisation" }));
+    const table = await screen.findByRole("table", { name: `Utilisation des semences, campagne ${year}` });
+    const row = within(table).getByText("Semence de maïs - P0573").closest("tr")!;
+    expect(row).toHaveTextContent("15 ha");
+    expect(row).toHaveTextContent("2 interventions");
+    expect(row).toHaveTextContent("27 doses de 50 000 grains");
+    expect(within(row).getByLabelText("Dose réalisée de Semence de maïs - P0573")).toHaveTextContent("28,8 (27 à 32)");
+    expect(within(row).getByLabelText("Dose prévue de Semence de maïs - P0573")).toHaveTextContent("28,8");
+    expect(within(row).getByText("estimé")).toBeInTheDocument();
+    expect(row).toHaveTextContent("Maïs grain");
+
+    await user.click(screen.getByText("Par espèce"));
+    expect(await within(await screen.findByRole("table", { name: `Utilisation des semences, campagne ${year}` })).findByText("Maïs")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Exporter en CSV" }));
+    await waitFor(() => expect(asked.some((q) => q.includes("by=species") && q.includes("format=csv"))).toBe(true));
   });
 
   it("rattacher au référentiel : propositions sûres cochées, approchées décochées", async () => {

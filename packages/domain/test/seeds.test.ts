@@ -5,6 +5,8 @@ import {
   grainsPerM2,
   mixtureMatches,
   mixtureTotal,
+  summarizeSeedUsage,
+  type SeedUsageLine,
   DomainError,
   looksLikeMixture,
   parseSeedUnit,
@@ -180,5 +182,35 @@ describe("mélanges et couverts (lot SE6)", () => {
     expect(coverFamilyOf(["crucifer", "phacelia"])).toBeNull();
     expect(coverFamilyOf(["legume", "other"])).toBeNull();
     expect(coverFamilyOf([])).toBeNull();
+  });
+});
+
+describe("utilisation par campagne (lot SE7)", () => {
+  const line = (areaHa: number | null, kgPerHa: number | null, extra: Partial<SeedUsageLine> = {}): SeedUsageLine => ({
+    areaHa,
+    stock: kgPerHa === null || areaHa === null ? null : kgPerHa * areaHa,
+    kg: kgPerHa === null || areaHa === null ? null : kgPerHa * areaHa,
+    grains: null,
+    kgPerHa,
+    grainsPerM2: null,
+    estimated: false,
+    ...extra,
+  });
+
+  it("moyenne pondérée par la surface, écart minimum-maximum", () => {
+    const f = summarizeSeedUsage([line(10, 180), line(5, 150)]);
+    expect(f).toMatchObject({ interventions: 2, areaHa: 15, stockQuantity: 2550, kg: 2550, unconvertible: 0, estimated: false, grainsPerM2: null });
+    expect(f.kgPerHa).toEqual({ mean: 170, min: 150, max: 180 });
+  });
+
+  it("dose non convertible : comptée sans bloquer ; estimée si un repère a servi ; sans stock par espèce", () => {
+    const f = summarizeSeedUsage([line(10, 180, { estimated: true }), line(5, null)], false);
+    expect(f).toMatchObject({ interventions: 2, areaHa: 15, stockQuantity: null, kg: 1800, unconvertible: 1, estimated: true });
+    expect(f.kgPerHa).toEqual({ mean: 180, min: 180, max: 180 });
+    expect(summarizeSeedUsage([])).toMatchObject({ interventions: 0, areaHa: 0, stockQuantity: null, kgPerHa: null });
+  });
+
+  it("sans surface connue : moyenne simple", () => {
+    expect(summarizeSeedUsage([line(null, 100, { stock: 1 }), line(null, 200, { stock: 1 })]).kgPerHa).toEqual({ mean: 150, min: 100, max: 200 });
   });
 });

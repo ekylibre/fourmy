@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Alert, Badge, Button, Chip, Group, Select, Stack, Text, TextInput, Title } from "@mantine/core";
+import { Alert, Badge, Button, Chip, Group, Select, Stack, Tabs, Text, TextInput, Title } from "@mantine/core";
 import { DataTable } from "mantine-datatable";
 import { Search } from "lucide-react";
 import { SEED_FLAG_LABELS, type SeedFlag, type SeedListItem } from "@fourmy/contracts";
@@ -12,6 +12,7 @@ import { ErrorAlert, Loading } from "../../components/states";
 import { AddSeedModal } from "./AddSeedModal";
 import { AttachModal } from "./AttachModal";
 import { SeedSheet } from "./SeedSheet";
+import { UsagePanel } from "./UsagePanel";
 import { ORGANIC_LABELS, stockUnitLabel, tgwLabel } from "./labels";
 import { useSeedAttach, useSeeds } from "./queries";
 
@@ -60,6 +61,7 @@ export function SeedsPage() {
     return [...set].sort((a, b) => b - a);
   }, [items, day]);
   const [campaign, setCampaign] = useState<number | null>(null);
+  const [tab, setTab] = useState<string>("seeds");
   const year = campaign ?? years[0] ?? Number(day.slice(0, 4));
   const usedIn = (s: SeedListItem) => s.usage.find((u) => u.campaign === year)?.interventions ?? 0;
 
@@ -114,144 +116,157 @@ export function SeedsPage() {
           densités de semis ne peuvent pas toutes être calculées.
         </Alert>
       )}
-      <Group gap="sm" align="flex-end">
-        <TextInput
-          aria-label="Rechercher une semence"
-          placeholder="Nom, variété, code GNIS"
-          leftSection={<Search size={16} />}
-          value={query}
-          onChange={(e) => setQuery(e.currentTarget.value)}
-        />
-        <Select aria-label="Espèce" placeholder="Toutes les espèces" data={speciesOptions} value={species} onChange={setSpecies} clearable searchable />
-        <Select
-          aria-label="Campagne"
-          data={years.map((y) => ({ value: String(y), label: `Campagne ${y}` }))}
-          value={String(year)}
-          onChange={(v) => setCampaign(v ? Number(v) : null)}
-          allowDeselect={false}
-          w={170}
-        />
-        <Chip.Group multiple value={filters} onChange={setFilters}>
-          <Group gap={6}>
-            <Chip value="used" size="sm">
-              Semées en {year}
-            </Chip>
-            <Chip value="tgw" size="sm">
-              Sans PMG
-            </Chip>
-            <Chip value="mixture" size="sm">
-              Mélanges
-            </Chip>
-            <Chip value="nonbio" size="sm">
-              Non bio
-            </Chip>
-          </Group>
-        </Chip.Group>
-      </Group>
-      <DataTable
-        withTableBorder
-        striped
-        highlightOnHover
-        minHeight={150}
-        aria-label="Semences"
-        noRecordsText={items.length ? "Aucune semence ne correspond aux filtres" : "Aucune semence : elles arrivent avec les achats, les imports ou la saisie d'un semis."}
-        records={rows}
-        idAccessor="articleId"
-        onRowClick={({ record }) => setSelected(record.articleId)}
-        columns={pickColumns<SeedListItem>(
-          [
-            {
-              accessor: "name",
-              title: "Semence",
-              render: (s) => (
-                <div>
-                  <Text size="sm" fw={500}>
-                    {s.name}
-                  </Text>
-                  {(s.sheet?.varietyName || s.sheet?.gnisCode) && (
-                    <Text size="xs" c="dimmed">
-                      {[s.sheet.varietyName, s.sheet.gnisCode].filter(Boolean).join(" · ")}
-                    </Text>
-                  )}
-                </div>
-              ),
-            },
-            {
-              accessor: "species",
-              title: "Espèce",
-              render: (s) =>
-                s.sheet?.isMixture ? (
-                  <Text size="sm">Mélange{s.componentCount ? ` de ${s.componentCount} espèces` : ""}</Text>
-                ) : s.speciesLabel ? (
-                  <Text size="sm">{s.speciesLabel}</Text>
-                ) : s.importedSpecies ? (
-                  <Text size="sm" c="dimmed" title="Lue dans un fichier importé, à rattacher">
-                    {s.importedSpecies}
-                  </Text>
-                ) : (
-                  "—"
-                ),
-            },
-            { accessor: "unit", title: "Unité de stock", render: (s) => (s.unitDim ? stockUnitLabel(s) : <Text c="brique" size="sm">{s.unit}</Text>) },
-            {
-              accessor: "tgw",
-              title: "PMG",
-              render: (s) => {
-                const label = tgwLabel(s);
-                if (!label) return s.sheet?.isMixture ? "—" : <Text size="sm" c="dimmed">inconnu</Text>;
-                return (
-                  <Text size="sm" className="lv-num" c={s.tgw?.estimated ? "dimmed" : undefined} title={s.tgw?.estimated ? "Repère de l'espèce : quantités estimées" : undefined}>
-                    {label}
-                  </Text>
-                );
-              },
-            },
-            { accessor: "organic", title: "Bio", render: (s) => (s.organicStatus ? ORGANIC_LABELS[s.organicStatus] : "—") + (s.seedTreated ? " · traitée" : "") },
-            {
-              accessor: "stock",
-              title: "Stock",
-              textAlign: "right",
-              render: (s) => (
-                <Text span size="sm" className="lv-num" c={s.stock < 0 ? "brique" : undefined}>
-                  {s.stock ? formatNumber(s.stock, 3) : "—"}
-                </Text>
-              ),
-            },
-            { accessor: "usage", title: `Interventions ${year}`, textAlign: "right", render: (s) => usedIn(s) || "—" },
-            {
-              accessor: "flags",
-              title: "À compléter",
-              render: (s) => (
-                <Group gap={4} wrap="nowrap">
-                  {s.flags.map((f) => (
-                    <Badge key={f} variant="light" color={FLAG_COLOR[f]} size="sm">
-                      {SEED_FLAG_LABELS[f]}
-                    </Badge>
-                  ))}
-                  {s.looksLikeMixture && (
-                    <Badge variant="outline" color="gray" size="sm" title="Le nom ou l'espèce importée évoque un mélange">
-                      Mélange ?
-                    </Badge>
-                  )}
-                  {(s.flags.length > 0 || s.looksLikeMixture) && owner && (
-                    <Button
-                      size="compact-xs"
-                      variant="subtle"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelected(s.articleId);
-                      }}
-                    >
-                      Compléter
-                    </Button>
-                  )}
-                </Group>
-              ),
-            },
-          ],
-          columns,
-        )}
-      />
+      <Tabs value={tab} onChange={(v) => setTab(v ?? "seeds")}>
+        <Tabs.List>
+          <Tabs.Tab value="seeds">Semences</Tabs.Tab>
+          <Tabs.Tab value="usage">Utilisation</Tabs.Tab>
+        </Tabs.List>
+        <Tabs.Panel value="seeds" pt="md">
+          <Stack>
+              <Group gap="sm" align="flex-end">
+                <TextInput
+                  aria-label="Rechercher une semence"
+                  placeholder="Nom, variété, code GNIS"
+                  leftSection={<Search size={16} />}
+                  value={query}
+                  onChange={(e) => setQuery(e.currentTarget.value)}
+                />
+                <Select aria-label="Espèce" placeholder="Toutes les espèces" data={speciesOptions} value={species} onChange={setSpecies} clearable searchable />
+                <Select
+                  aria-label="Campagne"
+                  data={years.map((y) => ({ value: String(y), label: `Campagne ${y}` }))}
+                  value={String(year)}
+                  onChange={(v) => setCampaign(v ? Number(v) : null)}
+                  allowDeselect={false}
+                  w={170}
+                />
+                <Chip.Group multiple value={filters} onChange={setFilters}>
+                  <Group gap={6}>
+                    <Chip value="used" size="sm">
+                      Semées en {year}
+                    </Chip>
+                    <Chip value="tgw" size="sm">
+                      Sans PMG
+                    </Chip>
+                    <Chip value="mixture" size="sm">
+                      Mélanges
+                    </Chip>
+                    <Chip value="nonbio" size="sm">
+                      Non bio
+                    </Chip>
+                  </Group>
+                </Chip.Group>
+              </Group>
+              <DataTable
+                withTableBorder
+                striped
+                highlightOnHover
+                minHeight={150}
+                aria-label="Semences"
+                noRecordsText={items.length ? "Aucune semence ne correspond aux filtres" : "Aucune semence : elles arrivent avec les achats, les imports ou la saisie d'un semis."}
+                records={rows}
+                idAccessor="articleId"
+                onRowClick={({ record }) => setSelected(record.articleId)}
+                columns={pickColumns<SeedListItem>(
+                  [
+                    {
+                      accessor: "name",
+                      title: "Semence",
+                      render: (s) => (
+                        <div>
+                          <Text size="sm" fw={500}>
+                            {s.name}
+                          </Text>
+                          {(s.sheet?.varietyName || s.sheet?.gnisCode) && (
+                            <Text size="xs" c="dimmed">
+                              {[s.sheet.varietyName, s.sheet.gnisCode].filter(Boolean).join(" · ")}
+                            </Text>
+                          )}
+                        </div>
+                      ),
+                    },
+                    {
+                      accessor: "species",
+                      title: "Espèce",
+                      render: (s) =>
+                        s.sheet?.isMixture ? (
+                          <Text size="sm">Mélange{s.componentCount ? ` de ${s.componentCount} espèces` : ""}</Text>
+                        ) : s.speciesLabel ? (
+                          <Text size="sm">{s.speciesLabel}</Text>
+                        ) : s.importedSpecies ? (
+                          <Text size="sm" c="dimmed" title="Lue dans un fichier importé, à rattacher">
+                            {s.importedSpecies}
+                          </Text>
+                        ) : (
+                          "—"
+                        ),
+                    },
+                    { accessor: "unit", title: "Unité de stock", render: (s) => (s.unitDim ? stockUnitLabel(s) : <Text c="brique" size="sm">{s.unit}</Text>) },
+                    {
+                      accessor: "tgw",
+                      title: "PMG",
+                      render: (s) => {
+                        const label = tgwLabel(s);
+                        if (!label) return s.sheet?.isMixture ? "—" : <Text size="sm" c="dimmed">inconnu</Text>;
+                        return (
+                          <Text size="sm" className="lv-num" c={s.tgw?.estimated ? "dimmed" : undefined} title={s.tgw?.estimated ? "Repère de l'espèce : quantités estimées" : undefined}>
+                            {label}
+                          </Text>
+                        );
+                      },
+                    },
+                    { accessor: "organic", title: "Bio", render: (s) => (s.organicStatus ? ORGANIC_LABELS[s.organicStatus] : "—") + (s.seedTreated ? " · traitée" : "") },
+                    {
+                      accessor: "stock",
+                      title: "Stock",
+                      textAlign: "right",
+                      render: (s) => (
+                        <Text span size="sm" className="lv-num" c={s.stock < 0 ? "brique" : undefined}>
+                          {s.stock ? formatNumber(s.stock, 3) : "—"}
+                        </Text>
+                      ),
+                    },
+                    { accessor: "usage", title: `Interventions ${year}`, textAlign: "right", render: (s) => usedIn(s) || "—" },
+                    {
+                      accessor: "flags",
+                      title: "À compléter",
+                      render: (s) => (
+                        <Group gap={4} wrap="nowrap">
+                          {s.flags.map((f) => (
+                            <Badge key={f} variant="light" color={FLAG_COLOR[f]} size="sm">
+                              {SEED_FLAG_LABELS[f]}
+                            </Badge>
+                          ))}
+                          {s.looksLikeMixture && (
+                            <Badge variant="outline" color="gray" size="sm" title="Le nom ou l'espèce importée évoque un mélange">
+                              Mélange ?
+                            </Badge>
+                          )}
+                          {(s.flags.length > 0 || s.looksLikeMixture) && owner && (
+                            <Button
+                              size="compact-xs"
+                              variant="subtle"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelected(s.articleId);
+                              }}
+                            >
+                              Compléter
+                            </Button>
+                          )}
+                        </Group>
+                      ),
+                    },
+                  ],
+                  columns,
+                )}
+              />
+          </Stack>
+        </Tabs.Panel>
+        <Tabs.Panel value="usage" pt="md">
+          {tab === "usage" && <UsagePanel years={years} year={year} onYear={setCampaign} onOpen={setSelected} />}
+        </Tabs.Panel>
+      </Tabs>
       <SeedSheet articleId={selected} onClose={() => setSelected(null)} proposal={proposals.data?.items.find((p) => p.articleId === selected) ?? null} />
       {adding && (
         <AddSeedModal

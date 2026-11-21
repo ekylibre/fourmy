@@ -1,10 +1,11 @@
 import { Hono } from "hono";
-import { lotSeedWrite, mixtureComponentsSave, seedAttachWrite, seedCreate, seedSheetSave } from "@fourmy/contracts";
+import { lotSeedWrite, mixtureComponentsSave, seedAttachWrite, seedCreate, seedSheetSave, seedUsageBy } from "@fourmy/contracts";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import { attachSeeds, createSeed, searchCatalog, seedAttachProposals } from "../repos/seed-catalog.js";
 import { getSeed, listSeeds, saveLotSeed, saveMixtureComponents, saveSeed, seedMixture, seedSpecies } from "../repos/seeds.js";
-import { atOrNow, problem, uuidParam } from "./helpers.js";
+import { seedUsage, seedUsageCsv } from "../repos/seed-usage.js";
+import { atOrNow, BadRequest, problem, uuidParam } from "./helpers.js";
 
 const invalid = (issues: { message: string; path: PropertyKey[] }[]) => issues.map((i) => `${i.path.join(".")} : ${i.message}`).join(" ");
 
@@ -16,6 +17,21 @@ const invalid = (issues: { message: string; path: PropertyKey[] }[]) => issues.m
  */
 export const seedRoutes = new Hono<Env>()
   .get("/seeds", async (c) => c.json({ items: await listSeeds(db(), c.get("farmId"), atOrNow(c)) }))
+  // Utilisation par campagne (lot SE7) : réalisé et prévu, par semence ou par espèce ; JSON ou CSV.
+  .get("/seeds/usage", async (c) => {
+    const campaign = Number(c.req.query("campaign") ?? new Date().getFullYear());
+    if (!Number.isInteger(campaign) || campaign < 2000 || campaign > 2100) throw new BadRequest("campaign : année attendue.");
+    const by = seedUsageBy.safeParse(c.req.query("by") ?? "article");
+    if (!by.success) throw new BadRequest("by : article ou species.");
+    const usage = await seedUsage(db(), c.get("farmId"), campaign, by.data);
+    if (c.req.query("format") === "csv") {
+      return c.body(seedUsageCsv(usage), 200, {
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": `attachment; filename="semences-${campaign}${by.data === "species" ? "-par-espece" : ""}.csv"`,
+      });
+    }
+    return c.json(usage);
+  })
   .get("/seeds/species", async (c) => c.json({ items: await seedSpecies(db(), c.get("farmId")) }))
   .get("/seeds/catalog", async (c) => c.json({ items: await searchCatalog(db(), c.get("farmId"), c.req.query("q") ?? "", c.req.query("species") || undefined) }))
   .post("/seeds", requireOwner, async (c) => {

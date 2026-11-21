@@ -305,3 +305,18 @@ flowchart LR
   - page de la parcelle (plan de fumure) : « Reprendre le semis du … », espèces semées et lien vers le semis.
 - Tests : API 7 (`seeds-mixture.integration.test.ts` : 8 + 4 + 2 + 1 = 15 kg/ha et 150 kg sortis, 422, couvert rattaché avec ses quatre espèces, proposition et reprise, semence seule ; les contrôles de légumineuses ne tournent que si la taxonomie est chargée), domaine 3, web 3 ; e2e semences, parcours, correction, assolement et contrôle AB verts en local ; turbo : 82 tâches vertes.
 - Synchronisation mobile : les espèces d'un mélange ne sont pas encore envoyées au mobile (issue prévue en SE8).
+
+### SE7 — Utilisation par campagne (21/11/2026)
+
+- API `GET /seeds/usage?campaign=&by=article|species&format=csv` (`repos/seed-usage.ts`) :
+  - chaque intrant semence d'une intervention réalisée ou prévue de la campagne (campagne de la culture en place, sinon année du semis) ;
+  - quantité dans l'unité du stock : mouvement de stock de l'intervention, sinon conversion (intervention prévue ou importée) ;
+  - kg, grains, dose en kg/ha et densité en grains/m², avec la conversion figée si elle existe, sinon le PMG du lot, de la fiche, puis le repère (« estimé ») ;
+  - surface travaillée, sinon celle de la parcelle ; activités d'après la culture en place ;
+  - regroupement par semence, ou par espèce (variétés comparées, sans quantité de stock car les unités diffèrent) ;
+  - réalisé et prévu distingués ; dose non convertible comptée, sans bloquer ;
+  - CSV « ; » à décimales françaises (une ligne par semence ou espèce et par statut).
+- Domaine `seeds/usage.ts` : `summarizeSeedUsage` (moyenne pondérée par la surface, écart minimum-maximum, sommes, « estimé », non convertibles).
+- Web : onglets **Semences** et **Utilisation** ; `UsagePanel` (campagne, par semence ou par espèce, réalisé et prévu, export CSV) ; le nom d'une semence ouvre sa fiche.
+- Tests : API 4 (`seeds-usage.integration.test.ts` : 170 kg/ha de moyenne pour 180 × 10 ha et 150 × 5 ha, 340 grains/m², repère estimé, unité illisible, par espèce, CSV, paramètres), domaine 3, web 1 ; e2e semences et parcours verts en local ; turbo : 82 tâches vertes.
+- Données importées de la ferme test : le calcul passe ; les semences n'y sont pas encore rattachées à leur espèce, d'où un seul groupe « Espèce non renseignée » dans le regroupement par espèce.
