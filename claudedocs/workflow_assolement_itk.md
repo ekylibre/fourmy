@@ -312,3 +312,39 @@ flowchart LR
 - **Point d'entrée** : l'assolement validé seulement (pas encore la page d'une activité).
 - **#116, reste ouvert** : l'annulation d'une découpe déjà validée (règle du temps 1, §6) n'est pas faite ; une intervention en attelages ou à plusieurs parcelles ne se répartit pas (un seul morceau).
 - **e2e** : reporté au lot IT6 (parcours complet ITK → assolement → interventions prévues → calendrier).
+
+### IT4 — Temps de travaux : barème BCMA, trajets, pointes (21/11/2026)
+
+- **Barème BCMA 2024** (accord du 21/11/2026, `claudedocs/accord_BCMA.md`) : `packages/certification-refs/scripts/extract-bcma.ts` lit le texte `pdftotext -layout` des deux guides « Coût des façons culturales ». Il recolle les libellés coupés sur deux ou trois lignes, recolle les en-têtes de famille coupés, retire le symbole de la colonne « Variation » (police à usage privé) et lit la largeur dans le libellé. **1 082 matériels** (873 grandes cultures, 209 viti-arbo) ; seules les lignes d'exemple du guide restent non lues. Sorties : `data/bcma-2024.csv` et `src/work/bcma-2024.ts` (généré).
+- **Référentiel** `src/work/machinery-rates.ts` : `MachineryRate`, source citée, `machineryRate`, `hectareRate`, `PROCEDURE_FAMILIES` (procédure → familles du barème), `machineryRatesFor`, `familyRatePerMeter`, `EQUIPMENT_TYPE_FAMILIES`, `suggestMachineryRate`.
+- **Migration 0079** : `equipments.machinery_rate_id`, table `parcel_routes` (cache des trajets).
+- **Domaine** `itk/workload.ts` : `resolveWorkRate` (saisi > observé (même procédure et même matériel, ou repris de l'historique) > barème du matériel mis à l'échelle de sa largeur, ou type du barème de l'étape > largeur × débit par mètre de la famille > inconnu), `workload` (heures au champ, journées de chantier, un aller-retour par journée, km, cumuls par matériel, personne, procédure et activité, semaines ISO avec étalement sur la plage, capacité, inconnus comptés), `itkPerHectare`, `isoWeek`.
+- **API** : `GET /crop-plans/:year/itk-context` (`?routes=0` pour l'éditeur d'ITK), `GET /machinery-rates?procedure=&q=`, `GET /equipments-rates`, `PUT /equipments/:id/machinery-rate`. Le navigateur ne charge jamais le barème complet (380 Ko) : seules les lignes citées sont envoyées. Débits observés en SQL : médiane surface / durée par procédure et matériel, à l'heure près, hors imports, au moins 3 chantiers, entre 0,1 et 50 ha/h, 4 dernières campagnes.
+- **Trajets** : point intérieur de chaque parcelle valide pendant la campagne, service `table` d'OSRM par paquets de 90, cache par empreinte (point et site) ; repli à vol d'oiseau × 1,3 à 25 km/h, recalculé dès qu'OSRM répond. Départ : site des réglages, sinon le siège.
+- **Web** :
+  - onglet **Travaux** de l'assolement (totaux, débits par source, inconnus, graphique des heures de main-d'œuvre par semaine avec la capacité, cumuls par personne, matériel, activité et intervention) ;
+  - colonne Débit de l'éditeur d'ITK : valeur et source, total d'heures par hectare ;
+  - « Type de matériel (barème BCMA) » dans une étape sans matériel de la ferme ;
+  - panneau **Débit de chantier** sur la fiche d'un matériel (ligne rattachée, proposition à retenir, recherche) ;
+  - réglages : journée de travail et heures par personne et par semaine.
+- **OSRM** : `docker/osrm/prepare.sh` accepte plusieurs régions et les fusionne (osmium de Debian). Les adresses Geofabrik ont changé (`<région>/<nom>/<nom>-latest.osm.pbf`) : l'ancienne forme redirigeait vers un 404, le script est corrigé.
+- **Tests** : référentiel `machinery-rates.test.ts` (4) ; domaine `itk-workload.test.ts` (4) ; API `itk-work.integration.test.ts` (3 : contexte, barème et rattachement, OSRM `table` simulé) ; web (colonne Débit de l'éditeur).
+
+**Données des fermes de test (base de développement)** : débits observés chez l'exploitant testeur, par exemple :
+- labour avec la charrue 1,19 ha/h (19 chantiers) ;
+- hersage 2,24 ha/h ;
+- semis tout-en-un 1,19 ha/h ;
+- pulvérisation 4,04 ha/h.
+
+Les propositions de rattachement suivent le nom du matériel (« Pulvériseur 3,2 m 28 disques » pour le déchaumeur à disques). Graphe OSRM Aquitaine et Pays de la Loire préparé en local (pic de 1,7 Go de mémoire) : **tous les trajets passent par la route**.
+- Exploitant testeur : 22 parcelles, aller médian 1,1 km (2 min), au plus 8,6 km.
+- GAEC : 41 parcelles, aller médian 4,2 km (9 min), au plus 10,8 km.
+
+Sur le serveur : même commande au déploiement, sur accord.
+
+**Écarts avec la conception** :
+- **Référentiel en module TypeScript** (`@fourmy/certification-refs`, comme les autres référentiels, principe C6) plutôt qu'en table `ref_machinery_rates`. `equipments.machinery_rate_id` porte l'identifiant texte de la ligne.
+- **Pas de « rendement de chantier »** dans les réglages : la performance du barème est déjà une performance réelle de chantier. Le repli « largeur × vitesse » devient « largeur × débit par mètre de la famille du barème ».
+- **Morceaux d'une découpe** : trajet de leur parcelle d'origine principale (pas de calcul par forme du brouillon, pas de `POST /crop-plans/:year/routes`).
+- **Capacité** : personnes actives de la ferme × heures par semaine (au moins une personne).
+- **Personnes non nommées** : une personne par passage par défaut (`people`), comptée en « main-d'œuvre non nommée ».

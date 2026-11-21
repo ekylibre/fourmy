@@ -15,9 +15,12 @@ coupait à travers champs et maisons.
 - La barre de rejeu affiche « Trajets recalés sur la route : 13/18 ». Un
   trajet non recalé (pas de route proche, signal coupé) garde ses points
   bruts.
-- **Itinéraires** : le même service sait calculer distance et durée d'un
-  trajet (siège → parcelle, parcelle → parcelle). Ce n'est pas encore exposé
-  dans Fourmy (voir *Suite*).
+- **Trajets siège → parcelles** (temps de travaux de l'assolement, lot IT4) :
+  service `table` d'OSRM, un appel pour toutes les parcelles (par paquets de
+  90), résultat gardé en cache (`parcel_routes`, invalidé quand la parcelle ou
+  le siège bougent). Sans OSRM, ou hors des régions chargées : distance à vol
+  d'oiseau × 1,3 à 25 km/h, signalée « estimée » ; l'estimation est recalculée
+  dès qu'OSRM répond.
 
 ## Hébergement
 
@@ -38,6 +41,8 @@ partent chez aucun tiers.
 ```sh
 docker/osrm/prepare.sh                         # Aquitaine, dans le volume fourmy_osrm
 docker/osrm/prepare.sh europe/france/midi-pyrenees   # autre région
+# Plusieurs régions, fusionnées en un seul graphe (osmium merge) :
+docker/osrm/prepare.sh europe/france/aquitaine europe/france/pays-de-la-loire
 docker compose -f docker/compose.dev.yml --profile osrm up -d osrm   # port 5000
 FOURMY_OSRM_URL=http://localhost:5000          # côté API
 ```

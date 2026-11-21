@@ -7,6 +7,7 @@ import { ArrowDown, ArrowLeft, ArrowUp, Copy, Plus, Save, Trash2 } from "lucide-
 import {
   ITK_ORIGIN_LABELS,
   ITK_SYSTEM_LABELS,
+  WORK_RATE_SOURCE_LABELS,
   getProcedure,
   unitLabel,
   type ArticleKind,
@@ -15,7 +16,8 @@ import {
   type ItkSystem,
   type ItkWrite,
 } from "@fourmy/contracts";
-import { anchorLabel, itkPreview, scheduleSteps } from "@fourmy/domain";
+import { anchorLabel, itkPerHectare, itkPreview, scheduleSteps } from "@fourmy/domain";
+import { fmtH, fmtRate, useItkWorkContext } from "./work";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { useActivities, useArticles, useCrewTemplates, useEquipments, usePeople } from "../../app/queries";
@@ -62,6 +64,11 @@ function Editor({ detail, owner, refetch }: { detail: ItkDetail; owner: boolean;
   const equipments = useEquipments(farm.id);
   const people = usePeople(farm.id);
   const crews = useCrewTemplates(farm.id);
+  // Débits et heures par hectare (lot IT4) : même contexte que l'assolement, sans les trajets.
+  const work = useItkWorkContext(farm.id, detail.example.year, { routes: false });
+  const perHa = useMemo(() => (work.data ? new Map(itkPerHectare({ steps: form.steps }, work.data).map((x) => [x.stepId, x])) : null), [work.data, form.steps]);
+  const totalPerHa = perHa ? [...perHa.values()].reduce((s, x) => s + (x.hoursPerHa ?? 0), 0) : 0;
+  const unknownRates = perHa ? [...perHa.values()].filter((x) => !x.rate).length : 0;
 
   // Prévenir avant de quitter la page avec des modifications non enregistrées.
   useEffect(() => {
@@ -337,9 +344,18 @@ function Editor({ detail, owner, refetch }: { detail: ItkDetail; owner: boolean;
                   </Text>
                 </Table.Td>
                 <Table.Td>
-                  <Text size="sm" c={s.workRateHaH ? undefined : "dimmed"} title={!s.workRateHaH && s.evidence?.observedRateHaH ? `Médiane de ${s.evidence.observedSamples} chantiers` : undefined}>
-                    {s.workRateHaH ? `${fmt(s.workRateHaH)} ha/h` : s.evidence?.observedRateHaH ? `${fmt(s.evidence.observedRateHaH)} ha/h observé` : "—"}
-                  </Text>
+                  {(() => {
+                    const r = perHa?.get(s.id)?.rate;
+                    if (!r) return <Text size="sm" c={perHa ? "orange" : "dimmed"}>{perHa ? "inconnu" : "—"}</Text>;
+                    return (
+                      <Text size="sm" title={r.label ?? undefined}>
+                        {fmtRate(r.haH)}{" "}
+                        <Text span size="xs" c="dimmed">
+                          {WORK_RATE_SOURCE_LABELS[r.source]}
+                        </Text>
+                      </Text>
+                    );
+                  })()}
                 </Table.Td>
                 {owner && (
                   <Table.Td onClick={(e) => e.stopPropagation()}>
@@ -375,7 +391,10 @@ function Editor({ detail, owner, refetch }: { detail: ItkDetail; owner: boolean;
           </Table.Tbody>
         </Table>
         <Text size="xs" c="dimmed" p="sm">
-          Temps de travaux et besoins en intrants par hectare : à venir (lots IT4 et IT5).
+          {perHa
+            ? `Par hectare : ${fmtH(Math.round(totalPerHa * 100) / 100)} de chantier${unknownRates ? `, ${unknownRates} débit(s) inconnu(s) non comptés` : ""}. Débits : saisi, sinon observé sur vos chantiers, sinon ${work.data!.rateSource}.`
+            : "Calcul des débits…"}
+          {" "}Besoins en intrants : à venir (lot IT5).
         </Text>
       </Paper>
 
@@ -401,6 +420,7 @@ function Editor({ detail, owner, refetch }: { detail: ItkDetail; owner: boolean;
 
       {editing && (
         <StepModal
+          farmId={farm.id}
           step={editing === "new" ? null : editing}
           options={options}
           readOnly={!owner}

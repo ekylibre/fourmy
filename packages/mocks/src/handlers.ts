@@ -278,6 +278,8 @@ export const handlers = [
   http.get(`*${base}/procedures`, () => HttpResponse.json(demoProcedures)),
   // Itinéraires techniques (lot IT1) : aucun dans la ferme de démonstration.
   http.get(`*${base}/technical-itineraries`, () => HttpResponse.json({ items: [] })),
+  // Temps de travaux (lot IT4) : aucun matériel rattaché au barème.
+  http.get(`*${base}/equipments-rates`, () => HttpResponse.json({ items: [] })),
   // Matériels et entretien (lots I à K) : liste résumée, plan vide, aucune échéance.
   http.get(`*${base}/equipments`, () =>
     HttpResponse.json({

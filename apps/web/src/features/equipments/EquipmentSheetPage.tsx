@@ -7,6 +7,7 @@ import { ArrowLeft, Gauge, ImageUp, Pencil, Plus, Trash2 } from "lucide-react";
 import { METER_ORIGIN_LABELS, equipmentKindLabel, equipmentTypeLabel, equipmentStateLabel, type EquipmentSheet, type FarmBrand, type MeterReading } from "@fourmy/contracts";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
+import { MachineryRatePanel } from "../itk/MachineryRatePanel";
 import { formatDate, formatDateTime, procedureLabel } from "../../app/labels";
 import { useEquipmentSheet } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
@@ -226,6 +227,7 @@ function General({ sheet: s }: { sheet: EquipmentSheet }) {
       <Grid.Col span={{ base: 12, md: 5 }}>
         <Stack>
           <LogoPanel sheet={s} owner={owner} />
+          <MachineryRatePanel farmId={farm.id} equipmentId={s.id} owner={owner} />
           {s.brandInfo && <BrandPanel brand={s.brandInfo} owner={owner} />}
           <Paper withBorder p="md">
             <Title order={4} mb="xs">

@@ -313,3 +313,79 @@ export interface PlannedConfirmResult {
   removed: number;
   failed: { key: string; message: string }[];
 }
+
+// ---------------------------------------------------------------------------
+// Lot IT4 : temps de travaux (débits de chantier, trajets, pointes).
+
+/** D'où vient un débit : saisi dans l'étape, observé sur la ferme, barème BCMA, largeur × barème de la famille. */
+export type WorkRateSource = "input" | "observed" | "bcma" | "width";
+export const WORK_RATE_SOURCE_LABELS: Record<WorkRateSource, string> = {
+  input: "saisi",
+  observed: "observé sur la ferme",
+  bcma: "barème BCMA",
+  width: "largeur × barème BCMA",
+};
+
+/** Ligne du barème utile au calcul (le référentiel complet reste côté serveur). */
+export interface ItkMachineryRateInfo {
+  id: string;
+  label: string;
+  family: string;
+  widthM: number | null;
+  /** ha/h ; null si la ligne n'est pas à l'hectare. */
+  haH: number | null;
+}
+
+export interface ItkEquipmentInfo {
+  id: string;
+  name: string;
+  /** Largeur de travail résolue (saisie, fiche, nom, gabarit). */
+  widthM: number | null;
+  machineryRateId: string | null;
+  /** Ligne proposée d'après le type et la largeur (non enregistrée). */
+  suggestedRateId: string | null;
+  /** Tracteur ou automoteur porteur : son débit est celui de l'outil. */
+  carrier: boolean;
+}
+
+export interface ItkObservedRate {
+  procedure: string;
+  equipmentId: string;
+  haH: number;
+  samples: number;
+}
+
+export interface ItkRoute {
+  distanceM: number;
+  durationS: number;
+  method: "osrm" | "estimate";
+}
+
+export const itkWorkSettings = z.object({
+  /** Heures de travail d'une journée (un aller-retour par journée de chantier). */
+  workdayHours: z.number().min(1).max(24).default(8),
+  /** Capacité d'une personne par semaine (pointes). */
+  weeklyHoursPerPerson: z.number().min(1).max(100).default(45),
+  /** Site de départ des trajets ; à défaut, le siège. */
+  defaultSiteId: z.string().uuid().nullable().default(null),
+});
+export type ItkWorkSettings = z.infer<typeof itkWorkSettings>;
+
+/** Contexte du temps de travaux d'un assolement, chargé une fois (`GET /crop-plans/:year/itk-context`). */
+export interface ItkWorkContext {
+  year: number;
+  itineraries: Record<string, { id: string; name: string; revision: number; activityId: string | null; content: ItkContent }>;
+  equipments: ItkEquipmentInfo[];
+  people: { id: string; name: string }[];
+  crewTemplates: Record<string, { equipmentIds: string[]; personIds: string[] }>;
+  observed: ItkObservedRate[];
+  machineryRates: Record<string, ItkMachineryRateInfo>;
+  /** Débit par mètre de largeur de la première famille du barème de chaque procédure (ha/h/m). */
+  familyPerMeter: Record<string, number>;
+  /** Trajet aller du site à chaque parcelle de base (clé `p:<id>`). */
+  routes: Record<string, ItkRoute>;
+  site: { id: string; name: string } | null;
+  settings: ItkWorkSettings;
+  /** Citation du barème (affichée avec chaque débit qui en vient). */
+  rateSource: string;
+}

@@ -8,8 +8,9 @@ doses à l'hectare, ses matériels et son débit de chantier.
 
 Les ITK servent à préparer l'assolement : on en choisit un à l'affectation
 d'une culture, puis « Préparer les interventions prévues » crée les
-interventions de la campagne (voir `docs/assolement.md`). Temps de travaux et
-besoins en intrants : à venir.
+interventions de la campagne (voir `docs/assolement.md`), et l'onglet
+**Travaux** de l'assolement estime les heures de chantier, les trajets et les
+pointes de travail. Besoins en intrants : à venir.
 
 ## Où
 
@@ -80,3 +81,27 @@ au-dessus, les intrants au-dessous, en pointillés (prévu). Un clic sur une
   variété).
 - **Supprimer** un itinéraire déjà utilisé par un assolement le désactive
   seulement : les assolements qui l'utilisent ne changent pas.
+
+## Débit de chantier
+
+Le temps passé au champ d'une étape est la surface (× part, × passages)
+divisée par le débit de chantier, pris dans cet ordre :
+
+1. **saisi** dans l'étape (ha/h) ;
+2. **observé** sur vos chantiers : médiane des interventions réalisées de
+   même procédure avec le même matériel, à l'heure près, sur au moins trois
+   chantiers (pas les interventions importées au jour près) ;
+3. **barème BCMA** : la ligne du barème rattachée au matériel (fiche du
+   matériel, panneau « Débit de chantier »), ramenée à sa largeur ; ou, pour
+   une étape sans matériel de la ferme, le « type de matériel » choisi dans
+   le barème ;
+4. **largeur × barème** : largeur de travail du matériel × débit par mètre
+   de la famille du barème pour la procédure.
+
+Sinon le débit est « inconnu » : l'étape n'est pas comptée, et c'est signalé.
+La colonne Débit de l'éditeur montre la valeur retenue et sa source, et le
+total d'heures par hectare de l'itinéraire.
+
+Le barème BCMA (édition 2024, guides CEGARA « Coût des façons culturales »)
+est repris avec l'accord du CEGARA et du BCMA ; il est cité avec chaque débit
+qui en vient.

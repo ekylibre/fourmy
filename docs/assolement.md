@@ -72,9 +72,19 @@ Données manquantes (parcelle sans culture prévue, culture sans code PAC, histo
 - **Préparer les interventions prévues** (assolement validé) : pour chaque culture qui a un itinéraire, les interventions de ses étapes, datées d'après le semis et la récolte prévus. Cochez ce qui est à créer, mettre à jour ou retirer, ajustez les dates, puis confirmez. Relancée après une révision ou une modification d'un itinéraire, elle ne refait que ce qui a changé ; une intervention modifiée à la main ou réalisée n'est jamais touchée. Les étapes sans date (semis ou récolte inconnus) restent « à préciser ».
 - **Modifier** rouvre un assolement validé (le brouillon repart de l'état actuel) ; la nouvelle validation demande un motif (sortie d'hiver…). **Historique** : les versions et leurs changements. **Abandonner le brouillon** revient à la dernière version.
 
+## Travaux
+
+Onglet **Travaux** (cultures qui ont un itinéraire technique) :
+- heures au champ et sur la route, kilomètres ;
+- débits par source (saisi, observé, barème) et ce qui est inconnu (débit, date, trajet) ;
+- heures de main-d'œuvre par semaine, avec la capacité de la ferme (personnes actives × heures par semaine des réglages) et les semaines en pointe ;
+- cumuls par personne, matériel, activité et intervention.
+
+Trajets : du siège (Ma ferme) à chaque parcelle, par la route (calcul d'itinéraire tracteur), un aller-retour par journée de chantier ; sans calcul d'itinéraire, distance à vol d'oiseau × 1,3 à 25 km/h, signalée.
+
 ## Réglages (responsable)
 
-Onglet **Réglages** : critère BCAE 7 mis en avant, ferme en plaine du Rhin (diversification à points, non calculée : « à vérifier »), délais de retour propres à la ferme.
+Onglet **Réglages** : critère BCAE 7 mis en avant, ferme en plaine du Rhin (diversification à points, non calculée : « à vérifier »), délais de retour propres à la ferme, journée de travail et heures par personne et par semaine (onglet Travaux).
 
 ## Limites connues
 
@@ -86,4 +96,4 @@ Onglet **Réglages** : critère BCAE 7 mis en avant, ferme en plaine du Rhin (di
 
 ## Suite
 
-Temps 2 : itinéraires techniques et interventions prévues faits ; temps de travaux et besoins en intrants à venir. Temps 3 (module économique : prix, rendements, marges) : `claudedocs/besoins_assolement.md` §5 et §6.
+Temps 2 : itinéraires techniques, interventions prévues et temps de travaux faits ; besoins en intrants à venir. Temps 3 (module économique : prix, rendements, marges) : `claudedocs/besoins_assolement.md` §5 et §6.

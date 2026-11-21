@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Accordion, Alert, Badge, Button, Checkbox, Group, Modal, Paper, ScrollArea, SegmentedControl, Select, Stack, Table, Text, TextInput, Textarea } from "@mantine/core";
+import { Accordion, Alert, Badge, Button, Checkbox, Group, Modal, NumberInput, Paper, ScrollArea, SegmentedControl, Select, Stack, Table, Text, TextInput, Textarea } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
 import { Ban, Crosshair, Eraser, Plus, Sprout } from "lucide-react";
@@ -666,6 +666,7 @@ export function HistoryPanel({ farmId, year, versions, editor, context }: { farm
 export function SettingsPanel({ farmId, year, context }: { farmId: string; year: number; context: CropPlanContext }) {
   const qc = useQueryClient();
   const [settings, setSettings] = useState(context.settings);
+  const work = settings.work ?? { workdayHours: 8, weeklyHoursPerPerson: 45, defaultSiteId: null };
   const save = useMutation({
     mutationFn: (s: CropPlanContext["settings"]) => api.put<CropPlanContext["settings"]>(farmPath(farmId, "/settings/crop-plan"), s),
     onSuccess: async () => {
@@ -698,6 +699,26 @@ export function SettingsPanel({ farmId, year, context }: { farmId: string; year:
         checked={settings.alsaceRhinePlain}
         onChange={(e) => setSettings({ ...settings, alsaceRhinePlain: e.currentTarget.checked })}
       />
+      <Group gap="sm" align="flex-end">
+        <NumberInput
+          label="Journée de travail (h)"
+          description="Un aller-retour par journée de chantier"
+          value={work.workdayHours}
+          onChange={(v) => setSettings({ ...settings, work: { ...work, workdayHours: typeof v === "number" && v >= 1 ? v : 8 } })}
+          min={1}
+          max={24}
+          w={200}
+        />
+        <NumberInput
+          label="Heures par personne et par semaine"
+          description="Capacité des pointes de travail"
+          value={work.weeklyHoursPerPerson}
+          onChange={(v) => setSettings({ ...settings, work: { ...work, weeklyHoursPerPerson: typeof v === "number" && v >= 1 ? v : 45 } })}
+          min={1}
+          max={100}
+          w={240}
+        />
+      </Group>
       <div>
         <Text fw={600} size="sm">
           Délais de retour (années)

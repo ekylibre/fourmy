@@ -18,6 +18,7 @@ import { draftShapes, ParcelTools, PendingOperations, splitOperation } from "./o
 import { cropPlanKeys, useCropPlan, useCropPlanContext } from "./queries";
 import { useCropPlanEditor, type SaveState } from "./useCropPlanEditor";
 import { PlannedInterventionsModal } from "../itk/PlannedInterventionsModal";
+import { WorkPanel } from "../itk/WorkPanel";
 import "./workspace.css";
 
 /**
@@ -229,6 +230,7 @@ function Editor({ farmId, year, plan, context, owner, nav }: { farmId: string; y
       <Tabs.List>
         <Tabs.Tab value="parcels">Parcelles</Tabs.Tab>
         <Tabs.Tab value="summary">Récapitulatif</Tabs.Tab>
+        <Tabs.Tab value="work">Travaux</Tabs.Tab>
         <Tabs.Tab value="checks" rightSection={issues ? <Badge size="xs" color={checksLevel === "danger" ? "brique" : "paille"}>{issues}</Badge> : null}>
           Contrôles
         </Tabs.Tab>
@@ -240,6 +242,9 @@ function Editor({ farmId, year, plan, context, owner, nav }: { farmId: string; y
       </Tabs.Panel>
       <Tabs.Panel value="summary" pt="sm">
         <SummaryPanel editor={editor} context={context} />
+      </Tabs.Panel>
+      <Tabs.Panel value="work" pt="sm">
+        {tab === "work" && <WorkPanel editor={editor} context={context} />}
       </Tabs.Panel>
       <Tabs.Panel value="checks" pt="sm">
         <Group mb="xs" gap="xs">
