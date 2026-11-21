@@ -1,7 +1,20 @@
 import { sql, type SQL } from "drizzle-orm";
 import type { Tx } from "@fourmy/db";
-import { itkContent, type ItkContent, type ItkDetail, type ItkSummary, type ItkWriteParsed } from "@fourmy/contracts";
-import { itkMissing, itkReferences } from "@fourmy/domain";
+import {
+  PLANT_FAMILIES,
+  itkContent,
+  type ActivityFamily,
+  type ArticleKind,
+  type ItkContent,
+  type ItkDeriveRequest,
+  type ItkDeriveResult,
+  type ItkDetail,
+  type ItkHistoryCampaign,
+  type ItkSummary,
+  type ItkWriteParsed,
+} from "@fourmy/contracts";
+import { deriveItinerary, itkMissing, itkReferences, parisDay, type DeriveIntervention } from "@fourmy/domain";
+import { readInterventionsWhere } from "./interventions.js";
 import { BadRequest, NotFound } from "../routes/helpers.js";
 
 /**
@@ -195,4 +208,131 @@ export async function deleteItk(tx: Tx, id: string, userId: string): Promise<{ d
   }
   await tx.execute(sql`DELETE FROM technical_itineraries WHERE id = ${id}`);
   return { deleted: true };
+}
+
+// ---------------------------------------------------------------------------
+// Lot IT2 : proposition d'un ITK depuis les interventions passées d'une activité.
+
+const pgArray = (values: string[]) => `{${values.join(",")}}`;
+
+/** Activité végétale de la ferme ; 404 sinon. */
+async function plantActivity(tx: Tx, activityId: string) {
+  const [a] = await rows<{ name: string; reference: string | null; family: ActivityFamily }>(tx, sql`SELECT name, reference, family FROM activities WHERE id = ${activityId}`);
+  if (!a || !PLANT_FAMILIES.includes(a.family)) throw new NotFound("Activité végétale introuvable.");
+  return a;
+}
+
+/** Campagnes où l'activité a des productions et des interventions réalisées sur leurs parcelles. */
+export async function itkHistoryCampaigns(tx: Tx, activityId: string): Promise<ItkHistoryCampaign[]> {
+  await plantActivity(tx, activityId);
+  return rows<ItkHistoryCampaign>(
+    tx,
+    sql`SELECT c.year, count(DISTINCT p.id)::int AS productions, count(DISTINCT i.id)::int AS interventions
+        FROM productions p JOIN campaigns c ON c.id = p.campaign_id
+        JOIN intervention_parameters t ON t.role = 'target' AND t.ref_type = 'land_parcel' AND t.ref_id = p.land_parcel_id
+        JOIN interventions i ON i.id = t.intervention_id AND i.status = 'done'
+             AND coalesce(i.started_at, i.stopped_at) >= make_date(c.year - 1, 8, 1)
+             AND coalesce(i.started_at, i.stopped_at) < make_date(c.year + 1, 1, 1)
+        WHERE p.activity_id = ${activityId} AND NOT p.declared
+        GROUP BY c.year ORDER BY c.year DESC`,
+  );
+}
+
+/** Proposition (rien n'est enregistré) : contenu validé, preuves par étape, statistiques. */
+export async function deriveItk(tx: Tx, req: ItkDeriveRequest): Promise<ItkDeriveResult> {
+  const activity = await plantActivity(tx, req.activityId);
+  const years = [...new Set(req.campaigns)].sort();
+  const min = years[0]!;
+  const max = years.at(-1)!;
+  const parcelIds = (
+    await rows<{ id: string }>(
+      tx,
+      sql`SELECT DISTINCT p.land_parcel_id AS id FROM productions p JOIN campaigns c ON c.id = p.campaign_id
+          WHERE p.activity_id = ${req.activityId} AND c.year = ANY(${`{${years.join(",")}}`}::int[]) AND NOT p.declared`,
+    )
+  ).map((r) => r.id);
+  const empty = (): ItkDeriveResult => ({
+    name: `${activity.name} — d'après ${years.join(", ")}`.slice(0, 120),
+    activityId: req.activityId,
+    activityName: activity.name,
+    production: activity.reference,
+    system: "conventional",
+    source: { activityId: req.activityId, campaigns: years, productions: 0 },
+    content: { schema: 1, steps: [] },
+    stats: { productions: 0, excluded: 0, interventions: 0, unconvertedInputs: 0, toComplete: 0 },
+  });
+  if (!parcelIds.length) return empty();
+
+  // Productions de ces parcelles autour des campagnes (toutes activités : elles bornent les fenêtres), surface à la mi-campagne.
+  const productions = (
+    await rows<{ id: string; parcel_id: string; activity_id: string | null; year: number; area_m2: string | null; started_on: string | null; stopped_on: string | null }>(
+      tx,
+      sql`SELECT p.id, p.land_parcel_id AS parcel_id, p.activity_id, c.year, p.started_on::text, p.stopped_on::text,
+                 coalesce((SELECT v.area_m2 FROM land_parcel_versions v WHERE v.land_parcel_id = p.land_parcel_id AND v.valid @> make_date(c.year, 6, 1)::timestamptz LIMIT 1),
+                          (SELECT v.area_m2 FROM land_parcel_versions v WHERE v.land_parcel_id = p.land_parcel_id ORDER BY lower(v.valid) DESC LIMIT 1)) AS area_m2
+          FROM productions p JOIN campaigns c ON c.id = p.campaign_id
+          WHERE p.land_parcel_id = ANY(${pgArray(parcelIds)}::uuid[]) AND c.year BETWEEN ${min - 1} AND ${max + 1} AND NOT p.declared`,
+    )
+  ).map((p) => ({
+    id: p.id,
+    parcelId: p.parcel_id,
+    activityId: p.activity_id,
+    campaign: p.year,
+    areaM2: Number(p.area_m2 ?? 0),
+    startedOn: p.started_on,
+    stoppedOn: p.stopped_on,
+  }));
+
+  const interventions = await readInterventionsWhere(
+    tx,
+    sql`i.status = 'done'
+        AND EXISTS (SELECT 1 FROM intervention_parameters t WHERE t.intervention_id = i.id AND t.role = 'target' AND t.ref_type = 'land_parcel'
+                    AND t.ref_id = ANY(${pgArray(parcelIds)}::uuid[]))
+        AND coalesce(i.started_at, i.stopped_at) >= make_date(${min - 2}, 8, 1)
+        AND coalesce(i.started_at, i.stopped_at) < make_date(${max + 2}, 1, 1)`,
+    20_000,
+  );
+  // Surfaces des parcelles ciblées (à défaut de surface travaillée), et articles cités.
+  const targetIds = [...new Set(interventions.flatMap((i) => i.targets.filter((t) => t.kind === "land_parcel").map((t) => t.id)))];
+  const areas = new Map(
+    (
+      await rows<{ id: string; area_m2: string | null }>(
+        tx,
+        sql`SELECT p.id, (SELECT v.area_m2 FROM land_parcel_versions v WHERE v.land_parcel_id = p.id ORDER BY lower(v.valid) DESC LIMIT 1) AS area_m2
+            FROM land_parcels p WHERE p.id = ANY(${pgArray(targetIds.length ? targetIds : parcelIds)}::uuid[])`,
+      )
+    ).map((r) => [r.id, Number(r.area_m2 ?? 0)]),
+  );
+  const articleIds = [...new Set(interventions.flatMap((i) => i.inputs.map((x) => x.articleId)))];
+  const articles = new Map(
+    articleIds.length
+      ? (await rows<{ id: string; name: string; kind: ArticleKind }>(tx, sql`SELECT id, name, kind FROM articles WHERE id = ANY(${pgArray(articleIds)}::uuid[])`)).map((a) => [
+          a.id,
+          { name: a.name, kind: a.kind },
+        ])
+      : [],
+  );
+  const derived = deriveItinerary({
+    activityId: req.activityId,
+    campaigns: years,
+    productions,
+    interventions: interventions.map(
+      (i): DeriveIntervention => ({
+        id: i.id,
+        procedure: i.procedure,
+        day: parisDay(i.startedAt ?? i.stoppedAt ?? i.createdAt),
+        origin: i.origin,
+        dayPrecision: i.periodPrecision === "day",
+        durationS: i.workDurationS ?? null,
+        targets: i.targets.filter((t) => t.kind === "land_parcel").map((t) => ({ parcelId: t.id, workedAreaM2: t.workedAreaM2 ?? areas.get(t.id) ?? 0 })),
+        inputs: i.inputs.map((x) => ({ articleId: x.articleId, quantity: x.quantity, unit: x.unit, per: x.per })),
+        equipmentIds: i.tools.map((x) => x.equipmentId),
+        personIds: i.doers.map((x) => x.personId),
+        crewTemplateId: i.crews.find((c) => c.templateId)?.templateId ?? null,
+      }),
+    ),
+    articles,
+    newId: () => crypto.randomUUID(),
+  });
+  return { ...empty(), source: { activityId: req.activityId, campaigns: years, productions: derived.stats.productions }, content: derived.content, stats: derived.stats };
 }

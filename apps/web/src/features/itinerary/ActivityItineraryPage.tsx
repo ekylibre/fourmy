@@ -51,9 +51,16 @@ export function ActivityItineraryPage() {
       </Button>
       <Group justify="space-between" wrap="wrap">
         <Title order={1}>Itinéraire technique — {a.title}</Title>
-        <Button component={Link} to={`/f/${farm.id}/itineraries?activityId=${activityId}`} variant="default" size="xs">
-          Itinéraires prévus de l'activité
-        </Button>
+        <Group gap="xs">
+          <Button component={Link} to={`/f/${farm.id}/itineraries?activityId=${activityId}`} variant="default" size="xs">
+            Itinéraires prévus de l'activité
+          </Button>
+          {farm.role === "owner" && (
+            <Button component={Link} to={`/f/${farm.id}/itineraries?activityId=${activityId}&derive=1`} variant="light" size="xs">
+              Créer un itinéraire depuis l'historique
+            </Button>
+          )}
+        </Group>
       </Group>
       <Grid>
         <Grid.Col span={{ base: 12, md: 3 }}>

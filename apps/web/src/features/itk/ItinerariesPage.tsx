@@ -3,12 +3,13 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 import { Alert, Badge, Button, Group, Modal, Paper, Select, Stack, Switch, Table, Text, TextInput, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Copy, Plus } from "lucide-react";
+import { ArrowLeft, Copy, History, Plus } from "lucide-react";
 import { ITK_ORIGIN_LABELS, ITK_SYSTEM_LABELS, getProcedure, type ItkDetail, type ItkSystem, type ItkWrite } from "@fourmy/contracts";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
 import { useActivities } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
+import { DeriveModal } from "./DeriveModal";
 import { itksKey, useItks } from "./queries";
 
 /**
@@ -24,6 +25,8 @@ export function ItinerariesPage() {
   const activityId = params.get("activityId");
   const [showInactive, setShowInactive] = useState(false);
   const [creating, setCreating] = useState(false);
+  // `?derive=1` : ouvert depuis l'itinéraire d'une activité (« Créer depuis l'historique »).
+  const [deriving, setDeriving] = useState(params.get("derive") === "1");
   const year = new Date().getFullYear();
   const activities = useActivities(farm.id, year);
   const q = useItks(farm.id, { activityId, active: showInactive ? undefined : true });
@@ -67,6 +70,11 @@ export function ItinerariesPage() {
             w={220}
           />
           <Switch label="Inactifs aussi" checked={showInactive} onChange={(e) => setShowInactive(e.currentTarget.checked)} />
+          {owner && (
+            <Button variant="default" leftSection={<History size={16} />} onClick={() => setDeriving(true)}>
+              Depuis l'historique
+            </Button>
+          )}
           {owner && (
             <Button leftSection={<Plus size={16} />} onClick={() => setCreating(true)}>
               Nouvel itinéraire
@@ -139,7 +147,7 @@ export function ItinerariesPage() {
               <Table.Tr>
                 <Table.Td colSpan={owner ? 6 : 5}>
                   <Text size="sm" c="dimmed" ta="center" py="md">
-                    Aucun itinéraire technique{activityId ? " pour cette activité" : ""}. {owner ? "Créez le premier avec « Nouvel itinéraire »." : ""}
+                    Aucun itinéraire technique{activityId ? " pour cette activité" : ""}. {owner ? "Créez le premier depuis l'historique de vos interventions, ou avec « Nouvel itinéraire »." : ""}
                   </Text>
                 </Table.Td>
               </Table.Tr>
@@ -147,6 +155,18 @@ export function ItinerariesPage() {
           </Table.Tbody>
         </Table>
       </Paper>
+      {deriving && (
+        <DeriveModal
+          farmId={farm.id}
+          activityOptions={activityOptions}
+          defaultActivityId={activityId}
+          onClose={() => {
+            setDeriving(false);
+            if (params.get("derive")) setParams(activityId ? { activityId } : {});
+          }}
+          onCreated={(t) => navigate(`/f/${farm.id}/itineraries/${t.id}`)}
+        />
+      )}
       {creating && (
         <NewItineraryModal
           farmId={farm.id}

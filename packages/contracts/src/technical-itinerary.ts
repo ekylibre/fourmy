@@ -57,6 +57,9 @@ export const itkEvidence = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
   note: z.string().max(300).optional(),
+  /** Débit observé (médiane, ha/h) et nombre de chantiers mesurés : information, pas un débit saisi. */
+  observedRateHaH: z.number().positive().optional(),
+  observedSamples: z.number().int().nonnegative().optional(),
 });
 export type ItkEvidence = z.infer<typeof itkEvidence>;
 
@@ -195,4 +198,42 @@ export interface ItkConflict {
   title: string;
   detail: string;
   current: ItkDetail;
+}
+
+/** Proposition d'un ITK depuis les interventions passées d'une activité (lot IT2). */
+export const itkDeriveRequest = z.object({
+  activityId: uuid,
+  campaigns: z.array(z.number().int().min(2000).max(2100)).min(1, "Au moins une campagne.").max(6),
+});
+export type ItkDeriveRequest = z.infer<typeof itkDeriveRequest>;
+
+export interface ItkDeriveStats {
+  /** Productions retenues (datées par un semis ou une récolte). */
+  productions: number;
+  /** Productions écartées : ni date de semis ni de récolte. */
+  excluded: number;
+  /** Interventions réalisées prises en compte. */
+  interventions: number;
+  /** Intrants dont la dose ne se ramène pas à l'hectare (unité illisible, surface inconnue). */
+  unconvertedInputs: number;
+  /** Étapes sans matériel ni intervenant dans l'historique (« à compléter »). */
+  toComplete: number;
+}
+
+export interface ItkDeriveResult {
+  name: string;
+  activityId: string;
+  activityName: string;
+  production: string | null;
+  system: ItkSystem;
+  source: { activityId: string; campaigns: number[]; productions: number };
+  content: ItkContent;
+  stats: ItkDeriveStats;
+}
+
+/** Campagnes d'une activité où des interventions réalisées existent (choix de « Créer depuis l'historique »). */
+export interface ItkHistoryCampaign {
+  year: number;
+  productions: number;
+  interventions: number;
 }

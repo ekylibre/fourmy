@@ -271,3 +271,23 @@ flowchart LR
 - Dates d'exemple de l'aperçu : dates types Lexicon de la production de l'ITK, sinon de celle de l'activité, ramenées à l'an prochain ; à défaut 15/10 → 10/07.
 - `ItineraryView` accepte `onIntervention` (clic sur une étape de l'aperçu) et `hint`.
 - Purposes (motifs de traitement) : gardés dans le document, pas encore saisissables dans la fenêtre d'étape (IT3, avec les contrôles phyto de la génération).
+
+### IT2 — ITK depuis l'historique (21/11/2026)
+
+- **Domaine** `packages/domain/src/itk/derive.ts` : `assignInterventions` (une intervention va à la production de sa parcelle qui court du lendemain de la récolte précédente à la veille de la suivante), `deriveItinerary`, `doseOf` (dose à l'hectare : unités `_per_hectare`, `grain_per_square_meter`, libellés repris « Kilogramme », « Mille grains »…, grammes, hectolitres, millions de grains).
+- **Contrat** : `itkDeriveRequest`, `ItkDeriveResult`, `ItkDeriveStats`, `ItkHistoryCampaign` ; `itkEvidence.observedRateHaH` et `observedSamples`.
+- **API** : `GET /technical-itineraries/history?activityId=` (campagnes avec interventions réalisées), `POST /technical-itineraries/derive` (proposition, aucune écriture ; lecture pour tous les membres).
+- **Web** : « Depuis l'historique » dans le catalogue et « Créer un itinéraire depuis l'historique » sur l'itinéraire d'une activité (`?derive=1`) : campagnes (les deux dernières cochées), proposition relue avec ses preuves, création (`origin = history`). Débit observé affiché dans l'éditeur et repris en un clic dans la fenêtre d'étape.
+- **Tests** : domaine `itk-derive.test.ts` (10), API (proposition sans écriture, création, activité d'une autre ferme), web `itk-derive.test.tsx`.
+
+**Données (base de développement, hors dépôt)** : 16 ITK créés depuis l'historique.
+- Exploitant testeur : Maïs (2024 à 2026, 24 productions, 270 interventions, 17 étapes, débits observés : labour 1,5 ha/h, hersage 2,6 ha/h, semis tout-en-un 1,1 ha/h), Avoine (3 étapes), Triticale (1 étape) ; la Jachère n'a aucune intervention datable.
+- GAEC : 13 activités (blé, orges, maïs fourrage, avoine noire, féverole, lin, carotte, épinard, prairies, luzerne, bande enherbée). Toutes les étapes sont « à compléter » (aucun matériel dans l'import) et aucun débit n'est observé, comme prévu (§15.2). Les doses viennent bien de Geofolia.
+- À faire : relecture par les deux exploitants (issue #112 élargie), puis création sur dev.fourmy.org après déploiement.
+
+**Écarts avec la conception** :
+- **Cultures en place depuis plus d'une campagne** (semées avant le 1er juillet de l'année précédente : prairies permanentes) : étapes à **dates fixes** (jour/mois, année de récolte ou précédente), conformément au §13.4. Sinon le décalage au semis dépasse les bornes du contrat (constaté sur les prairies de la GAEC).
+- Une récolte antérieure au semis (culture précédente restée dans la fenêtre) n'entre pas dans l'itinéraire.
+- Une intervention dont le décalage sort des bornes d'une ancre (dates de production incohérentes) est ignorée.
+- Procédure répétée en plus de 4 groupes (irrigation, apports fractionnés) : une seule étape à passages répétés (nombre et intervalle médians). Ses intrants ne sont gardés que s'ils servent à au moins la moitié des passages ; ils sont donc souvent vides et à compléter à la main.
+- Une production sans date de semis ni de récolte (ni intervention de semis ou de récolte) est écartée et comptée (« Jachère »).
