@@ -68,3 +68,35 @@ s'affiche sous le nom de la production ; il servira de rendement par défaut
 Ces références sont chargées par la synchro Lexicon (jeux `productions` et
 `eu_market_prices`, en accès libre).
 
+## Prix de marché de la Commission européenne (agrifood)
+
+Le worker interroge chaque semaine l'API agrifood de la Commission
+européenne (prix des céréales relevés en France, en €/t, par place et par
+semaine) et garde les prix en cache. Après un échec, il réessaie le
+lendemain ; le cache et la copie Lexicon des mêmes prix restent utilisés.
+Quand le cache a des prix pour une espèce, ils remplacent la copie Lexicon
+dans les repères ; seul le débouché courant de la production est retenu s'il
+est coté (blé panifiable pour le blé tendre, orge brassicole pour l'orge de
+printemps, orge fourragère pour l'orge d'hiver…).
+
+État au 21/11/2026 : l'API répond en erreur (point d'entrée suspendu) ; les
+repères viennent de Lexicon.
+
+## Rendement et prix prévus de l'assolement
+
+Dans le panneau **Affecter** de l'assolement, le rendement (q/ha) et le prix
+de vente (€/t) prévus se saisissent avec l'activité. Laissés vides, ces
+valeurs par défaut s'appliquent, affichées sous les champs avec leur source :
+
+| Valeur | Par défaut, dans l'ordre |
+|---|---|
+| Rendement | médiane des rendements de la ferme pour l'activité sur les trois campagnes précédentes (récoltes enregistrées, moyenne des parcelles par campagne) ; sinon médiane des trois dernières campagnes Agreste du département |
+| Prix de vente | prix du produit principal saisi dans l'onglet Produits ; sinon place de marché (agrifood, puis Lexicon) ; sinon MATIF ; sinon prix producteur du département, puis de France |
+
+Les valeurs saisies sont gardées avec la culture à la validation de
+l'assolement (`productions.attrs.forecasts`).
+
+Limite : le rendement de la ferme est calculé sur les récoltes en quintaux,
+tonnes ou kilogrammes ; pour une culture fourragère, il dépend de la façon dont
+les récoltes ont été saisies (matière brute ou sèche) et mérite d'être vérifié.
+

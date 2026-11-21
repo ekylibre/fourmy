@@ -351,6 +351,10 @@ export const handlers = [
   http.post(`*${base}/control/check`, () => HttpResponse.json({ check: null })),
   // Assolement (lot AS2b) : pas encore d'assolement ; les tests de l'écran posent les leurs.
   http.get(`*${base}/crop-plans`, () => HttpResponse.json([])),
+  // Module économique (temps 3) : aucun prix, aucun repère par défaut.
+  http.get(`*${base}/crop-plans/:year/eco-context`, ({ params }) => HttpResponse.json({ year: Number(params.year), department: null, activities: [], labour: null })),
+  http.get(`*${base}/prices/suggestions/products`, () => HttpResponse.json({ department: null, items: [] })),
+  http.get(`*${base}/prices`, () => HttpResponse.json({ items: [] })),
   http.get(`*${base}/crop-plans/:year`, () => HttpResponse.json({ title: "Introuvable", status: 404 }, { status: 404 })),
   http.get(`*${base}/settings/certification`, () =>
     HttpResponse.json({ hveCampaignStartMd: "01-01", hveMethod: "campaign", hveIftScale: "current", hveBeaujolais: null, hveLivestock: null, rotationYears: 5, rotationSameSpeciesMax: 2, organicNitrogenPeriod: "calendar", abNotifiedOn: null, abCommittedOn: null }),

@@ -1,7 +1,10 @@
 import { sql, type SQL } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
-import type { Price, PriceKind, PriceSuggestion, ProductSuggestions, priceWrite } from "@fourmy/contracts";
+import { priceKey, type EcoContext, type Price, type PriceKind, type PriceSuggestion, type ProductSuggestions, type priceWrite } from "@fourmy/contracts";
 import type { z } from "zod";
+import { marketCodesFor } from "@fourmy/certification-refs";
+import { defaultPrice, defaultYield } from "@fourmy/domain";
+import { harvestYields } from "./fertilization-plans.js";
 import { BadRequest, NotFound } from "../routes/helpers.js";
 
 /**
@@ -141,15 +144,21 @@ export async function productSuggestions(db: Database, farmId: string, today: st
               ORDER BY specie, zone, nature, started_on DESC`,
         )
       : [];
-    // Marchés européens (France) : les trois places au prix le plus récent, par espèce.
+    // Marchés européens (France), dernier prix par place : cache de l'API agrifood d'abord, copie Lexicon ensuite.
+    type Market = { id: string; specie: string; code: string; label: string; price: string; unit: string; started_on: string; source: "agrifood" | "lexicon" };
     const market = species.length
-      ? await rows<{ id: string; specie: string; label: string; stage: string | null; price: string; unit: string; started_on: string }>(
+      ? await rows<Market>(
           tx,
           sql`SELECT * FROM (
-                SELECT DISTINCT ON (specie, label) id, specie, label, stage, price::text, unit, started_on::text
+                SELECT DISTINCT ON (specie, product_label) id, specie, product_code AS code, product_label AS label, price::text, unit, started_on::text, 'agrifood' AS source
+                FROM market_prices WHERE specie = ANY(${arr(species)}::text[]) AND started_on >= ${oldest}::date
+                ORDER BY specie, product_label, started_on DESC) a
+              UNION ALL
+              SELECT * FROM (
+                SELECT DISTINCT ON (specie, label) id, specie, product_code AS code, label, price::text, unit, started_on::text, 'lexicon' AS source
                 FROM lexicon_market_prices WHERE specie = ANY(${arr(species)}::text[]) AND started_on >= ${oldest}::date
-                ORDER BY specie, label, started_on DESC) last
-              ORDER BY specie, started_on DESC`,
+                ORDER BY specie, label, started_on DESC) l
+              ORDER BY started_on DESC`,
         )
       : [];
     const yields =
@@ -169,10 +178,22 @@ export async function productSuggestions(db: Database, farmId: string, today: st
         push(pp.find((p) => p.nature === "farmer_price" && p.zone === department), "department");
         push(pp.find((p) => p.nature === "farmer_price" && p.zone === "0"), "national");
         push(pp.find((p) => p.nature === "matif_price"), "matif");
-        const places = market.filter((x) => x.specie === a.specie);
+        // Agrifood s'il a des prix pour l'espèce, sinon Lexicon ; débouché courant de la production s'il est coté.
+        const ofSpecie = market.filter((x) => x.specie === a.specie);
+        const fromSource = ofSpecie.some((x) => x.source === "agrifood") ? ofSpecie.filter((x) => x.source === "agrifood") : ofSpecie;
+        const preferred = marketCodesFor(a.specie, a.reference)[0]?.code;
+        const places = fromSource.some((x) => x.code === preferred) ? fromSource.filter((x) => x.code === preferred) : fromSource;
         const newest = places[0] ? Date.parse(places[0].started_on) : 0;
         for (const m of places.filter((x) => newest - Date.parse(x.started_on) <= 183 * 86_400_000).slice(0, 3)) {
-          suggestions.push({ source: "lexicon", scope: "market", label: m.label, amount: Number(m.price), unit: m.unit, date: m.started_on, ref: `eu_market_prices:${m.id}` });
+          suggestions.push({
+            source: m.source,
+            scope: "market",
+            label: m.label,
+            amount: Number(m.price),
+            unit: m.unit,
+            date: m.started_on,
+            ref: `${m.source === "agrifood" ? "agrifood" : "eu_market_prices"}:${m.id}`,
+          });
         }
       }
       return {
@@ -184,5 +205,56 @@ export async function productSuggestions(db: Database, farmId: string, today: st
       };
     });
     return { department, items };
+  });
+}
+
+/**
+ * Contexte économique d'une campagne d'assolement (lot E3) : par activité
+ * végétale, rendements réalisés de la ferme (q/ha, moyenne des parcelles par
+ * campagne), rendements Agreste et repères de prix, prix de vente saisi, et
+ * les défauts qui en découlent ; coût horaire de la main-d'œuvre.
+ */
+export async function ecoContext(db: Database, farmId: string, year: number, today: string = new Date().toISOString().slice(0, 10)): Promise<EcoContext> {
+  const refs = await productSuggestions(db, farmId, today);
+  return withFarm(db, farmId, async (tx) => {
+    const parcels = await harvestYields(tx, farmId, year - 3, year - 1);
+    const productions = await rows<{ parcel_id: string; year: number; activity_id: string }>(
+      tx,
+      sql`SELECT pr.land_parcel_id AS parcel_id, c.year, pr.activity_id FROM productions pr JOIN campaigns c ON c.id = pr.campaign_id
+          WHERE pr.activity_id IS NOT NULL AND c.year BETWEEN ${year - 3} AND ${year - 1}`,
+    );
+    const activityOf = new Map(productions.map((p) => [`${p.parcel_id}|${p.year}`, p.activity_id]));
+    const byActivityYear = new Map<string, number[]>();
+    for (const y of parcels) {
+      const a = activityOf.get(`${y.parcelId}|${y.year}`);
+      if (!a) continue;
+      const k = `${a}|${y.year}`;
+      byActivityYear.set(k, [...(byActivityYear.get(k) ?? []), y.yieldQHa]);
+    }
+    const current = await rows<Row>(
+      tx,
+      sql`SELECT DISTINCT ON (kind, article_id, equipment_id, activity_id, product, procedure) ${COLS}
+          FROM prices WHERE kind IN ('product', 'labour') AND valid_from <= ${today}::date
+          ORDER BY kind, article_id, equipment_id, activity_id, product, procedure, valid_from DESC, created_at DESC`,
+    );
+    const prices = current.map(read);
+    const byKey = new Map(prices.map((p) => [priceKey(p), p]));
+    const activities = refs.items.map((i) => {
+      const farmYields = [...byActivityYear.entries()]
+        .filter(([k]) => k.startsWith(`${i.activityId}|`))
+        .map(([k, vs]) => ({ campaign: Number(k.split("|")[1]), value: Math.round((vs.reduce((s, v) => s + v, 0) / vs.length) * 10) / 10 }))
+        .sort((a, b) => b.campaign - a.campaign);
+      const farmPrice = byKey.get(priceKey({ kind: "product", articleId: null, equipmentId: null, activityId: i.activityId, product: "principal", procedure: null })) ?? null;
+      return {
+        ...i,
+        agreste: i.yields,
+        farmYields,
+        farmPrice,
+        yield: defaultYield(farmYields, i.yields, year, refs.department),
+        price: defaultPrice(farmPrice, i.suggestions),
+      };
+    });
+    const labour = prices.find((p) => p.kind === "labour") ?? null;
+    return { year, department: refs.department, activities: activities.map(({ yields: _y, ...a }) => a), labour };
   });
 }

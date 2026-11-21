@@ -5,14 +5,24 @@ import { notifications } from "@mantine/notifications";
 import { Ban, Crosshair, Eraser, Plus, Sprout } from "lucide-react";
 import { ACTIVITY_FAMILY_LABELS, COVER_FAMILY_LABELS, COVER_KIND_LABELS, getProcedure, type ActivityFamily, type ControlFinding, type ControlSection, type CropPlanChange, type CropPlanContext, type CropPlanParcelKey, type CropPlanValidation } from "@fourmy/contracts";
 import { RETURN_INTERVALS } from "@fourmy/certification-refs";
+import { forecastsKey } from "@fourmy/domain";
 import { Link } from "react-router";
 import { useArea } from "../../app/prefs";
 import { useFarm } from "../../app/farm";
 import { useItks } from "../itk/queries";
+import { useEcoContext } from "../economics/queries";
 import { api, farmPath } from "../../app/api";
 import { ControlLight } from "../certification/controls";
 import { cropPlanKeys, useCropPlanVersion } from "./queries";
 import { addSecondary, assignMain, clearParcels, markFallow, setCover, type CropPlanEditor } from "./useCropPlanEditor";
+
+/** Saisie numérique (« 112,5 », 112.5) → nombre ; null si vide ou invalide. */
+const toNumber = (v: number | string): number | null => {
+  if (typeof v === "number") return Number.isFinite(v) && v >= 0 ? v : null;
+  const n = Number(v.replace(",", ".").trim());
+  return v.trim() && Number.isFinite(n) && n >= 0 ? n : null;
+};
+const fmtNumber = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
 
 /** Panneaux de l'écran d'assolement (conception §7). */
 
@@ -177,7 +187,11 @@ export function AssignForm({
   const [startedOn, setStartedOn] = useState("");
   const [stoppedOn, setStoppedOn] = useState("");
   const [itineraryId, setItineraryId] = useState<string | null>(null);
+  const [yieldQHa, setYieldQHa] = useState<number | string>("");
+  const [price, setPrice] = useState<number | string>("");
   const farm = useFarm();
+  const eco = useEcoContext(farm.id, context.year);
+  const ecoActivity = eco.data?.activities.find((a) => a.activityId === activityId) ?? null;
   const itks = useItks(farm.id, { active: true });
   const itkOptions = useMemo(() => {
     const all = itks.data?.items ?? [];
@@ -196,7 +210,14 @@ export function AssignForm({
   const sel = new Set<string>(selected);
   const selectedArea = editor.plan.parcels.filter((p) => sel.has(p.key)).reduce((s, p) => s + p.areaM2, 0);
   const options = useMemo(() => activityOptions(context), [context]);
-  const dates = { startedOn: startedOn || null, stoppedOn: stoppedOn || null, itineraryId };
+  // Prévision saisie (lot E3) ; vide : les défauts du contexte économique s'appliquent (rien n'est enregistré).
+  const yieldValue = toNumber(yieldQHa);
+  const priceValue = toNumber(price);
+  const forecasts =
+    yieldValue !== null || priceValue !== null
+      ? [{ product: "principal", unit: "quintal_per_hectare", priceUnit: "ton", ...(yieldValue !== null ? { yield: yieldValue } : {}), ...(priceValue !== null ? { price: priceValue } : {}) }]
+      : null;
+  const dates = { startedOn: startedOn || null, stoppedOn: stoppedOn || null, itineraryId, forecasts };
   const findings = editor.sections.flatMap((s) => s.findings).filter((f) => f.level !== "ok" && f.level !== "na" && touches(f, sel));
   const carried = new Set(context.parcels.filter((p) => p.carryOver).map((p) => `p:${p.id}`));
   const selectedCarried = selected.filter((k) => carried.has(k));
@@ -216,6 +237,8 @@ export function AssignForm({
     // Itinéraire proposé : le seul de l'activité, s'il n'y en a qu'un.
     const own = (itks.data?.items ?? []).filter((t) => t.activityId === id);
     setItineraryId(own.length === 1 ? own[0]!.id : null);
+    setYieldQHa("");
+    setPrice("");
   };
 
   return (
@@ -256,6 +279,34 @@ export function AssignForm({
             <Button size="xs" variant="subtle" component={Link} to={`/f/${farm.id}/itineraries?activityId=${activityId}`} target="_blank">
               Itinéraires…
             </Button>
+          </Group>
+        )}
+        {activityId && (
+          <Group gap="xs" align="flex-start" wrap="wrap" aria-label="Prévisions">
+            <NumberInput
+              size="xs"
+              label="Rendement prévu (q/ha)"
+              placeholder={ecoActivity?.yield ? fmtNumber(ecoActivity.yield.value) : "—"}
+              description={ecoActivity?.yield ? `Par défaut : ${ecoActivity.yield.label}` : "Pas de rendement de référence"}
+              value={yieldQHa}
+              onChange={setYieldQHa}
+              min={0}
+              decimalScale={1}
+              decimalSeparator=","
+              style={{ flex: 1, minWidth: 180 }}
+            />
+            <NumberInput
+              size="xs"
+              label="Prix de vente prévu (€/t)"
+              placeholder={ecoActivity?.price && ecoActivity.price.unit === "ton" ? fmtNumber(ecoActivity.price.value) : "—"}
+              description={ecoActivity?.price ? `Par défaut : ${ecoActivity.price.label}` : "Pas de prix de référence"}
+              value={price}
+              onChange={setPrice}
+              min={0}
+              decimalScale={2}
+              decimalSeparator=","
+              style={{ flex: 1, minWidth: 180 }}
+            />
           </Group>
         )}
         <Group gap="xs">
@@ -477,6 +528,7 @@ function changeLabel(c: CropPlanChange, names: (key: string) => string, activity
       const parts: string[] = [];
       if (c.before.startedOn !== c.after.startedOn || c.before.stoppedOn !== c.after.stoppedOn) parts.push("dates modifiées");
       if ((c.before.itineraryId ?? null) !== (c.after.itineraryId ?? null)) parts.push(c.after.itineraryId ? itk(c.after.itineraryId) : "itinéraire retiré");
+      if (forecastsKey(c.before.forecasts) !== forecastsKey(c.after.forecasts)) parts.push(c.after.forecasts?.length ? "prévisions modifiées" : "prévisions retirées");
       return `${names(c.key)} : ${activity(c.after.activityId)}, ${parts.join(", ") || "modifiée"}`;
     }
     case "production.delete":

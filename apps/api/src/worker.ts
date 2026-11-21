@@ -20,6 +20,7 @@ import { drainAgrirouterOutbox } from "./integrations/agrirouter-outbox.js";
 import { readAgrirouterInbox } from "./integrations/agrirouter-read.js";
 import { purgeExpiredImportFiles } from "./repos/file-imports.js";
 import { ekylibreUploadsTick } from "./repos/ekylibre-uploads.js";
+import { agrifoodBaseFromEnv, refreshMarketPrices } from "./agrifood.js";
 
 /**
  * Worker : synchronise les intégrations actives de toutes les fermes
@@ -47,6 +48,24 @@ async function lexiconTick(): Promise<void> {
     for (const r of await syncLexicon(client, LEXICON_SOURCE)) {
       if (r.status === "loaded") console.log(`[worker] Lexicon ${r.name} ${r.version} chargé (${r.rows} lignes)`);
     }
+  } finally {
+    await client.end();
+  }
+}
+
+// Prix de marché des céréales (API agrifood, lot E3) : une fois par semaine,
+// nouvel essai le lendemain d'un échec (état gardé en base) ; FOURMY_AGRIFOOD_URL=off pour ne pas appeler.
+const AGRIFOOD_BASE = agrifoodBaseFromEnv();
+let agrifoodCheckedAt = 0;
+
+async function agrifoodTick(): Promise<void> {
+  if (!AGRIFOOD_BASE || Date.now() - agrifoodCheckedAt < 3_600_000) return;
+  agrifoodCheckedAt = Date.now();
+  const client = postgres(process.env.DATABASE_URL!, { max: 1, onnotice: () => {} });
+  try {
+    const r = await refreshMarketPrices(client, { base: AGRIFOOD_BASE });
+    if (r.status === "loaded") console.log(`[worker] agrifood : ${r.rows} prix de marché`);
+    if (r.status === "failed") console.warn(`[worker] agrifood : ${r.error}`);
   } finally {
     await client.end();
   }
@@ -193,6 +212,7 @@ ekylibreTimer.unref();
 async function tick(): Promise<void> {
   for (const [name, job] of [
     ["lexicon", lexiconTick],
+    ["agrifood", agrifoodTick],
     ["eau", waterTick],
     ["ift", iftTick],
     ["météo", weatherTick],

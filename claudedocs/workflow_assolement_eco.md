@@ -95,3 +95,15 @@ flowchart LR
 - **Reste** : prix des intrants. Les jeux `fertilizers`, `phytosanitary_prices` et `seeds` répondent 403 sans clé, y compris leur structure : leur chargement attend la lecture de leur structure avec la clé d'adhérent.
 - Tests : chargeur (2 nouveaux), API (1), web (1).
 
+### E3 — fait (21/11)
+- Migration 0082 : `market_prices` (cache agrifood), `market_price_fetches` (dernier appel : réussite, échec, message).
+- Référentiel `certification-refs/economics/eu-market-codes.ts` : 11 codes (espèce, débouché), code par défaut par production.
+- `apps/api/src/agrifood.ts` : lecture des réponses (prix « €201,50 », dates jj/mm/aaaa, France seulement), appel de 20 s, rafraîchissement hebdomadaire, nouvel essai le lendemain d'un échec, cache gardé ; tâche du worker (`FOURMY_AGRIFOOD_URL`, `off`). API toujours en panne le 21/11 (point d'entrée `SUSPENDED`) : format repris du code de Lexicon.
+- Repères des produits : cache agrifood prioritaire sur la copie Lexicon, débouché courant de la production.
+- Domaine `economics/defaults.ts` : `defaultYield` (médiane ferme sur 3 campagnes, sinon médiane Agreste sur 3 campagnes), `defaultPrice` (ferme, place de marché agrifood puis Lexicon, MATIF, prix producteur).
+- `GET /crop-plans/:year/eco-context` : par activité, rendements de la ferme (récoltes en q/ha, `harvestYields` du plan de fumure), Agreste, repères, prix saisi, défauts ; coût horaire.
+- Assolement : `forecasts` (rendement, prix, unité du prix) dans le panneau Affecter, défauts affichés avec leur source ; gardés à la réaffectation de la même activité ; différence de prévisions = mise à jour de la production (« prévisions modifiées ») ; recopiés dans `productions.attrs.forecasts` à la validation et relus à la réouverture.
+- Essai sur les données de test : maïs de l'exploitant testeur 101,6 q/ha (médiane ferme 2024-2025) et 211,37 €/t ; blé du GAEC 58,5 q/ha (ferme 2026) et 196,37 €/t (La Pallice) ; avoine et triticale sans historique : médiane Agreste. Saisie de 70 q/ha dans Chrome enregistrée au brouillon.
+- Limite : rendement des cultures fourragères selon la saisie des récoltes (matière brute ou sèche).
+- Tests : domaine (defaults 4, diff 1), API (agrifood 3, eco-context, validation), web (panneau Affecter).
+

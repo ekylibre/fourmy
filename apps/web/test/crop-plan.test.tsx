@@ -133,6 +133,47 @@ describe("assolement", () => {
     expect(within(table).getByRole("checkbox", { name: `Choisir ${G!.name}` })).toBeInTheDocument();
   });
 
+  it("prévisions : défauts affichés avec leur source, rendement saisi enregistré avec l'affectation", async () => {
+    const user = userEvent.setup();
+    const { saves } = cropPlanServer();
+    server.use(
+      http.get("*/crop-plans/2027/eco-context", () =>
+        HttpResponse.json({
+          year: 2027,
+          department: "64",
+          labour: null,
+          activities: [
+            {
+              activityId: WHEAT,
+              production: "winter_common_wheat",
+              specie: "triticum_aestivum",
+              farmYields: [],
+              agreste: [],
+              suggestions: [],
+              farmPrice: null,
+              yield: { value: 68, unit: "quintal_per_hectare", source: "agreste", label: "médiane Agreste 64 2023-2025" },
+              price: { value: 196.37, unit: "ton", source: "lexicon", label: "Milling wheat La Pallice, avr. 2026", date: "2026-04-27" },
+            },
+          ],
+        }),
+      ),
+    );
+    renderApp(`/f/${FARM}/crop-plan/2027`);
+    await user.click(await screen.findByRole("button", { name: "Préparer l'assolement 2027" }));
+    const table = await screen.findByRole("table", { name: "Parcelles de l'assolement" });
+    await user.click(within(table).getByRole("checkbox", { name: `Choisir ${R!.name}` }));
+    await choose(user, "Activité", "Blé tendre");
+    expect(await screen.findByText("Par défaut : médiane Agreste 64 2023-2025")).toBeInTheDocument();
+    expect(screen.getByText("Par défaut : Milling wheat La Pallice, avr. 2026")).toBeInTheDocument();
+    expect(screen.getByLabelText("Rendement prévu (q/ha)")).toHaveAttribute("placeholder", "68");
+    await user.type(screen.getByLabelText("Rendement prévu (q/ha)"), "75,5");
+    await user.click(screen.getByRole("button", { name: "Affecter" }));
+    await vi.waitFor(
+      () => expect(saves.at(-1)?.assignments.map((a) => a.forecasts)).toEqual([[{ product: "principal", unit: "quintal_per_hectare", priceUnit: "ton", yield: 75.5 }]]),
+      { timeout: 3000 },
+    );
+  });
+
   it("Activités : le menu Assolement propose la campagne et la suivante", async () => {
     const user = userEvent.setup();
     renderApp(`/f/${FARM}/activities?at=2026-06-10`);

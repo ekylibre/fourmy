@@ -14,6 +14,7 @@ import {
   type CropPlanValidateWrite,
   type CropPlanValidation,
   type CropPlanPlannedMove,
+  type CropPlanForecast,
   type CropPlanVersionView,
   type CropPlanView,
   type CropPlanYearCrop,
@@ -404,10 +405,12 @@ async function existingProductions(tx: Tx, year: number): Promise<ExistingProduc
     started_on: string | null;
     stopped_on: string | null;
     itinerary_id: string | null;
+    forecasts: CropPlanForecast[] | null;
     done: boolean;
   }>(
     tx,
     sql`SELECT p.id, p.land_parcel_id, p.activity_id, ${ROLE} AS role, p.started_on::text, p.stopped_on::text, p.attrs->>'itineraryId' AS itinerary_id,
+               p.attrs->'forecasts' AS forecasts,
                EXISTS (SELECT 1 FROM interventions i
                        JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_type = 'land_parcel'
                        WHERE i.status = 'done' AND t.ref_id = p.land_parcel_id
@@ -424,6 +427,7 @@ async function existingProductions(tx: Tx, year: number): Promise<ExistingProduc
     startedOn: r.started_on,
     stoppedOn: r.stopped_on,
     ...(r.itinerary_id ? { itineraryId: r.itinerary_id } : {}),
+    ...(Array.isArray(r.forecasts) && r.forecasts.length ? { forecasts: r.forecasts } : {}),
     hasDoneInterventions: r.done,
   }));
 }
@@ -471,6 +475,7 @@ async function liveDraft(tx: Tx, year: number): Promise<CropPlanDraft> {
       stoppedOn: p.stoppedOn,
       productionId: p.id,
       ...(p.itineraryId ? { itineraryId: p.itineraryId } : {}),
+      ...(p.forecasts?.length ? { forecasts: p.forecasts } : {}),
     })),
   };
 }
@@ -795,13 +800,14 @@ async function applyChanges(tx: Tx, farmId: string, year: number, changes: CropP
   }
   const created = new Map<string, string>();
   const parcelId = (key: string) => keyMap.get(key) ?? key.slice(2);
-  const fields = (f: { activityId: string; role: string; startedOn: string | null; stoppedOn: string | null; itineraryId?: string | null }) => sql`
+  const fields = (f: { activityId: string; role: string; startedOn: string | null; stoppedOn: string | null; itineraryId?: string | null; forecasts?: CropPlanForecast[] }) => sql`
     activity_id = ${f.activityId},
     nature = (SELECT CASE a.family WHEN 'vine_farming' THEN 'vine' WHEN 'animal_farming' THEN 'grassland' ELSE 'field_crop' END FROM activities a WHERE a.id = ${f.activityId}),
     cultivation = (SELECT coalesce(a.cultivation, lx.specie) FROM activities a LEFT JOIN lexicon_productions lx ON lx.reference_name = a.reference WHERE a.id = ${f.activityId}),
     started_on = ${f.startedOn}::date, stopped_on = ${f.stoppedOn}::date,
-    attrs = (coalesce(attrs, '{}'::jsonb) - 'itineraryId') || jsonb_build_object('cropPlan', jsonb_build_object('role', ${f.role}::text))
-            || ${f.itineraryId ? sql`jsonb_build_object('itineraryId', ${f.itineraryId}::text)` : sql`'{}'::jsonb`},
+    attrs = (coalesce(attrs, '{}'::jsonb) - 'itineraryId' - 'forecasts') || jsonb_build_object('cropPlan', jsonb_build_object('role', ${f.role}::text))
+            || ${f.itineraryId ? sql`jsonb_build_object('itineraryId', ${f.itineraryId}::text)` : sql`'{}'::jsonb`}
+            || ${f.forecasts?.length ? sql`jsonb_build_object('forecasts', ${JSON.stringify(f.forecasts)}::jsonb)` : sql`'{}'::jsonb`},
     updated_at = now()`;
   for (const c of changes) {
     if (c.kind === "production.delete") {

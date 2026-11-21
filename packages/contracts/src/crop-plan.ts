@@ -32,13 +32,22 @@ export const cropPlanOperation = z.discriminatedUnion("kind", [
 export type CropPlanOperation = z.infer<typeof cropPlanOperation>;
 
 /** Prévision de rendement et de prix d'un produit (réservé au temps 3). */
+/**
+ * Prévision d'un produit de la culture (temps 3, lot E3) : rendement à
+ * l'hectare et prix de vente HT, saisis ; absents, les défauts du contexte
+ * économique s'appliquent (rendement de la ferme ou Agreste, prix de la ferme,
+ * agrifood ou Lexicon).
+ */
 export const cropPlanForecast = z.object({
-  product: z.string(),
-  yield: z.number().nonnegative(),
-  unit: z.string(),
-  price: z.number().nonnegative().optional(),
+  product: z.string().trim().min(1).max(60),
+  yield: z.number().nonnegative().max(100_000).optional(),
+  unit: z.string().max(40),
+  price: z.number().nonnegative().max(1_000_000).optional(),
+  /** Unité du prix (ton, quintal…) ; la tonne par défaut. */
+  priceUnit: z.string().max(40).optional(),
   currency: z.literal("EUR").optional(),
 });
+export type CropPlanForecast = z.infer<typeof cropPlanForecast>;
 
 export const cropPlanAssignment = z
   .object({
@@ -119,6 +128,8 @@ export const cropPlanProductionFields = z.object({
   stoppedOn: isoDate.nullable(),
   /** Itinéraire technique choisi (temps 2, lot IT3), gardé dans `productions.attrs.itineraryId`. */
   itineraryId: z.string().uuid().nullable().optional(),
+  /** Prévisions de rendement et de prix (temps 3, lot E3), gardées dans `productions.attrs.forecasts`. */
+  forecasts: z.array(cropPlanForecast).optional(),
 });
 export type CropPlanProductionFields = z.infer<typeof cropPlanProductionFields>;
 
