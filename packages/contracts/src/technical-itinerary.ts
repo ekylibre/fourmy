@@ -388,6 +388,8 @@ export interface ItkWorkContext {
   settings: ItkWorkSettings;
   /** Citation du barème (affichée avec chaque débit qui en vient). */
   rateSource: string;
+  /** Heures réalisées de la campagne précédente par activité (lot IT6, écart prévu / réalisé). */
+  previousHoursByActivity?: Record<string, number>;
 }
 
 // ---------------------------------------------------------------------------

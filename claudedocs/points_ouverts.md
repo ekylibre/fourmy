@@ -323,11 +323,19 @@ Besoins, conception et plans : `claudedocs/besoins_import_onboarding.md`, `claud
 
 122. **Essai de l'écran d'assolement avec l'exploitant testeur** : préparer 2027 sur sa ferme, retours à intégrer. *donnée · P2 · workflow_assolement Q5* — issue #112
 123. **Relecture des repères agronomiques** (délais de retour, précédents) par un agronome ; soja (2 ans ou 4 à 6 ans) et pomme de terre en priorité. *donnée · P2 · workflow_assolement Q3* — issue #113
-124. **Temps 2 : itinéraires techniques** à l'affectation (catalogue Lexicon, ITK de la ferme), interventions proposées puis confirmées, temps de travaux (OSRM), besoins en intrants. *évolution · P2 · besoins_assolement §5* — issue #114
+124. ~~**Temps 2 : itinéraires techniques** à l'affectation (catalogue Lexicon, ITK de la ferme), interventions proposées puis confirmées, temps de travaux (OSRM), besoins en intrants~~ : **fait le 21/11**, lots IT1 à IT6, PR #135 à #141 à fusionner (`claudedocs/workflow_assolement_itk.md`). Suites : 135 à 141. *évolution · P2 · besoins_assolement §5* — issue #114
 125. **Temps 3 : module économique** (prix des intrants par la clé d'adhérent Lexicon, prix de vente par l'API agrifood de la Commission, rendements et marges). *évolution · P3 · besoins_assolement §6* — issue #115
-126. **Découpe : report des interventions prévues** sur les morceaux et annulation d'une découpe validée. *évolution · P3 · workflow_assolement AS3* — issue #116
+126. **Découpe : annulation d'une découpe validée** (le report des interventions prévues sur les morceaux est fait, lot IT3) ; répartition d'une intervention en attelages ou à plusieurs parcelles. *évolution · P3 · workflow_assolement AS3, workflow_assolement_itk IT3* — issue #116
 127. **Mobile : parcellaire à la date d'effet d'une découpe** (synchronisation qui ne voit le changement qu'à la synchronisation complète suivante). *dette · P3 · workflow_assolement AS3* — issue #117
 128. **BCAE 7 : barème à points de la plaine du Rhin** (liste des communes de l'arrêté BCAE) et liste des légumineuses de l'exemption à vérifier sur la notice Télépac 2026. *donnée · P3 · docs/pac/rapport_pac.md* — issue #118
+
+135. **Relecture des itinéraires techniques des deux fermes de test** : 3 ITK pour l'exploitant testeur (maïs, avoine, triticale) et 13 pour la GAEC (étapes à compléter : travail du sol, matériels), créés depuis l'historique sur la base de développement ; à recréer sur dev.fourmy.org après déploiement, puis à relire avec eux. *donnée · P2 · workflow_assolement_itk IT2* — issue #112 (élargie)
+136. **Chantiers multi-parcelles** : regrouper en une intervention prévue les parcelles d'une même étape à la même date (option du lot IT7). *évolution · P3 · conception_assolement_itk §13.1*
+137. **OSRM sur le serveur** : préparer le graphe Aquitaine + Pays de la Loire (`docker/osrm/prepare.sh europe/france/aquitaine europe/france/pays-de-la-loire`), puis redémarrer le service, au déploiement des lots IT. *exploitation · P2 · workflow_assolement_itk IT4*
+138. **Capacité des pointes de travail** : elle compte toutes les personnes actives de la ferme (48 sur la ferme pilote, reprises d'Ekylibre) ; choisir les personnes qui comptent (salariés, saisonniers, période de présence) ? *décision · P3 · recette IT6*
+139. **ITK pluriannuels** (vigne : plantation, P+1, pleine production ; luzerne) : une seule année d'exploitation par ITK aujourd'hui. *évolution · P3 · conception_assolement_itk §13.4*
+140. **Partage d'ITK entre fermes** (bibliothèque Fourmy, retour à l'idée du catalogue Lexicon avec des contenus refaits). *évolution · P3 · conception_assolement_itk §13.5*
+141. **Rattachement des matériels au barème BCMA** des deux fermes de test : propositions à confirmer sur la fiche de chaque matériel (le type et la largeur manquent souvent). *donnée · P2 · workflow_assolement_itk IT4*
 
 ## 18. Semences
 

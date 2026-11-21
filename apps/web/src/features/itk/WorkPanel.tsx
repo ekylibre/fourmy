@@ -134,7 +134,7 @@ export function WorkPanel({ editor, context }: { editor: CropPlanEditor; context
       <SimpleGrid cols={{ base: 1, md: 2 }}>
         <Lines title="Par personne" lines={result.byPerson} />
         <Lines title="Par matériel" lines={result.byEquipment} />
-        <Lines title="Par activité" lines={result.byActivity} />
+        <ByActivity lines={result.byActivity} previous={q.data!.previousHoursByActivity ?? {}} year={context.year} />
         <Lines title="Par intervention" lines={result.byProcedure} />
       </SimpleGrid>
       <Text size="xs" c="dimmed">
@@ -164,7 +164,7 @@ function Lines({ title, lines }: { title: string; lines: WorkloadLine[] }) {
                     {l.name}
                   </Text>
                 </Table.Td>
-                <Table.Td ta="right" className="lv-num">
+                <Table.Td ta="right" className="lv-num" style={{ whiteSpace: "nowrap" }}>
                   {fmtH(l.hours)}
                 </Table.Td>
               </Table.Tr>
@@ -172,6 +172,46 @@ function Lines({ title, lines }: { title: string; lines: WorkloadLine[] }) {
           </Table.Tbody>
         </Table>
       )}
+    </Paper>
+  );
+}
+
+/** Par activité : heures prévues, et heures réalisées de la campagne précédente quand il y en a (lot IT6). */
+function ByActivity({ lines, previous, year }: { lines: WorkloadLine[]; previous: Record<string, number>; year: number }) {
+  const any = lines.some((l) => l.id && previous[l.id]);
+  return (
+    <Paper withBorder p="sm">
+      <Title order={5} mb={4}>
+        Par activité
+      </Title>
+      <Table verticalSpacing={2} aria-label="Par activité">
+        {any && (
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th />
+              <Table.Th ta="right">{year} prévu</Table.Th>
+              <Table.Th ta="right">{year - 1} réalisé</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+        )}
+        <Table.Tbody>
+          {lines.map((l) => (
+            <Table.Tr key={l.id ?? l.name}>
+              <Table.Td>
+                <Text size="sm">{l.name}</Text>
+              </Table.Td>
+              <Table.Td ta="right" className="lv-num" style={{ whiteSpace: "nowrap" }}>
+                {fmtH(l.hours)}
+              </Table.Td>
+              {any && (
+                <Table.Td ta="right" className="lv-num" style={{ whiteSpace: "nowrap" }}>
+                  {l.id && previous[l.id] ? fmtH(previous[l.id]!) : "—"}
+                </Table.Td>
+              )}
+            </Table.Tr>
+          ))}
+        </Table.Tbody>
+      </Table>
     </Paper>
   );
 }

@@ -371,3 +371,26 @@ Sur le serveur : même commande au déploiement, sur accord.
 - Les besoins portent sur **toutes les occurrences** d'une étape, datées ou non : une date manquante n'enlève pas l'intrant.
 - Un **morceau de découpe** du brouillon n'a pas de plan de fumure (le plan suit la parcelle d'origine) : son azote vient de l'ITK.
 - **Recoupement avec « Utilisation des semences » (SE7)** : à faire à la recette (IT6), une fois des interventions prévues générées sur une ferme de test.
+
+### IT6 — Récapitulatif, documentation et recette (21/11/2026)
+
+- **Récapitulatif par activité** : l'onglet Travaux compare les heures prévues de chaque activité aux heures réalisées de la campagne précédente (`previousHoursByActivity` du contexte). Ce sont les interventions réalisées à l'heure près, rattachées à l'activité de la production de leur parcelle à leur date (`fourmy_production_at`). Les heures restent sur une seule ligne dans les colonnes étroites.
+- **Recoupement avec « Utilisation des semences » (SE7)**, point de contrôle d'IT5 : test `itk-recette.integration.test.ts`. Le besoin de l'onglet Intrants (250 grains/m² × 20 ha × PMG 45 g = 2 250 kg) est égal aux semences prévues de SE7 une fois les deux interventions générées.
+- **e2e de bout en bout** `e2e/itk-journey.spec.ts` (ferme pilote viticole, campagne 2033, tout est effacé à la fin) :
+  1. ITK à dates fixes ;
+  2. « Préparer l'assolement », ITK proposé d'office à l'affectation ;
+  3. onglet Travaux (débits saisis, graphique des semaines) et onglet Intrants ;
+  4. validation ;
+  5. « Préparer les interventions prévues » : 4 par parcelle créées.
+
+  Il passe avec `crop-plan.spec.ts` et `itk.spec.ts`.
+- **Documentation** :
+  - `docs/itineraires-techniques.md` : ITK, création depuis l'historique, aperçu, débit de chantier et ses sources, barème BCMA ;
+  - `docs/assolement.md` : itinéraire à l'affectation, interventions prévues, découpe, Travaux, Intrants, réglages ;
+  - `docs/routage-osrm.md` : trajets, plusieurs régions ;
+  - `points_ouverts.md` : point 124 fait, 126 réduit à l'annulation d'une découpe validée, suites 135 à 141.
+- **Recette avec l'exploitant testeur** : à faire sur dev.fourmy.org après le déploiement des lots IT (PR #135 à #141), avec l'OSRM du serveur (point 137) et les ITK recréés depuis l'historique (point 135).
+
+**Constats de la recette locale** :
+- Capacité des pointes : 48 personnes actives sur la ferme pilote (reprise Ekylibre) ; la capacité est donc surestimée (point 138).
+- Sans siège localisé, les trajets ne sont pas comptés, et c'est signalé.

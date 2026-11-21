@@ -207,6 +207,21 @@ export async function itkWorkContext(db: Database, farmId: string, year: number,
         .filter((x): x is readonly [string, number] => x[1] !== null),
     );
     const site = await startSite(tx, settings.defaultSiteId);
+    // Heures réalisées de la campagne précédente, par activité de la production à la date de l'intervention.
+    const previous = await rows<{ activity_id: string; hours: number }>(
+      tx,
+      sql`SELECT pr.activity_id, sum(d.hours)::float8 AS hours
+          FROM (SELECT i.id, i.started_at,
+                       (SELECT sum(extract(epoch FROM q.stopped_at - q.started_at)) FROM intervention_periods q WHERE q.intervention_id = i.id) / 3600.0 AS hours,
+                       (SELECT t.ref_id FROM intervention_parameters t WHERE t.intervention_id = i.id AND t.role = 'target' AND t.ref_type = 'land_parcel' LIMIT 1) AS parcel_id
+                FROM interventions i
+                WHERE i.status = 'done' AND i.period_precision = 'time'
+                  AND i.started_at >= make_date(${year - 2}, 8, 1) AND i.started_at < make_date(${year}, 1, 1)) d
+          JOIN productions pr ON pr.id = fourmy_production_at(d.parcel_id, (d.started_at AT TIME ZONE 'Europe/Paris')::date)
+          JOIN campaigns c ON c.id = pr.campaign_id AND c.year = ${year - 1}
+          WHERE d.hours > 0 AND pr.activity_id IS NOT NULL
+          GROUP BY pr.activity_id`,
+    );
     return {
       year,
       itineraries: Object.fromEntries(itks.map((t) => [t.id, { id: t.id, name: t.name, revision: t.revision, activityId: t.activity_id, content: t.content }])),
@@ -221,6 +236,7 @@ export async function itkWorkContext(db: Database, farmId: string, year: number,
       site: site ? { id: site.id, name: site.name } : null,
       settings,
       rateSource: cite(MACHINERY_RATES_SOURCE),
+      previousHoursByActivity: Object.fromEntries(previous.map((p) => [p.activity_id, Math.round(p.hours * 10) / 10])),
     };
   });
 }

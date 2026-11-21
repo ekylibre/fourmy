@@ -98,6 +98,7 @@ Onglet **Réglages** : critère BCAE 7 mis en avant, ferme en plaine du Rhin (di
 - BCAE 7 : barème à points de la plaine du Rhin non calculé ; liste des légumineuses de l'exemption reconstituée (à vérifier sur la notice Télépac).
 - Découpe : pas d'annulation d'une découpe validée (fusionner les morceaux) ; mobile mis à jour à la première synchronisation complète après la date d'effet ; une intervention prévue en attelages ou sur plusieurs parcelles se reporte sur un seul morceau.
 - Interventions prévues : une par parcelle et par étape (pas encore de chantier multi-parcelles) ; un intrant générique (« Azote 40 u ») est noté dans l'intervention, à préciser.
+- Travaux : la capacité des pointes compte toutes les personnes actives de la ferme ; un aller-retour par journée de chantier et par parcelle (pas de tournée entre parcelles) ; un morceau de découpe reprend le trajet de sa parcelle d'origine.
 - Zonages : chargés avec le référentiel Lexicon (jeux `protected_water_zones`, `protected_natural_zones`) ; sans eux, la section Réglementaire ne voit que les points d'eau.
 
 ## Suite
