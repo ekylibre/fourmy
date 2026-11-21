@@ -353,6 +353,7 @@ export const handlers = [
   http.get(`*${base}/crop-plans`, () => HttpResponse.json([])),
   // Module économique (temps 3) : aucun prix, aucun repère par défaut.
   http.get(`*${base}/crop-plans/:year/eco-context`, ({ params }) => HttpResponse.json({ year: Number(params.year), department: null, activities: [], labour: null })),
+  http.get(`*${base}/crop-plans/:year/eco-previous`, ({ params }) => HttpResponse.json({ year: Number(params.year) - 1, productions: [], works: [], articles: {} })),
   http.get(`*${base}/prices/suggestions/products`, () => HttpResponse.json({ department: null, items: [] })),
   http.get(`*${base}/prices`, () => HttpResponse.json({ items: [] })),
   http.get(`*${base}/crop-plans/:year`, () => HttpResponse.json({ title: "Introuvable", status: 404 }, { status: 404 })),

@@ -13,8 +13,10 @@ import {
   type MarginPost,
   type Price,
   type PriceKind,
+  type RealizedFacts,
 } from "@fourmy/contracts";
 import { inputNeeds } from "../itk/needs.js";
+import { toStockQuantity } from "../quantities.js";
 import { scheduleSteps } from "../itk/schedule.js";
 import { resolveWorkRate, stepStaffing } from "../itk/workload.js";
 import { convertPrice, priceAt } from "./prices.js";
@@ -50,6 +52,9 @@ export interface MarginsContext {
   prices: readonly Price[];
   day: string;
 }
+
+/** Productions de référence sans produit vendu (jachère) : ni rendement ni prix attendus. */
+const NO_PRODUCT = new Set(["fallow"]);
 
 const zero = (): MarginFigures => ({ product: 0, operational: 0, grossMargin: 0, mechanisation: 0, labour: 0, directMargin: 0 });
 const finish = (f: MarginFigures): MarginFigures => {
@@ -95,7 +100,9 @@ export function cropPlanMargins(items: readonly MarginItem[], ctx: MarginsContex
     const yieldUnit = f?.yield !== undefined ? f.unit : (ref?.yield?.unit ?? "quintal_per_hectare");
     const priceValue = f?.price ?? ref?.price?.value ?? null;
     const priceUnit = f?.price !== undefined ? (f.priceUnit ?? "ton") : (ref?.price?.unit ?? "ton");
-    if (yieldValue === null) miss("product", "Rendement prévu", null, ha, a);
+    if (!f && ref?.production && NO_PRODUCT.has(ref.production)) {
+      // Jachère : pas de produit.
+    } else if (yieldValue === null) miss("product", "Rendement prévu", null, ha, a);
     else if (priceValue === null) miss("product", "Prix de vente", "product", ha, a);
     else {
       const base = yieldUnit.replace(/_per_hectare$/, "");
@@ -203,3 +210,125 @@ export function cropPlanMargins(items: readonly MarginItem[], ctx: MarginsContex
     missing: [...missing.values()].map((m) => ({ ...m, areaHa: Math.round(m.areaHa * 100) / 100 })).sort((x, y) => y.areaHa - x.areaHa),
   };
 }
+
+/**
+ * Marges réalisées d'une campagne (lot E5, réalisé simplifié) : produit des
+ * récoltes enregistrées, intrants des interventions réalisées, mécanisation
+ * et main-d'œuvre sur leurs heures (ou leur surface), aux prix en vigueur le
+ * jour de chaque intervention ; prix de vente de la ferme à la fin de la
+ * campagne, sinon le prix par défaut du contexte économique. Mêmes manques
+ * que les marges prévues.
+ */
+export function realizedMargins(
+  facts: RealizedFacts,
+  ctx: { work: Pick<ItkWorkContext, "equipments" | "machineryRates">; eco: EcoContext; prices: readonly Price[] },
+): CropPlanMargins {
+  const price = (kind: PriceKind, ref: Parameters<typeof key>[1], day: string) => priceAt(ctx.prices, key(kind, ref), day);
+  const eco = new Map(ctx.eco.activities.map((a) => [a.activityId, a]));
+  const equipments = new Map(ctx.work.equipments.map((e) => [e.id, e]));
+  const byActivity = new Map<string, { figures: MarginFigures; areaHa: number; incomplete: Set<MarginPost> }>();
+  const missing = new Map<string, MarginMissing>();
+  const counted = new Set<string>();
+  const activityOf = (id: string) => {
+    const a = byActivity.get(id) ?? { figures: zero(), areaHa: 0, incomplete: new Set<MarginPost>() };
+    byActivity.set(id, a);
+    return a;
+  };
+  /** Manque d'une culture : hectares comptés une fois par culture et par libellé. */
+  const miss = (post: MarginPost, label: string, tab: PriceKind | null, productionId: string, areaHa: number, a: { incomplete: Set<MarginPost> }) => {
+    a.incomplete.add(post);
+    const k = `${post}|${label}`;
+    const m = missing.get(k) ?? { post, label, tab, areaHa: 0 };
+    if (!counted.has(`${k}|${productionId}`)) m.areaHa += areaHa;
+    counted.add(`${k}|${productionId}`);
+    missing.set(k, m);
+  };
+  const end = `${facts.year}-12-31`;
+  const areaOf = new Map(facts.productions.map((p) => [p.productionId, p.areaHa]));
+
+  for (const p of facts.productions) {
+    const a = activityOf(p.activityId);
+    a.areaHa += p.areaHa;
+    const production = eco.get(p.activityId)?.production;
+    if (p.yieldQHa === null && production && NO_PRODUCT.has(production)) continue;
+    if (p.yieldQHa === null) {
+      miss("product", "Récolte non enregistrée", null, p.productionId, p.areaHa, a);
+      continue;
+    }
+    const farm = price("product", { activityId: p.activityId, product: "principal" }, end);
+    const ref = farm ? { value: farm.amount, unit: farm.unit } : eco.get(p.activityId)?.price;
+    const unitPrice = ref ? convertPrice(ref.value, ref.unit, "quintal") : null;
+    if (unitPrice === null) miss("product", "Prix de vente", "product", p.productionId, p.areaHa, a);
+    else a.figures.product += p.yieldQHa * p.areaHa * unitPrice;
+  }
+
+  for (const w of facts.works) {
+    const a = activityOf(w.activityId);
+    const ha = areaOf.get(w.productionId) ?? w.areaHa;
+    for (const i of w.inputs) {
+      const article = facts.articles[i.articleId];
+      if (!article) continue;
+      let quantity: number | null;
+      try {
+        quantity = toStockQuantity({
+          quantity: i.quantity,
+          unit: i.unit,
+          articleUnit: article.unit,
+          areaHa: w.areaHa,
+          density: article.density,
+          ...(article.kind === "seed" ? { seed: { tgwG: article.tgwG, grainsPerDose: article.grainsPerDose } } : {}),
+        });
+      } catch {
+        quantity = null;
+      }
+      if (quantity === null) {
+        miss("operational", `${article.name} (quantité non convertible)`, null, w.productionId, ha, a);
+        continue;
+      }
+      const p = price("article", { articleId: i.articleId }, w.day);
+      const unitPrice = p ? convertPrice(p.amount, p.unit, article.unit, { density: article.density, seed: article.kind === "seed" ? { tgwG: article.tgwG, grainsPerDose: article.grainsPerDose } : undefined }) : null;
+      if (unitPrice === null) miss("operational", `Prix de ${article.name}`, "article", w.productionId, ha, a);
+      else a.figures.operational += quantity * unitPrice;
+    }
+    const procedureLabel = getProcedure(w.procedure).label;
+    for (const id of w.equipmentIds) {
+      const e = equipments.get(id);
+      const own = price("equipment", { equipmentId: id }, w.day);
+      const r = e?.machineryRateId ? ctx.work.machineryRates[e.machineryRateId] : undefined;
+      let cost: number | null = null;
+      if (own) cost = own.unit === "hectare" ? own.amount * w.areaHa : own.unit === "hour" && w.hours !== null ? own.amount * w.hours : null;
+      else if (r?.costPerUnit !== undefined && r.unit === "hectares") cost = r.costPerUnit * w.areaHa;
+      else if (r?.costPerHour !== undefined && w.hours !== null) cost = r.costPerHour * w.hours;
+      if (cost !== null) a.figures.mechanisation += cost;
+      else if ((own?.unit === "hour" || r) && w.hours === null) miss("mechanisation", `Durée des interventions (${procedureLabel})`, null, w.productionId, ha, a);
+      else miss("mechanisation", `Coût de ${e?.name ?? "matériel"} (prix ou barème)`, "equipment", w.productionId, ha, a);
+    }
+    if (w.hours === null) {
+      if (w.equipmentIds.length || w.people) miss("labour", `Durée des interventions (${procedureLabel})`, null, w.productionId, ha, a);
+      continue;
+    }
+    const labour = price("labour", {}, w.day) ?? ctx.eco.labour;
+    if (!labour || labour.unit !== "hour") miss("labour", "Coût horaire de la main-d'œuvre", "labour", w.productionId, ha, a);
+    else a.figures.labour += w.hours * Math.max(1, w.people) * labour.amount;
+  }
+
+  const activities: ActivityMargin[] = [...byActivity.entries()]
+    .map(([activityId, a]) => {
+      const f = finish(a.figures);
+      return { activityId, areaHa: Math.round(a.areaHa * 100) / 100, ...f, perHa: perHa(f, a.areaHa), incomplete: [...a.incomplete], withoutItinerary: 0 };
+    })
+    .sort((x, y) => y.areaHa - x.areaHa);
+  const sum = zero();
+  let areaHa = 0;
+  for (const [, a] of byActivity) {
+    areaHa += a.areaHa;
+    for (const k of ["product", "operational", "mechanisation", "labour"] as const) sum[k] += a.figures[k];
+  }
+  const total = finish(sum);
+  return {
+    activities,
+    total: { ...total, areaHa: Math.round(areaHa * 100) / 100, perHa: perHa(total, areaHa) },
+    missing: [...missing.values()].map((m) => ({ ...m, areaHa: Math.round(m.areaHa * 100) / 100 })).sort((x, y) => y.areaHa - x.areaHa),
+  };
+}
+

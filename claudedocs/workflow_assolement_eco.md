@@ -115,3 +115,11 @@ flowchart LR
 - Tests : domaine (exemple chiffré 10 ha de blé : marge directe 9 880 € ; manques ; défauts et culture sans ITK), web (onglet Économie).
 - Constat de poste : limite d'observateurs de fichiers atteinte (`ENOSPC`) sur le serveur Vite de développement, modules périmés jusqu'au redémarrage (`fs.inotify.max_user_watches` à relever).
 
+### E5 — fait en partie (21/11)
+- Contrat `RealizedFacts` ; `GET /crop-plans/:year/eco-previous` (`repos/eco-previous.ts`) : cultures N-1 et rendements réalisés (`harvestYields`), interventions réalisées rattachées à la culture du jour (`fourmy_production_at`), surface travaillée, heures au prorata (périodes > 24 h écartées), matériels, intervenants, intrants (doses à l'hectare, totaux au prorata) ; fiches d'articles partagées (`articleInfos`, sorti de `itk-inputs.ts`).
+- Domaine `realizedMargins` : mêmes postes et manques que le prévu, prix en vigueur le jour de chaque intervention (`toStockQuantity` pour les quantités) ; prix de vente de la ferme au 31/12, sinon défaut ; jachère sans produit attendu (prévu et réalisé).
+- Web : colonnes « Marge directe N-1 » et « Écart », détail du réalisé et ses manques (accordéon) ; historique des prix chargé une fois (`/prices?history=1`).
+- Données de test : exploitant testeur 2026 : 82 interventions dont 77 avec heures (95 h), aucune récolte 2026 enregistrée ; GAEC : 366 interventions sans heures (date seule), 15 cultures récoltées sur 43 : les manques le disent.
+- **Écart au plan** : comparaison avec le **prévu** N-1 (assolement N-1 validé avec ITK) non faite — aucune ferme de test n'en a ; à reprendre quand un assolement validé avec ITK aura une campagne suivante.
+- Tests : domaine (réalisé chiffré, sans récolte, jachère), API (route), web (colonne N-1 et écart).
+

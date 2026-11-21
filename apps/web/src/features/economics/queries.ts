@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { EcoContext, Price, PriceKind, ProductSuggestions } from "@fourmy/contracts";
+import type { EcoContext, Price, PriceKind, ProductSuggestions, RealizedFacts } from "@fourmy/contracts";
 import { api, farmPath } from "../../app/api";
 
 /** Prix de la ferme (temps 3, lot E1). */
@@ -39,10 +39,19 @@ export function useEcoContext(farmId: string, year: number, enabled = true) {
   });
 }
 
-/** Prix en vigueur de toutes natures (lot E4, marges). */
-export function useCurrentPrices(farmId: string, at: string) {
+/** Historique des prix de toutes natures (lots E4 et E5 : prix en vigueur à la date de chaque intervention). */
+export function usePriceHistoryAll(farmId: string) {
   return useQuery({
-    queryKey: [...pricesKey(farmId), "current", at],
-    queryFn: () => api.get<{ items: Price[] }>(farmPath(farmId, `/prices?at=${at}`)),
+    queryKey: [...pricesKey(farmId), "history", "all"],
+    queryFn: () => api.get<{ items: Price[] }>(farmPath(farmId, "/prices?history=1")),
+  });
+}
+
+/** Faits réalisés de la campagne précédente (lot E5). */
+export function useEcoPrevious(farmId: string, year: number) {
+  return useQuery({
+    queryKey: [...pricesKey(farmId), "eco-previous", year],
+    queryFn: () => api.get<RealizedFacts>(farmPath(farmId, `/crop-plans/${year}/eco-previous`)),
+    staleTime: 5 * 60_000,
   });
 }

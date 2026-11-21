@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { uuid } from "./primitives.js";
+import type { ItkArticleInfo } from "./technical-itinerary.js";
 
 /**
  * Module économique de l'assolement (temps 3, claudedocs/conception_assolement_eco.md).
@@ -214,4 +215,34 @@ export interface CropPlanMargins {
   activities: ActivityMargin[];
   total: MarginFigures & { areaHa: number; perHa: MarginFigures };
   missing: MarginMissing[];
+}
+
+// ---------------------------------------------------------------------------
+// Lot E5 : campagne précédente, réalisé simplifié (récoltes, intrants, heures).
+
+/** Faits réalisés d'une campagne, par culture (production) : ce qu'en tire la comparaison N-1. */
+export interface RealizedFacts {
+  year: number;
+  productions: {
+    productionId: string;
+    activityId: string;
+    areaHa: number;
+    /** Rendement réalisé (q/ha) d'après les récoltes enregistrées ; null sans récolte convertible. */
+    yieldQHa: number | null;
+  }[];
+  /** Interventions réalisées, une ligne par parcelle travaillée (rattachée à la culture du jour). */
+  works: {
+    interventionId: string;
+    productionId: string;
+    activityId: string;
+    procedure: string;
+    day: string;
+    areaHa: number;
+    /** Heures de l'intervention au prorata de la surface ; null sans durée (date seule, ou périodes de plus de 24 h). */
+    hours: number | null;
+    equipmentIds: string[];
+    people: number;
+    inputs: { articleId: string; quantity: number; unit: string }[];
+  }[];
+  articles: Record<string, ItkArticleInfo>;
 }

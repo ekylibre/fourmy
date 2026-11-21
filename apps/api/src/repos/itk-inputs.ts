@@ -49,39 +49,7 @@ export async function itkInputsContext(db: Database, farmId: string, year: numbe
     for (const t of itks) for (const s of t.content.steps) for (const i of s.inputs) if (i.articleId) ids.add(i.articleId);
     for (const a of apps) if (a.article_id) ids.add(a.article_id);
     for (const p of planned) ids.add(p.article_id);
-    const list = ids.size
-      ? await rows<{
-          id: string;
-          name: string;
-          kind: ArticleKind;
-          unit: string;
-          density: number | null;
-          basis: "mass_percent" | "kg_per_t" | "kg_per_m3" | null;
-          n_total: number | null;
-          tgw_g: number | null;
-          grains_per_dose: number | null;
-        }>(
-          tx,
-          sql`SELECT a.id, a.name, a.kind, a.unit, f.density::float8 AS density, f.basis, f.n_total::float8 AS n_total, s.tgw_g::float8 AS tgw_g, s.grains_per_dose
-              FROM articles a LEFT JOIN article_fertilizers f ON f.article_id = a.id LEFT JOIN article_seeds s ON s.article_id = a.id
-              WHERE a.id = ANY(${pgArray([...ids])}::uuid[])`,
-        )
-      : [];
-    const articles: Record<string, ItkArticleInfo> = Object.fromEntries(
-      list.map((a) => [
-        a.id,
-        {
-          id: a.id,
-          name: a.name,
-          kind: a.kind,
-          unit: a.unit,
-          density: a.density,
-          tgwG: a.tgw_g,
-          grainsPerDose: a.grains_per_dose,
-          fertilizer: a.basis && a.n_total !== null ? { basis: a.basis, nTotal: a.n_total, density: a.density } : null,
-        },
-      ]),
-    );
+    const articles = await articleInfos(tx, [...ids]);
 
     const stock: Record<string, number> = {};
     if (ids.size) {
@@ -112,4 +80,43 @@ export async function itkInputsContext(db: Database, farmId: string, year: numbe
     }
     return { year, at: at.slice(0, 10), articles, stock, reserved, plans };
   });
+}
+
+/** Fiches des articles (unité, densité, teneurs, PMG) qui servent à convertir les doses. */
+export async function articleInfos(tx: Tx, idList: string[]): Promise<Record<string, ItkArticleInfo>> {
+  const ids = new Set(idList);
+  const list = ids.size
+    ? await rows<{
+        id: string;
+        name: string;
+        kind: ArticleKind;
+        unit: string;
+        density: number | null;
+        basis: "mass_percent" | "kg_per_t" | "kg_per_m3" | null;
+        n_total: number | null;
+        tgw_g: number | null;
+        grains_per_dose: number | null;
+      }>(
+        tx,
+        sql`SELECT a.id, a.name, a.kind, a.unit, f.density::float8 AS density, f.basis, f.n_total::float8 AS n_total, s.tgw_g::float8 AS tgw_g, s.grains_per_dose
+            FROM articles a LEFT JOIN article_fertilizers f ON f.article_id = a.id LEFT JOIN article_seeds s ON s.article_id = a.id
+            WHERE a.id = ANY(${pgArray([...ids])}::uuid[])`,
+      )
+    : [];
+  const articles: Record<string, ItkArticleInfo> = Object.fromEntries(
+    list.map((a) => [
+      a.id,
+      {
+        id: a.id,
+        name: a.name,
+        kind: a.kind,
+        unit: a.unit,
+        density: a.density,
+        tgwG: a.tgw_g,
+        grainsPerDose: a.grains_per_dose,
+        fertilizer: a.basis && a.n_total !== null ? { basis: a.basis, nTotal: a.n_total, density: a.density } : null,
+      },
+    ]),
+  );
+  return articles;
 }

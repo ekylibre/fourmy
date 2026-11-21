@@ -174,7 +174,7 @@ describe("assolement", () => {
     );
   });
 
-  it("onglet Économie : marges par activité à l'hectare, culture sans itinéraire signalée", async () => {
+  it("onglet Économie : marges par activité à l'hectare, culture sans itinéraire signalée, écart avec le réalisé 2026", async () => {
     const user = userEvent.setup();
     cropPlanServer();
     server.use(
@@ -195,6 +195,10 @@ describe("assolement", () => {
         }),
       ),
       http.get("*/crop-plans/2027/inputs-context", () => HttpResponse.json({ year: 2027, at: "2026-11-21", articles: {}, stock: {}, reserved: {}, plans: {} })),
+      // Réalisé 2026 : 60 q/ha récoltés, valorisés au prix par défaut ; aucune intervention.
+      http.get("*/crop-plans/2027/eco-previous", () =>
+        HttpResponse.json({ year: 2026, productions: [{ productionId: "pr", activityId: WHEAT, areaHa: 2, yieldQHa: 60 }], works: [], articles: {} }),
+      ),
       http.get("*/crop-plans/2027/eco-context", () =>
         HttpResponse.json({
           year: 2027,
@@ -229,6 +233,11 @@ describe("assolement", () => {
     expect(wheat.cells[2]!.textContent).toMatch(/^1\s?335\s€$/);
     expect(wheat.cells[7]!.textContent).toMatch(/^1\s?335\s€$/);
     expect(screen.getByText(/1 culture\(s\) sans itinéraire technique/)).toBeInTheDocument();
+    // 60 × 19,637 = 1 178 €/ha en 2026 ; écart + 157 €/ha.
+    expect(within(margins).getByText("Marge directe 2026")).toBeInTheDocument();
+    expect(wheat.cells[8]!.textContent).toMatch(/^1\s?178\s€$/);
+    expect(wheat.cells[9]!.textContent).toMatch(/^\+157\s€$/);
+    expect(screen.getByText(/^Réalisé 2026 : marge directe/)).toBeInTheDocument();
     expect(screen.queryByLabelText("À compléter")).not.toBeInTheDocument();
   });
 

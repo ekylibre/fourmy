@@ -3,6 +3,7 @@ import { priceKind, pricesWrite } from "@fourmy/contracts";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import { addPrices, deletePrice, ecoContext, listPrices, productSuggestions } from "../repos/prices.js";
+import { realizedFacts } from "../repos/eco-previous.js";
 import { domainCtx, problem, uuidParam } from "./helpers.js";
 
 /** Prix de la ferme (temps 3, lot E1) : lecture pour les membres, saisie par le responsable. */
@@ -22,6 +23,12 @@ export const priceRoutes = new Hono<Env>()
     const year = Number(c.req.param("year"));
     if (!Number.isInteger(year) || year < 2000 || year > 2100) return problem(c, 400, "Campagne invalide");
     return c.json(await ecoContext(db(), c.get("farmId"), year));
+  })
+  // Faits réalisés de la campagne précédente (lot E5) : récoltes, interventions, intrants, heures.
+  .get("/crop-plans/:year/eco-previous", async (c) => {
+    const year = Number(c.req.param("year"));
+    if (!Number.isInteger(year) || year < 2001 || year > 2100) return problem(c, 400, "Campagne invalide");
+    return c.json(await realizedFacts(db(), c.get("farmId"), year - 1));
   })
   .post("/prices", requireOwner, async (c) => {
     const parsed = pricesWrite.safeParse(await c.req.json().catch(() => null));

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { itkContent, type EcoContext, type ItkArticleInfo, type ItkInputsContext, type ItkWorkContext, type Price } from "@fourmy/contracts";
-import { cropPlanMargins, type MarginItem } from "../src/index.js";
+import { itkContent, type RealizedFacts, type EcoContext, type ItkArticleInfo, type ItkInputsContext, type ItkWorkContext, type Price } from "@fourmy/contracts";
+import { cropPlanMargins, realizedMargins, type MarginItem } from "../src/index.js";
 
 /**
  * Marges de l'assolement (lot E4) sur un exemple chiffré à la main : 10 ha de
@@ -155,3 +155,40 @@ describe("marges de l'assolement", () => {
     expect(m.activities[0]).toMatchObject({ product: 13_353.16, operational: 0, mechanisation: 0, labour: 0, directMargin: 13_353.16, withoutItinerary: 1, incomplete: [] });
   });
 });
+
+describe("marges réalisées de la campagne précédente (lot E5)", () => {
+  const facts: RealizedFacts = {
+    year: 2026,
+    productions: [{ productionId: "pr1", activityId: WHEAT, areaHa: 10, yieldQHa: 60 }],
+    works: [
+      // Semis : 4 h, une personne, semoir au barème (30 €/ha), 180 kg/ha de semence.
+      { interventionId: "i1", productionId: "pr1", activityId: WHEAT, procedure: "sowing", day: "2025-10-15", areaHa: 10, hours: 4, equipmentIds: [DRILL], people: 1, inputs: [{ articleId: SEED, quantity: 180, unit: "kilogram_per_hectare" }] },
+      // Fertilisation : date seule (pas de durée), épandeur à son prix (10 €/ha), 200 kg/ha d'un engrais stocké en tonnes.
+      { interventionId: "i2", productionId: "pr1", activityId: WHEAT, procedure: "mineral_fertilizing", day: "2026-02-20", areaHa: 10, hours: null, equipmentIds: [SPREADER], people: 1, inputs: [{ articleId: AMMO, quantity: 200, unit: "kilogram_per_hectare" }] },
+    ],
+    articles: { [SEED]: art(SEED, { name: "Blé Chevignon", kind: "seed" }), [AMMO]: art(AMMO, { name: "Ammonitrate", kind: "fertilizer", unit: "ton" }) },
+  };
+
+  it("valorise récoltes, intrants, matériels et heures aux prix du jour ; durée manquante signalée", () => {
+    // Prix en vigueur depuis 2025 (le semis date d'octobre 2025).
+    const older = prices.map((p) => ({ ...p, validFrom: "2025-01-01" }));
+    const m = realizedMargins(facts, { work, eco, prices: [...older, price({ kind: "product", activityId: WHEAT, product: "principal", unit: "ton", amount: 180, validFrom: "2026-08-01" })] });
+    // Produit 60 q × 10 ha × 18 €/q = 10 800 ; intrants 1 800 kg × 0,6 + 2 t × 500 = 2 080 ;
+    // mécanisation 300 + 100 ; main-d'œuvre 4 h × 20 € (la fertilisation n'a pas de durée).
+    expect(m.activities[0]).toMatchObject({ areaHa: 10, product: 10_800, operational: 2_080, grossMargin: 8_720, mechanisation: 400, labour: 80, directMargin: 8_240, incomplete: ["labour"] });
+    expect(m.missing).toEqual([{ post: "labour", label: "Durée des interventions (Fertilisation minérale)", tab: null, areaHa: 10 }]);
+  });
+
+  it("jachère : ni récolte ni prix attendus", () => {
+    const fallow: EcoContext = { ...eco, activities: [{ activityId: WHEAT, production: "fallow", specie: "plant", farmYields: [], agreste: [], suggestions: [], farmPrice: null, yield: null, price: null }] };
+    expect(realizedMargins({ ...facts, productions: [{ ...facts.productions[0]!, yieldQHa: null }], works: [] }, { work, eco: fallow, prices }).missing).toEqual([]);
+    expect(cropPlanMargins([{ ...item, itineraryId: null, forecasts: undefined }], { work, inputs, eco: fallow, prices, day: "2026-11-21" }).missing).toEqual([]);
+  });
+
+  it("sans récolte ni prix : postes incomplets", () => {
+    const m = realizedMargins({ ...facts, productions: [{ ...facts.productions[0]!, yieldQHa: null }], works: [] }, { work, eco, prices });
+    expect(m.missing.map((x) => x.label)).toEqual(["Récolte non enregistrée"]);
+    expect(m.activities[0]!.product).toBe(0);
+  });
+});
+
