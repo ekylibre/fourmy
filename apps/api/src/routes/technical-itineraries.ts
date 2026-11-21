@@ -1,9 +1,9 @@
 import { Hono, type Context } from "hono";
 import { withFarm } from "@fourmy/db";
-import { itkWrite } from "@fourmy/contracts";
+import { itkDeriveRequest, itkWrite } from "@fourmy/contracts";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
-import { StaleItk, copyItk, createItk, deleteItk, getItk, listItks, updateItk } from "../repos/technical-itineraries.js";
+import { StaleItk, copyItk, createItk, deleteItk, deriveItk, getItk, itkHistoryCampaigns, listItks, updateItk } from "../repos/technical-itineraries.js";
 import { domainCtx, problem, uuidParam } from "./helpers.js";
 
 /**
@@ -32,6 +32,17 @@ export const technicalItineraryRoutes = new Hono<Env>()
       listItks(tx, { activityId, active: active === undefined ? undefined : active === "true" }),
     );
     return c.json({ items });
+  })
+  // Lot IT2 : campagnes disponibles, puis proposition depuis l'historique (aucune écriture).
+  .get("/technical-itineraries/history", async (c) => {
+    const activityId = uuidParam(c, "activityId", "query");
+    const items = await withFarm(db(), c.get("farmId"), (tx) => itkHistoryCampaigns(tx, activityId));
+    return c.json({ items });
+  })
+  .post("/technical-itineraries/derive", async (c) => {
+    const parsed = itkDeriveRequest.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", issues(parsed.error));
+    return c.json(await withFarm(db(), c.get("farmId"), (tx) => deriveItk(tx, parsed.data)));
   })
   .get("/technical-itineraries/:id", async (c) => {
     const id = uuidParam(c, "id");

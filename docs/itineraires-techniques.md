@@ -37,6 +37,30 @@ Le tableau montre la date de chaque étape pour un semis et une récolte
 d'exemple (dates types de la culture), modifiables au-dessus de la frise.
 « Trier par date » remet les étapes dans l'ordre du temps.
 
+## Créer un itinéraire depuis l'historique
+
+« Depuis l'historique » (catalogue), ou « Créer un itinéraire depuis
+l'historique » sur l'itinéraire d'une activité :
+
+1. choisissez l'activité et les campagnes à reprendre (les deux dernières
+   sont cochées) ;
+2. « Proposer » : Fourmy regroupe les interventions réalisées en étapes,
+   datées par rapport au semis (date de semis de la culture, sinon première
+   intervention de semis) ou à la récolte. Pour chaque étape :
+   - le **décalage médian** et la plage habituelle ;
+   - la **part** de la surface concernée ; « si besoin » quand moins de la
+     moitié des parcelles l'ont eue ;
+   - la **dose médiane à l'hectare** de chaque intrant ;
+   - les **matériels et intervenants habituels** ;
+   - le **débit observé** quand les durées sont connues à l'heure près
+     (pas pour les interventions importées au jour près) ;
+3. relisez la proposition, nommez l'itinéraire, puis « Créer l'itinéraire ».
+
+Une prairie ou une luzerne en place depuis plusieurs années est décrite à
+**dates fixes** (« 15/10 de l'année précédente », « 18/03 »). Les étapes
+sans matériel ni intervenant sont signalées « à compléter » ; dans la
+fenêtre d'une étape, « Reprendre ce débit » recopie le débit observé.
+
 ## Aperçu sur la frise
 
 La frise montre la culture du semis à la récolte d'exemple, les travaux

@@ -298,9 +298,18 @@ export function StepModal({
         )}
         <Textarea label="Notes" value={notes} onChange={(e) => setNotes(e.currentTarget.value)} maxLength={1000} autosize minRows={1} disabled={readOnly} />
         {step?.evidence && (
-          <Text size="xs" c="dimmed">
-            D'après l'historique : {step.evidence.parcels} parcelle{step.evidence.parcels > 1 ? "s" : ""} sur {step.evidence.ofParcels}, {step.evidence.campaigns.join(", ")}.
-          </Text>
+          <Group gap="xs">
+            <Text size="xs" c="dimmed">
+              D'après l'historique : {step.evidence.parcels} parcelle{step.evidence.parcels > 1 ? "s" : ""} sur {step.evidence.ofParcels}, {step.evidence.campaigns.join(", ")}
+              {step.evidence.note ? ` (${step.evidence.note})` : ""}
+              {step.evidence.observedRateHaH ? ` ; débit observé ${String(step.evidence.observedRateHaH).replace(".", ",")} ha/h sur ${step.evidence.observedSamples} chantiers` : ""}.
+            </Text>
+            {!readOnly && step.evidence.observedRateHaH && workRate === "" && (
+              <Button size="compact-xs" variant="subtle" onClick={() => setWorkRate(step.evidence!.observedRateHaH!)}>
+                Reprendre ce débit
+              </Button>
+            )}
+          </Group>
         )}
         {error && <Alert color="red">{error}</Alert>}
         <Group justify="flex-end">

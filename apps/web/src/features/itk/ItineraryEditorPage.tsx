@@ -337,8 +337,8 @@ function Editor({ detail, owner, refetch }: { detail: ItkDetail; owner: boolean;
                   </Text>
                 </Table.Td>
                 <Table.Td>
-                  <Text size="sm" c={s.workRateHaH ? undefined : "dimmed"}>
-                    {s.workRateHaH ? `${fmt(s.workRateHaH)} ha/h` : "—"}
+                  <Text size="sm" c={s.workRateHaH ? undefined : "dimmed"} title={!s.workRateHaH && s.evidence?.observedRateHaH ? `Médiane de ${s.evidence.observedSamples} chantiers` : undefined}>
+                    {s.workRateHaH ? `${fmt(s.workRateHaH)} ha/h` : s.evidence?.observedRateHaH ? `${fmt(s.evidence.observedRateHaH)} ha/h observé` : "—"}
                   </Text>
                 </Table.Td>
                 {owner && (
