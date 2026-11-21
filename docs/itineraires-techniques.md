@@ -10,7 +10,7 @@ Les ITK servent à préparer l'assolement : on en choisit un à l'affectation
 d'une culture, puis « Préparer les interventions prévues » crée les
 interventions de la campagne (voir `docs/assolement.md`), et l'onglet
 **Travaux** de l'assolement estime les heures de chantier, les trajets et les
-pointes de travail. Besoins en intrants : à venir.
+pointes de travail, et l'onglet **Intrants** les quantités à prévoir et à acheter.
 
 ## Où
 

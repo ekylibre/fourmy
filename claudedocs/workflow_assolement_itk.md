@@ -348,3 +348,26 @@ Sur le serveur : même commande au déploiement, sur accord.
 - **Morceaux d'une découpe** : trajet de leur parcelle d'origine principale (pas de calcul par forme du brouillon, pas de `POST /crop-plans/:year/routes`).
 - **Capacité** : personnes actives de la ferme × heures par semaine (au moins une personne).
 - **Personnes non nommées** : une personne par passage par défaut (`people`), comptée en « main-d'œuvre non nommée ».
+
+### IT5 — Besoins en intrants (21/11/2026)
+
+- **Domaine** `itk/needs.ts` :
+  - `inputNeeds` : dose × surface × part × passages, étapes « si besoin » à part ;
+  - `doseToStock` : semences par `seedRate` et `convertSeedQuantity` (grains/m², milliers, doses, PMG) ; engrais et phyto par `convertQuantity` (densité) ;
+  - `nitrogenToStock` : apport d'azote du plan → produit, d'après la teneur (% de masse, kg/t, kg/m³) ;
+  - intrants génériques regroupés par libellé et unité ;
+  - dose inconvertible gardée dans l'unité de la dose (grains/m² ramenés en grains), signalée, jamais comptée pour zéro ;
+  - à acheter = besoin − (stock − réservé).
+- **Plan de fumure** : un plan établi ou révisé de la campagne (version en cours) remplace les intrants engrais des étapes de fertilisation minérale de l'ITK de sa parcelle ; la fertilisation organique reste celle de l'ITK ; un apport sans engrais choisi est compté en kg N, à part.
+- **API** `GET /crop-plans/:year/inputs-context` (`repos/itk-inputs.ts`) :
+  - articles cités par les ITK, les plans et les interventions prévues (unité, densité, PMG, grains par dose, teneur en azote) ;
+  - stock à la date du jour (somme des mouvements) ;
+  - réservé : interventions prévues saisies à la main sur la campagne (du 1er août précédent au 31 décembre), converties par `toStockQuantity`. Celles des ITK sont déjà dans les besoins ;
+  - apports des plans de fumure établis, par parcelle.
+- **Web** : onglet **Intrants** de l'assolement (par nature : besoin, si besoin, stock, réservé, à acheter, source ; doses non converties signalées).
+- **Tests** : domaine `itk-needs.test.ts` (5) ; API `itk-inputs.integration.test.ts`.
+
+**Écarts avec la conception** :
+- Les besoins portent sur **toutes les occurrences** d'une étape, datées ou non : une date manquante n'enlève pas l'intrant.
+- Un **morceau de découpe** du brouillon n'a pas de plan de fumure (le plan suit la parcelle d'origine) : son azote vient de l'ITK.
+- **Recoupement avec « Utilisation des semences » (SE7)** : à faire à la recette (IT6), une fois des interventions prévues générées sur une ferme de test.
