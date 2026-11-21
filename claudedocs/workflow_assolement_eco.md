@@ -123,3 +123,9 @@ flowchart LR
 - **Écart au plan** : comparaison avec le **prévu** N-1 (assolement N-1 validé avec ITK) non faite — aucune ferme de test n'en a ; à reprendre quand un assolement validé avec ITK aura une campagne suivante.
 - Tests : domaine (réalisé chiffré, sans récolte, jachère), API (route), web (colonne N-1 et écart).
 
+### E6 — fait (21/11)
+- e2e `apps/web/e2e/economics.spec.ts` (ferme pilote viticole, campagne 2034) : itinéraire sans matériel de la ferme, affectation avec rendement et prix prévus, onglet Économie (produit 6 000 €/ha, prestations et coût horaire manquants), saisie dans le module (coût horaire, deux prestations), marges complètes (mécanisation 480 €/ha, marge directe 5 520 €/ha). Vert en local (API 3000, `vite preview` 4173, base 5434).
+- Corrigé en recette : onglet Services sans les procédures de la vigne (vendange en prestation impossible à chiffrer) ; réalisé N-1 sans état de chargement ni d'erreur.
+- Recette dans Chrome sur les deux fermes de test : module Économique (Matériels, Main-d'œuvre, Produits), prévisions de l'assolement, onglet Économie (prévu et réalisé 2026 : 186 €/ha de marge directe et 102 manques pour la GAEC, faute de prix saisis).
+- Documentation : `docs/economie.md` (limites connues) ; points ouverts : 125 fait, suites 142-147.
+

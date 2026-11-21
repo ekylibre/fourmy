@@ -127,7 +127,8 @@ function ServicesTab({ farmId, owner }: { farmId: string; owner: boolean }) {
   const { q, get } = useCurrent(farmId, "service");
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorAlert error={q.error} />;
-  const rows: PriceRow[] = PROCEDURES.filter((p) => itkProcedureAllowed(p.code) && p.category !== "vine")
+  // Toutes les procédures d'un itinéraire, vigne comprise (vendange, pulvérisation en prestation).
+  const rows: PriceRow[] = PROCEDURES.filter((p) => itkProcedureAllowed(p.code))
     .sort((a, b) => a.label.localeCompare(b.label, "fr"))
     .map((p) => ({ label: getProcedure(p.code).label, sub: "prestation (ETA, CUMA)", ref: { procedure: p.code }, unit: "hectare", units: ["hectare", "hour"], current: get({ procedure: p.code }) }));
   return <PriceTable farmId={farmId} kind="service" rows={rows} owner={owner} label="Prestation" />;
