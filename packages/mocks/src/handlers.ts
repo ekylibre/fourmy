@@ -276,6 +276,8 @@ export const handlers = [
       operatorProtection: "Pendant le mélange/chargement : gants en nitrile.", restrictedMentions: null, mixCodes: [1, 3], organic: false, biocontrol: false }] }),
   ),
   http.get(`*${base}/procedures`, () => HttpResponse.json(demoProcedures)),
+  // Itinéraires techniques (lot IT1) : aucun dans la ferme de démonstration.
+  http.get(`*${base}/technical-itineraries`, () => HttpResponse.json({ items: [] })),
   // Matériels et entretien (lots I à K) : liste résumée, plan vide, aucune échéance.
   http.get(`*${base}/equipments`, () =>
     HttpResponse.json({

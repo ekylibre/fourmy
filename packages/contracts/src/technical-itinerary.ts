@@ -237,3 +237,79 @@ export interface ItkHistoryCampaign {
   productions: number;
   interventions: number;
 }
+
+// ---------------------------------------------------------------------------
+// Lot IT3 : interventions prévues d'une campagne, proposées puis confirmées (A10, A14).
+
+/** Lien d'une intervention prévue avec l'étape d'ITK qui l'a proposée (`interventions.itinerary_ref`). */
+export interface ItineraryRef {
+  itineraryId: string;
+  revision: number;
+  stepId: string;
+  occurrence: number;
+  productionId: string;
+  campaign: number;
+  /** Empreinte de ce que la génération a écrit : différente ⇒ modifiée depuis par l'utilisateur. */
+  hash: string;
+}
+
+/**
+ * create : à créer ; update : générée, non modifiée, à refaire (ITK ou culture changés) ;
+ * remove : générée, non modifiée, plus proposée (à annuler) ; same : déjà à jour ;
+ * modified : générée puis modifiée à la main (conservée) ; done : réalisée ou annulée (jamais touchée) ;
+ * undated : étape sans date (semis ou récolte inconnus), non proposée.
+ */
+export type PlannedState = "create" | "update" | "remove" | "same" | "modified" | "done" | "undated";
+
+export interface PlannedItem {
+  /** `<production>:<étape>:<passage>`. */
+  key: string;
+  state: PlannedState;
+  productionId: string;
+  parcelId: string;
+  parcelName: string;
+  activityName: string;
+  itineraryId: string;
+  itineraryName: string;
+  procedure: string;
+  label: string;
+  /** Jour prévu (AAAA-MM-JJ), null : à préciser. */
+  day: string | null;
+  areaM2: number;
+  optional: boolean;
+  /** Intrants : article de la ferme (écrit dans l'intervention) ou générique (dans les notes). */
+  inputs: { articleId: string | null; label: string; dose: number; unit: string }[];
+  /** Intervention existante (mise à jour, retrait, conservée). */
+  interventionId: string | null;
+  /** L'ITK a changé depuis la génération de l'intervention existante. */
+  itineraryChanged: boolean;
+}
+
+export interface PlannedPreview {
+  year: number;
+  items: PlannedItem[];
+  /** Productions de la campagne sans ITK (rien à proposer). */
+  withoutItinerary: number;
+  /** Empreinte de l'aperçu : la confirmation est refusée (409) s'il a changé. */
+  previewHash: string;
+}
+
+export const plannedPreviewRequest = z.object({ productionIds: z.array(uuid).max(2000).optional() });
+export type PlannedPreviewRequest = z.infer<typeof plannedPreviewRequest>;
+
+export const plannedConfirmWrite = z.object({
+  productionIds: z.array(uuid).max(2000).optional(),
+  previewHash: z.string().min(1).max(100),
+  /** Clés acceptées (états create, update, remove) ; les autres sont ignorées. */
+  accepted: z.array(z.string().max(200)).max(20_000),
+  /** Dates modifiées dans l'aperçu (clé → AAAA-MM-JJ). */
+  dateEdits: z.record(z.string().max(200), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).default({}),
+});
+export type PlannedConfirmWrite = z.input<typeof plannedConfirmWrite>;
+
+export interface PlannedConfirmResult {
+  created: number;
+  updated: number;
+  removed: number;
+  failed: { key: string; message: string }[];
+}

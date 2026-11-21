@@ -13,6 +13,7 @@ import {
   type CropPlanSettings,
   type CropPlanValidateWrite,
   type CropPlanValidation,
+  type CropPlanPlannedMove,
   type CropPlanVersionView,
   type CropPlanView,
   type CropPlanYearCrop,
@@ -402,10 +403,11 @@ async function existingProductions(tx: Tx, year: number): Promise<ExistingProduc
     role: "main" | "secondary";
     started_on: string | null;
     stopped_on: string | null;
+    itinerary_id: string | null;
     done: boolean;
   }>(
     tx,
-    sql`SELECT p.id, p.land_parcel_id, p.activity_id, ${ROLE} AS role, p.started_on::text, p.stopped_on::text,
+    sql`SELECT p.id, p.land_parcel_id, p.activity_id, ${ROLE} AS role, p.started_on::text, p.stopped_on::text, p.attrs->>'itineraryId' AS itinerary_id,
                EXISTS (SELECT 1 FROM interventions i
                        JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_type = 'land_parcel'
                        WHERE i.status = 'done' AND t.ref_id = p.land_parcel_id
@@ -421,6 +423,7 @@ async function existingProductions(tx: Tx, year: number): Promise<ExistingProduc
     role: r.role,
     startedOn: r.started_on,
     stoppedOn: r.stopped_on,
+    ...(r.itinerary_id ? { itineraryId: r.itinerary_id } : {}),
     hasDoneInterventions: r.done,
   }));
 }
@@ -458,6 +461,7 @@ async function liveDraft(tx: Tx, year: number): Promise<CropPlanDraft> {
       startedOn: p.startedOn,
       stoppedOn: p.stoppedOn,
       productionId: p.id,
+      ...(p.itineraryId ? { itineraryId: p.itineraryId } : {}),
     })),
   };
 }
@@ -617,9 +621,12 @@ export async function validateCropPlan(
     if (unknownActivities.length) {
       blockers.push({ code: "unknown-parcel", message: `${unknownActivities.length} culture(s) prévue(s) avec une activité inconnue ou sans parcelles.`, keys: unknownActivities.map((a) => a.key) });
     }
-    blockers.push(...operationBlockers(draft, resolved, context), ...(await serverOperationBlockers(tx, draft, context)));
+    const server = await serverOperationBlockers(tx, draft, context, body.plannedMoves ?? {});
+    blockers.push(...operationBlockers(draft, resolved, context), ...server.blockers);
+    changes.push(...server.changes);
+    const plannedToMove = server.plannedToMove;
 
-    if (opts.dryRun || blockers.length) return { dryRun: opts.dryRun, changes, blockers, sections, version: null };
+    if (opts.dryRun || blockers.length) return { dryRun: opts.dryRun, changes, blockers, sections, version: null, plannedToMove };
 
     const applied = await applyChanges(tx, farmId, year, changes, draft, p.id);
     const version = (p.current_version ?? 0) + 1;
@@ -628,7 +635,7 @@ export async function validateCropPlan(
                                  ${JSON.stringify(changes)}::jsonb, ${JSON.stringify(sections)}::jsonb, ${context.refsVersion})`);
     await tx.execute(sql`UPDATE crop_plans SET status = 'validated', draft = NULL, revision = revision + 1, current_version = ${version},
                          updated_at = now(), updated_by = ${opts.userId} WHERE id = ${p.id}`);
-    return { dryRun: false, changes, blockers, sections, version };
+    return { dryRun: false, changes, blockers, sections, version, plannedToMove };
   });
 }
 
@@ -638,8 +645,10 @@ export async function validateCropPlan(
  * (validité, recouvrement de la parcelle d'origine), interventions de la
  * parcelle d'origine après la date d'effet, fusion de surfaces AB et non AB.
  */
-async function serverOperationBlockers(tx: Tx, draft: CropPlanDraft, context: CropPlanContext) {
+async function serverOperationBlockers(tx: Tx, draft: CropPlanDraft, context: CropPlanContext, moves: Record<string, string>) {
   const out: CropPlanValidation["blockers"] = [];
+  const changes: CropPlanChange[] = [];
+  const plannedToMove: CropPlanPlannedMove[] = [];
   const base = new Set(context.parcels.map((p) => p.id));
   const shapes = new Map<string, string>(); // morceaux du brouillon (n:) → GeoJSON
   for (const op of draft.operations) {
@@ -669,18 +678,36 @@ async function serverOperationBlockers(tx: Tx, draft: CropPlanDraft, context: Cr
       out.push({ code: "geometry", message: `${names} : les nouvelles parcelles ne recouvrent pas exactement la surface d'origine (écart ${Math.round(geo.gap)} m², chevauchement ${Math.round(geo.overlap)} m²${geo.invalid ? ", contour invalide" : ""}).`, keys: pieces.map((p) => p.key) });
     }
     if (!sources.length) continue;
-    const ivs = await rows<{ status: string; n: number }>(
+    const ivs = await rows<{ id: string; status: string; procedure: string; day: string; generated: boolean; crews: boolean; parcel_id: string; targets: number }>(
       tx,
-      sql`SELECT i.status, count(DISTINCT i.id)::int AS n FROM interventions i
+      sql`SELECT DISTINCT ON (i.id) i.id, i.status, i.procedure, (i.started_at AT TIME ZONE 'Europe/Paris')::date::text AS day,
+                 i.itinerary_ref IS NOT NULL AS generated, i.staffing = 'crews' AS crews, t.ref_id AS parcel_id,
+                 (SELECT count(*)::int FROM intervention_parameters x WHERE x.intervention_id = i.id AND x.role = 'target') AS targets
+          FROM interventions i
           JOIN intervention_parameters t ON t.intervention_id = i.id AND t.role = 'target' AND t.ref_type = 'land_parcel'
           WHERE t.ref_id = ANY(${uuids(sources)}) AND i.status IN ('done', 'planned') AND i.started_at >= ${op.effectiveOn}::date::timestamptz
-          GROUP BY i.status`,
+          ORDER BY i.id`,
     );
     const srcKeys = sources.map((id) => `p:${id}`);
-    const done = ivs.find((r) => r.status === "done")?.n ?? 0;
-    const planned = ivs.find((r) => r.status === "planned")?.n ?? 0;
+    const done = ivs.filter((r) => r.status === "done").length;
     if (done) out.push({ code: "effective-date", message: `${names} : ${done} intervention(s) réalisée(s) sur la parcelle d'origine après le ${op.effectiveOn} ; choisissez une date d'effet plus tardive.`, keys: srcKeys });
-    if (planned) out.push({ code: "planned-interventions", message: `${names} : ${planned} intervention(s) prévue(s) sur la parcelle d'origine après le ${op.effectiveOn} : reportez-les sur les nouvelles parcelles ou annulez-les avant de valider.`, keys: srcKeys });
+    // Interventions prévues après la date d'effet (#116) : générées par un ITK, annulées (à reproposer sur les
+    // morceaux) ; saisies à la main, reportées sur un morceau ou réparties au prorata, au choix.
+    let unresolved = 0;
+    for (const r of ivs.filter((x) => x.status === "planned")) {
+      const key = `p:${r.parcel_id}` as const;
+      if (r.generated) {
+        changes.push({ kind: "intervention.cancel", interventionId: r.id, key, procedure: r.procedure, day: r.day });
+        continue;
+      }
+      const choice = moves[r.id] ?? null;
+      const splittable = !r.crews && r.targets === 1;
+      plannedToMove.push({ interventionId: r.id, procedure: r.procedure, day: r.day, key, pieces: pieces.map((p) => ({ key: p.key, name: p.name })), choice, splittable });
+      if (choice === "each" && splittable) changes.push({ kind: "intervention.split", interventionId: r.id, key, to: pieces.map((p) => p.key), procedure: r.procedure, day: r.day });
+      else if (choice && choice !== "each" && pieces.some((p) => p.key === choice)) changes.push({ kind: "intervention.retarget", interventionId: r.id, key, to: choice, procedure: r.procedure, day: r.day });
+      else unresolved++;
+    }
+    if (unresolved) out.push({ code: "planned-interventions", message: `${names} : ${unresolved} intervention(s) prévue(s) saisie(s) à la main sur la parcelle d'origine après le ${op.effectiveOn} : choisissez le morceau qui la reçoit, ou de la répartir sur chaque morceau.`, keys: srcKeys });
     if (op.kind === "merge") {
       const ab = sources.filter((id) => context.certification.abParcels[id]);
       if (ab.length && ab.length !== op.sources.length) {
@@ -688,7 +715,7 @@ async function serverOperationBlockers(tx: Tx, draft: CropPlanDraft, context: Cr
       }
     }
   }
-  return out;
+  return { blockers: out, changes, plannedToMove };
 }
 
 /** Applique une découpe ou une fusion : versions d'origine closes, nouvelles parcelles, filiation, certifications. */
@@ -759,12 +786,13 @@ async function applyChanges(tx: Tx, farmId: string, year: number, changes: CropP
   }
   const created = new Map<string, string>();
   const parcelId = (key: string) => keyMap.get(key) ?? key.slice(2);
-  const fields = (f: { activityId: string; role: string; startedOn: string | null; stoppedOn: string | null }) => sql`
+  const fields = (f: { activityId: string; role: string; startedOn: string | null; stoppedOn: string | null; itineraryId?: string | null }) => sql`
     activity_id = ${f.activityId},
     nature = (SELECT CASE a.family WHEN 'vine_farming' THEN 'vine' WHEN 'animal_farming' THEN 'grassland' ELSE 'field_crop' END FROM activities a WHERE a.id = ${f.activityId}),
     cultivation = (SELECT coalesce(a.cultivation, lx.specie) FROM activities a LEFT JOIN lexicon_productions lx ON lx.reference_name = a.reference WHERE a.id = ${f.activityId}),
     started_on = ${f.startedOn}::date, stopped_on = ${f.stoppedOn}::date,
-    attrs = coalesce(attrs, '{}'::jsonb) || jsonb_build_object('cropPlan', jsonb_build_object('role', ${f.role}::text)),
+    attrs = (coalesce(attrs, '{}'::jsonb) - 'itineraryId') || jsonb_build_object('cropPlan', jsonb_build_object('role', ${f.role}::text))
+            || ${f.itineraryId ? sql`jsonb_build_object('itineraryId', ${f.itineraryId}::text)` : sql`'{}'::jsonb`},
     updated_at = now()`;
   for (const c of changes) {
     if (c.kind === "production.delete") {
@@ -779,6 +807,42 @@ async function applyChanges(tx: Tx, farmId: string, year: number, changes: CropP
       await tx.execute(sql`UPDATE productions SET ${fields(c.after)} WHERE id = ${id}`);
     }
   }
+  // Interventions prévues de la parcelle d'origine d'une découpe (#116).
+  const pieceAreas = new Map<string, number>();
+  for (const op of draft.operations) for (const piece of op.kind === "split" ? op.pieces : [op.result]) pieceAreas.set(piece.key, piece.areaM2);
+  for (const c of changes) {
+    if (c.kind === "intervention.cancel") {
+      await tx.execute(sql`UPDATE interventions SET status = 'cancelled', updated_at = now() WHERE id = ${c.interventionId} AND status = 'planned'`);
+    } else if (c.kind === "intervention.retarget") {
+      // La surface travaillée saisie valait pour la parcelle d'origine : le morceau entier est ciblé.
+      await tx.execute(sql`UPDATE intervention_parameters SET ref_id = ${parcelId(c.to)}, attrs = nullif(coalesce(attrs, '{}'::jsonb) - 'workedAreaM2', '{}'::jsonb), working_zone = NULL
+                           WHERE intervention_id = ${c.interventionId} AND role = 'target' AND ref_type = 'land_parcel' AND ref_id = ${c.key.slice(2)}`);
+      await tx.execute(sql`UPDATE interventions SET updated_at = now() WHERE id = ${c.interventionId}`);
+    } else if (c.kind === "intervention.split") {
+      const total = c.to.reduce((s, k) => s + (pieceAreas.get(k) ?? 0), 0);
+      for (const to of c.to) {
+        const share = total > 0 ? (pieceAreas.get(to) ?? 0) / total : 1 / c.to.length;
+        const id = crypto.randomUUID();
+        // Copie de l'intervention, de ses paramètres et de ses périodes ; quantités totales au prorata, doses à l'hectare gardées.
+        await tx.execute(sql`INSERT INTO interventions
+          SELECT (jsonb_populate_record(i, jsonb_build_object('id', ${id}::uuid, 'client_id', NULL, 'created_at', now(), 'updated_at', now()))).*
+          FROM interventions i WHERE i.id = ${c.interventionId}`);
+        await tx.execute(sql`INSERT INTO intervention_parameters
+          SELECT (jsonb_populate_record(p, jsonb_build_object(
+                    'id', gen_random_uuid(), 'intervention_id', ${id}::uuid,
+                    'ref_id', CASE WHEN p.role = 'target' AND p.ref_type = 'land_parcel' THEN ${parcelId(to)}::uuid ELSE p.ref_id END,
+                    'attrs', CASE WHEN p.role = 'target' THEN nullif(coalesce(p.attrs, '{}'::jsonb) - 'workedAreaM2', '{}'::jsonb) ELSE p.attrs END,
+                    'working_zone', CASE WHEN p.role = 'target' THEN NULL ELSE p.working_zone END,
+                    'quantity', CASE WHEN p.role IN ('input', 'output') AND p.quantity IS NOT NULL AND coalesce(p.unit, '') !~ '_per_(hectare|square_meter)$'
+                                     THEN p.quantity * ${share} ELSE p.quantity END))).*
+          FROM intervention_parameters p WHERE p.intervention_id = ${c.interventionId}`);
+        await tx.execute(sql`INSERT INTO intervention_periods (id, intervention_id, started_at, stopped_at)
+          SELECT gen_random_uuid(), ${id}, started_at, stopped_at FROM intervention_periods WHERE intervention_id = ${c.interventionId} AND crew_id IS NULL`);
+      }
+      await tx.execute(sql`UPDATE interventions SET status = 'cancelled', updated_at = now() WHERE id = ${c.interventionId}`);
+    }
+  }
+
   // Couverts d'interculture : cahier de fertilisation, campagne de la culture qui suit.
   const coverOf = new Map(draft.covers.map((c) => [c.id, c]));
   const coverByCoverId = new Map(draft.covers.filter((c) => c.coverId).map((c) => [c.coverId!, c]));

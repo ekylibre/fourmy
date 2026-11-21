@@ -32,14 +32,16 @@ export interface CropPlanDiff {
   blockers: CropPlanBlocker[];
 }
 
+// L'itinéraire technique (lot IT3) n'apparaît que s'il est choisi : les changements du temps 1 restent identiques.
 const fields = (a: CropPlanProductionFields): CropPlanProductionFields => ({
   activityId: a.activityId,
   role: a.role,
   startedOn: a.startedOn,
   stoppedOn: a.stoppedOn,
+  ...(a.itineraryId ? { itineraryId: a.itineraryId } : {}),
 });
 const same = (a: CropPlanProductionFields, b: CropPlanProductionFields) =>
-  a.activityId === b.activityId && a.role === b.role && a.startedOn === b.startedOn && a.stoppedOn === b.stoppedOn;
+  a.activityId === b.activityId && a.role === b.role && a.startedOn === b.startedOn && a.stoppedOn === b.stoppedOn && (a.itineraryId ?? null) === (b.itineraryId ?? null);
 
 export function diffCropPlan(
   draft: CropPlanDraft,

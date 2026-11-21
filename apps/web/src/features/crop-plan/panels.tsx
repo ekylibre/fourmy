@@ -3,9 +3,12 @@ import { Accordion, Alert, Badge, Button, Checkbox, Group, Modal, Paper, ScrollA
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
 import { Ban, Crosshair, Eraser, Plus, Sprout } from "lucide-react";
-import { ACTIVITY_FAMILY_LABELS, COVER_FAMILY_LABELS, COVER_KIND_LABELS, type ActivityFamily, type ControlFinding, type ControlSection, type CropPlanChange, type CropPlanContext, type CropPlanParcelKey, type CropPlanValidation } from "@fourmy/contracts";
+import { ACTIVITY_FAMILY_LABELS, COVER_FAMILY_LABELS, COVER_KIND_LABELS, getProcedure, type ActivityFamily, type ControlFinding, type ControlSection, type CropPlanChange, type CropPlanContext, type CropPlanParcelKey, type CropPlanValidation } from "@fourmy/contracts";
 import { RETURN_INTERVALS } from "@fourmy/certification-refs";
+import { Link } from "react-router";
 import { useArea } from "../../app/prefs";
+import { useFarm } from "../../app/farm";
+import { useItks } from "../itk/queries";
 import { api, farmPath } from "../../app/api";
 import { ControlLight } from "../certification/controls";
 import { cropPlanKeys, useCropPlanVersion } from "./queries";
@@ -173,6 +176,17 @@ export function AssignForm({
   const [secondaryId, setSecondaryId] = useState<string | null>(null);
   const [startedOn, setStartedOn] = useState("");
   const [stoppedOn, setStoppedOn] = useState("");
+  const [itineraryId, setItineraryId] = useState<string | null>(null);
+  const farm = useFarm();
+  const itks = useItks(farm.id, { active: true });
+  const itkOptions = useMemo(() => {
+    const all = itks.data?.items ?? [];
+    const activity = context.activities.find((a) => a.id === activityId);
+    const own = all.filter((t) => t.activityId === activityId);
+    // Puis ceux d'une autre activité de la même espèce de référence (blé tendre conventionnel, bio…).
+    const near = all.filter((t) => t.activityId !== activityId && activity?.species && context.activities.find((a) => a.id === t.activityId)?.species === activity.species);
+    return [...own, ...near].map((t) => ({ value: t.id, label: t.activityId === activityId ? t.name : `${t.name} (${t.activityName ?? "autre activité"})` }));
+  }, [itks.data, activityId, context.activities]);
   const [coverKind, setCoverKind] = useState<"sown" | "regrowth_cereal" | "regrowth_rapeseed">("sown");
   const [coverFamily, setCoverFamily] = useState<string | null>(null);
   const [coverSpecies, setCoverSpecies] = useState("");
@@ -182,7 +196,7 @@ export function AssignForm({
   const sel = new Set<string>(selected);
   const selectedArea = editor.plan.parcels.filter((p) => sel.has(p.key)).reduce((s, p) => s + p.areaM2, 0);
   const options = useMemo(() => activityOptions(context), [context]);
-  const dates = { startedOn: startedOn || null, stoppedOn: stoppedOn || null };
+  const dates = { startedOn: startedOn || null, stoppedOn: stoppedOn || null, itineraryId };
   const findings = editor.sections.flatMap((s) => s.findings).filter((f) => f.level !== "ok" && f.level !== "na" && touches(f, sel));
   const carried = new Set(context.parcels.filter((p) => p.carryOver).map((p) => `p:${p.id}`));
   const selectedCarried = selected.filter((k) => carried.has(k));
@@ -199,6 +213,9 @@ export function AssignForm({
     const annual = a?.cycle === "annual";
     setStartedOn(annual ? (a?.defaultStartedOn ?? "") : "");
     setStoppedOn(annual ? (a?.defaultStoppedOn ?? "") : "");
+    // Itinéraire proposé : le seul de l'activité, s'il n'y en a qu'un.
+    const own = (itks.data?.items ?? []).filter((t) => t.activityId === id);
+    setItineraryId(own.length === 1 ? own[0]!.id : null);
   };
 
   return (
@@ -224,6 +241,23 @@ export function AssignForm({
           <TextInput type="date" label="Semis (prévu)" value={startedOn} onChange={(e) => setStartedOn(e.currentTarget.value)} style={{ flex: 1, minWidth: 140 }} />
           <TextInput type="date" label="Récolte (prévue)" value={stoppedOn} onChange={(e) => setStoppedOn(e.currentTarget.value)} style={{ flex: 1, minWidth: 140 }} />
         </Group>
+        {activityId && (
+          <Group gap="xs" align="flex-end" wrap="nowrap">
+            <Select
+              label="Itinéraire technique"
+              placeholder={itkOptions.length ? "Aucun" : "Aucun itinéraire pour cette activité"}
+              data={itkOptions}
+              value={itineraryId}
+              onChange={setItineraryId}
+              clearable
+              searchable
+              style={{ flex: 1 }}
+            />
+            <Button size="xs" variant="subtle" component={Link} to={`/f/${farm.id}/itineraries?activityId=${activityId}`} target="_blank">
+              Itinéraires…
+            </Button>
+          </Group>
+        )}
         <Group gap="xs">
           <Button size="xs" leftSection={<Sprout size={14} />} disabled={!selected.length || !activityId} onClick={() => act((d) => assignMain(d, selected, activityId!, dates))}>
             Affecter
@@ -428,6 +462,8 @@ export function ChecksPanel({ sections, onSelect }: { sections: ControlSection[]
   );
 }
 
+const frenchDay = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+
 /** Un changement de la validation, en clair. */
 function changeLabel(c: CropPlanChange, names: (key: string) => string, activity: (id: string) => string): string {
   switch (c.kind) {
@@ -453,6 +489,12 @@ function changeLabel(c: CropPlanChange, names: (key: string) => string, activity
       return `${names(c.key)} : couvert ${c.species} modifié`;
     case "cover.delete":
       return `${names(c.key)} : couvert ${c.species} retiré`;
+    case "intervention.cancel":
+      return `${names(c.key)} : ${getProcedure(c.procedure).label} prévue le ${frenchDay(c.day)} (itinéraire) annulée, à reproposer sur les morceaux`;
+    case "intervention.retarget":
+      return `${names(c.key)} : ${getProcedure(c.procedure).label} prévue le ${frenchDay(c.day)} reportée sur ${names(c.to)}`;
+    case "intervention.split":
+      return `${names(c.key)} : ${getProcedure(c.procedure).label} prévue le ${frenchDay(c.day)} répartie sur ${c.to.map(names).join(", ")}`;
   }
 }
 
@@ -489,15 +531,18 @@ export function ValidateModal({ farmId, year, editor, context, revision, revisin
 }) {
   const qc = useQueryClient();
   const [reason, setReason] = useState("");
+  // Interventions prévues saisies à la main sur une parcelle découpée (#116) : morceau choisi ou « each ».
+  const [moves, setMoves] = useState<Record<string, string>>({});
   const preview = useQuery({
-    queryKey: ["crop-plans", farmId, year, "preview", revision],
-    queryFn: () => api.post<CropPlanValidation>(farmPath(farmId, `/crop-plans/${year}/validate?dryRun=1`), { revision }),
+    queryKey: ["crop-plans", farmId, year, "preview", revision, moves],
+    queryFn: () => api.post<CropPlanValidation>(farmPath(farmId, `/crop-plans/${year}/validate?dryRun=1`), { revision, plannedMoves: moves }),
+    placeholderData: (prev) => prev,
     enabled: opened,
     staleTime: 0,
     gcTime: 0,
   });
   const validate = useMutation({
-    mutationFn: () => api.post<CropPlanValidation>(farmPath(farmId, `/crop-plans/${year}/validate`), { revision, ...(reason.trim() ? { reason: reason.trim() } : {}) }),
+    mutationFn: () => api.post<CropPlanValidation>(farmPath(farmId, `/crop-plans/${year}/validate`), { revision, plannedMoves: moves, ...(reason.trim() ? { reason: reason.trim() } : {}) }),
     onSuccess: async (r) => {
       notifications.show({ color: "lichen", message: `Assolement ${year} validé (version ${r.version}).` });
       await qc.invalidateQueries({ queryKey: cropPlanKeys.all(farmId) });
@@ -535,6 +580,31 @@ export function ValidateModal({ farmId, year, editor, context, revision, revisin
                 ))}
               </Stack>
             </Alert>
+          )}
+          {(p.plannedToMove ?? []).length > 0 && (
+            <div>
+              <Text fw={600} size="sm" mb={4}>
+                Interventions prévues sur les parcelles découpées
+              </Text>
+              <Stack gap={4} aria-label="Interventions prévues à reporter">
+                {p.plannedToMove!.map((m) => (
+                  <Group key={m.interventionId} justify="space-between" wrap="nowrap" gap="xs">
+                    <Text size="sm">
+                      {getProcedure(m.procedure).label} du {frenchDay(m.day)}
+                    </Text>
+                    <Select
+                      size="xs"
+                      w={220}
+                      placeholder="À reporter sur…"
+                      aria-label={`Report de ${getProcedure(m.procedure).label} du ${frenchDay(m.day)}`}
+                      data={[...m.pieces.map((x) => ({ value: x.key, label: x.name })), ...(m.splittable ? [{ value: "each", label: "Sur chaque morceau (au prorata)" }] : [])]}
+                      value={moves[m.interventionId] ?? null}
+                      onChange={(v) => setMoves((cur) => (v ? { ...cur, [m.interventionId]: v } : Object.fromEntries(Object.entries(cur).filter(([k]) => k !== m.interventionId))))}
+                    />
+                  </Group>
+                ))}
+              </Stack>
+            </div>
           )}
           <div>
             <Text fw={600} size="sm" mb={4}>

@@ -291,3 +291,24 @@ flowchart LR
 - Une intervention dont le décalage sort des bornes d'une ancre (dates de production incohérentes) est ignorée.
 - Procédure répétée en plus de 4 groupes (irrigation, apports fractionnés) : une seule étape à passages répétés (nombre et intervalle médians). Ses intrants ne sont gardés que s'ils servent à au moins la moitié des passages ; ils sont donc souvent vides et à compléter à la main.
 - Une production sans date de semis ni de récolte (ni intervention de semis ou de récolte) est écartée et comptée (« Jachère »).
+
+### IT3 — ITK dans l'assolement, interventions prévues sur demande, #116 (21/11/2026)
+
+- **Assolement** : sélecteur « Itinéraire technique » dans le panneau Affecter (ITK de l'activité, puis ceux d'une activité de même espèce ; proposé d'office quand l'activité n'en a qu'un). `itineraryId` passe à `productions.attrs.itineraryId` à la validation (`cropPlanProductionFields.itineraryId`, `diffCropPlan`), et revient dans le brouillon à la réouverture.
+- **Migration 0078** : `interventions.itinerary_ref` (contrôle des clés), index unique partiel (ferme, production, étape, passage) hors annulées, index par campagne.
+- **Domaine** `itk/planned.ts` : `proposeInterventions`, `plannedSignature` (FNV-1a sur procédure, jour, cibles, intrants, matériels, intervenants), `reconcilePlanned` (create, update, remove, same, modified, done, undated).
+- **API** `routes/planned-interventions.ts`, `repos/planned-interventions.ts` : `POST /planned-interventions/:year/preview` (membres), `POST /planned-interventions/:year` (responsable ; `previewHash`, `accepted`, `dateEdits` ; 409 si l'aperçu a changé). Écriture par `planInTx` (validation et contrôles de la saisie), une intervention par point de sauvegarde : un refus est rapporté sans annuler le reste. Verrou consultatif par ferme et campagne.
+- **#116** : à la validation d'une découpe, les interventions prévues générées de la parcelle d'origine après la date d'effet sont annulées (`intervention.cancel`) ; celles saisies à la main sont reportées sur un morceau (`intervention.retarget`) ou réparties sur chaque morceau au prorata (`intervention.split` : copie de l'intervention, de ses paramètres et de ses périodes, quantités totales au prorata, doses à l'hectare gardées), au choix dans la fenêtre de validation (`plannedMoves`, `plannedToMove`).
+- **Web** : « Préparer les interventions prévues » sur l'assolement validé (fenêtre d'aperçu, cases, dates, refus rapportés) ; choix du report dans la fenêtre de validation ; libellés des nouveaux changements.
+- **Tests** : domaine `itk-planned.test.ts` (5) ; API `planned-interventions.integration.test.ts` (5 : ITK passé à la production, création, relance sans effet, modifiée gardée, ITK modifié, 409, réalisée intouchée, droits, découpe) ; web `itk-planned.test.tsx`.
+
+**Écarts avec la conception** :
+- **Origine** : les interventions générées gardent l'origine de l'écriture (`web`) ; c'est `itinerary_ref` qui les distingue. Ajouter `itinerary` à l'énumération des origines aurait touché la synchronisation mobile.
+- **Mise à jour** = annulation de l'ancienne puis création d'une nouvelle (nouvel identifiant), plutôt qu'une réécriture en place.
+- **Date modifiée dans l'aperçu** : l'empreinte enregistrée est celle de la proposition ; l'intervention compte donc comme « modifiée à la main » et n'est plus déplacée par une génération suivante.
+- **Dates manquantes** : à défaut des dates de la production, les dates types Lexicon de l'activité ; sinon « à préciser ».
+- **Intrants génériques** (sans article) : notés dans les notes de l'intervention (« Intrants à préciser : … »).
+- **ITK par défaut** à l'affectation : celui de l'activité s'il est seul, plutôt que « celui du dernier assolement validé ».
+- **Point d'entrée** : l'assolement validé seulement (pas encore la page d'une activité).
+- **#116, reste ouvert** : l'annulation d'une découpe déjà validée (règle du temps 1, §6) n'est pas faite ; une intervention en attelages ou à plusieurs parcelles ne se répartit pas (un seul morceau).
+- **e2e** : reporté au lot IT6 (parcours complet ITK → assolement → interventions prévues → calendrier).

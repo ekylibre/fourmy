@@ -114,6 +114,8 @@ export const cropPlanProductionFields = z.object({
   role: z.enum(["main", "secondary"]),
   startedOn: isoDate.nullable(),
   stoppedOn: isoDate.nullable(),
+  /** Itinéraire technique choisi (temps 2, lot IT3), gardé dans `productions.attrs.itineraryId`. */
+  itineraryId: z.string().uuid().nullable().optional(),
 });
 export type CropPlanProductionFields = z.infer<typeof cropPlanProductionFields>;
 
@@ -145,6 +147,13 @@ export const cropPlanChange = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("cover.create"), coverKey: z.string(), key: cropPlanParcelKey, species: z.string() }),
   z.object({ kind: z.literal("cover.update"), coverId: z.string(), key: cropPlanParcelKey, species: z.string() }),
   z.object({ kind: z.literal("cover.delete"), coverId: z.string(), key: cropPlanParcelKey, species: z.string() }),
+  // Découpe et interventions prévues de la parcelle d'origine après la date d'effet (lot IT3, #116).
+  /** Générée par un ITK : annulée, à reproposer sur les morceaux. */
+  z.object({ kind: z.literal("intervention.cancel"), interventionId: z.string(), key: cropPlanParcelKey, procedure: z.string(), day: z.string() }),
+  /** Saisie à la main : reportée sur un morceau. */
+  z.object({ kind: z.literal("intervention.retarget"), interventionId: z.string(), key: cropPlanParcelKey, to: z.string(), procedure: z.string(), day: z.string() }),
+  /** Saisie à la main : répartie sur chaque morceau, au prorata des surfaces. */
+  z.object({ kind: z.literal("intervention.split"), interventionId: z.string(), key: cropPlanParcelKey, to: z.array(z.string()), procedure: z.string(), day: z.string() }),
 ]);
 export type CropPlanChange = z.infer<typeof cropPlanChange>;
 
@@ -199,6 +208,11 @@ export const cropPlanValidateWrite = z.object({
   revision: z.number().int().min(0),
   /** Motif d'une révision (sortie d'hiver…). */
   reason: z.string().trim().max(500).optional(),
+  /**
+   * Interventions prévues saisies à la main sur une parcelle découpée (lot IT3, #116) :
+   * identifiant → morceau qui la reçoit, ou « each » (une par morceau, au prorata).
+   */
+  plannedMoves: z.record(z.string().uuid(), z.union([cropPlanParcelKey, z.literal("each")])).default({}),
 });
 export type CropPlanValidateWrite = z.infer<typeof cropPlanValidateWrite>;
 
@@ -287,6 +301,21 @@ export interface CropPlanValidation {
   sections: ControlSection[];
   /** Version créée (validation appliquée). */
   version: number | null;
+  /** Interventions prévues saisies à la main à reporter sur les morceaux d'une découpe (#116). */
+  plannedToMove?: CropPlanPlannedMove[];
+}
+
+export interface CropPlanPlannedMove {
+  interventionId: string;
+  procedure: string;
+  day: string;
+  /** Parcelle d'origine. */
+  key: string;
+  pieces: { key: string; name: string }[];
+  /** Choix reçu (morceau ou « each »), s'il y en a un. */
+  choice: string | null;
+  /** « each » impossible (intervention en attelages) : un seul morceau. */
+  splittable: boolean;
 }
 
 export interface CropPlanVersionView extends CropPlanVersionSummary {
