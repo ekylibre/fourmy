@@ -329,4 +329,4 @@ flowchart LR
 - Correctif tiré de la recette : `nameParts` lit l'espèce et la variété d'un nom « Semence(s) de <espèce> - <variété> » ; la variété est cherchée au catalogue pour cette espèce (code GNIS repris). Ferme pilote : 26 propositions, dont 14 avec leur code GNIS.
 - Documentation : `docs/semences.md` (guide), ligne du README, `claudedocs/points_ouverts.md` (mise à jour du 21/11, thème 18, points 129 à 134).
 - Tests : API 1 fichier unitaire (`seed-names.test.ts`) et 2 cas dans `seeds-catalog.integration.test.ts`.
-- Issues GitHub des points 129 à 134 : à créer après accord.
+- Issues GitHub #129 à #134 (points 129 à 134), jalon « Fin 2026 », projet Roadmap.
