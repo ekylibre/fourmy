@@ -16,6 +16,7 @@ const SQUARE = (x: number) => `MULTIPOLYGON(((${x} 44.8,${x + 0.01} 44.8,${x + 0
 const tractor = crypto.randomUUID();
 const plough = crypto.randomUUID();
 const parcel = crypto.randomUUID();
+const maize = crypto.randomUUID();
 let site = "";
 let siteName = "";
 
@@ -45,6 +46,12 @@ describe.skipIf(!url)("temps de travaux (intégration)", () => {
                            WHERE farm_id = ${farmId} AND is_headquarters RETURNING id, name`;
     site = hq!.id;
     siteName = hq!.name;
+    // Maïs 2025 sur Le Champ (jusqu'au 31/12) : les labours d'octobre 2025 lui reviennent (heures réalisées N-1).
+    const c25 = crypto.randomUUID();
+    await sql`INSERT INTO activities (id, farm_id, name, family) VALUES (${maize}, ${farmId}, 'Maïs', 'plant_farming')`;
+    await sql`INSERT INTO campaigns (id, farm_id, year, starts_on, stops_on) VALUES (${c25}, ${farmId}, 2025, '2025-01-01', '2025-12-31')`;
+    await sql`INSERT INTO productions (id, farm_id, campaign_id, land_parcel_id, nature, activity_id, started_on, stopped_on)
+              VALUES (${crypto.randomUUID()}, ${farmId}, ${c25}, ${parcel}, 'field_crop', ${maize}, '2025-04-15', '2025-12-31')`;
     // Trois labours à l'heure près de 4 h sur 10 ha : 2,5 ha/h observés pour la charrue et le tracteur.
     for (const day of ["2025-10-01", "2025-10-03", "2025-10-06"]) {
       const id = crypto.randomUUID();
@@ -73,6 +80,7 @@ describe.skipIf(!url)("temps de travaux (intégration)", () => {
     expect(c.settings).toEqual({ workdayHours: 8, weeklyHoursPerPerson: 45, defaultSiteId: null });
     expect(c.familyPerMeter.plowing).toBeGreaterThan(0);
     expect(c.rateSource).toMatch(/BCMA/);
+    expect(c.previousHoursByActivity).toEqual({ [maize]: 12 });
     const [cached] = await sql`SELECT method FROM parcel_routes WHERE farm_id = ${farmId} AND parcel_key = ${parcel}`;
     expect(cached!.method).toBe("estimate");
   });
