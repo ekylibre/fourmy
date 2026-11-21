@@ -41,6 +41,11 @@ const proposal: ItkDeriveResult = {
   },
 };
 
+const workContext = {
+  year: 2027, itineraries: {}, equipments: [], people: [], crewTemplates: {}, observed: [], machineryRates: {}, familyPerMeter: {}, routes: {}, site: null,
+  settings: { workdayHours: 8, weeklyHoursPerPerson: 45, defaultSiteId: null }, rateSource: "Barème BCMA (édition 2024)",
+};
+
 describe("itinéraire depuis l'historique", () => {
   it("campagnes, proposition, création puis éditeur", async () => {
     const derived: unknown[] = [];
@@ -63,6 +68,7 @@ describe("itinéraire depuis l'historique", () => {
         HttpResponse.json({ ...proposal, id: CREATED, origin: "history", active: true, revision: 0, cycle: "annual", updatedAt: "2026-11-21T10:00:00Z", notes: null, missing: [], example: { sowingOn: "2026-03-01", harvestOn: "2026-09-20", year: 2026 } }),
       ),
       http.get("*/crew-templates", () => HttpResponse.json({ items: [] })),
+      http.get("*/crop-plans/:year/itk-context", () => HttpResponse.json(workContext)),
     );
     const user = userEvent.setup();
     renderApp(`/f/${FARM}/itineraries?activityId=${ACTIVITY}&derive=1`);
@@ -85,6 +91,6 @@ describe("itinéraire depuis l'historique", () => {
     await user.click(within(dialog).getByRole("button", { name: "Créer l'itinéraire" }));
     await waitFor(() => expect(created).toMatchObject([{ origin: "history", name: "Vignes AOP — d'après 2025, 2026" }]));
     expect(await screen.findByRole("table", { name: "Étapes de l'itinéraire" }, { timeout: 10_000 })).toBeInTheDocument();
-    expect(screen.getByText("3,2 ha/h observé")).toBeInTheDocument();
+    expect(await screen.findByText("observé sur la ferme")).toBeInTheDocument();
   });
 });

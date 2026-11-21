@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { geoJsonGeometry } from "./primitives.js";
 import type { ControlSection } from "./certification.js";
+import { itkWorkSettings } from "./technical-itinerary.js";
 
 /**
  * Assolement prévisionnel (claudedocs/conception_assolement.md §3.3) : le
@@ -104,6 +105,8 @@ export const cropPlanSettings = z
     alsaceRhinePlain: z.boolean().default(false),
     /** Délais de retour propres à la ferme (années), par repère (`RETURN_INTERVALS`). */
     returnIntervals: z.record(z.string(), z.number().int().min(1).max(15)).default({}),
+    /** Temps de travaux (lot IT4) : journée de travail, capacité par personne, site de départ. */
+    work: itkWorkSettings.optional(),
   })
   .default({ bcae7Preferred: "rotation", alsaceRhinePlain: false, returnIntervals: {} });
 export type CropPlanSettings = z.infer<typeof cropPlanSettings>;

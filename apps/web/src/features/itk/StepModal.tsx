@@ -16,6 +16,7 @@ import {
   type ItkStep,
 } from "@fourmy/contracts";
 import { ARTICLE_KIND_LABELS } from "../../app/labels";
+import { useMachineryRates } from "./work";
 
 type Option = { value: string; label: string };
 export interface StepOptions {
@@ -58,12 +59,14 @@ const dayMonthText = (md: string) => `${md.slice(3)}/${md.slice(0, 2)}`;
  * débit saisi. Rien n'est enregistré avant « Enregistrer » dans l'éditeur.
  */
 export function StepModal({
+  farmId,
   step,
   options,
   readOnly,
   onSave,
   onClose,
 }: {
+  farmId: string;
   step: ItkStep | null;
   options: StepOptions;
   readOnly: boolean;
@@ -85,6 +88,11 @@ export function StepModal({
   const [personIds, setPersonIds] = useState<string[]>(step?.staffing.personIds ?? []);
   const [people, setPeople] = useState<number | "">(step?.staffing.people ?? "");
   const [workRate, setWorkRate] = useState<number | "">(step?.workRateHaH ?? "");
+  // Type de matériel du barème BCMA quand aucun matériel de la ferme n'est désigné (lot IT4, §15.3).
+  const [machineryRateId, setMachineryRateId] = useState<string | null>(step?.staffing.machineryRateId ?? null);
+  const [rateSearch, setRateSearch] = useState("");
+  const noEquipment = !crewTemplateId && equipmentIds.length === 0;
+  const rates = useMachineryRates(farmId, procedure, rateSearch, noEquipment && !!procedure);
   const [notes, setNotes] = useState(step?.notes ?? "");
   const [error, setError] = useState<string | null>(null);
 
@@ -128,7 +136,7 @@ export function StepModal({
         equipmentIds,
         personIds,
         people: people === "" ? undefined : people,
-        ...(step?.staffing.machineryRateId ? { machineryRateId: step.staffing.machineryRateId } : {}),
+        ...(noEquipment && machineryRateId ? { machineryRateId } : {}),
       },
       workRateHaH: workRate === "" ? undefined : workRate,
       notes: notes.trim() || undefined,
@@ -295,6 +303,26 @@ export function StepModal({
               <NumberInput label="Personnes" description="Si aucune n'est nommée" value={people} onChange={(v) => setPeople(typeof v === "number" ? v : "")} min={0} max={50} disabled={readOnly} />
             )}
           </Group>
+        )}
+        {noEquipment && (
+          <Select
+            label="Type de matériel (barème BCMA)"
+            description="Sans matériel de la ferme (prestation, matériel à acheter) : son débit de référence sert au temps de travaux"
+            placeholder="Rechercher : semoir 4 m, pulvérisateur 24 m…"
+            data={[
+              ...(machineryRateId && !(rates.data?.items ?? []).some((r) => r.id === machineryRateId) ? [{ value: machineryRateId, label: "Type choisi" }] : []),
+              ...(rates.data?.items ?? []).map((r) => ({ value: r.id, label: `${r.label}${r.haH ? ` · ${String(r.haH).replace(".", ",")} ha/h` : ""}` })),
+            ]}
+            value={machineryRateId}
+            onChange={setMachineryRateId}
+            searchable
+            searchValue={rateSearch}
+            onSearchChange={setRateSearch}
+            filter={({ options }) => options}
+            clearable
+            nothingFoundMessage="Aucun matériel du barème"
+            disabled={readOnly}
+          />
         )}
         <Textarea label="Notes" value={notes} onChange={(e) => setNotes(e.currentTarget.value)} maxLength={1000} autosize minRows={1} disabled={readOnly} />
         {step?.evidence && (

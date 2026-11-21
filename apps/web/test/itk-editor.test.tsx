@@ -58,6 +58,11 @@ const detail: ItkDetail = {
   },
 };
 
+const workContext = {
+  year: 2027, itineraries: {}, equipments: [], people: [], crewTemplates: {}, observed: [], machineryRates: {}, familyPerMeter: {}, routes: {}, site: null,
+  settings: { workdayHours: 8, weeklyHoursPerPerson: 45, defaultSiteId: null }, rateSource: "Barème BCMA (édition 2024)",
+};
+
 describe("éditeur d'itinéraire technique", () => {
   beforeEach(() => {
     tika.renders.length = 0;
@@ -69,6 +74,7 @@ describe("éditeur d'itinéraire technique", () => {
     server.use(
       http.get("*/technical-itineraries/:id", () => HttpResponse.json(detail)),
       http.get("*/crew-templates", () => HttpResponse.json({ items: [] })),
+      http.get("*/crop-plans/:year/itk-context", () => HttpResponse.json(workContext)),
       http.put("*/technical-itineraries/:id", async ({ request }) => {
         const body = (await request.json()) as { revision: number; content: { steps: unknown[] } };
         puts.push({ revision: body.revision, steps: body.content.steps.length });
@@ -83,7 +89,9 @@ describe("éditeur d'itinéraire technique", () => {
     expect(within(table).getByText("Déchaumage")).toBeInTheDocument();
     expect(within(table).getByText("semis J-30")).toBeInTheDocument();
     expect(within(table).getByText("Blé Chevignon 180 kg/ha")).toBeInTheDocument();
-    expect(within(table).getByText("2,5 ha/h")).toBeInTheDocument();
+    expect(await within(table).findByText("2,5 ha/h")).toBeInTheDocument();
+    expect(within(table).getByText("saisi")).toBeInTheDocument();
+    expect(screen.getByText(/Par hectare : 0,4 h de chantier, 1 débit\(s\) inconnu\(s\)/)).toBeInTheDocument();
     await waitFor(() => expect(tika.renders.length).toBeGreaterThan(0));
     expect(tika.renders.at(-1)!.system.steps[0]!.interventions.map((i) => i.day)).toEqual([0, 30]);
 
