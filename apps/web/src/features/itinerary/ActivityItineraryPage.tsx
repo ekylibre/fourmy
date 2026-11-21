@@ -49,7 +49,12 @@ export function ActivityItineraryPage() {
       <Button component={Link} to={`/f/${farm.id}/activities?at=${day}`} variant="subtle" leftSection={<ArrowLeft size={14} />} w="fit-content" px={0}>
         Activités
       </Button>
-      <Title order={1}>Itinéraire technique — {a.title}</Title>
+      <Group justify="space-between" wrap="wrap">
+        <Title order={1}>Itinéraire technique — {a.title}</Title>
+        <Button component={Link} to={`/f/${farm.id}/itineraries?activityId=${activityId}`} variant="default" size="xs">
+          Itinéraires prévus de l'activité
+        </Button>
+      </Group>
       <Grid>
         <Grid.Col span={{ base: 12, md: 3 }}>
           <Paper withBorder p="md">

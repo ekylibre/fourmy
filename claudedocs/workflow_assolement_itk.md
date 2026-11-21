@@ -254,4 +254,20 @@ flowchart LR
 
 ## 6. Réalisé
 
-*(rempli au fil des lots)*
+### IT1 — Socle : modèle, API et éditeur d'ITK (21/11/2026)
+
+- **Migration 0077** : table `technical_itineraries` (RLS, `UNIQUE (farm_id, name)`, index par activité).
+- **Contrat** `packages/contracts/src/technical-itinerary.ts` : `itkAnchor`, `itkInput`, `itkStep` (avec `staffing.machineryRateId` et `evidence`), `itkContent`, `itkWrite`, `ItkSummary`, `ItkDetail`, `ItkMissing`, `ITK_DOSE_UNITS`, `itkUnitAllowed`, `itkProcedureAllowed`.
+- **Domaine** `packages/domain/src/itk/` : `scheduleSteps`, `anchorDate`, `anchorLabel` ; `itkMissing`, `itkReferences` ; `itkPreview` (frise TIKA).
+- **API** `routes/technical-itineraries.ts`, `repos/technical-itineraries.ts` : liste (filtre activité, actif), fiche (éléments à remplacer, dates d'exemple), création idempotente, modification avec révision (409 + version du serveur), copie, suppression ou désactivation.
+- **Web** `features/itk/` : catalogue `/f/:ferme/itineraries` (accès depuis Activités et depuis l'itinéraire d'une activité), éditeur `/f/:ferme/itineraries/:id` (tableau des étapes, fenêtre d'étape, trier par date, dupliquer, 409 : recharger ou écraser), aperçu TIKA sur des dates d'exemple modifiables.
+- **Tests** : domaine `itk.test.ts` (7), API `technical-itineraries.integration.test.ts` (6), web `itk-editor.test.tsx`, e2e `itk.spec.ts`.
+
+**Écarts avec la conception** :
+- Préfixe `Itk` pour les types : `ItineraryStep` et `TechnicalItinerary` désignent déjà la frise TIKA (`contracts/itinerary.ts`).
+- Procédures acceptées : catalogue Fourmy **et** codes repris d'Ekylibre ayant un libellé officiel (`PROCEDURE_LABELS`), pour que les ITK proposés depuis l'historique (IT2) gardent les procédures reprises ; l'entretien du matériel est refusé. Un intrant doit être d'une nature acceptée par la procédure.
+- Références : un article, matériel, intervenant ou attelage type doit être de la ferme, sauf s'il figurait déjà dans la version enregistrée (supprimé depuis : gardé, « à remplacer »).
+- Suppression : « utilisé » = cité par un brouillon d'assolement, une version validée ou une production (`attrs.itineraryId`) ; l'ITK est alors désactivé, sinon supprimé. La réponse dit lequel (`{ deleted }`).
+- Dates d'exemple de l'aperçu : dates types Lexicon de la production de l'ITK, sinon de celle de l'activité, ramenées à l'an prochain ; à défaut 15/10 → 10/07.
+- `ItineraryView` accepte `onIntervention` (clic sur une étape de l'aperçu) et `hint`.
+- Purposes (motifs de traitement) : gardés dans le document, pas encore saisissables dans la fenêtre d'étape (IT3, avec les contrôles phyto de la génération).

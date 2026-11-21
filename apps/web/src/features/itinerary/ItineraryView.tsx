@@ -18,6 +18,8 @@ export function ItineraryView({
   onView,
   toolbar,
   onGroup,
+  onIntervention,
+  hint,
 }: {
   itinerary: TechnicalItinerary;
   view: ItineraryChartView;
@@ -26,6 +28,10 @@ export function ItineraryView({
   toolbar?: React.ReactNode;
   /** Marque regroupant plusieurs interventions (vue fusionnée) : à l'écran de décider. */
   onGroup?: (ref: TikaRef) => void;
+  /** Clic sur une marque, à la place de l'ouverture de l'intervention (aperçu d'un ITK). */
+  onIntervention?: (ref: TikaRef) => void;
+  /** Phrase d'aide sous la barre, à la place de celle des interventions. */
+  hint?: string;
 }) {
   const farm = useFarm();
   const navigate = useNavigate();
@@ -33,6 +39,7 @@ export function ItineraryView({
   const marks = itinerary.steps.reduce((n, s) => n + s.marks.length, 0);
 
   const open = (ref: TikaRef) => {
+    if (onIntervention) return onIntervention(ref);
     if (ref.interventionIds.length === 1) navigate(`/f/${farm.id}/interventions/${ref.interventionIds[0]}`);
     else onGroup?.(ref);
   };
@@ -57,7 +64,7 @@ export function ItineraryView({
       ) : (
         <>
           <Text size="xs" c="dimmed" mb="xs">
-            {marks} intervention{marks > 1 ? "s" : ""} : travaux au-dessus de la culture, intrants au-dessous. Cliquez sur une intervention pour ouvrir sa fiche.
+            {hint ?? `${marks} intervention${marks > 1 ? "s" : ""} : travaux au-dessus de la culture, intrants au-dessous. Cliquez sur une intervention pour ouvrir sa fiche.`}
           </Text>
           <div style={{ background: "#ffffff", color: "#212529", borderRadius: 4, padding: 8 }}>
             <TikaChart system={system} onIntervention={open} />
