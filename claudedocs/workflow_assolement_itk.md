@@ -394,3 +394,27 @@ Sur le serveur : même commande au déploiement, sur accord.
 **Constats de la recette locale** :
 - Capacité des pointes : 48 personnes actives sur la ferme pilote (reprise Ekylibre) ; la capacité est donc surestimée (point 138).
 - Sans siège localisé, les trajets ne sont pas comptés, et c'est signalé.
+
+### Recette dans Chrome et corrections (21/11/2026)
+
+Recette des écrans du temps 2 sur les deux fermes de test, base de développement, dans Chrome.
+
+**Défauts corrigés** :
+- **Interventions prévues refusées** (16 sur 91 chez l'exploitant testeur) : la génération envoyait l'unité de la dose (`kilogram`, `liter`), mais les articles repris d'Ekylibre ont un libellé (« Kilogramme », « Litre ») et la saisie d'un phyto exige l'unité de l'article. Correction : la dose est écrite dans l'unité de l'article quand elle s'y convertit (`convertQuantity`, densité) ; les semences gardent la leur. L'empreinte est calculée sur ce qui est écrit, normalisé comme à la relecture. Après correction, les 16 sont créées et les 75 déjà créées restent « à jour ».
+- **Barème BCMA : lignes décalées d'une colonne** quand un libellé coupé finit par un nombre (« coupe à 7,5 m à 9 », « 120 x 160 »), soit une quinzaine de lignes (presses, moissonneuses, désileuse). Correction : les colonnes sont découpées sur deux espaces ou plus, et les 7 nombres sont les 7 dernières cellules numériques. CSV et module régénérés (toujours 1 082 matériels) ; tests : aucun prix d'achat < 200 €, aucun débit à l'hectare > 50 ha/h.
+- **Type de matériel du barème choisi dans une étape** : compté seulement après enregistrement et rechargement. Correction : la ligne choisie est ajoutée au contexte de l'éditeur, et le contexte du temps de travaux est invalidé à l'enregistrement d'un ITK.
+- **« Type choisi »** à la réouverture : remplacé par le nom de la ligne (contexte et choix courant).
+
+**Défauts du temps 1 corrigés** :
+- **Conflit à « Valider… »** juste après un geste : la validation attend la sauvegarde en cours, et la révision est mise à jour sans attendre le rendu.
+- **« Sans culture » perdu une fois validé** : les parcelles sans culture de la dernière version validée sont reprises dans le brouillon (assolement validé, réouverture), tant qu'elles n'ont pas de culture principale.
+
+**Ergonomie** :
+- Fenêtre d'étape : la liste des procédures ne s'ouvre plus d'elle-même sur une étape existante.
+- Onglet Intrants : 4 colonnes (intrant et source ; besoin et « si besoin » ; disponible = stock − réservé, avec le détail ; à acheter), retour à la ligne des unités, défilement dans le panneau ; stocks négatifs en orange avec un avertissement (comptés pour zéro).
+- Onglet Travaux : message et liens vers les itinéraires dont des étapes n'ont pas de débit ; pas de graphique vide.
+- Aperçu de validation : l'itinéraire de chaque culture ; un changement d'itinéraire est distingué d'un changement de dates.
+
+**Analyse : maïs de l'exploitant testeur, 167 h prévues contre 274 h réalisées en 2026.** Deux saisies reprises d'Ekylibre couvraient plusieurs jours d'un seul tenant, nuits comprises : un hersage de 98,5 h et un semis de 83 h. Les périodes de plus de 24 h sont maintenant écartées du réalisé et leur nombre est affiché. Le réalisé 2026 devient 92,9 h (2 périodes écartées, récoltes de l'ETA sans durée). Il est cohérent avec les 167 h prévues, qui comptent aussi la route, la récolte et la fertilisation.
+
+**Reste** : 414 km de route pour 36 ha, conséquence de la règle « un aller-retour par journée et par parcelle » (limite connue, liée au point 136, chantiers multi-parcelles).

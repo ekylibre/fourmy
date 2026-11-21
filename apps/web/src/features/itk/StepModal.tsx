@@ -13,6 +13,7 @@ import {
   type ArticleKind,
   type ItkAnchor,
   type ItkInput,
+  type ItkMachineryRateInfo,
   type ItkStep,
 } from "@fourmy/contracts";
 import { ARTICLE_KIND_LABELS } from "../../app/labels";
@@ -24,6 +25,8 @@ export interface StepOptions {
   equipments: Option[];
   people: Option[];
   crewTemplates: Option[];
+  /** Lignes du barème déjà connues (libellé du type de matériel choisi). */
+  machineryRates?: Record<string, ItkMachineryRateInfo>;
 }
 
 /** Procédures proposées : catalogue, hors entretien du matériel, groupées par forme. */
@@ -40,6 +43,7 @@ const PROCEDURE_GROUPS = (() => {
     .filter((g) => g.items.length > 0);
 })();
 
+const rateLabel = (r: ItkMachineryRateInfo) => `${r.label}${r.haH ? ` · ${String(r.haH).replace(".", ",")} ha/h` : ""}`;
 const defaultUnit = (kind: ArticleKind) => (kind === "phyto" ? "liter_per_hectare" : "kilogram_per_hectare");
 
 /** « 15/02 » → « 02-15 » ; null si illisible. */
@@ -70,7 +74,8 @@ export function StepModal({
   step: ItkStep | null;
   options: StepOptions;
   readOnly: boolean;
-  onSave: (step: ItkStep) => void;
+  /** `rate` : ligne du barème choisie, pour le calcul avant enregistrement. */
+  onSave: (step: ItkStep, rate?: ItkMachineryRateInfo) => void;
   onClose: () => void;
 }) {
   const [procedure, setProcedure] = useState<string | null>(step?.procedure ?? null);
@@ -91,6 +96,7 @@ export function StepModal({
   // Type de matériel du barème BCMA quand aucun matériel de la ferme n'est désigné (lot IT4, §15.3).
   const [machineryRateId, setMachineryRateId] = useState<string | null>(step?.staffing.machineryRateId ?? null);
   const [rateSearch, setRateSearch] = useState("");
+  const [chosenRate, setChosenRate] = useState<ItkMachineryRateInfo | null>(machineryRateId ? (options.machineryRates?.[machineryRateId] ?? null) : null);
   const noEquipment = !crewTemplateId && equipmentIds.length === 0;
   const rates = useMachineryRates(farmId, procedure, rateSearch, noEquipment && !!procedure);
   const [notes, setNotes] = useState(step?.notes ?? "");
@@ -144,7 +150,7 @@ export function StepModal({
     if (!parsed.success) return setError(parsed.error.issues.map((i) => i.message).join(" "));
     const bad = parsed.data.inputs.find((i) => !itkUnitAllowed(i.unit, i.kind));
     if (bad) return setError(`« ${bad.label} » : unité réservée aux semences.`);
-    onSave(parsed.data);
+    onSave(parsed.data, noEquipment && chosenRate ? chosenRate : undefined);
   };
 
   return (
@@ -159,7 +165,7 @@ export function StepModal({
             searchable
             required
             disabled={readOnly}
-            data-autofocus
+            data-autofocus={step ? undefined : true}
           />
           <TextInput label="Libellé" placeholder={definition?.label ?? "Désherbage d'automne"} value={label} onChange={(e) => setLabel(e.currentTarget.value)} maxLength={120} disabled={readOnly} />
         </Group>
@@ -310,11 +316,17 @@ export function StepModal({
             description="Sans matériel de la ferme (prestation, matériel à acheter) : son débit de référence sert au temps de travaux"
             placeholder="Rechercher : semoir 4 m, pulvérisateur 24 m…"
             data={[
-              ...(machineryRateId && !(rates.data?.items ?? []).some((r) => r.id === machineryRateId) ? [{ value: machineryRateId, label: "Type choisi" }] : []),
-              ...(rates.data?.items ?? []).map((r) => ({ value: r.id, label: `${r.label}${r.haH ? ` · ${String(r.haH).replace(".", ",")} ha/h` : ""}` })),
+              ...(machineryRateId && !(rates.data?.items ?? []).some((r) => r.id === machineryRateId)
+                ? [{ value: machineryRateId, label: chosenRate ? rateLabel(chosenRate) : "Type de matériel du barème" }]
+                : []),
+              ...(rates.data?.items ?? []).map((r) => ({ value: r.id, label: rateLabel(r) })),
             ]}
             value={machineryRateId}
-            onChange={setMachineryRateId}
+            onChange={(v) => {
+              setMachineryRateId(v);
+              setChosenRate(v ? ((rates.data?.items ?? []).find((r) => r.id === v) ?? chosenRate) : null);
+              setRateSearch("");
+            }}
             searchable
             searchValue={rateSearch}
             onSearchChange={setRateSearch}

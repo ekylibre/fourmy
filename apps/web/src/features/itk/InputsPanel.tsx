@@ -64,16 +64,19 @@ export function InputsPanel({ editor, context }: { editor: CropPlanEditor; conte
           </Badge>
         )}
       </Group>
+      {lines.some((l) => (l.stock ?? 0) < 0) && (
+        <Alert color="orange" p="xs">
+          Des stocks sont négatifs (sorties sans entrées, souvent une reprise d'historique) : ils comptent pour zéro dans « à acheter ». Corrigez-les dans Stocks.
+        </Alert>
+      )}
+      <Table.ScrollContainer minWidth={380} type="native">
       <Table verticalSpacing={4} aria-label="Intrants à prévoir">
         <Table.Thead>
           <Table.Tr>
             <Table.Th>Intrant</Table.Th>
             <Table.Th ta="right">Besoin</Table.Th>
-            <Table.Th ta="right">Si besoin</Table.Th>
-            <Table.Th ta="right">Stock</Table.Th>
-            <Table.Th ta="right">Réservé</Table.Th>
+            <Table.Th ta="right">Disponible</Table.Th>
             <Table.Th ta="right">À acheter</Table.Th>
-            <Table.Th>Source</Table.Th>
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
@@ -82,6 +85,7 @@ export function InputsPanel({ editor, context }: { editor: CropPlanEditor; conte
           ))}
         </Table.Tbody>
       </Table>
+      </Table.ScrollContainer>
       <Text size="xs" c="dimmed">
         Stock au {new Date(`${inputs.data!.at}T12:00:00Z`).toLocaleDateString("fr-FR")}, dans l'unité de chaque article ; « réservé » : interventions prévues saisies à la main sur la
         campagne. Un intrant générique ou un apport du plan sans engrais choisi n'est pas comparé au stock.
@@ -94,48 +98,66 @@ function KindRows({ label, lines }: { label: string; lines: InputNeedLine[] }) {
   return (
     <>
       <Table.Tr>
-        <Table.Td colSpan={7} bg="var(--mantine-color-default-hover)">
+        <Table.Td colSpan={4} bg="var(--mantine-color-default-hover)">
           <Text size="sm" fw={600}>
             {label}
           </Text>
         </Table.Td>
       </Table.Tr>
-      {lines.map((l) => (
-        <Table.Tr key={`${l.articleId ?? l.label}|${l.unit}`}>
-          <Table.Td>
-            <Group gap={6} wrap="nowrap">
-              <Text size="sm" c={l.articleId ? undefined : "dimmed"}>
-                {l.label}
+      {lines.map((l) => {
+        const negative = (l.stock ?? 0) < 0;
+        const available = l.stock === null ? null : Math.max(0, l.stock) - (l.reserved ?? 0);
+        return (
+          <Table.Tr key={`${l.articleId ?? l.label}|${l.unit}`}>
+            <Table.Td>
+              <Group gap={6} wrap="wrap">
+                <Text size="sm" c={l.articleId ? undefined : "dimmed"}>
+                  {l.label}
+                </Text>
+                {l.unconvertible && (
+                  <Badge size="xs" color="orange" variant="light">
+                    non converti
+                  </Badge>
+                )}
+              </Group>
+              <Text size="xs" c="dimmed">
+                {l.sources.map((s) => SOURCE[s]).join(", ")}
               </Text>
-              {l.unconvertible && (
-                <Badge size="xs" color="orange" variant="light">
-                  non converti
-                </Badge>
+            </Table.Td>
+            <Table.Td ta="right" className="lv-num">
+              {l.needed ? qty(l.needed, l.unit) : "—"}
+              {l.optional > 0 && (
+                <Text size="xs" c="dimmed">
+                  + {qty(l.optional, l.unit)} si besoin
+                </Text>
               )}
-            </Group>
-          </Table.Td>
-          <Table.Td ta="right" className="lv-num">
-            {l.needed ? qty(l.needed, l.unit) : "—"}
-          </Table.Td>
-          <Table.Td ta="right" className="lv-num">
-            {l.optional ? qty(l.optional, l.unit) : ""}
-          </Table.Td>
-          <Table.Td ta="right" className="lv-num">
-            {l.stock === null ? "" : qty(l.stock, l.unit)}
-          </Table.Td>
-          <Table.Td ta="right" className="lv-num">
-            {l.reserved ? qty(l.reserved, l.unit) : ""}
-          </Table.Td>
-          <Table.Td ta="right" className="lv-num">
-            {l.toBuy === null ? "" : l.toBuy > 0 ? <Text span c="brique" fw={600} inherit>{qty(l.toBuy, l.unit)}</Text> : "couvert"}
-          </Table.Td>
-          <Table.Td>
-            <Text size="xs" c="dimmed">
-              {l.sources.map((s) => SOURCE[s]).join(", ")}
-            </Text>
-          </Table.Td>
-        </Table.Tr>
-      ))}
+            </Table.Td>
+            <Table.Td ta="right" className="lv-num">
+              {available === null ? (
+                ""
+              ) : (
+                <Text size="sm" inherit c={negative ? "orange" : undefined} title={`Stock ${qty(l.stock!, l.unit)}${l.reserved ? `, réservé ${qty(l.reserved, l.unit)}` : ""}`}>
+                  {qty(Math.max(0, available), l.unit)}
+                  {(negative || l.reserved) && (
+                    <Text size="xs" c={negative ? "orange" : "dimmed"}>
+                      {negative ? `stock ${qty(l.stock!, l.unit)}` : `réservé ${qty(l.reserved!, l.unit)}`}
+                    </Text>
+                  )}
+                </Text>
+              )}
+            </Table.Td>
+            <Table.Td ta="right" className="lv-num">
+              {l.toBuy === null ? "" : l.toBuy > 0 ? (
+                <Text span c="brique" fw={600} inherit>
+                  {qty(l.toBuy, l.unit)}
+                </Text>
+              ) : (
+                "couvert"
+              )}
+            </Table.Td>
+          </Table.Tr>
+        );
+      })}
     </>
   );
 }

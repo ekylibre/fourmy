@@ -12,6 +12,7 @@ import {
   unitLabel,
   type ArticleKind,
   type ItkDetail,
+  type ItkMachineryRateInfo,
   type ItkStep,
   type ItkSystem,
   type ItkWrite,
@@ -66,7 +67,10 @@ function Editor({ detail, owner, refetch }: { detail: ItkDetail; owner: boolean;
   const crews = useCrewTemplates(farm.id);
   // Débits et heures par hectare (lot IT4) : même contexte que l'assolement, sans les trajets.
   const work = useItkWorkContext(farm.id, detail.example.year, { routes: false });
-  const perHa = useMemo(() => (work.data ? new Map(itkPerHectare({ steps: form.steps }, work.data).map((x) => [x.stepId, x])) : null), [work.data, form.steps]);
+  // Lignes du barème choisies dans une étape et pas encore enregistrées : comptées tout de suite.
+  const [extraRates, setExtraRates] = useState<Record<string, ItkMachineryRateInfo>>({});
+  const workCtx = useMemo(() => (work.data ? { ...work.data, machineryRates: { ...work.data.machineryRates, ...extraRates } } : null), [work.data, extraRates]);
+  const perHa = useMemo(() => (workCtx ? new Map(itkPerHectare({ steps: form.steps }, workCtx).map((x) => [x.stepId, x])) : null), [workCtx, form.steps]);
   const totalPerHa = perHa ? [...perHa.values()].reduce((s, x) => s + (x.hoursPerHa ?? 0), 0) : 0;
   const unknownRates = perHa ? [...perHa.values()].filter((x) => !x.rate).length : 0;
 
@@ -84,8 +88,9 @@ function Editor({ detail, owner, refetch }: { detail: ItkDetail; owner: boolean;
       equipments: (equipments.data?.items ?? []).filter((e) => !e.state || e.state === "active").map((e) => ({ value: e.id, label: e.name })),
       people: (people.data?.items ?? []).filter((p) => p.active).map((p) => ({ value: p.id, label: p.name })),
       crewTemplates: (crews.data?.items ?? []).filter((t) => t.active).map((t) => ({ value: t.id, label: t.name })),
+      machineryRates: { ...(work.data?.machineryRates ?? {}), ...extraRates },
     }),
-    [articles.data, equipments.data, people.data, crews.data],
+    [articles.data, equipments.data, people.data, crews.data, work.data, extraRates],
   );
   const names = useMemo(() => {
     const m = new Map<string, string>();
@@ -144,6 +149,8 @@ function Editor({ detail, owner, refetch }: { detail: ItkDetail; owner: boolean;
       setConflict(false);
       queryClient.setQueryData([...itksKey(farm.id), "detail", t.id], t);
       void queryClient.invalidateQueries({ queryKey: [...itksKey(farm.id), "list"] });
+      // Temps de travaux de l'assolement et de l'éditeur : l'ITK a changé.
+      void queryClient.invalidateQueries({ queryKey: ["itk-work", farm.id] });
       notifications.show({ color: "lichen", message: "Itinéraire enregistré." });
     },
     onError: (e) => {
@@ -425,7 +432,8 @@ function Editor({ detail, owner, refetch }: { detail: ItkDetail; owner: boolean;
           options={options}
           readOnly={!owner}
           onClose={() => setEditing(null)}
-          onSave={(step) => {
+          onSave={(step, rate) => {
+            if (rate) setExtraRates((r) => ({ ...r, [rate.id]: rate }));
             setSteps((l) => (editing === "new" ? [...l, step] : l.map((x) => (x.id === step.id ? step : x))));
             setEditing(null);
           }}

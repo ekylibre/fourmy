@@ -465,16 +465,20 @@ export function ChecksPanel({ sections, onSelect }: { sections: ControlSection[]
 const frenchDay = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
 /** Un changement de la validation, en clair. */
-function changeLabel(c: CropPlanChange, names: (key: string) => string, activity: (id: string) => string): string {
+function changeLabel(c: CropPlanChange, names: (key: string) => string, activity: (id: string) => string, itk: (id: string | null | undefined) => string): string {
   switch (c.kind) {
     case "campaign.create":
       return `Campagne ${c.year} créée`;
     case "production.create":
-      return `${names(c.key)} : ${activity(c.after.activityId)}${c.after.role === "secondary" ? " (dérobée)" : ""}`;
-    case "production.update":
-      return c.before.activityId === c.after.activityId
-        ? `${names(c.key)} : ${activity(c.after.activityId)}, dates modifiées`
-        : `${names(c.key)} : ${activity(c.before.activityId)} → ${activity(c.after.activityId)}`;
+      return `${names(c.key)} : ${activity(c.after.activityId)}${c.after.role === "secondary" ? " (dérobée)" : ""}${c.after.itineraryId ? ` · ${itk(c.after.itineraryId)}` : ""}`;
+    case "production.update": {
+      if (c.before.activityId !== c.after.activityId)
+        return `${names(c.key)} : ${activity(c.before.activityId)} → ${activity(c.after.activityId)}${c.after.itineraryId ? ` · ${itk(c.after.itineraryId)}` : ""}`;
+      const parts: string[] = [];
+      if (c.before.startedOn !== c.after.startedOn || c.before.stoppedOn !== c.after.stoppedOn) parts.push("dates modifiées");
+      if ((c.before.itineraryId ?? null) !== (c.after.itineraryId ?? null)) parts.push(c.after.itineraryId ? itk(c.after.itineraryId) : "itinéraire retiré");
+      return `${names(c.key)} : ${activity(c.after.activityId)}, ${parts.join(", ") || "modifiée"}`;
+    }
     case "production.delete":
       return `${names(c.key)} : ${activity(c.before.activityId)} retiré(e)`;
     case "parcel.carry":
@@ -505,12 +509,15 @@ export function ChangeList({ changes, editor, context }: { changes: CropPlanChan
     editor.draft.operations.flatMap((o) => (o.kind === "split" ? o.pieces : [o.result])).find((p) => p.key === key)?.name ??
     key;
   const activity = (id: string) => editor.activities.get(id)?.name ?? "activité inconnue";
+  const farm = useFarm();
+  const itks = useItks(farm.id);
+  const itk = (id: string | null | undefined) => `itinéraire « ${(itks.data?.items ?? []).find((t) => t.id === id)?.name ?? "…"} »`;
   if (!changes.length) return <Text size="sm">Aucun changement.</Text>;
   return (
     <Stack gap={2} aria-label="Changements">
       {changes.map((c, i) => (
         <Text key={i} size="sm">
-          {changeLabel(c, names, activity)}
+          {changeLabel(c, names, activity, itk)}
         </Text>
       ))}
     </Stack>

@@ -10,6 +10,14 @@ describe("barème BCMA", () => {
     for (const r of MACHINERY_RATES) expect(r.label).not.toMatch(/\s{2}|[-]/);
   });
 
+  it("libellé qui finit par un nombre : colonnes non décalées (recette du 21/11)", () => {
+    const combine = MACHINERY_RATES.find((r) => r.label.startsWith("Mois-bat coup 420"))!;
+    expect(combine).toMatchObject({ label: "Mois-bat coup 420 non conventionnelle coupe à 7,5 m à 9 m occasion", purchasePrice: 188100, annualUse: 350, performancePerH: 3.15 });
+    // Aucun prix d'achat absurde (une colonne décalée y mettait un morceau de libellé).
+    expect(MACHINERY_RATES.filter((r) => r.purchasePrice < 200).map((r) => r.label)).toEqual([]);
+    expect(MACHINERY_RATES.filter((r) => r.unit === "hectares" && r.performancePerH > 50).map((r) => r.label)).toEqual([]);
+  });
+
   it("libellés coupés recollés, largeur lue", () => {
     const drill = MACHINERY_RATES.find((r) => r.label === "Semoir céréal cannelures ou ergots gravitaire 4 m")!;
     expect(drill).toMatchObject({ family: "Semis", unit: "hectares", widthM: 4, performancePerH: 1.8, purchasePrice: 15250 });

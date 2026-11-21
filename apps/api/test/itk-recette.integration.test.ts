@@ -79,4 +79,26 @@ describe.skipIf(!url)("recette : besoins en semences et utilisation des semences
     expect(group.planned.stockQuantity).toBeCloseTo(need.needed, 3);
     expect(group.planned.kg).toBeCloseTo(2250, 3);
   });
+
+  it("phyto en unité reprise (« Litre ») : intervention créée dans l'unité de l'article, puis « à jour » (recette du 21/11)", async () => {
+    const phyto = crypto.randomUUID();
+    await sql`INSERT INTO articles (id, farm_id, name, kind, unit) VALUES (${phyto}, ${farmId}, 'Choriste', 'phyto', 'Litre')`;
+    const current = await (await send("GET", `/technical-itineraries/${itk}`)).json();
+    const steps = [
+      ...current.content.steps,
+      { id: crypto.randomUUID(), procedure: "spraying", anchor: { kind: "sowing", offsetDays: 30 }, inputs: [{ articleId: phyto, kind: "phyto", label: "Choriste", dose: 0.75, unit: "liter_per_hectare" }] },
+    ];
+    const put = await send("PUT", `/technical-itineraries/${itk}`, { revision: current.revision, name: current.name, activityId: wheat, content: { schema: 1, steps } });
+    expect(put.status).toBe(200);
+    const preview = await (await send("POST", "/planned-interventions/2027/preview", {})).json();
+    const sprays = preview.items.filter((i: { procedure: string }) => i.procedure === "spraying");
+    expect(sprays.map((i: { state: string }) => i.state)).toEqual(["create", "create"]);
+    const confirmed = await (await send("POST", "/planned-interventions/2027", { previewHash: preview.previewHash, accepted: sprays.map((i: { key: string }) => i.key) })).json();
+    expect(confirmed).toMatchObject({ created: 2, failed: [] });
+    const [input] = await sql`SELECT p.quantity::float8 AS q, p.unit FROM intervention_parameters p JOIN interventions i ON i.id = p.intervention_id
+                              WHERE i.farm_id = ${farmId} AND p.role = 'input' AND p.ref_id = ${phyto} LIMIT 1`;
+    expect(input).toEqual({ q: 0.75, unit: "Litre_per_hectare" });
+    const again = await (await send("POST", "/planned-interventions/2027/preview", {})).json();
+    expect(again.items.filter((i: { procedure: string }) => i.procedure === "spraying").map((i: { state: string }) => i.state)).toEqual(["same", "same"]);
+  });
 });

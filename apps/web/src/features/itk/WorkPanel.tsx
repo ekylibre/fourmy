@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { Alert, Badge, Group, Loader, Paper, SimpleGrid, Stack, Table, Text, Title } from "@mantine/core";
 import { BarChart } from "@mantine/charts";
 import { WORK_RATE_SOURCE_LABELS, getProcedure, type CropPlanContext, type WorkRateSource } from "@fourmy/contracts";
-import { workload, type WorkloadItem, type WorkloadLine } from "@fourmy/domain";
+import { resolveWorkRate, workload, type WorkloadItem, type WorkloadLine } from "@fourmy/domain";
 import { useFarm } from "../../app/farm";
 import type { CropPlanEditor } from "../crop-plan/useCropPlanEditor";
 import { fmtH, useItkWorkContext } from "./work";
@@ -64,6 +64,10 @@ export function WorkPanel({ editor, context }: { editor: CropPlanEditor; context
       </Alert>
     );
   const over = result.weeks.filter((w) => w.over);
+  // Itinéraires de l'assolement dont des étapes n'ont pas de débit : à compléter.
+  const toComplete = [...new Set(items.map((i) => i.itineraryId))]
+    .map((id) => q.data!.itineraries[id])
+    .filter((t): t is NonNullable<typeof t> => !!t && t.content.steps.some((st) => !resolveWorkRate(st, q.data!)));
   const sources = Object.entries(result.rateSources) as [WorkRateSource, number][];
   return (
     <Stack gap="sm" aria-label="Temps de travaux">
@@ -102,6 +106,21 @@ export function WorkPanel({ editor, context }: { editor: CropPlanEditor; context
           </Badge>
         )}
       </Group>
+      {toComplete.length > 0 && (
+        <Alert color={result.fieldH === 0 ? "orange" : "gray"} p="xs" title={result.fieldH === 0 ? "Aucun débit de chantier connu" : undefined}>
+          <Text size="sm">
+            {result.fieldH === 0 ? "Rien ne peut être compté : " : "Des étapes ne sont pas comptées : "}
+            complétez dans l'itinéraire les matériels (rattachés au barème sur leur fiche), un type de matériel du barème ou un débit saisi.
+          </Text>
+          <Group gap="xs" mt={4}>
+            {toComplete.map((t) => (
+              <Text key={t.id} component={Link} to={`/f/${farm.id}/itineraries/${t.id}`} size="sm" c="lichen">
+                {t.name}
+              </Text>
+            ))}
+          </Group>
+        </Alert>
+      )}
       {!q.data!.site && <Alert color="orange">Siège non localisé (Ma ferme) : les trajets ne sont pas comptés.</Alert>}
       {Object.values(q.data!.routes).some((r) => r.method === "estimate") && (
         <Text size="xs" c="dimmed">
@@ -109,6 +128,7 @@ export function WorkPanel({ editor, context }: { editor: CropPlanEditor; context
         </Text>
       )}
 
+      {result.weeks.length > 0 && (
       <Paper withBorder p="sm">
         <Title order={5} mb="xs">
           Main-d'œuvre par semaine
@@ -130,11 +150,12 @@ export function WorkPanel({ editor, context }: { editor: CropPlanEditor; context
             : `Capacité : ${q.data!.people.length || 1} personne(s) × ${q.data!.settings.weeklyHoursPerPerson} h par semaine.`}
         </Text>
       </Paper>
+      )}
 
       <SimpleGrid cols={{ base: 1, md: 2 }}>
         <Lines title="Par personne" lines={result.byPerson} />
         <Lines title="Par matériel" lines={result.byEquipment} />
-        <ByActivity lines={result.byActivity} previous={q.data!.previousHoursByActivity ?? {}} year={context.year} />
+        <ByActivity lines={result.byActivity} previous={q.data!.previousHoursByActivity ?? {}} excluded={q.data!.previousExcludedPeriods ?? {}} year={context.year} />
         <Lines title="Par intervention" lines={result.byProcedure} />
       </SimpleGrid>
       <Text size="xs" c="dimmed">
@@ -177,7 +198,8 @@ function Lines({ title, lines }: { title: string; lines: WorkloadLine[] }) {
 }
 
 /** Par activité : heures prévues, et heures réalisées de la campagne précédente quand il y en a (lot IT6). */
-function ByActivity({ lines, previous, year }: { lines: WorkloadLine[]; previous: Record<string, number>; year: number }) {
+function ByActivity({ lines, previous, excluded, year }: { lines: WorkloadLine[]; previous: Record<string, number>; excluded: Record<string, number>; year: number }) {
+  const dropped = lines.reduce((s, l) => s + (l.id ? (excluded[l.id] ?? 0) : 0), 0);
   const any = lines.some((l) => l.id && previous[l.id]);
   return (
     <Paper withBorder p="sm">
@@ -212,6 +234,11 @@ function ByActivity({ lines, previous, year }: { lines: WorkloadLine[]; previous
           ))}
         </Table.Tbody>
       </Table>
+      {dropped > 0 && (
+        <Text size="xs" c="dimmed" mt={4}>
+          Réalisé : {dropped} période(s) de plus de 24 h écartée(s) (chantier saisi du premier au dernier jour, nuits comprises).
+        </Text>
+      )}
     </Paper>
   );
 }

@@ -441,8 +441,17 @@ async function existingCovers(tx: Tx, year: number): Promise<ExistingCover[]> {
 async function liveDraft(tx: Tx, year: number): Promise<CropPlanDraft> {
   const prods = await existingProductions(tx, year);
   const covers = await existingCovers(tx, year);
+  // « Sans culture » n'est pas une production : repris de la dernière version validée, pour les parcelles toujours sans culture principale.
+  const [last] = await rows<{ fallow: CropPlanDraft["fallow"] | null }>(
+    tx,
+    sql`SELECT v.snapshot->'fallow' AS fallow FROM crop_plan_versions v JOIN crop_plans p ON p.id = v.plan_id
+        WHERE p.year = ${year} ORDER BY v.version DESC LIMIT 1`,
+  );
+  const withMain = new Set(prods.filter((p) => p.role === "main").map((p) => parcelKeyOf(p.landParcelId)));
+  const fallow = (last?.fallow ?? []).filter((f) => !withMain.has(f.key));
   return {
     ...emptyDraft(year),
+    fallow,
     covers: covers.map((c) => ({
       id: c.id,
       key: parcelKeyOf(c.landParcelId),

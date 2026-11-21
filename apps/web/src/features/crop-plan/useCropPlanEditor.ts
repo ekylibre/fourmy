@@ -134,11 +134,16 @@ export function useCropPlanEditor(farmId: string, year: number, plan: CropPlanVi
   // Sauvegarde au fil de l'eau.
   const revisionRef = useRef(revision);
   revisionRef.current = revision;
+  // Sauvegarde en cours : « Valider… » l'attend (sinon la révision envoyée serait périmée, 409).
+  const inflight = useRef<Promise<void> | null>(null);
   const save = useCallback(
-    async (d: CropPlanDraft) => {
+    (d: CropPlanDraft) => {
+      const run = (async () => {
       setSaveState("saving");
       try {
         const saved = await api.put<CropPlanView>(farmPath(farmId, `/crop-plans/${year}/draft`), { revision: revisionRef.current, draft: d });
+        // Révision à jour tout de suite, sans attendre le prochain rendu.
+        revisionRef.current = saved.revision;
         setRevision(saved.revision);
         dirty.current = false;
         setSaveState((s) => (s === "saving" ? "saved" : s));
@@ -151,6 +156,11 @@ export function useCropPlanEditor(farmId: string, year: number, plan: CropPlanVi
           setSaveError(err instanceof Error ? err.message : String(err));
         }
       }
+      })();
+      inflight.current = run;
+      return run.finally(() => {
+        if (inflight.current === run) inflight.current = null;
+      });
     },
     [farmId, year],
   );
@@ -171,6 +181,7 @@ export function useCropPlanEditor(farmId: string, year: number, plan: CropPlanVi
   }, [farmId, year, draft, save]);
   /** Enregistre tout de suite (avant la validation). */
   const flush = useCallback(async () => {
+    if (inflight.current) await inflight.current;
     if (dirty.current) await save(draft);
     return revisionRef.current;
   }, [draft, save]);

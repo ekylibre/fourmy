@@ -390,6 +390,8 @@ export interface ItkWorkContext {
   rateSource: string;
   /** Heures réalisées de la campagne précédente par activité (lot IT6, écart prévu / réalisé). */
   previousHoursByActivity?: Record<string, number>;
+  /** Périodes de plus de 24 h écartées de ces heures réalisées, par activité. */
+  previousExcludedPeriods?: Record<string, number>;
 }
 
 // ---------------------------------------------------------------------------
