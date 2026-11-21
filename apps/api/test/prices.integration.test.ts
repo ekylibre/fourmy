@@ -107,6 +107,9 @@ describe.skipIf(!url)("prix de la ferme (intégration)", () => {
       const eco2 = await (await send(worker, "GET", "/crop-plans/2027/eco-context")).json();
       expect(eco2.activities.find((i: { activityId: string }) => i.activityId === grain).price).toMatchObject({ value: 190, source: "farm", label: "prix de la ferme" });
       expect((await send(worker, "GET", "/crop-plans/abc/eco-context")).status).toBe(400);
+      // Campagne précédente (lot E5) : ferme sans historique, rien de réalisé.
+      expect(await (await send(worker, "GET", "/crop-plans/2027/eco-previous")).json()).toEqual({ year: 2026, productions: [], works: [], articles: {} });
+      expect((await send(worker, "GET", "/crop-plans/abc/eco-previous")).status).toBe(400);
     } finally {
       await sql`DELETE FROM lexicon_production_prices WHERE specie = 'zz_specie'`;
       await sql`DELETE FROM lexicon_market_prices WHERE specie = 'zz_specie'`;

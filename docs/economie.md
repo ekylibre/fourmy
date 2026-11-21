@@ -121,3 +121,27 @@ figure dans **À compléter**, avec les hectares concernés et un lien vers
 l'onglet du module Économique où saisir le prix. Une culture sans itinéraire
 technique n'a que son produit.
 
+### Comparaison avec la campagne précédente
+
+Sous le tableau, les colonnes **Marge directe N-1** et **Écart** comparent
+chaque activité au **réalisé** de la campagne précédente ; le détail du
+réalisé (mêmes postes, ses propres manques) s'ouvre dessous. Réalisé
+simplifié :
+
+- produit : rendement des récoltes enregistrées × surface × prix de vente de
+  la ferme à la fin de la campagne (sinon le prix par défaut) ;
+- charges opérationnelles : intrants des interventions réalisées, convertis
+  dans l'unité du stock, au prix en vigueur le jour de l'intervention ;
+- mécanisation : matériels des interventions, à leur prix propre ou au barème
+  BCMA (à l'hectare travaillé, ou à l'heure) ;
+- main-d'œuvre : heures des interventions (périodes de plus de 24 h écartées)
+  × intervenants × coût horaire du jour.
+
+Une intervention saisie à la date seule, sans heures, rend la main-d'œuvre
+(et la mécanisation à l'heure) incomplète ; une culture sans récolte
+enregistrée, le produit. La jachère n'attend ni récolte ni prix.
+
+Limite : la comparaison avec le **prévu** de la campagne précédente (son
+assolement validé avec des itinéraires) n'est pas encore faite ; seule la
+comparaison avec le réalisé l'est.
+
