@@ -5,7 +5,7 @@ import { Alert, Badge, Button, ColorInput, Group, Menu, Modal, MultiSelect, Pape
 import { useDebouncedValue } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChartGantt, LayoutGrid, Map as MapIcon, Pencil, Plus } from "lucide-react";
+import { ChartGantt, LayoutGrid, Map as MapIcon, Pencil, Plus, Route } from "lucide-react";
 import { ACTIVITY_FAMILIES, ACTIVITY_FAMILY_LABELS, PARCEL_FAMILIES, PLANT_FAMILIES, type Activity, type ActivityFamily, type ReferenceProduction } from "@fourmy/contracts";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useAt } from "../../app/at";
@@ -93,6 +93,9 @@ export function ActivitiesPage() {
             checked={activeOnly}
             onChange={(e) => setActiveOnly(e.currentTarget.checked)}
           />
+          <Button component={Link} to={`/f/${farm.id}/itineraries`} variant="default" leftSection={<Route size={16} />}>
+            Itinéraires techniques
+          </Button>
           <CropPlanMenu farmId={farm.id} year={year} owner={owner} />
           {owner && (
             <Button leftSection={<Plus size={16} />} onClick={() => setEditing("new")}>

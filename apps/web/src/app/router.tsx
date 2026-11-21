@@ -20,6 +20,8 @@ import { SeedsPage } from "../features/seeds/SeedsPage";
 import { FertilizationPage } from "../features/fertilization/FertilizationPage";
 import { ActivitiesPage } from "../features/activities/ActivitiesPage";
 import { CropPlanPage } from "../features/crop-plan/CropPlanPage";
+import { ItinerariesPage } from "../features/itk/ItinerariesPage";
+import { ItineraryEditorPage } from "../features/itk/ItineraryEditorPage";
 import { EquipmentsPage } from "../features/equipments/EquipmentsPage";
 import { EquipmentSheetPage } from "../features/equipments/EquipmentSheetPage";
 import { CrewTemplatesPage } from "../features/equipments/CrewTemplatesPage";
@@ -201,6 +203,8 @@ const pages = [
       { path: "fertilization/plans/:planId", element: <Suspense fallback={<Loading />}><PlanPage /></Suspense> },
       { path: "activities", element: <ActivitiesPage /> },
       { path: "crop-plan/:year", element: <CropPlanPage /> },
+      { path: "itineraries", element: <ItinerariesPage /> },
+      { path: "itineraries/:itineraryId", element: <ItineraryEditorPage /> },
       { path: "activities/:activityId/itinerary", element: <Suspense fallback={<Loading />}><ActivityItineraryPage /></Suspense> },
       { path: "equipments", element: <EquipmentsPage /> },
       { path: "equipments/crew-templates", element: <CrewTemplatesPage /> },

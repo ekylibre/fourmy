@@ -1,0 +1,198 @@
+import { z } from "zod";
+import { uuid } from "./primitives.js";
+import { PROCEDURE_LABELS, articleKind, getProcedure, treatmentPurpose, type ArticleKind } from "./procedures.js";
+
+/**
+ * Itinéraires techniques de la ferme (ITK), assolement temps 2
+ * (claudedocs/conception_assolement_itk.md §4.2, lot IT1). Un ITK est une
+ * suite d'étapes prévisionnelles datées par rapport au semis, à la récolte ou
+ * à une date fixe, avec intrants et doses à l'hectare, matériels et débit.
+ * Préfixe `Itk` : `ItineraryStep` désigne déjà l'étape de la frise TIKA.
+ */
+
+const monthDay = z.string().regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, "Date au format MM-JJ");
+
+/** Ancre d'une étape : J±n du semis ou de la récolte, ou date fixe (année de récolte, ou celle d'avant). */
+export const itkAnchor = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("sowing"), offsetDays: z.number().int().min(-366).max(730) }),
+  z.object({ kind: z.literal("harvest"), offsetDays: z.number().int().min(-366).max(366) }),
+  z.object({ kind: z.literal("date"), monthDay, yearOffset: z.union([z.literal(-1), z.literal(0)]) }),
+]);
+export type ItkAnchor = z.infer<typeof itkAnchor>;
+
+/** Unités de dose (par surface traitée). Grains, doses et milliers : semences seulement. */
+export const ITK_DOSE_UNITS = [
+  "kilogram_per_hectare",
+  "liter_per_hectare",
+  "quintal_per_hectare",
+  "ton_per_hectare",
+  "cubic_meter_per_hectare",
+  "unity_per_hectare",
+  "grain_per_square_meter",
+  "grain_per_hectare",
+  "thousand_per_hectare",
+  "dose_per_hectare",
+] as const;
+const SEED_ONLY_UNITS = new Set(["grain_per_square_meter", "grain_per_hectare", "thousand_per_hectare", "dose_per_hectare"]);
+
+export function itkUnitAllowed(unit: string, kind: ArticleKind): boolean {
+  return (ITK_DOSE_UNITS as readonly string[]).includes(unit) && (kind === "seed" || !SEED_ONLY_UNITS.has(unit));
+}
+
+export const itkInput = z.object({
+  /** Article de la ferme ; absent pour un intrant générique (« Azote 40 u »). */
+  articleId: uuid.optional(),
+  kind: articleKind,
+  label: z.string().trim().min(1, "Libellé de l'intrant obligatoire.").max(120),
+  dose: z.number().positive("Dose positive.").max(1_000_000),
+  unit: z.enum(ITK_DOSE_UNITS),
+});
+export type ItkInput = z.infer<typeof itkInput>;
+
+/** Preuves d'une étape proposée depuis l'historique (lot IT2), gardées pour l'affichage. */
+export const itkEvidence = z.object({
+  parcels: z.number().int().nonnegative(),
+  ofParcels: z.number().int().nonnegative(),
+  campaigns: z.array(z.number().int()),
+  from: z.string().optional(),
+  to: z.string().optional(),
+  note: z.string().max(300).optional(),
+});
+export type ItkEvidence = z.infer<typeof itkEvidence>;
+
+export const itkStep = z.object({
+  /** Stable : sert à l'idempotence de la génération des interventions prévues (lot IT3). */
+  id: uuid,
+  procedure: z.string().min(1).max(80),
+  label: z.string().trim().max(120).optional(),
+  anchor: itkAnchor,
+  /** Plage de réalisation ± n jours. */
+  windowDays: z.number().int().min(0).max(90).optional(),
+  repeat: z.object({ count: z.number().int().min(1).max(20), everyDays: z.number().int().min(1).max(365) }).optional(),
+  /** Part de la surface concernée (0 à 1). */
+  share: z.number().gt(0, "Part supérieure à 0.").max(1, "Part au plus 100 %.").default(1),
+  /** « Si besoin » : proposée décochée, comptée à part. */
+  optional: z.boolean().default(false),
+  purposes: z.array(treatmentPurpose).max(10).optional(),
+  inputs: z.array(itkInput).max(20).default([]),
+  staffing: z
+    .object({
+      crewTemplateId: uuid.optional(),
+      equipmentIds: z.array(uuid).max(20).default([]),
+      personIds: z.array(uuid).max(20).default([]),
+      /** Nombre de personnes quand aucune n'est nommée. */
+      people: z.number().int().min(0).max(50).optional(),
+      /** Type de matériel du barème BCMA quand aucun matériel de la ferme n'est désigné (lot IT4). */
+      machineryRateId: z.string().max(80).optional(),
+    })
+    .default({ equipmentIds: [], personIds: [] }),
+  /** Débit saisi, ha/h (décision A15) ; sinon observé ou barème (lot IT4). */
+  workRateHaH: z.number().gt(0).max(200).optional(),
+  notes: z.string().max(1000).optional(),
+  evidence: itkEvidence.optional(),
+});
+export type ItkStep = z.infer<typeof itkStep>;
+export type ItkStepInput = z.input<typeof itkStep>;
+
+/** Procédure acceptée dans un ITK : connue (catalogue ou reprise d'Ekylibre), hors entretien du matériel. */
+export function itkProcedureAllowed(code: string): boolean {
+  const p = getProcedure(code);
+  if (p.legacy && !(code in PROCEDURE_LABELS)) return false;
+  return p.shape !== "maintenance" && p.category !== "equipment";
+}
+
+export const itkContent = z
+  .object({
+    schema: z.literal(1),
+    /** Début du cycle d'un ITK sans semis (pérennes), comme le « Début (jour/mois) » de Lexicon. */
+    startMonthDay: monthDay.optional(),
+    steps: z.array(itkStep).max(80),
+  })
+  .superRefine((c, ctx) => {
+    const ids = new Set<string>();
+    c.steps.forEach((s, i) => {
+      if (ids.has(s.id)) ctx.addIssue({ code: "custom", path: ["steps", i, "id"], message: "Deux étapes portent le même identifiant." });
+      ids.add(s.id);
+      if (!itkProcedureAllowed(s.procedure)) {
+        ctx.addIssue({ code: "custom", path: ["steps", i, "procedure"], message: `Procédure inconnue ou hors itinéraire : ${s.procedure}.` });
+        return;
+      }
+      const p = getProcedure(s.procedure);
+      s.inputs.forEach((input, j) => {
+        if (!p.inputKinds.includes(input.kind))
+          ctx.addIssue({ code: "custom", path: ["steps", i, "inputs", j, "kind"], message: `« ${input.label} » : intrant non accepté par « ${p.label} ».` });
+        else if (!itkUnitAllowed(input.unit, input.kind))
+          ctx.addIssue({ code: "custom", path: ["steps", i, "inputs", j, "unit"], message: `« ${input.label} » : unité réservée aux semences.` });
+      });
+    });
+  });
+export type ItkContent = z.infer<typeof itkContent>;
+
+export const itkSystem = z.enum(["conventional", "organic"]);
+export type ItkSystem = z.infer<typeof itkSystem>;
+export const itkCycle = z.enum(["annual", "perennial"]);
+export const itkOrigin = z.enum(["manual", "history", "copy"]);
+export type ItkOrigin = z.infer<typeof itkOrigin>;
+
+export const ITK_SYSTEM_LABELS: Record<ItkSystem, string> = { conventional: "Conventionnel", organic: "Biologique" };
+export const ITK_ORIGIN_LABELS: Record<ItkOrigin, string> = { manual: "Saisi", history: "Depuis l'historique", copy: "Copie" };
+
+/** Écriture d'un ITK : création (sans révision) ou modification (avec la révision lue). */
+export const itkWrite = z.object({
+  id: uuid.optional(),
+  revision: z.number().int().nonnegative().optional(),
+  name: z.string().trim().min(1, "Nom obligatoire.").max(120),
+  activityId: uuid.nullable().default(null),
+  production: z.string().trim().max(120).nullable().default(null),
+  system: itkSystem.default("conventional"),
+  cycle: itkCycle.default("annual"),
+  origin: itkOrigin.default("manual"),
+  source: z.record(z.string(), z.unknown()).nullable().default(null),
+  notes: z.string().max(2000).nullable().default(null),
+  active: z.boolean().default(true),
+  content: itkContent,
+});
+export type ItkWrite = z.input<typeof itkWrite>;
+export type ItkWriteParsed = z.output<typeof itkWrite>;
+
+/** Élément du document qui n'existe plus (ou plus actif) dans la ferme : à remplacer. */
+export interface ItkMissing {
+  stepId: string;
+  kind: "article" | "equipment" | "person" | "crew_template";
+  id: string;
+  /** Libellé connu (intrant), sinon null. */
+  label: string | null;
+}
+
+export interface ItkSummary {
+  id: string;
+  name: string;
+  activityId: string | null;
+  activityName: string | null;
+  production: string | null;
+  system: ItkSystem;
+  cycle: "annual" | "perennial";
+  origin: ItkOrigin;
+  active: boolean;
+  revision: number;
+  steps: number;
+  procedures: string[];
+  missing: number;
+  updatedAt: string;
+}
+
+export interface ItkDetail extends Omit<ItkSummary, "steps" | "procedures" | "missing"> {
+  source: Record<string, unknown> | null;
+  notes: string | null;
+  content: ItkContent;
+  missing: ItkMissing[];
+  /** Dates d'exemple pour l'aperçu (dates types Lexicon de la production, ramenées à l'an prochain). */
+  example: { sowingOn: string; harvestOn: string; year: number };
+}
+
+/** Réponse 409 : l'ITK a changé depuis sa lecture. */
+export interface ItkConflict {
+  title: string;
+  detail: string;
+  current: ItkDetail;
+}

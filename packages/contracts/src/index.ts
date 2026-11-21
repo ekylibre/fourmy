@@ -37,3 +37,4 @@ export * from "./imports.js";
 export * from "./certification.js";
 export * from "./crop-plan.js";
 export * from "./seeds.js";
+export * from "./technical-itinerary.js";
