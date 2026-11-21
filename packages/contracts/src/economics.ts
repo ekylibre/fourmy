@@ -90,7 +90,7 @@ export const priceKey = (p: Pick<Price, "kind" | "articleId" | "equipmentId" | "
  */
 export interface PriceSuggestion {
   source: PriceSource;
-  scope: "department" | "national" | "matif" | "market";
+  scope: "department" | "national" | "matif" | "market" | "reference";
   label: string;
   amount: number;
   unit: string;
@@ -123,7 +123,18 @@ export const PRICE_SCOPE_LABELS: Record<PriceSuggestion["scope"], string> = {
   national: "prix producteur France",
   matif: "MATIF",
   market: "marché européen",
+  reference: "prix de référence",
 };
+
+/** Repères Lexicon des intrants de la ferme (point 142) : prix de référence Cereapro et Germineo. */
+export interface ArticleSuggestions {
+  items: {
+    articleId: string;
+    /** Référence rattachée (« Ammonitrate 33.5 », « Avoine ») et comment (AMM, variante, composition, espèce). */
+    match: string;
+    suggestions: PriceSuggestion[];
+  }[];
+}
 
 /** Origine d'une valeur prévue (rendement, prix) : saisie dans l'assolement ou défaut calculé. */
 export type ForecastSource = "plan" | "farm" | "agreste" | "agrifood" | "lexicon";

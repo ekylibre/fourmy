@@ -97,4 +97,36 @@ describe("module Économique", () => {
       expect.objectContaining({ kind: "product", product: "principal", amount: 201.5, unit: "ton", source: "lexicon", sourceRef: "eu_market_prices:MAI_FR", sourceDate: "2026-04-13" }),
     ]);
   });
+
+  it("intrants : prix de référence Lexicon, « Reprendre » garde la source", async () => {
+    const posted: { items: Record<string, unknown>[] }[] = [];
+    server.use(
+      http.get("*/prices/suggestions/articles", () =>
+        HttpResponse.json({
+          items: [
+            {
+              articleId: "00000000-0000-7000-8000-000000000301",
+              match: "Fongicide X (AMM 2000003)",
+              suggestions: [{ source: "lexicon", scope: "reference", label: "Fongicide X · Cereapro, oct. 2026", amount: 18, unit: "liter", date: "2026-10-01", ref: "input_prices:p:2000003_liter_2026-10" }],
+            },
+          ],
+        }),
+      ),
+      http.post("*/prices", async ({ request }) => {
+        posted.push((await request.json()) as (typeof posted)[number]);
+        return HttpResponse.json({ items: [] }, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(`/f/${FARM}/economics?tab=article`);
+    const table = await screen.findByRole("table", { name: "Intrant" }, { timeout: 10_000 });
+    expect(await within(table).findByText("Référence : Fongicide X (AMM 2000003)")).toBeInTheDocument();
+    expect(screen.getByText(/Prix de référence relevés par Cereapro et Germineo/)).toBeInTheDocument();
+    await user.click(within(table).getByRole("button", { name: "Reprendre prix de référence pour Fongicide X" }));
+    await user.click(screen.getByRole("button", { name: "Enregistrer (1)" }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]!.items).toEqual([
+      expect.objectContaining({ kind: "article", amount: 18, unit: "liter", source: "lexicon", sourceRef: "input_prices:p:2000003_liter_2026-10", sourceDate: "2026-10-01" }),
+    ]);
+  });
 });

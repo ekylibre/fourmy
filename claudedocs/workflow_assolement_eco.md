@@ -129,3 +129,11 @@ flowchart LR
 - Recette dans Chrome sur les deux fermes de test : module Économique (Matériels, Main-d'œuvre, Produits), prévisions de l'assolement, onglet Économie (prévu et réalisé 2026 : 186 €/ha de marge directe et 102 manques pour la GAEC, faute de prix saisis).
 - Documentation : `docs/economie.md` (limites connues) ; points ouverts : 125 fait, suites 142-147.
 
+### E2 (suite) — prix des intrants, fait (21/11)
+- Bundle `fourmy` publié dans Lexicon (flavor suivi, branche v2) et servi avec la clé de portée `bundle:fourmy`.
+- Migration 0083 : `lexicon_fertilizer_refs`, `lexicon_seed_species`, `lexicon_input_prices` ; synchro des jeux réservés `fertilizers`, `phytosanitary_prices`, `seeds` (prix mensuels).
+- `GET /prices/suggestions/articles` : rattachement par AMM, variante ou composition N-P-K (connue des deux côtés), espèce, variété SEMAE unique ou nom (pas pour un mélange) ; douze derniers mois, dernier prix par conditionnement, marchand, bio.
+- Web, onglet Intrants : repères (référence, conditionnement, marchand, mois), « Reprendre », attribution Cereapro et Germineo.
+- Base de développement : 566 lignes d'engrais, 31 de phyto, 231 de semences ; AgroEDI chargé pour la première fois. 5 articles rattachés chez l'exploitant testeur, 27 à la GAEC.
+- Corrigé à l'essai : références sans teneur rattachées à un article presque vide ; mélange de couverts rattaché au prix d'une espèce par son nom.
+

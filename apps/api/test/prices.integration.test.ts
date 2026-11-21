@@ -118,6 +118,58 @@ describe.skipIf(!url)("prix de la ferme (intégration)", () => {
     }
   });
 
+  it("repères des intrants (point 142) : phyto par l'AMM, engrais par la variante ou la composition, semence par la variété ; bio selon l'article", async () => {
+    const phyto = crypto.randomUUID();
+    const ammo = crypto.randomUUID();
+    const npk = crypto.randomUUID();
+    const seed = crypto.randomUUID();
+    const organicSeed = crypto.randomUUID();
+    await sql`INSERT INTO lexicon_fertilizer_refs (id, name, kind, nitrogen, phosphorus, potassium, variant) VALUES
+      ('zz_ammo', 'Ammonitrate test', 'mineral', 33.5, NULL, NULL, 'zz_ammo_variant'), ('zz_npk', 'NPK test 17,3-41,7-0', 'mineral', 17.3, 41.7, NULL, NULL),
+      ('zz_empty', 'Sans teneur', 'mineral', NULL, NULL, NULL, NULL)`;
+    await sql`INSERT INTO lexicon_seed_species (id, name, taxon) VALUES ('zz_avoine', 'Zzavoine', 'zz_taxon')`;
+    await sql`INSERT INTO lexicon_seed_varieties (gnis_code, species, species_label, variety_name, search) VALUES ('ZZ00001', 'zz_taxon', 'ZZAVOINE', 'ZZVARIETE', 'zzvariete')`;
+    await sql`INSERT INTO lexicon_input_prices (id, kind, ref, packaging, organic, month, price, unit, merchant) VALUES
+      ('zz1', 'phyto', '9999901', NULL, NULL, '2026-10-01', 7.4, 'liter', 'cereapro'),
+      ('zz2', 'fertilizer', 'zz_ammo', 'bulk', NULL, '2026-10-01', 560.5, 'ton', 'germineo'),
+      ('zz3', 'fertilizer', 'zz_ammo', 'bulk', NULL, '2025-01-01', 400, 'ton', 'germineo'),
+      ('zz4', 'fertilizer', 'zz_npk', 'big_bag_600', NULL, '2026-10-01', 720, 'ton', 'cereapro'),
+      ('zz5', 'seed', 'zz_avoine', NULL, false, '2026-10-01', 1.016, 'kilogram', 'germineo'),
+      ('zz6', 'seed', 'zz_avoine', NULL, true, '2026-10-01', 1.2893, 'kilogram', 'germineo, semence_biologique')`;
+    try {
+      await sql`INSERT INTO articles (id, farm_id, name, kind, unit, amm) VALUES (${phyto}, ${farmId}, 'Stoy', 'phyto', 'liter', '9999901')`;
+      await sql`INSERT INTO articles (id, farm_id, name, kind, unit, lexicon_ref) VALUES (${ammo}, ${farmId}, 'Ammo de la ferme', 'fertilizer', 'ton', 'zz_ammo_variant')`;
+      await sql`INSERT INTO articles (id, farm_id, name, kind, unit) VALUES (${npk}, ${farmId}, 'Starter maison', 'fertilizer', 'kilogram')`;
+      await sql`INSERT INTO article_fertilizers (article_id, farm_id, basis, n_total, p2o5, origin) VALUES (${npk}, ${farmId}, 'mass_percent', 17.3, 41.7, 'confirmed')`;
+      // Article presque vide (0-0,02-0) : ne se rattache pas à une référence sans teneur.
+      const empty = crypto.randomUUID();
+      await sql`INSERT INTO articles (id, farm_id, name, kind, unit) VALUES (${empty}, ${farmId}, 'Oligo maison', 'fertilizer', 'kilogram')`;
+      await sql`INSERT INTO article_fertilizers (article_id, farm_id, basis, n_total, p2o5, origin) VALUES (${empty}, ${farmId}, 'mass_percent', 0, 0.02, 'confirmed')`;
+      await sql`INSERT INTO lexicon_input_prices (id, kind, ref, month, price, unit, merchant) VALUES ('zz7', 'fertilizer', 'zz_empty', '2026-10-01', 200, 'ton', 'cereapro')`;
+      await sql`INSERT INTO articles (id, farm_id, name, kind, unit) VALUES (${seed}, ${farmId}, 'Zzvariete', 'seed', 'kilogram')`;
+      await sql`INSERT INTO articles (id, farm_id, name, kind, unit, organic_status) VALUES (${organicSeed}, ${farmId}, 'Zzavoine bio', 'seed', 'kilogram', 'organic')`;
+      const mix = crypto.randomUUID();
+      await sql`INSERT INTO articles (id, farm_id, name, kind, unit) VALUES (${mix}, ${farmId}, 'Zzavoine + radis', 'seed', 'kilogram')`;
+      const res = await (await send(worker, "GET", "/prices/suggestions/articles")).json();
+      const of = (id: string) => res.items.find((i: { articleId: string }) => i.articleId === id);
+      expect(of(phyto)).toMatchObject({ match: "Stoy (AMM 9999901)", suggestions: [{ amount: 7.4, unit: "liter", scope: "reference", source: "lexicon", label: "Stoy · Cereapro, oct. 2026" }] });
+      // Variante : seul le prix de moins d'un an.
+      expect(of(ammo).suggestions.map((x: { amount: number; label: string }) => [x.amount, x.label])).toEqual([[560.5, "Ammonitrate test · vrac · Germineo, oct. 2026"]]);
+      expect(of(ammo).match).toBe("Ammonitrate test (variante Lexicon)");
+      expect(of(npk)).toMatchObject({ match: "NPK test 17,3-41,7-0 (même composition)", suggestions: [{ amount: 720 }] });
+      expect(of(empty)).toBeUndefined();
+      // Mélange : pas de rattachement par le nom.
+      expect(of(mix)).toBeUndefined();
+      expect(of(seed)).toMatchObject({ match: "Zzavoine (espèce)", suggestions: [{ amount: 1.016, unit: "kilogram" }] });
+      expect(of(organicSeed)).toMatchObject({ match: "Zzavoine (nom)", suggestions: [{ amount: 1.2893, label: "Zzavoine · bio · Germineo, semence_biologique, oct. 2026" }] });
+    } finally {
+      await sql`DELETE FROM lexicon_input_prices WHERE id LIKE 'zz%'`;
+      await sql`DELETE FROM lexicon_fertilizer_refs WHERE id LIKE 'zz_%'`;
+      await sql`DELETE FROM lexicon_seed_species WHERE id = 'zz_avoine'`;
+      await sql`DELETE FROM lexicon_seed_varieties WHERE gnis_code = 'ZZ00001'`;
+    }
+  });
+
   it("refuse une clé incohérente ou un article d'une autre ferme ; suppression d'une ligne", async () => {
     expect((await send(owner, "POST", "/prices", { items: [{ kind: "article", unit: "ton", amount: 1, validFrom: "2026-01-01" }] })).status).toBe(400);
     const foreign = crypto.randomUUID();

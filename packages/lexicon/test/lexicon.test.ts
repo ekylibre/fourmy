@@ -63,7 +63,14 @@ const WKB = "0106000020e61000000100000001030000000100000004000000000000000000e03
 
 function fakeServer(
   phytoVersion: string,
-  { agroedi = false, zones = false, seeds = false, prices = false, apiKey }: { agroedi?: boolean; zones?: boolean; seeds?: boolean; prices?: boolean; apiKey?: string } = {},
+  {
+    agroedi = false,
+    zones = false,
+    seeds = false,
+    prices = false,
+    inputs = false,
+    apiKey,
+  }: { agroedi?: boolean; zones?: boolean; seeds?: boolean; prices?: boolean; inputs?: boolean; apiKey?: string } = {},
 ) {
   const csv = (lines: string[]) => gzipSync(lines.join("\n") + "\n");
   const files: Record<string, string | Buffer> = {
@@ -77,6 +84,9 @@ function fakeServer(
         ...(zones ? { protected_water_zones: { current: "w1", versions: ["w1"] }, protected_natural_zones: { current: "n1", versions: ["n1"] } } : {}),
         ...(seeds ? { seed_varieties: { current: "sv1", versions: ["sv1"] } } : {}),
         ...(prices ? { eu_market_prices: { current: "eu1", versions: ["eu1"] } } : {}),
+        ...(inputs
+          ? { fertilizers: { current: "fe1", versions: ["fe1"] }, phytosanitary_prices: { current: "pp1", versions: ["pp1"] }, seeds: { current: "se1", versions: ["se1"] } }
+          : {}),
       },
     }),
     [`phytosanitary/${phytoVersion}/manifest.json`]: JSON.stringify({
@@ -249,6 +259,45 @@ function fakeServer(
     ]);
     files["eu_market_prices/eu1/manifest.json"] = JSON.stringify({ name: "eu_market_prices", version: "eu1", tables: [{ name: "registered_eu_market_prices", rows: 2, files: [{ path: "data/eu_0.csv.gz" }] }] });
   }
+  if (inputs) {
+    // Prix de référence des intrants (jeux réservés aux adhérents).
+    const pkg = (name: string, version: string, tables: Record<string, { structure: string; lines: string[] }>) => {
+      files[`${name}/${version}/structure.sql`] = Object.entries(tables).map(([t, x]) => `CREATE TABLE ${t} (${x.structure});`).join("\n");
+      for (const [t, x] of Object.entries(tables)) files[`${name}/${version}/data/${t}_0.csv.gz`] = csv(x.lines);
+      files[`${name}/${version}/manifest.json`] = JSON.stringify({
+        name,
+        version,
+        scope: "members",
+        tables: Object.entries(tables).map(([t, x]) => ({ name: t, rows: x.lines.length, files: [{ path: `data/${t}_0.csv.gz` }] })),
+      });
+    };
+    pkg("fertilizers", "fe1", {
+      registered_fertilizers: {
+        structure: "id character varying, name character varying, kind character varying, nitrogen numeric, phosphorus numeric, potassium numeric, sulfur numeric, magnesium numeric, calcium numeric, variant_reference_name character varying, merchants text[]",
+        lines: [`ammonitrate_33_5,Ammonitrate 33.5,mineral,33.50,,,,,,ammonitrate_33,"{cereapro,germineo}"`],
+      },
+      registered_fertilizer_monthly_prices: {
+        structure: "id character varying, fertilizer_id character varying, packaging character varying, month date, price numeric, unit character varying, merchant character varying, negotiated boolean, observations integer, last_observed_on date",
+        lines: [`a_bulk_2026-10,ammonitrate_33_5,bulk,2026-10-01,560.50,ton,germineo,f,5,2026-10-07`, `a_bb_2026-10,ammonitrate_33_5,big_bag_600,2026-10-01,596.00,ton,cereapro,t,5,2026-10-07`],
+      },
+    });
+    pkg("phytosanitary_prices", "pp1", {
+      registered_phytosanitary_monthly_prices: {
+        structure: "id character varying, product_id integer, month date, price numeric, unit character varying, merchant character varying, negotiated boolean, observations integer, last_observed_on date",
+        lines: [`2130063_liter_2026-10,2130063,2026-10-01,7.40,liter,cereapro,t,5,2026-10-07`],
+      },
+    });
+    pkg("seeds", "se1", {
+      registered_seed_species: {
+        structure: "id character varying, name character varying, latin_name character varying, family character varying, category character varying, season character varying, sowing_rate_min numeric, sowing_rate_max numeric, taxon_reference_name character varying",
+        lines: [`avoine,Avoine,Avena sativa,Poaceae,cereal,autumn,80.00,140.00,avena_sativa`],
+      },
+      registered_seed_monthly_prices: {
+        structure: "id character varying, species_id character varying, organic boolean, month date, price_per_kilogram numeric, lowest_price_per_kilogram numeric, highest_price_per_kilogram numeric, offers integer, merchants text[], last_observed_on date",
+        lines: [`avoine_organic_2026-10,avoine,t,2026-10-01,1.2893,1.1736,1.5473,8,"{germineo,semence_biologique}",2026-10-07`],
+      },
+    });
+  }
   const fetchImpl = (async (input: string | URL, init?: RequestInit) => {
     const path = String(input).replace("http://lexicon.test/", "");
     requested.push(path);
@@ -298,6 +347,30 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", { timeout: 150_
           { gnis_code: "510A387", species: "avena_sativa", species_label: "AVOINE", variety_name: "KWS PURSANT", registered_on: null, search: "kws pursant avoine" },
           { gnis_code: "512E492", species: "triticum_aestivum", species_label: "BLE TENDRE", variety_name: "THERMIDOR", registered_on: "2023-12-27", search: "thermidor ble tendre" },
           { gnis_code: "5219021", species: "trifolium_incarnatum", species_label: "TRÈFLE INCARNAT", variety_name: "CONTEA", registered_on: null, search: "contea trefle incarnat" },
+        ]);
+        throw new Rollback();
+      })
+      .catch((e) => {
+        if (!(e instanceof Rollback)) throw e;
+      });
+  });
+
+  it("avec une clé : prix de référence des intrants (engrais, phyto, semences)", async () => {
+    await sql
+      .begin(async (tx) => {
+        const reports = await syncLexiconIn(tx, { base: "http://lexicon.test", apiKey: "lex_test", fetchImpl: fakeServer("v1", { inputs: true, apiKey: "lex_test" }).fetchImpl, force: true });
+        expect(reports.filter((r) => ["fertilizers", "phytosanitary_prices", "seeds"].includes(r.name)).map((r) => [r.name, r.status, r.rows])).toEqual([
+          ["fertilizers", "loaded", 3],
+          ["phytosanitary_prices", "loaded", 1],
+          ["seeds", "loaded", 2],
+        ]);
+        expect(await tx`SELECT id, variant, nitrogen::float8 AS n FROM lexicon_fertilizer_refs`).toEqual([{ id: "ammonitrate_33_5", variant: "ammonitrate_33", n: 33.5 }]);
+        expect(await tx`SELECT taxon FROM lexicon_seed_species`).toEqual([{ taxon: "avena_sativa" }]);
+        expect(await tx`SELECT kind, ref, packaging, organic, price::float8 AS price, unit, merchant FROM lexicon_input_prices ORDER BY kind, price`).toEqual([
+          { kind: "fertilizer", ref: "ammonitrate_33_5", packaging: "bulk", organic: null, price: 560.5, unit: "ton", merchant: "germineo" },
+          { kind: "fertilizer", ref: "ammonitrate_33_5", packaging: "big_bag_600", organic: null, price: 596, unit: "ton", merchant: "cereapro" },
+          { kind: "phyto", ref: "2130063", packaging: null, organic: null, price: 7.4, unit: "liter", merchant: "cereapro" },
+          { kind: "seed", ref: "avoine", packaging: null, organic: true, price: 1.2893, unit: "kilogram", merchant: "germineo, semence_biologique" },
         ]);
         throw new Rollback();
       })
@@ -364,6 +437,9 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", { timeout: 150_
           { name: "protected_natural_zones", version: "", status: "absent", rows: 0 },
           { name: "seed_varieties", version: "", status: "absent", rows: 0 },
           { name: "eu_market_prices", version: "", status: "absent", rows: 0 },
+          { name: "fertilizers", version: "", status: "absent", rows: 0 },
+          { name: "phytosanitary_prices", version: "", status: "absent", rows: 0 },
+          { name: "seeds", version: "", status: "absent", rows: 0 },
         ]);
         expect(await tx`SELECT reference_name, started_on::text, stopped_on::text FROM lexicon_productions ORDER BY 1`).toEqual([
           { reference_name: "grain_corn", started_on: "2000-03-01", stopped_on: "2000-11-30" },
@@ -405,7 +481,7 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", { timeout: 150_
         // Même version : rien n'est retéléchargé.
         const again = fakeServer("v1");
         const second = await syncLexiconIn(tx, { base: "http://lexicon.test", fetchImpl: again.fetchImpl });
-        expect(second.map((r) => r.status)).toEqual(["up-to-date", "up-to-date", "up-to-date", "up-to-date", "absent", "absent", "absent", "absent", "absent"]);
+        expect(second.map((r) => r.status)).toEqual(["up-to-date", "up-to-date", "up-to-date", "up-to-date", "absent", "absent", "absent", "absent", "absent", "absent", "absent", "absent"]);
         expect(again.requested).toEqual(["index.json"]);
         throw new Rollback();
       })

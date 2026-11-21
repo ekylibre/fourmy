@@ -227,7 +227,7 @@ export function PriceTable({ farmId, kind, rows, owner, label }: { farmId: strin
                         <Group key={sg.ref} gap={4} wrap="nowrap">
                           <Text size="xs" c="dimmed">
                             {PRICE_SCOPE_LABELS[sg.scope]}
-                            {sg.scope === "market" ? ` (${sg.label})` : ""} : {fmtEuro(sg.amount)} / {priceUnitLabel(sg.unit)}, {fmtMonth(sg.date)}
+                            {sg.scope === "market" || sg.scope === "reference" ? ` (${sg.label})` : ""} : {fmtEuro(sg.amount)} / {priceUnitLabel(sg.unit)}, {fmtMonth(sg.date)}
                           </Text>
                           {owner && (
                             <Button
