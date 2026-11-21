@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { CoverFamilyKey } from "./fertilization.js";
 
 /**
  * Semences (claudedocs/conception_semences.md) : fiche d'une semence
@@ -61,12 +62,16 @@ export const mixtureComponentWrite = z.object({
   gnisCode: gnis.nullable().default(null),
 });
 export type MixtureComponentWrite = z.infer<typeof mixtureComponentWrite>;
-export type MixtureComponent = MixtureComponentWrite & { id: string; position: number };
+export type MixtureComponent = MixtureComponentWrite & { id: string; position: number; legume?: boolean };
 
 export const mixtureComponentsWrite = z
   .array(mixtureComponentWrite)
   .max(20)
   .refine((l) => new Set(l.map((c) => c.label.toLowerCase())).size === l.length, { message: "Une espèce est en double dans le mélange." });
+
+/** Espèces d'un mélange, enregistrées ensemble (PUT /articles/:id/seed/components). */
+export const mixtureComponentsSave = z.object({ components: mixtureComponentsWrite });
+export type MixtureComponentsSave = z.infer<typeof mixtureComponentsSave>;
 
 /** PMG d'un lot de semence (lots.attrs.seed) : l'emporte sur celui de l'article. */
 export const lotSeedWrite = z.object({ tgwG, origin: tgwOrigin, on: day.nullable().default(null) });
@@ -94,6 +99,13 @@ export const mixtureDose = z.object({
   kgHa: z.number().positive().max(1000),
 });
 export type MixtureDose = z.infer<typeof mixtureDose>;
+
+/** Doses d'un mélange à un semis : une espèce une fois, 20 au plus. */
+export const mixtureDoses = z
+  .array(mixtureDose)
+  .min(1)
+  .max(20)
+  .refine((l) => new Set(l.map((d) => d.label.toLowerCase())).size === l.length, { message: "Une espèce est en double dans les doses du mélange." });
 
 /** Espèce semée d'un couvert (cover_crops.components). */
 export const coverComponent = z.object({ label: name, species: z.string().nullable(), kgHa: z.number().positive().nullable() });
@@ -244,3 +256,23 @@ export interface SeedAttachProposal {
 /** Rattacher : les semences choisies parmi les propositions. */
 export const seedAttachWrite = z.object({ articleIds: z.array(z.string().uuid()).min(1).max(500) });
 export type SeedAttachWrite = z.infer<typeof seedAttachWrite>;
+
+// --- Mélanges et couverts (lot SE6) --------------------------------------------------
+
+/** Espèces d'un mélange et doses du dernier semis, proposées à la saisie (FR-SE-13b). */
+export interface SeedMixture {
+  articleId: string;
+  components: MixtureComponent[];
+  last: { interventionId: string; startedAt: string; doses: MixtureDose[] } | null;
+}
+
+/** Semis réalisé sur une parcelle, que le couvert peut reprendre (FR-SE-16). */
+export interface CoverSowingProposal {
+  interventionId: string;
+  startedAt: string;
+  /** Semences semées : leurs espèces et leur dose. */
+  components: CoverComponent[];
+  /** Famille du couvert déduite des espèces ; null si elle ne se déduit pas. */
+  family: CoverFamilyKey | null;
+  legumes: number;
+}

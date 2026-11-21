@@ -492,7 +492,11 @@ export async function loadHveBiodiversity(tx: Tx, campaign: number, period: { fr
             SELECT sum(area)::float8 AS area_m2, bool_or(pp) AS pp FROM c GROUP BY species, cid`,
       )
     : [];
-  const cover = await rows<{ species: string | null }>(tx, sql`SELECT DISTINCT species FROM cover_crops WHERE campaign = ${campaign} AND species IS NOT NULL`);
+  // Espèces des couverts : celles semées (lot SE6, composition reprise du semis), sinon le libellé saisi.
+  const cover = await rows<{ species: string | null; components: { label: string; species: string | null }[] | null }>(
+    tx,
+    sql`SELECT DISTINCT species, components FROM cover_crops WHERE campaign = ${campaign} AND species IS NOT NULL`,
+  );
   const crops = parcels.map((p) => ({
     species: p.species ?? `inconnue-${p.id}`,
     label: p.species ?? p.name,
@@ -509,6 +513,14 @@ export async function loadHveBiodiversity(tx: Tx, campaign: number, period: { fr
     iae,
     plots: plots.map((p) => ({ areaM2: p.area_m2, permanentGrassland: p.pp })),
     crops,
-    coverSpecies: [...new Set(cover.flatMap((c) => (c.species ?? "").split(/[,;+]/).map((x) => x.trim().toLowerCase()).filter(Boolean)))],
+    coverSpecies: [
+      ...new Set(
+        cover.flatMap((c) =>
+          c.components?.length
+            ? c.components.map((x) => (x.species ?? x.label).trim().toLowerCase())
+            : (c.species ?? "").split(/[,;+]/).map((x) => x.trim().toLowerCase()).filter(Boolean),
+        ),
+      ),
+    ],
   };
 }

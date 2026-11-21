@@ -19,7 +19,7 @@ import {
   refreshNitrateZones,
   saveWaterSource,
 } from "../repos/fertilization-context.js";
-import { deleteCoverCrop, saveCoverCrop } from "../repos/cover-crops.js";
+import { coverSowingProposals, deleteCoverCrop, saveCoverCrop } from "../repos/cover-crops.js";
 import { addSteering, deleteSteering } from "../repos/steering.js";
 import { addDocument, deleteDocument, listDocuments, readDocument } from "../repos/regulatory-documents.js";
 import { BadRequest, problem, uuidParam } from "./helpers.js";
@@ -124,6 +124,10 @@ export const fertilizationRoutes = new Hono<Env>()
     if (!parsed.success) return problem(c, 400, "Corps invalide", invalid(parsed.error.issues));
     return c.json(await saveCoverCrop(db(), c.get("farmId"), uuidParam(c, "id"), parsed.data));
   })
+  // Semis de l'interculture que le couvert peut reprendre (lot SE6, FR-SE-16).
+  .get("/land-parcels/:id/cover-crop/sowings", async (c) =>
+    c.json({ items: await coverSowingProposals(db(), c.get("farmId"), uuidParam(c, "id"), campaignOf(c.req.query("campaign"))) }),
+  )
   .delete("/land-parcels/:id/cover-crop", requireOwner, async (c) => {
     await deleteCoverCrop(db(), c.get("farmId"), uuidParam(c, "id"), campaignOf(c.req.query("campaign")));
     return c.body(null, 204);

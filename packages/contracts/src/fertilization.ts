@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isoDate } from "./primitives.js";
+import { coverComponent } from "./seeds.js";
 
 /**
  * Fertilisation azotée (FR-REG-3, docs/fertilisation-design.md). Lot AE :
@@ -589,6 +590,9 @@ export const coverCropWrite = z
     biomass: z.enum(["le_1", "1_3", "ge_3"]).nullable().default(null),
     destructionMode: z.enum(["mechanical", "chemical", "frost", "harvest", "grazing"]).nullable().default(null),
     notes: z.string().trim().max(1000).nullable().default(null),
+    /** Semis qui a implanté le couvert, et ses espèces avec leur dose (lot SE6, FR-SE-16). */
+    sowingInterventionId: z.string().uuid().nullable().default(null),
+    components: z.array(coverComponent).max(20).nullable().default(null),
   })
   .refine((c) => !c.destroyedOn || c.destroyedOn >= c.sownOn, { message: "La destruction suit le semis." })
   .refine((c) => (c.kind === "sown") === (c.family !== null), { message: "Un couvert semé a une famille ; des repousses n'en ont pas." });

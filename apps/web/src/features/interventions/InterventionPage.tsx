@@ -27,6 +27,7 @@ import { ParcelMap } from "../map/ParcelMap";
 import { kgN, nitrogenNote, useFertilizers } from "../fertilization/fertilization";
 import { NitrogenLine } from "../fertilization/NitrogenLine";
 import { isAreaRate, SeedLine } from "../seeds/SeedLine";
+import { MixtureLine } from "../seeds/MixtureDoses";
 import { useSeeds } from "../seeds/queries";
 import { CancelModal } from "./CancelModal";
 import { LIGHTS, TrafficLight } from "../../components/TrafficLight";
@@ -462,6 +463,7 @@ function InterventionSheet({ intervention: i }: { intervention: InterventionDeta
                       farmId={farm.id}
                     />
                   )}
+                  {"mixture" in q && q.mixture && <MixtureLine doses={q.mixture} />}
                 </Table.Td>
                 <Table.Td ta="right" className="lv-num" fw={rate || q.per === "hectare" ? 600 : undefined}>
                   {perHa === null ? "—" : rate ? `${formatNumber(perHa, 3)} ${unit}` : `${formatNumber(perHa, 3)} ${unit}/ha`}

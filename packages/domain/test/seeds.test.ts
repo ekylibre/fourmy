@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
   convertSeedQuantity,
+  coverFamilyOf,
+  grainsPerM2,
+  mixtureMatches,
+  mixtureTotal,
   DomainError,
   looksLikeMixture,
   parseSeedUnit,
@@ -147,3 +151,34 @@ describe("unité enregistrée d'un semis (lot SE5)", () => {
   });
 });
 
+
+describe("mélanges et couverts (lot SE6)", () => {
+  it("dose du mélange : somme des doses, à 0,01 près", () => {
+    const doses = [{ kgHa: 8 }, { kgHa: 4 }, { kgHa: 2 }, { kgHa: 1 }];
+    expect(mixtureTotal(doses)).toBe(15);
+    expect(mixtureMatches(15, doses)).toBe(true);
+    expect(mixtureMatches(15.01, doses)).toBe(true);
+    expect(mixtureMatches(15.02, doses)).toBe(false);
+    expect(mixtureTotal([{ kgHa: 0.1 }, { kgHa: 0.2 }])).toBe(0.3);
+  });
+
+  it("densité d'une espèce : kg/ha × 100 / PMG", () => {
+    expect(grainsPerM2(8, 20)).toBe(40);
+    expect(grainsPerM2(8, null)).toBeNull();
+  });
+
+  it("famille du couvert d'après les espèces, rien de deviné hors référentiel", () => {
+    expect(coverFamilyOf(["legume", "legume"])).toBe("legumineuses");
+    expect(coverFamilyOf(["crucifer"])).toBe("cruciferes");
+    expect(coverFamilyOf(["phacelia"])).toBe("hydrophyllacees");
+    expect(coverFamilyOf(["grass_oat_rye"])).toBe("graminees_seigle_avoine");
+    expect(coverFamilyOf(["grass_ryegrass"])).toBe("graminees_ray_grass");
+    expect(coverFamilyOf(["grass_oat_rye", "legume"])).toBe("melange_graminees_legumineuses");
+    expect(coverFamilyOf(["grass_oat_rye", "grass_ryegrass", "legume"])).toBe("melange_graminees_legumineuses");
+    expect(coverFamilyOf(["crucifer", "legume"])).toBe("melange_cruciferes_legumineuses");
+    expect(coverFamilyOf(["grass_oat_rye", "legume", "phacelia", "crucifer"])).toBeNull();
+    expect(coverFamilyOf(["crucifer", "phacelia"])).toBeNull();
+    expect(coverFamilyOf(["legume", "other"])).toBeNull();
+    expect(coverFamilyOf([])).toBeNull();
+  });
+});

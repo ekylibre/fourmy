@@ -194,6 +194,95 @@ describe("interventions", () => {
     expect(calls[1]).toMatchObject({ inputs: [{ articleId: MAIS, quantity: 9, per: "total", unit: "grain_per_square_meter" }] });
   });
 
+  it("un mélange se sème espèce par espèce, en kg/ha : doses du dernier semis proposées, somme envoyée (lot SE6)", async () => {
+    const MIX = "00000000-0000-7000-8000-00000000f401";
+    const C = ["00000000-0000-7000-8000-00000000f411", "00000000-0000-7000-8000-00000000f412", "00000000-0000-7000-8000-00000000f413", "00000000-0000-7000-8000-00000000f414"];
+    const now = "2026-01-01T00:00:00.000Z";
+    const seed = {
+      articleId: MIX,
+      name: "Couvert 4 espèces",
+      unit: "kilogram",
+      unitDim: "mass",
+      lexiconRef: null,
+      organicStatus: null,
+      seedTreated: null,
+      sheet: { articleId: MIX, species: null, varietyName: null, gnisCode: null, category: null, isMixture: true, grainsPerDose: null, bagKg: null, tgwG: null, tgwOrigin: null, tgwOn: null, updatedAt: now },
+      speciesLabel: null,
+      importedSpecies: null,
+      importedGnis: null,
+      componentCount: 4,
+      reference: null,
+      tgw: null,
+      flags: [],
+      looksLikeMixture: true,
+      stock: 500,
+      usage: [],
+    };
+    const comp = (i: number, label: string, species: string, legume = false) => ({ id: C[i], label, species, varietyName: null, gnisCode: null, position: i, legume });
+    const mixture = {
+      articleId: MIX,
+      components: [comp(0, "Avoine rude", "avena_strigosa"), comp(1, "Vesce commune", "vicia_sativa", true), comp(2, "Phacélie", "phacelia_tanacetifolia"), comp(3, "Radis", "raphanus_sativus")],
+      last: {
+        interventionId: "00000000-0000-7000-8000-00000000f499",
+        startedAt: "2025-08-12",
+        doses: [
+          { componentId: C[0], label: "Avoine rude", species: "avena_strigosa", kgHa: 8 },
+          { componentId: C[1], label: "Vesce commune", species: "vicia_sativa", kgHa: 4 },
+          { componentId: C[2], label: "Phacélie", species: "phacelia_tanacetifolia", kgHa: 2 },
+        ],
+      },
+    };
+    const calls: Record<string, unknown>[] = [];
+    server.use(
+      http.get("*/articles", () =>
+        HttpResponse.json({ items: [{ id: MIX, farmId: FARM, lexiconRef: null, name: "Couvert 4 espèces", kind: "seed", unit: "kilogram", createdAt: now, updatedAt: now }], nextCursor: null }),
+      ),
+      http.get("*/seeds", () => HttpResponse.json({ items: [seed] })),
+      http.get("*/articles/:id/seed/mixture", () => HttpResponse.json(mixture)),
+      http.post("*/interventions", async ({ request }) => HttpResponse.json(calls.push((await request.json()) as Record<string, unknown>) && {}, { status: 201 })),
+      http.post("*/interventions/:id/complete", async ({ request }) => {
+        calls.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ intervention: {}, movements: [], warnings: [] });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(`/f/${FARM}/interventions?at=2026-06-10`);
+    const button = await screen.findByRole("button", { name: "Nouvelle intervention" });
+    await vi.waitFor(() => expect(button).toBeEnabled());
+    await user.click(button);
+    const form = await screen.findByRole("form", { name: "Saisie de l'intervention" });
+    await user.click(within(form).getByRole("combobox", { name: "Intervention" }));
+    await user.click(await screen.findByRole("option", { name: "Semis" }));
+    await user.click(within(form).getByRole("combobox", { name: "Parcelles" }));
+    await user.click(await screen.findByRole("option", { name: /Les Rouffiats/ }));
+    await user.click(within(form).getByRole("combobox", { name: "Produit" }));
+    await user.click(await screen.findByRole("option", { name: /Couvert 4 espèces/ }));
+    // Doses du semis précédent proposées ; le radis n'y était pas.
+    const doses = await within(form).findByLabelText("Doses du mélange");
+    await vi.waitFor(() => expect(within(form).getByRole("textbox", { name: "Quantité" })).toHaveValue("14"));
+    expect(doses).toHaveTextContent("Dose du mélange : 14 kg/ha · 1 légumineuse sur 3 espèces (4 kg/ha) · doses du semis du 12/08/2025 proposées");
+    await user.type(within(doses).getByRole("textbox", { name: "Dose de Radis" }), "1");
+    await vi.waitFor(() => expect(within(form).getByRole("textbox", { name: "Quantité" })).toHaveValue("15"));
+    expect(doses).toHaveTextContent("1 légumineuse sur 4 espèces");
+    await user.click(within(form).getByRole("button", { name: "Enregistrer" }));
+    await vi.waitFor(() => expect(calls).toHaveLength(2));
+    expect(calls[1]).toMatchObject({
+      inputs: [
+        {
+          articleId: MIX,
+          quantity: 15,
+          per: "hectare",
+          mixture: [
+            { componentId: C[0], label: "Avoine rude", kgHa: 8 },
+            { componentId: C[1], label: "Vesce commune", kgHa: 4 },
+            { componentId: C[2], label: "Phacélie", kgHa: 2 },
+            { componentId: C[3], label: "Radis", kgHa: 1 },
+          ],
+        },
+      ],
+    });
+  });
+
   it("Entrée dans un champ n'envoie pas le formulaire ; deux envois portent le même identifiant", async () => {
     const ids: string[] = [];
     server.use(

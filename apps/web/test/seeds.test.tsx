@@ -134,6 +134,50 @@ describe("semences", () => {
     expect(saved).not.toHaveProperty("unit");
   });
 
+  it("mélange : le responsable décrit ses espèces, légumineuses repérées, sans proportion (lot SE6)", async () => {
+    let saved: { components: { label: string; species: string | null }[] } | null = null;
+    const sheet = { articleId: MIX, species: null, varietyName: null, gnisCode: null, category: null, isMixture: true, grainsPerDose: null, bagKg: null, tgwG: null, tgwOrigin: null, tgwOn: null, updatedAt: "2026-01-01T00:00:00Z" };
+    const mixDetail: SeedDetail = { ...mixture, sheet, components: [], lots: [], interventions: [] };
+    server.use(
+      http.get("*/seeds", () => HttpResponse.json({ items: [{ ...mixture, sheet }] })),
+      http.get("*/seeds/attach", () => HttpResponse.json({ items: [] })),
+      http.get("*/seeds/species", () =>
+        HttpResponse.json({
+          items: [
+            { species: "avena_strigosa", label: "Avoine rude", legume: false, hasReference: false },
+            { species: "trifolium_incarnatum", label: "Trèfle incarnat", legume: true, hasReference: false },
+          ],
+        }),
+      ),
+      http.get("*/articles/:id/seed", () => HttpResponse.json(mixDetail)),
+      http.put("*/articles/:id/seed/components", async ({ request }) => {
+        saved = (await request.json()) as typeof saved;
+        return HttpResponse.json(mixDetail);
+      }),
+    );
+    renderApp(`/f/${FARM}/seeds`);
+    const user = userEvent.setup();
+    await user.click(await screen.findByText("Avoine + TI + Radis + Phacélie"));
+    const drawer = await screen.findByRole("dialog", { name: "Avoine + TI + Radis + Phacélie" });
+    const table = await within(drawer).findByRole("table", { name: "Espèces du mélange" });
+    await user.click(within(table).getByRole("combobox", { name: "Espèce 1" }));
+    await user.click(await screen.findByRole("option", { name: "Avoine rude" }));
+    await user.click(within(table).getByRole("combobox", { name: "Espèce 2" }));
+    await user.click(await screen.findByRole("option", { name: "Trèfle incarnat (légumineuse)" }));
+    expect(within(table).getByText("Légumineuse")).toBeInTheDocument();
+    await user.click(within(drawer).getByRole("button", { name: "Ajouter une espèce" }));
+    await user.type(within(drawer).getByRole("textbox", { name: "Libellé 3" }), "Radis");
+    expect(within(drawer).getByText("1 légumineuse sur 3 espèces")).toBeInTheDocument();
+    await user.click(within(drawer).getByRole("button", { name: "Enregistrer les espèces" }));
+    await waitFor(() =>
+      expect(saved?.components).toEqual([
+        { species: "avena_strigosa", label: "Avoine rude", varietyName: null, gnisCode: null },
+        { species: "trifolium_incarnatum", label: "Trèfle incarnat", varietyName: null, gnisCode: null },
+        { species: null, label: "Radis", varietyName: null, gnisCode: null },
+      ]),
+    );
+  });
+
   it("rattacher au référentiel : propositions sûres cochées, approchées décochées", async () => {
     const proposals: SeedAttachProposal[] = [
       { articleId: MAIZE, name: "Semence de maïs - P0573", species: "zea_mays", speciesLabel: "Maïs", varietyName: "P0573", gnisCode: "570GE61", isMixture: false, reason: "code GNIS 570GE61 au catalogue officiel", sure: true, approximate: false },

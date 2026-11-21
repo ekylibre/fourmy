@@ -2,6 +2,7 @@ import { z } from "zod";
 import { uuid, farmId, isoDateTime, geoJsonGeometry, auditFields } from "../primitives.js";
 import { treatmentPurpose } from "../procedures.js";
 import { complianceResult, complianceWrite, iftResult, interventionWeather } from "../phyto.js";
+import { mixtureDoses } from "../seeds.js";
 
 /**
  * Interventions (docs/interventions.md §4). Modèle simplifié par rapport à
@@ -78,6 +79,8 @@ export const interventionInput = z.object({
   from: location.optional(),
   /** Entretien de plusieurs matériels : celui qui reçoit la pièce ou le fluide. */
   equipmentId: uuid.optional(),
+  /** Mélange de semences : dose de chaque espèce en kg/ha ; la quantité en est la somme (lot SE6, S7). */
+  mixture: mixtureDoses.optional(),
 });
 export type InterventionInput = z.infer<typeof interventionInput>;
 
