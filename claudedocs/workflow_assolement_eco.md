@@ -107,3 +107,11 @@ flowchart LR
 - Limite : rendement des cultures fourragères selon la saisie des récoltes (matière brute ou sèche).
 - Tests : domaine (defaults 4, diff 1), API (agrifood 3, eco-context, validation), web (panneau Affecter).
 
+### E4 — fait (21/11)
+- Contrat : `MarginFigures`, `ActivityMargin`, `MarginMissing`, `CropPlanMargins`.
+- Domaine `economics/margins.ts` (`cropPlanMargins`) : produit (prévision ou défaut, conversion du prix dans l'unité du rendement), charges opérationnelles (`inputNeeds` par culture × prix de l'article converti ; « si besoin » exclu), mécanisation par passage (prix propre à l'hectare ou à l'heure, barème BCMA à l'hectare ou à l'heure, type du barème de l'étape, prestation), main-d'œuvre (heures champ + trajets × personnes × coût horaire ; rien pour une prestation), marges brute et directe, par activité, à l'hectare, total ; manques avec hectares (comptés une fois par culture) et onglet à compléter.
+- Web : onglet « Économie » de l'assolement (€/ha ou total, cellules incomplètes en orange avec « * », « À compléter » avec liens vers le module).
+- Essai sur l'assolement 2027 de l'exploitant testeur : maïs 2 148 €/ha de produit, main-d'œuvre 91 €/ha ; 15 manques listés (prix d'intrants, matériels sans barème, fertilisation sans matériel).
+- Tests : domaine (exemple chiffré 10 ha de blé : marge directe 9 880 € ; manques ; défauts et culture sans ITK), web (onglet Économie).
+- Constat de poste : limite d'observateurs de fichiers atteinte (`ENOSPC`) sur le serveur Vite de développement, modules périmés jusqu'au redémarrage (`fs.inotify.max_user_watches` à relever).
+

@@ -100,3 +100,24 @@ Limite : le rendement de la ferme est calculé sur les récoltes en quintaux,
 tonnes ou kilogrammes ; pour une culture fourragère, il dépend de la façon dont
 les récoltes ont été saisies (matière brute ou sèche) et mérite d'être vérifié.
 
+## Marges de l'assolement (onglet Économie)
+
+L'onglet **Économie** de l'assolement estime les marges prévues de la
+campagne, par activité et pour l'assolement, en €/ha ou en total, à partir du
+brouillon (recalculées à chaque geste) :
+
+| Poste | Calcul |
+|---|---|
+| Produit | rendement × surface × prix de vente (saisis à l'affectation, sinon par défaut) |
+| Charges opérationnelles | besoins en intrants de l'onglet **Intrants** × prix de l'article (converti dans l'unité du stock) ; étapes « si besoin » non comptées |
+| **Marge brute** | produit − charges opérationnelles |
+| Mécanisation | pour chaque passage daté : prix propre du matériel (à l'hectare ou à l'heure), sinon son coût du barème BCMA (à l'hectare, ou à l'heure pour un tracteur) ; une étape sans matériel de la ferme : type du barème choisi dans l'ITK, sinon prestation de la procédure (onglet Services) |
+| Main-d'œuvre | heures des passages (champ et trajets, comme l'onglet **Travaux**) × personnes × coût horaire ; rien pour une prestation |
+| **Marge directe** | marge brute − mécanisation − main-d'œuvre |
+
+Rien n'est compté pour zéro sans le dire : un prix, un rendement ou un débit
+manquant rend le poste **incomplet** (montant en orange, suivi de « * ») et
+figure dans **À compléter**, avec les hectares concernés et un lien vers
+l'onglet du module Économique où saisir le prix. Une culture sans itinéraire
+technique n'a que son produit.
+

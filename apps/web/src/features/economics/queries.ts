@@ -38,3 +38,11 @@ export function useEcoContext(farmId: string, year: number, enabled = true) {
     enabled,
   });
 }
+
+/** Prix en vigueur de toutes natures (lot E4, marges). */
+export function useCurrentPrices(farmId: string, at: string) {
+  return useQuery({
+    queryKey: [...pricesKey(farmId), "current", at],
+    queryFn: () => api.get<{ items: Price[] }>(farmPath(farmId, `/prices?at=${at}`)),
+  });
+}

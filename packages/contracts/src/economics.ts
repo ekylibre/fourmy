@@ -167,3 +167,51 @@ export interface EcoContext {
   /** Coût horaire de la main-d'œuvre en vigueur. */
   labour: Price | null;
 }
+
+// ---------------------------------------------------------------------------
+// Lot E4 : marges de l'assolement (FR-AS-33, décision A19).
+
+export type MarginPost = "product" | "operational" | "mechanisation" | "labour";
+
+export const MARGIN_POST_LABELS: Record<MarginPost, string> = {
+  product: "Produit",
+  operational: "Charges opérationnelles",
+  mechanisation: "Mécanisation",
+  labour: "Main-d'œuvre",
+};
+
+/** Montants HT, en euros. */
+export interface MarginFigures {
+  product: number;
+  operational: number;
+  grossMargin: number;
+  mechanisation: number;
+  labour: number;
+  directMargin: number;
+}
+
+/** Ce qui manque pour qu'un poste soit complet : un prix, un rendement, un matériel (jamais compté pour zéro sans le dire). */
+export interface MarginMissing {
+  post: MarginPost;
+  label: string;
+  /** Onglet du module Économique où le compléter. */
+  tab: PriceKind | null;
+  /** Hectares concernés. */
+  areaHa: number;
+}
+
+export interface ActivityMargin extends MarginFigures {
+  activityId: string;
+  areaHa: number;
+  perHa: MarginFigures;
+  /** Postes incomplets de l'activité. */
+  incomplete: MarginPost[];
+  /** Cultures sans itinéraire technique : ni intrants, ni mécanisation, ni main-d'œuvre. */
+  withoutItinerary: number;
+}
+
+export interface CropPlanMargins {
+  activities: ActivityMargin[];
+  total: MarginFigures & { areaHa: number; perHa: MarginFigures };
+  missing: MarginMissing[];
+}

@@ -174,6 +174,64 @@ describe("assolement", () => {
     );
   });
 
+  it("onglet Économie : marges par activité à l'hectare, culture sans itinéraire signalée", async () => {
+    const user = userEvent.setup();
+    cropPlanServer();
+    server.use(
+      http.get("*/crop-plans/2027/itk-context", () =>
+        HttpResponse.json({
+          year: 2027,
+          itineraries: {},
+          equipments: [],
+          people: [],
+          crewTemplates: {},
+          observed: [],
+          machineryRates: {},
+          familyPerMeter: {},
+          routes: {},
+          site: null,
+          settings: { workdayHours: 8, weeklyHoursPerPerson: 45, defaultSiteId: null },
+          rateSource: "test",
+        }),
+      ),
+      http.get("*/crop-plans/2027/inputs-context", () => HttpResponse.json({ year: 2027, at: "2026-11-21", articles: {}, stock: {}, reserved: {}, plans: {} })),
+      http.get("*/crop-plans/2027/eco-context", () =>
+        HttpResponse.json({
+          year: 2027,
+          department: "44",
+          labour: null,
+          activities: [
+            {
+              activityId: WHEAT,
+              production: "winter_common_wheat",
+              specie: "triticum_aestivum",
+              farmYields: [],
+              agreste: [],
+              suggestions: [],
+              farmPrice: null,
+              yield: { value: 68, unit: "quintal_per_hectare", source: "agreste", label: "médiane Agreste 44 2023-2025" },
+              price: { value: 196.37, unit: "ton", source: "lexicon", label: "Milling wheat La Pallice, avr. 2026" },
+            },
+          ],
+        }),
+      ),
+    );
+    renderApp(`/f/${FARM}/crop-plan/2027`);
+    await user.click(await screen.findByRole("button", { name: "Préparer l'assolement 2027" }));
+    const table = await screen.findByRole("table", { name: "Parcelles de l'assolement" });
+    await user.click(within(table).getByRole("checkbox", { name: `Choisir ${R!.name}` }));
+    await choose(user, "Activité", "Blé tendre");
+    await user.click(screen.getByRole("button", { name: "Affecter" }));
+    await user.click(screen.getByRole("tab", { name: "Économie" }));
+    const margins = await screen.findByRole("table", { name: "Marges par activité" }, { timeout: 10_000 });
+    const wheat = within(margins).getByText("Blé tendre").closest("tr")!;
+    // 68 q/ha × 19,637 €/q = 1 335 €/ha ; sans itinéraire, la marge directe vaut le produit.
+    expect(wheat.cells[2]!.textContent).toMatch(/^1\s?335\s€$/);
+    expect(wheat.cells[7]!.textContent).toMatch(/^1\s?335\s€$/);
+    expect(screen.getByText(/1 culture\(s\) sans itinéraire technique/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("À compléter")).not.toBeInTheDocument();
+  });
+
   it("Activités : le menu Assolement propose la campagne et la suivante", async () => {
     const user = userEvent.setup();
     renderApp(`/f/${FARM}/activities?at=2026-06-10`);
