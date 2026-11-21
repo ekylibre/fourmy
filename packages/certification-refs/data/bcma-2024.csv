@@ -459,7 +459,7 @@ effluents-d-elevage--ens-epandage-lisier-15-5-m3-standard-enfouisseurs-prairies-
 effluents-d-elevage--ens-epandage-lisier-15-5-m3-standard-rampe-a-pendillards-12-m;Coût des façons culturales 2024;Effluents d'élevage;voyages;Ens. épandage lisier 15.5 m3 standard + rampe à pendillards 12 m;12;114630;600;19.12;3.5;22.62;2;45.23
 effluents-d-elevage--ens-epandage-lisier-15-5-m3-standard-rampe-a-pendillards-15-m;Coût des façons culturales 2024;Effluents d'élevage;voyages;Ens. épandage lisier 15.5 m3 standard + rampe à pendillards 15 m;15;120900;600;20.16;3.7;23.86;2;47.72
 effluents-d-elevage--ens-epandage-lisier-15-5-m3-standard-rampe-a-pendillards-18-m;Coût des façons culturales 2024;Effluents d'élevage;voyages;Ens. épandage lisier 15.5 m3 standard + rampe à pendillards 18 m;18;134490;600;22.43;4;26.43;2;52.86
-effluents-d-elevage--ens-epandage-lisier-15-5-m3-stand-dpa-rampe-a-pendillards-58-70-m;Coût des façons culturales 2024;Effluents d'élevage;voyages;Ens. épandage lisier 15.5 m3 stand+DPA + rampe à pendillards 58,70 m;58.7;18;146000;600;24.35;5;29.35;2
+effluents-d-elevage--ens-epandage-lisier-15-5-m3-stand-dpa-rampe-a-pendillards-18-m;Coût des façons culturales 2024;Effluents d'élevage;voyages;Ens. épandage lisier 15.5 m3 stand+DPA + rampe à pendillards 18 m;18;146000;600;24.35;5;29.35;2;58.7
 effluents-d-elevage--ens-epandage-lisier-19-m3-standard-buse-arriere-simple;Coût des façons culturales 2024;Effluents d'élevage;voyages;Ens. épandage lisier 19 m3 standard + buse arrière simple;;91000;750;12.14;3;15.14;1.5;22.71
 effluents-d-elevage--ens-epandage-lisier-19-m3-standard-enfouisseurs-praire-4-m;Coût des façons culturales 2024;Effluents d'élevage;voyages;Ens. épandage lisier 19 m3 standard + enfouisseurs praire 4 m;4;121580;750;16.22;5;21.22;1.5;31.83
 effluents-d-elevage--ens-epandage-lisier-19-m3-standard-rampe-pendillards-15-m;Coût des façons culturales 2024;Effluents d'élevage;voyages;Ens. épandage lisier 19 m3 standard + rampe pendillards 15 m;15;134900;750;18;4.2;22.2;2;44.4
@@ -521,7 +521,7 @@ moissonneuse-batteus--mois-bat-coup-110-4-secoueurs-coupe-3-7-m-occasion;Coût d
 moissonneuse-batteus--mois-bat-coup-150-5-secoueurs-coupe-a-4-05-m-occasion;Coût des façons culturales 2024;Moissonneuse-batteuse;hectares;Mois-bat coup 150 5 secoueurs coupe à 4,05 m occasion;4.05;91620;125;46.13;45;91.13;1;91.13
 moissonneuse-batteus--mois-bat-coup-170-5-secoueurs-coupe-a-4-5-m-occasion;Coût des façons culturales 2024;Moissonneuse-batteuse;hectares;Mois-bat coup 170 5 secoueurs coupe à 4,5 m occasion;4.5;103820;150;43.56;44.4;87.96;1.15;101.16
 moissonneuse-batteus--mois-bat-coup-270-5-a-6-secoueurs-coupe-a-6-m-occasion;Coût des façons culturales 2024;Moissonneuse-batteuse;hectares;Mois-bat coup 270 5 à 6 secoueurs coupe à 6 m occasion;6;111750;175;40.19;36.4;76.59;1.95;149.35
-moissonneuse-batteus--mois-bat-coup-420-non-conventionnelle-coupe-a-7-5-m-a-223-42-m-occasio;Coût des façons culturales 2024;Moissonneuse-batteuse;hectares;Mois-bat coup 420 non conventionnelle coupe à 7,5 m à 223,42 m occasion;7.5;9;188100;350;33.83;37.1;70.93;3.15
+moissonneuse-batteus--mois-bat-coup-420-non-conventionnelle-coupe-a-7-5-m-a-9-m-occasion;Coût des façons culturales 2024;Moissonneuse-batteuse;hectares;Mois-bat coup 420 non conventionnelle coupe à 7,5 m à 9 m occasion;7.5;188100;350;33.83;37.1;70.93;3.15;223.42
 moissonneuse-batteus--mois-bat-coup-170-5-secoueurs-coupe-4-05-a-4-6-m;Coût des façons culturales 2024;Moissonneuse-batteuse;hectares;Mois-bat coup 170 5 secoueurs coupe 4,05 à 4.6 m;4.6;149260;160;58.72;35.9;94.62;1.25;118.27
 moissonneuse-batteus--mois-bat-coup-210-5-secoueurs-coupe-5-a-6-m;Coût des façons culturales 2024;Moissonneuse-batteuse;hectares;Mois-bat coup 210 5 secoueurs coupe 5 à 6 m;6;182850;150;76.72;36.3;113.02;1.5;169.54
 moissonneuse-batteus--mois-bat-coup-235-5-secoueurs-coupe-5-5-a-6-m;Coût des façons culturales 2024;Moissonneuse-batteuse;hectares;Mois-bat coup 235 5 secoueurs coupe 5,5 à 6 m;6;207640;175;74.68;35.4;110.08;1.75;192.64
@@ -545,7 +545,7 @@ moissonneuse-batteus--cueilleur-pour-colza-tournesol-ou-pois-coupe-avancee;Coût
 moissonneuse-batteus--cueilleur-coupe-pois-4-25-m;Coût des façons culturales 2024;Moissonneuse-batteuse;hectares;Cueilleur Coupe Pois 4.25 m;4.25;17910;70;23.11;3.1;26.21;0.7;18.34
 moissonneuse-batteus--cueilleur-coupe-pois-4-85-m;Coût des façons culturales 2024;Moissonneuse-batteuse;hectares;Cueilleur Coupe Pois 4.85 m;4.85;23320;80;26.33;3.1;29.43;0.9;26.48
 moissonneuse-batteus--cueilleur-coupe-pois-6-10-m;Coût des façons culturales 2024;Moissonneuse-batteuse;hectares;Cueilleur Coupe Pois 6.10 m;6.1;26980;100;24.37;3.1;27.47;1;27.47
-moissonneuse-batteus--recuperateur-hydraulique-10-m-55-32;Coût des façons culturales 2024;Moissonneuse-batteuse;hectares;Récupérateur hydraulique 10 m 55,32;10;3;61640;150;37.11;2.4;39.51;1.4
+moissonneuse-batteus--recuperateur-hydraulique-10-m3;Coût des façons culturales 2024;Moissonneuse-batteuse;hectares;Récupérateur hydraulique 10 m3;;61640;150;37.11;2.4;39.51;1.4;55.32
 moissonneuse-batteus--recuperateur-hydraulique-avec-depot-sur-andain;Coût des façons culturales 2024;Moissonneuse-batteuse;hectares;Récupérateur hydraulique avec dépôt sur andain;;21170;150;12.75;2.2;14.95;1.4;20.92
 recolte-du-lin--retourneuse-tractee-lin-1-rang;Coût des façons culturales 2024;Récolte du lin;hectares;Retourneuse tractée lin 1 rang;;8500;25;28.33;3.6;31.93;0.8;25.54
 recolte-du-lin--souleveuse-tractee-lin-2-rangs;Coût des façons culturales 2024;Récolte du lin;hectares;Souleveuse tractée lin 2 rangs;;11620;75;12.91;1.3;14.21;2;28.42
@@ -650,15 +650,15 @@ materiels-de-fenaiso--faneur-2-7-m-montagne-a-tapis;Coût des façons culturales
 materiels-de-fenaiso--faneur-a-tapis7-m-a-tapis;Coût des façons culturales 2024;Matériels de fenaison 1;hectares;Faneur à tapis7 m à tapis;7;81920;500;13.65;3;16.65;5.5;91.57
 materiels-de-fenaiso--faneur-8-9-m-a-tapis;Coût des façons culturales 2024;Matériels de fenaison 1;hectares;Faneur 8 - 9 m à tapis;9;89280;600;12.4;3;15.4;7;107.78
 materiels-de-fenaiso--faneur-retourneur-d-andain;Coût des façons culturales 2024;Matériels de fenaison 1;hectares;Faneur retourneur d'andain;;15930;75;17.7;1.7;19.4;2;38.79
-materiels-de-fenaiso--presse-balles-chambre-fixe-120x-95-13;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Presse balles chambre fixe 120x 95,13;;120;38470;1000;3.21;0.6;3.81;25
+materiels-de-fenaiso--presse-balles-chambre-fixe-120x120;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Presse balles chambre fixe 120x120;;38470;1000;3.21;0.6;3.81;25;95.13
 materiels-de-fenaiso--presse-balles-chambre-variable-120-x-160;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Presse balles chambre variable 120 x 160;;44110;1200;3.06;0.8;3.86;35;135.19
 materiels-de-fenaiso--presse-balles-chambre-variable-120-x-180;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Presse balles chambre variable 120 x 180;;50410;1500;2.8;0.9;3.7;40;147.99
 materiels-de-fenaiso--presse-balles-chambre-variable-120-x-180-hg;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Presse balles chambre variable 120 x 180 HG;;60920;4000;1.27;1.1;2.37;50;118.44
 materiels-de-fenaiso--dispositif-hacheur-presse-balle-ronde;Coût des façons culturales 2024;Matériels de fenaison 1;balles;dispositif hacheur presse balle ronde;;6260;1500;0.35;0.3;0.65;30;19.43
 materiels-de-fenaiso--presse-balles-moyenne-densite-noueur-ficelle;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Presse balles moyenne densité noueur ficelle;;23470;15000;0.18;0.03;0.21;400;84.54
-materiels-de-fenaiso--presse-balles-haute-densite-50-x-86-37;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Presse balles haute densité 50 x 86,37;;80;70370;6000;1.36;0.8;2.16;40
-materiels-de-fenaiso--presse-balles-haute-densite-80-x-166-11;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Presse balles haute densité 80 x 166,11;;80;131700;5000;3.05;1.1;4.15;40
-materiels-de-fenaiso--presse-balles-haute-densite-70-x-104-14;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Presse balles haute densité 70 x 104,14;;120;138300;6000;2.67;0.8;3.47;30
+materiels-de-fenaiso--presse-balles-haute-densite-50-x-80;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Presse balles haute densité 50 x 80;;70370;6000;1.36;0.8;2.16;40;86.37
+materiels-de-fenaiso--presse-balles-haute-densite-80-x-80;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Presse balles haute densité 80 x 80;;131700;5000;3.05;1.1;4.15;40;166.11
+materiels-de-fenaiso--presse-balles-haute-densite-70-x-120;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Presse balles haute densité 70 x 120;;138300;6000;2.67;0.8;3.47;30;104.14
 materiels-de-fenaiso--presse-balles-haute-densite-70-x-120-haut-de-gamme;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Presse balles haute densité 70 x 120 haut de gamme;;183960;6000;3.55;0.8;4.35;30;130.6
 materiels-de-fenaiso--presse-balles-haute-densite-90-x-120-cm;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Presse balles haute densité 90 x 120 cm;;149700;6000;2.89;0.8;3.69;30;110.75
 materiels-de-fenaiso--presse-balles-haute-densite-90-x-120-cm-haut-de-gamme;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Presse balles haute densité 90 x 120 cm haut de gamme;;203950;6000;3.94;0.8;4.74;40;189.58
@@ -670,8 +670,8 @@ materiels-de-fenaiso--incorporateur-de-conservateur-2;Coût des façons cultural
 materiels-de-fenaiso--enrubanneuse-portee-3-points-1-balle-ou-1-ballot;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Enrubanneuse portée 3 points 1 balle ou 1 ballot;;11750;600;1.96;0.26;2.22;1;2.22
 materiels-de-fenaiso--enrubanneuse-trainee-1-balle-ou-1-ballot;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Enrubanneuse trainée 1 balle ou 1 ballot;;20550;1000;2.06;0.36;2.42;1;2.42
 materiels-de-fenaiso--enrubanneuse-trainee-1-balle-automatique;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Enrubanneuse trainée 1 balle automatique;;24670;2000;1.23;0.42;1.65;1;1.65
-materiels-de-fenaiso--presse-enruba-hors-film-120x-226-79;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Presse enruba hors film 120x 226,79;;120;102670;2500;4.76;0.91;5.67;40
-materiels-de-fenaiso--presse-enruba-hors-film-120x-244-29;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Presse enruba hors film 120x 244,29;;150;112110;2500;5.2;0.91;6.11;40
+materiels-de-fenaiso--presse-enruba-hors-film-120x120;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Presse enruba hors film 120x120;;102670;2500;4.76;0.91;5.67;40;226.79
+materiels-de-fenaiso--presse-enruba-hors-film-120x150;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Presse enruba hors film 120x150;;112110;2500;5.2;0.91;6.11;40;244.29
 materiels-de-fenaiso--enrubanneuse-alim-en-continue-type-baudoin;Coût des façons culturales 2024;Matériels de fenaison 1;balles;Enrubanneuse alim en continue Type Baudoin;;35240;2500;1.63;0.56;2.19;1;2.19
 materiels-de-fenaiso--remorque-auto-foin-25-m3-sans-couteaux;Coût des façons culturales 2024;Matériels de fenaison 2;hectares;Remorque auto foin 25 m3 sans couteaux;;37770;40;78.67;2.3;80.97;0.75;60.73
 materiels-de-fenaiso--remorque-auto-foin-35-m3-sans-couteaux;Coût des façons culturales 2024;Matériels de fenaison 2;hectares;Remorque auto foin 35 m3 sans couteaux;;47200;65;60.5;2.3;62.8;1.25;78.5
@@ -694,11 +694,11 @@ materiels-de-fenaiso--equipement-sp-barre-de-coupe-directe-largeur-5-20-m-pour-e
 materiels-de-distrib--desileuse-godet-desileur-porte-3-points-1-5-m3;Coût des façons culturales 2024;Matériels de distribution;heures;Désileuse godet désileur porté 3 points 1,5 m3;;8230;150;5.49;0.7;6.19;1;6.19
 materiels-de-distrib--desileuse-godet-desileur-sur-telescopique-2-5-m3;Coût des façons culturales 2024;Matériels de distribution;heures;Désileuse godet désileur sur télescopique 2,5 m3;;16800;150;11.21;1;12.21;1;12.21
 materiels-de-distrib--desileuse-godet-desileur-melangeur-sur-telescopique-3-m3;Coût des façons culturales 2024;Matériels de distribution;heures;Désileuse godet désileur mélangeur sur télescopique 3 m3;;25430;150;16.96;1.2;18.16;1;18.16
-materiels-de-distrib--desileuse-simple-portee-1-5-a-2-m-5-29;Coût des façons culturales 2024;Matériels de distribution;heures;Désileuse simple portée 1,5 à 2 m 5,29;2;3;8570;200;4.29;1;5.29;1
+materiels-de-distrib--desileuse-simple-portee-1-5-a-2-m3;Coût des façons culturales 2024;Matériels de distribution;heures;Désileuse simple portée 1,5 à 2 m3;;8570;200;4.29;1;5.29;1;5.29
 materiels-de-distrib--desileuse-simple-semi-portee-1-tapis-3-a-4-m3;Coût des façons culturales 2024;Matériels de distribution;heures;Désileuse simple semi-portée 1 tapis 3 à 4 m3;;24070;200;12.04;1.5;13.54;1;13.54
 materiels-de-distrib--desileuse-pailleuse-portee-1-balle-turbine;Coût des façons culturales 2024;Matériels de distribution;heures;Désileuse pailleuse portée 1 balle turbine;;16090;125;12.88;1;13.88;1;13.88
-materiels-de-distrib--desileuse-pailleuse-5-a-6-m-15-92;Coût des façons culturales 2024;Matériels de distribution;heures;Désileuse pailleuse 5 à 6 m 15,92;6;3;34770;250;13.92;2;15.92;1
-materiels-de-distrib--desileuse-recycleuse-8-a-9-m-15-70;Coût des façons culturales 2024;Matériels de distribution;heures;Désileuse recycleuse 8 à 9 m 15,70;9;3;42870;325;13.2;2.5;15.7;1
+materiels-de-distrib--desileuse-pailleuse-5-a-6-m3;Coût des façons culturales 2024;Matériels de distribution;heures;Désileuse pailleuse 5 à 6 m3;;34770;250;13.92;2;15.92;1;15.92
+materiels-de-distrib--desileuse-recycleuse-8-a-9-m3;Coût des façons culturales 2024;Matériels de distribution;heures;Désileuse recycleuse 8 à 9 m3;;42870;325;13.2;2.5;15.7;1;15.7
 materiels-de-distrib--desileuse-melangeuse-a-vis-8-a-10-m3;Coût des façons culturales 2024;Matériels de distribution;heures;Désileuse mélangeuse à vis 8 à 10 m3;;47570;325;14.65;2;16.65;1;16.65
 materiels-de-distrib--desileuse-remorque-distributrice-12-m3;Coût des façons culturales 2024;Matériels de distribution;heures;Désileuse remorque distributrice 12 m3;;19380;200;8.07;1.5;9.57;1;9.57
 materiels-de-distrib--desileuse-remorque-distributrice-avec-pesee-15-m3;Coût des façons culturales 2024;Matériels de distribution;heures;Désileuse remorque distributrice avec pesée 15 m3;;28190;200;11.74;1.8;13.54;1;13.54
@@ -745,7 +745,7 @@ materiels-de-transpo--remorque-18-m3-1-essieu-tranbordeur-15-t;Coût des façons
 materiels-de-transpo--remorque-38-m3-3-essieux-l-transbordeur-29-t;Coût des façons culturales 2024;Matériels de transport;heures;Remorque 38 m3 3 essieux l transbordeur 29 T;;128140;600;11.95;2;13.95;1;13.95
 materiels-de-transpo--remorque-2-essieux-porte-caisson-18-t;Coût des façons culturales 2024;Matériels de transport;heures;Remorque 2 essieux porte caisson 18 T;;56510;675;4.68;2;6.68;1;6.68
 materiels-de-transpo--remorque-3-essieux-porte-caisson-22-t;Coût des façons culturales 2024;Matériels de transport;heures;Remorque 3 essieux porte caisson 22 T;;63700;675;5.28;2.5;7.78;1;7.78
-materiels-de-transpo--remorque-caisse-24m-0-88;Coût des façons culturales 2024;Matériels de transport;heures;Remorque caisse 24m 0,88;24;3;9250;675;0.77;0.11;0.88;1
+materiels-de-transpo--remorque-caisse-24m3;Coût des façons culturales 2024;Matériels de transport;heures;Remorque caisse 24m3;;9250;675;0.77;0.11;0.88;1;0.88
 materiels-de-transpo--remorque-30-m3-2-essieux-a-fond-poussant-18-t;Coût des façons culturales 2024;Matériels de transport;heures;Remorque 30 m3 2 essieux à fond poussant 18 T;;60850;225;15.13;1.8;16.93;1;16.93
 materiels-de-transpo--remorque-40-m3-3-essieux-a-fond-poussant-24-t;Coût des façons culturales 2024;Matériels de transport;heures;Remorque 40 m3 3 essieux à fond poussant 24 T;;86600;300;16.15;2;18.15;1;18.15
 materiels-de-transpo--remorque-bennette-3-pts-1-8-m-large;Coût des façons culturales 2024;Matériels de transport;heures;Remorque bennette 3 pts 1,8 m large;1.8;1280;75;0.95;0.13;1.08;1;1.08
@@ -810,12 +810,12 @@ materiels-d-epierrag--broyeur-de-pi-rotor-1-8-a-2-m;Coût des façons culturales
 materiels-d-epierrag--broyeur-de-pi-rotor-2-5-m;Coût des façons culturales 2024;Matériels d'épierrage;hectares;Broyeur de pi rotor 2.5 m;2.5;41230;182;26.26;8.46;34.72;1.3;45.13
 materiels-d-epierrag--broyeur-de-pi-tp-16-marteaux-rotor-1-8-a2m;Coût des façons culturales 2024;Matériels d'épierrage;hectares;Broyeur de pi TP 16 marteaux rotor 1.8 à2m;2;48490;200;28.1;14;42.1;1;42.1
 materiels-d-epierrag--aligneuse-ram-2-rotors-pierre-2-8-a-30-cm-4-m-large;Coût des façons culturales 2024;Matériels d'épierrage;hectares;Aligneuse ram 2 rotors, pierre 2,8 à 30 cm 4 m large;4;90000;75;139.08;10.67;149.74;0.75;112.31
-materiels-d-epierrag--ramasseuse-de-pierre-1-a-2-m-80-25;Coût des façons culturales 2024;Matériels d'épierrage;hectares;Ramasseuse de pierre 1 à 2 m 80,25;2;3;37920;78;56.34;5.38;61.73;1.3
-materiels-d-epierrag--ramasseuse-de-pierre-3-m-78-33;Coût des façons culturales 2024;Matériels d'épierrage;hectares;Ramasseuse de pierre 3 m 78,33;3;3;43080;140;35.66;3.5;39.16;2
-materiels-d-epierrag--ramasseuse-de-pierre-4-m-99-68;Coût des façons culturales 2024;Matériels d'épierrage;hectares;Ramasseuse de pierre 4 m 99,68;4;3;55370;175;36.67;3.2;39.87;2.5
+materiels-d-epierrag--ramasseuse-de-pierre-1-a-2-m3;Coût des façons culturales 2024;Matériels d'épierrage;hectares;Ramasseuse de pierre 1 à 2 m3;;37920;78;56.34;5.38;61.73;1.3;80.25
+materiels-d-epierrag--ramasseuse-de-pierre-3-m3;Coût des façons culturales 2024;Matériels d'épierrage;hectares;Ramasseuse de pierre 3 m3;;43080;140;35.66;3.5;39.16;2;78.33
+materiels-d-epierrag--ramasseuse-de-pierre-4-m3;Coût des façons culturales 2024;Matériels d'épierrage;hectares;Ramasseuse de pierre 4 m3;;55370;175;36.67;3.2;39.87;2.5;99.68
 materiels-divers-1--cureuse-de-fosses-rigoleuse-a-fraise;Coût des façons culturales 2024;Matériels divers 1;heures;Cureuse de fossés rigoleuse à fraise;;7020;200;3.51;2.2;5.71;1;5.71
 materiels-divers-1--malaxeur-de-800-l;Coût des façons culturales 2024;Matériels divers 1;heures;Malaxeur de 800 l;;4470;200;2.24;2.1;4.34;1;4.34
-materiels-divers-1--malaxeur-de-beton-1-m-4-55;Coût des façons culturales 2024;Matériels divers 1;heures;Malaxeur de béton 1 m 4,55;1;3;5400;150;2.45;2.1;4.55;1
+materiels-divers-1--malaxeur-de-beton-1-m3;Coût des façons culturales 2024;Matériels divers 1;heures;Malaxeur de béton 1 m3;;5400;150;2.45;2.1;4.55;1;4.55
 materiels-divers-1--malaxeur-de-beton-sur-bras-telescopique;Coût des façons culturales 2024;Matériels divers 1;heures;Malaxeur de béton sur bras telescopique;;5970;150;2.71;2.1;4.81;1;4.81
 materiels-divers-1--affuteuse-de-piquets;Coût des façons culturales 2024;Matériels divers 1;heures;Affûteuse de piquets;;7750;125;5.17;0.7;5.87;1;5.87
 materiels-divers-1--nettoyeur-haute-pression-eau-froide;Coût des façons culturales 2024;Matériels divers 1;heures;Nettoyeur haute pression eau froide;;2480;50;6.82;1.1;7.92;1;7.92
@@ -834,8 +834,8 @@ materiels-divers-1--enfonce-pieu-pendulaire-pneumatique;Coût des façons cultur
 materiels-divers-1--deboucheuse-de-drains;Coût des façons culturales 2024;Matériels divers 1;jours;Déboucheuse de drains;;20380;20;101.96;50;151.96;1;151.96
 materiels-divers-1--convoyeur-pneumatique-debit-250-qtx-h-traine-pdf;Coût des façons culturales 2024;Matériels divers 1;quintaux;Convoyeur pneumatique débit 250 qtx/h trainé pdf;;22330;25000;0.07;0.05;0.12;250;31.1
 materiels-divers-1--convoyeur-pneumatique-debit-500-qtx-h-traine-pdf;Coût des façons culturales 2024;Matériels divers 1;quintaux;Convoyeur pneumatique débit 500 qtx/h trainé pdf;;35400;42500;0.07;0.08;0.15;500;74.7
-materiels-divers-1--vis-a-grains-debit-350-qtx-h-diam-20-45;Coût des façons culturales 2024;Matériels divers 1;quintaux;Vis à grains débit 350 qtx/h diam 20,45;;200;6380;5000;0.11;0.03;0.14;150
-materiels-divers-1--vis-a-grains-debit-500-qtx-h-diam-36-93;Coût des façons culturales 2024;Matériels divers 1;quintaux;Vis à grains débit 500 qtx/h diam 36,93;;250;10530;20000;0.04;0.03;0.07;500
+materiels-divers-1--vis-a-grains-debit-350-qtx-h-diam-200;Coût des façons culturales 2024;Matériels divers 1;quintaux;Vis à grains débit 350 qtx/h diam 200;;6380;5000;0.11;0.03;0.14;150;20.45
+materiels-divers-1--vis-a-grains-debit-500-qtx-h-diam-250;Coût des façons culturales 2024;Matériels divers 1;quintaux;Vis à grains débit 500 qtx/h diam 250;;10530;20000;0.04;0.03;0.07;500;36.93
 materiels-divers-1--fosse-a-grain-mobile;Coût des façons culturales 2024;Matériels divers 1;quintaux;Fosse à grain mobile;;14010;20000;0.06;0.03;0.09;500;44.18
 materiels-divers-1--applatisseur-3-points-10-t-h;Coût des façons culturales 2024;Matériels divers 1;quintaux;Applatisseur 3 points 10 t/h;;18540;5000;0.31;0.03;0.34;150;50.84
 materiels-divers-1--applatisseur-traine-10-20-t-h;Coût des façons culturales 2024;Matériels divers 1;quintaux;Applatisseur trainé 10/20 t/h;;38490;20000;0.16;0.03;0.19;500;95.17
@@ -853,7 +853,7 @@ irrigation--enrouleur-85-m3-h-125-mm-x-400-m;Coût des façons culturales 2024;I
 irrigation--enrouleur-60m3-h-120-mm-x-600-m;Coût des façons culturales 2024;Irrigation;hectares;Enrouleur 60m3/h 120 mm x 600 m;;53500;180;18.98;2.72;21.7;0;0
 irrigation--enrouleur-65-m3-h-125-mm-x-650-m;Coût des façons culturales 2024;Irrigation;hectares;Enrouleur 65 m3/h 125 mm x 650 m;;57500;195;18.83;2.7;21.53;0;0
 irrigation--enrouleur-60-m3-h-125-mm-x-750-m;Coût des façons culturales 2024;Irrigation;hectares;Enrouleur 60 m3/h 125 mm x 750 m;;72500;180;25.71;3.69;29.4;0;0
-irrigation--rampe-sur-enr-72-m-sur-chariot-4-roues-rotator-sur-enrouleur-125-x-ram;Coût des façons culturales 2024;Irrigation;hectares;Rampe sur enr 72 m, sur chariot 4 roues, rotator, sur enrouleur 125 x - rampe frontale pour enrouleur;;650;85000;210;25.84;2.43;28.27;0
+irrigation--rampe-sur-enr-72-m-sur-chariot-4-roues-rotator-sur-enrouleur-125-x-650;Coût des façons culturales 2024;Irrigation;hectares;Rampe sur enr 72 m, sur chariot 4 roues, rotator, sur enrouleur 125 x 650 rampe frontale pour enrouleur;;85000;210;25.84;2.43;28.27;0;0
 irrigation--pivots-fixes-5-tours-rotator-longueur-300-m;Coût des façons culturales 2024;Irrigation;hectares;Pivots fixes 5 tours, rotator longueur 300 m;;70000;88;29.53;16.92;46.45;0;0
 irrigation--pivots-fixes-8-tours-rotator-longueur-500-m;Coût des façons culturales 2024;Irrigation;hectares;Pivots fixes 8 tours, rotator longueur 500 m;;115000;232;18.4;10.37;28.77;0;0
 irrigation--rampe-frontal-190-m-rotator-groupe-electrogene-rampe-frontale-guidage-;Coût des façons culturales 2024;Irrigation;hectares;Rampe frontal 190 m, rotator groupe électrogène rampe frontale guidage sabot;;110000;94;43.45;21.35;64.8;0;0
@@ -865,7 +865,7 @@ irrigation--station-d-irr-armoire-colonne-30-m-accessoires-montage-compteur-pomp
 irrigation--station-d-irr-armoire-colonne-70-m-accessoires-montage-compteur-pompe-;Coût des façons culturales 2024;Irrigation;hectares;Station d'irr + armoire + colonne (70 m) + accessoires + montage + compteur pompe 80 ch;;62500;150;15.47;37.58;53.05;0;0
 irrigation--station-d-irr-armoire-colonne-70-m-accessoires-montage-compteur-pompe--2;Coût des façons culturales 2024;Irrigation;hectares;Station d'irr + armoire + colonne (70 m) + accessoires + montage + compteur pompe 150 ch;;80000;300;9.9;36.83;46.73;0;0
 irrigation--station-d-irr-accessoires-montage-compteur-pompe-de-surface-50-ch;Coût des façons culturales 2024;Irrigation;hectares;Station d'irr + accessoires + montage + compteur pompe de surface 50 ch;;25000;150;6.19;36.55;42.74;0;0
-irrigation--station-d-irr-accessoires-montage-compteur-pompe-de-surface-ch;Coût des façons culturales 2024;Irrigation;hectares;Station d'irr + accessoires + montage + compteur pompe de surface - ch;;100;45000;300;5.57;36.32;41.89;0
+irrigation--station-d-irr-accessoires-montage-compteur-pompe-de-surface-100-ch;Coût des façons culturales 2024;Irrigation;hectares;Station d'irr + accessoires + montage + compteur pompe de surface 100 ch;;45000;300;5.57;36.32;41.89;0;0
 irrigation--canalisations-pour-1000-de-long-a-10-6-m-tuyaux-aluminium-4-pouces;Coût des façons culturales 2024;Irrigation;hectares;Canalisations pour 1000 de long à 10,6 €/m tuyaux aluminium 4 pouces;;10660;133;2.98;1.2;4.18;0;0
 irrigation--canalisations-pour-1000-de-long-a-13-m-tuyaux-aluminium-5-pouces;Coût des façons culturales 2024;Irrigation;hectares;Canalisations pour 1000 de long à 13 €/m tuyaux aluminium 5 pouces;;14220;200;2.64;0.92;3.56;0;0
 irrigation--canalisations-140-mm-tuyau;Coût des façons culturales 2024;Irrigation;hectares;Canalisations 140 mm tuyau;;20000;200;2.13;1;3.13;0;0

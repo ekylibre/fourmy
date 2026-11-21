@@ -36,7 +36,28 @@ const UNITS = "heures|hectares|voyages|m3|tonnes|balles|km|jours|quintaux|sacs|k
 const FAMILY = new RegExp(`^(\\S.*?)\\s{3,}(${UNITS})\\s*$`);
 const UNIT_ONLY = new RegExp(`^(${UNITS})$`);
 const NUM = String.raw`(\d{1,3}(?: \d{3})*(?:,\d+)?|-)`;
-const ROW = new RegExp(String.raw`^(.*?)\s*${NUM}\s+${NUM}\s+${NUM}\s+${NUM}\s+${NUM}\s+${NUM}\s+${NUM}(?:\s+(.*?))?\s*$`);
+const NUM_CELL = new RegExp(`^${NUM}$`);
+/**
+ * Ligne de matériel : les colonnes du PDF sont séparées par au moins deux
+ * espaces. Les 7 nombres sont les 7 dernières cellules numériques ; ce qui
+ * précède est le libellé (un libellé qui finit par un nombre, « coupe à 9 »,
+ * reste du libellé), ce qui suit est une fin de libellé ou un symbole.
+ * Rend [ligne, libellé, n1…n7, fin] comme une correspondance d'expression.
+ */
+function parseRow(line: string): string[] | null {
+  const cells = line.trim().split(/\s{2,}/);
+  let last = -1;
+  for (let i = cells.length - 1; i >= 0; i--)
+    if (NUM_CELL.test(cells[i]!)) {
+      last = i;
+      break;
+    }
+  if (last < 6) return null;
+  const nums = cells.slice(last - 6, last + 1);
+  if (!nums.every((c) => NUM_CELL.test(c))) return null;
+  return [line, cells.slice(0, last - 6).join(" "), ...nums, cells.slice(last + 1).join(" ")];
+}
+const ROW = { exec: parseRow };
 const JUNK = /CEGARA|Barème annuel|Prix d'achat|Quantité|d'unités|d'utilisation|^\s*unité\s*$|moyen\s*$|Variat|Perfor|mance en|\/\s*n-1|SOURCE|Coûts standards|Ces coûts|Familles de matériels|financier sur|calcul dite|par unité/;
 const NUMBER_ONLY = /^\d+$/;
 

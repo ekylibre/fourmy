@@ -16,6 +16,8 @@ import {
   proposeInterventions,
   reconcilePlanned,
   splitUnit,
+  storedUnit,
+  convertQuantity,
   type DomainCtx,
   type ExistingPlanned,
   type PlannedItinerary,
@@ -64,6 +66,8 @@ interface Loaded {
   existing: ExistingPlanned[];
   interventions: Map<string, Intervention>;
   crews: Map<string, { equipmentIds: string[]; personIds: string[] }>;
+  /** Articles cités par les ITK : unité du stock, nature, densité (dose écrite dans l'unité de l'article). */
+  articles: Map<string, { unit: string; kind: string; density: number | null }>;
   withoutItinerary: number;
 }
 
@@ -121,7 +125,19 @@ async function load(tx: Tx, year: number, productionIds?: string[]): Promise<Loa
       crews.set(m.template_id, c);
     }
   }
+  const articleIds = [...new Set([...itineraries.values()].flatMap((t) => t.content.steps.flatMap((s) => s.inputs.map((i) => i.articleId).filter((x): x is string => !!x))))];
+  const articles = new Map(
+    (articleIds.length
+      ? await rows<{ id: string; unit: string; kind: string; density: number | null }>(
+          tx,
+          sql`SELECT a.id, a.unit, a.kind, f.density::float8 AS density FROM articles a LEFT JOIN article_fertilizers f ON f.article_id = a.id
+              WHERE a.id = ANY(${pgArray(articleIds)}::uuid[])`,
+        )
+      : []
+    ).map((a) => [a.id, { unit: a.unit, kind: a.kind, density: a.density }]),
+  );
   return {
+    articles,
     productions: withItk.map((p) => ({
       id: p.id,
       parcelId: p.parcel_id,
@@ -149,19 +165,30 @@ async function load(tx: Tx, year: number, productionIds?: string[]): Promise<Loa
 /** Matériels et intervenants d'une proposition : attelage type déplié, sinon ceux de l'étape. */
 const staffingOf = (p: PlannedProposal, crews: Loaded["crews"]) => (p.crewTemplateId && crews.get(p.crewTemplateId)) || { equipmentIds: p.equipmentIds, personIds: p.personIds };
 
+/**
+ * Intrant écrit : dose à l'hectare dans l'unité de l'article quand elle s'y
+ * convertit (une unité reprise d'Ekylibre est un libellé, « Kilogramme » ; la
+ * saisie d'un phyto exige l'unité de l'article, recette du 21/11), sinon dans
+ * l'unité de la dose. Les semences gardent la leur (grains/m², doses…).
+ */
+function inputOf(i: PlannedProposal["inputs"][number], articles: Loaded["articles"]) {
+  const { unit } = splitUnit(i.unit);
+  const a = articles.get(i.articleId!);
+  const base = { articleId: i.articleId!, per: "hectare" as const };
+  if (!a || a.kind === "seed") return { ...base, quantity: i.dose, unit };
+  if (unit === a.unit) return { ...base, quantity: i.dose };
+  const q = convertQuantity(i.dose, unit, a.unit, a.density);
+  return q !== null && q > 0 ? { ...base, quantity: Math.round(q * 1e6) / 1e6 } : { ...base, quantity: i.dose, unit };
+}
+
 /** Ce que la génération écrit (corps d'intervention prévue), pour un jour donné. */
-function writeOf(p: PlannedProposal, day: string, crews: Loaded["crews"]) {
-  const staff = staffingOf(p, crews);
+function writeOf(p: PlannedProposal, day: string, l: Pick<Loaded, "crews" | "articles">) {
+  const staff = staffingOf(p, l.crews);
   return interventionPlanWrite.parse({
     procedure: p.procedure,
     plannedAt: `${day}T06:00:00Z`,
     targets: [{ kind: "land_parcel", id: p.parcelId, ...(p.areaM2 > 0 ? { workedAreaM2: p.areaM2 } : {}) }],
-    inputs: p.inputs
-      .filter((i) => i.articleId)
-      .map((i) => {
-        const { unit } = splitUnit(i.unit);
-        return { articleId: i.articleId!, quantity: i.dose, per: "hectare" as const, unit };
-      }),
+    inputs: p.inputs.filter((i) => i.articleId).map((i) => inputOf(i, l.articles)),
     tools: staff.equipmentIds.map((equipmentId) => ({ equipmentId })),
     doers: staff.personIds.map((personId) => ({ personId })),
     purposes: p.purposes,
@@ -169,16 +196,17 @@ function writeOf(p: PlannedProposal, day: string, crews: Loaded["crews"]) {
   });
 }
 
-function signatureOfProposal(p: PlannedProposal, crews: Loaded["crews"], day = p.day): string | null {
+/** Empreinte de ce que la génération écrirait, normalisée comme à la relecture (`signatureOfIntervention`). */
+function signatureOfProposal(p: PlannedProposal, l: Pick<Loaded, "crews" | "articles">, day = p.day): string | null {
   if (!day) return null;
-  const staff = staffingOf(p, crews);
+  const w = writeOf(p, day, l);
   return plannedSignature({
     procedure: p.procedure,
     day,
     targets: [{ id: p.parcelId, workedAreaM2: p.areaM2 > 0 ? p.areaM2 : null }],
-    inputs: p.inputs.filter((i) => i.articleId).map((i) => ({ articleId: i.articleId!, quantity: i.dose, unit: i.unit })),
-    equipmentIds: staff.equipmentIds,
-    personIds: staff.personIds,
+    inputs: w.inputs.map((i) => ({ articleId: i.articleId, quantity: i.quantity, unit: storedUnit(i.unit ?? l.articles.get(i.articleId)?.unit ?? "", i.per) })),
+    equipmentIds: w.tools.map((t) => t.equipmentId),
+    personIds: w.doers.map((d) => d.personId),
   });
 }
 
@@ -215,7 +243,7 @@ function toItem(r: ReconciledItem, l: Loaded): PlannedItem {
 async function previewInTx(tx: Tx, year: number, productionIds?: string[]): Promise<{ preview: PlannedPreview; reconciled: ReconciledItem[]; loaded: Loaded }> {
   const loaded = await load(tx, year, productionIds);
   const proposals = proposeInterventions(loaded.productions, loaded.itineraries);
-  const reconciled = reconcilePlanned(proposals, loaded.existing, (p) => signatureOfProposal(p, loaded.crews));
+  const reconciled = reconcilePlanned(proposals, loaded.existing, (p) => signatureOfProposal(p, loaded));
   const items = reconciled.map((r) => toItem(r, loaded));
   // Noms des parcelles des retraits (production disparue ou changée).
   const missingNames = items.filter((i) => !i.parcelName && i.parcelId).map((i) => i.parcelId);
@@ -265,9 +293,9 @@ export async function confirmPlanned(db: Database, farmId: string, year: number,
       try {
         await tx.transaction(async (sp) => {
           if (r.state === "update") await cancel(sp, r.existing!.id);
-          const { intervention } = await planInTx(sp, farmId, ctx, { ...writeOf(p, day, loaded.crews), id: ctx.newId() });
+          const { intervention } = await planInTx(sp, farmId, ctx, { ...writeOf(p, day, loaded), id: ctx.newId() });
           // Empreinte de la proposition non modifiée : une date changée dans l'aperçu compte comme une modification à la main.
-          const ref: ItineraryRef = { itineraryId: p.itineraryId, revision: p.revision, stepId: p.stepId, occurrence: p.occurrence, productionId: p.productionId, campaign: p.campaign, hash: signatureOfProposal(p, loaded.crews)! };
+          const ref: ItineraryRef = { itineraryId: p.itineraryId, revision: p.revision, stepId: p.stepId, occurrence: p.occurrence, productionId: p.productionId, campaign: p.campaign, hash: signatureOfProposal(p, loaded)! };
           await sp.execute(sql`UPDATE interventions SET itinerary_ref = ${JSON.stringify(ref)}::jsonb WHERE id = ${intervention.id}`);
         });
         if (r.state === "update") result.updated++;

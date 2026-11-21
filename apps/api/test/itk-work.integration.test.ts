@@ -61,6 +61,13 @@ describe.skipIf(!url)("temps de travaux (intégration)", () => {
         (${crypto.randomUUID()}, ${id}, 'tool', 'equipment', ${tractor}), (${crypto.randomUUID()}, ${id}, 'tool', 'equipment', ${plough})`;
     }
   });
+  beforeAll(async () => {
+    // Un hersage saisi sur 30 h d'un seul tenant (nuits comprises) : écarté du réalisé, compté.
+    const id = crypto.randomUUID();
+    await sql`INSERT INTO interventions (id, farm_id, procedure, status, origin, started_at, stopped_at) VALUES (${id}, ${farmId}, 'raking', 'done', 'web', '2025-10-08T06:00:00Z', '2025-10-09T12:00:00Z')`;
+    await sql`INSERT INTO intervention_periods (id, intervention_id, started_at, stopped_at) VALUES (${crypto.randomUUID()}, ${id}, '2025-10-08T06:00:00Z', '2025-10-09T12:00:00Z')`;
+    await sql`INSERT INTO intervention_parameters (id, intervention_id, role, ref_type, ref_id) VALUES (${crypto.randomUUID()}, ${id}, 'target', 'land_parcel', ${parcel})`;
+  });
   afterAll(async () => {
     await teardown(sql, farmId, users);
     await sql.end();
@@ -81,6 +88,7 @@ describe.skipIf(!url)("temps de travaux (intégration)", () => {
     expect(c.familyPerMeter.plowing).toBeGreaterThan(0);
     expect(c.rateSource).toMatch(/BCMA/);
     expect(c.previousHoursByActivity).toEqual({ [maize]: 12 });
+    expect(c.previousExcludedPeriods).toEqual({ [maize]: 1 });
     const [cached] = await sql`SELECT method FROM parcel_routes WHERE farm_id = ${farmId} AND parcel_key = ${parcel}`;
     expect(cached!.method).toBe("estimate");
   });
