@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router";
 import { Alert, Badge, Button, Grid, Group, Modal, Paper, Stack, Tabs, Text, Title, Tooltip } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
-import { ChevronLeft, ChevronRight, Lock, PanelRightClose, PanelRightOpen, Pencil, Redo2, Undo2, X } from "lucide-react";
+import { CalendarPlus, ChevronLeft, ChevronRight, Lock, PanelRightClose, PanelRightOpen, Pencil, Redo2, Undo2, X } from "lucide-react";
 import type { CropPlanContext, CropPlanParcelKey, CropPlanView } from "@fourmy/contracts";
 import { worstControlLevel } from "@fourmy/domain";
 import { api, farmPath } from "../../app/api";
@@ -17,6 +17,7 @@ import { FALLOW, MapLegend } from "./legend";
 import { draftShapes, ParcelTools, PendingOperations, splitOperation } from "./operations";
 import { cropPlanKeys, useCropPlan, useCropPlanContext } from "./queries";
 import { useCropPlanEditor, type SaveState } from "./useCropPlanEditor";
+import { PlannedInterventionsModal } from "../itk/PlannedInterventionsModal";
 import "./workspace.css";
 
 /**
@@ -99,6 +100,7 @@ function Editor({ farmId, year, plan, context, owner, nav }: { farmId: string; y
   const [tab, setTab] = useState<string | null>("parcels");
   const [filter, setFilter] = useState<ParcelFilter>("all");
   const [validating, setValidating] = useState<{ revision: number } | null>(null);
+  const [planning, setPlanning] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [cutting, setCutting] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -388,6 +390,7 @@ function Editor({ farmId, year, plan, context, owner, nav }: { farmId: string; y
 
   return (
     <Stack gap="sm">
+      {planning && <PlannedInterventionsModal farmId={farmId} year={year} onClose={() => setPlanning(false)} />}
       <Group justify="space-between" wrap="wrap">
         <Group gap="sm">
           <Title order={1}>Assolement {year}</Title>
@@ -431,6 +434,11 @@ function Editor({ farmId, year, plan, context, owner, nav }: { farmId: string; y
                 Valider…
               </Button>
             </>
+          )}
+          {owner && plan.status === "validated" && (
+            <Button size="sm" variant="default" leftSection={<CalendarPlus size={14} />} onClick={() => setPlanning(true)}>
+              Préparer les interventions prévues
+            </Button>
           )}
           {owner && plan.status === "validated" && (
             <Button size="sm" variant="light" leftSection={<Pencil size={14} />} loading={reopen.isPending} onClick={() => reopen.mutate()}>

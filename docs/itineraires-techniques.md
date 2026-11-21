@@ -6,8 +6,10 @@ culture : travail du sol, semis, fertilisation, traitements, récolte. Chaque
 « récolte J+5 »), ou à une date fixe (« 15/02 »), avec ses intrants et leurs
 doses à l'hectare, ses matériels et son débit de chantier.
 
-Les ITK servent à préparer l'assolement : temps de travaux, besoins en
-intrants, puis interventions prévues de la campagne (à venir).
+Les ITK servent à préparer l'assolement : on en choisit un à l'affectation
+d'une culture, puis « Préparer les interventions prévues » crée les
+interventions de la campagne (voir `docs/assolement.md`). Temps de travaux et
+besoins en intrants : à venir.
 
 ## Où
 

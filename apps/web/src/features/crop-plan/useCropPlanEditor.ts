@@ -19,6 +19,8 @@ const UNDO_LIMIT = 100;
 export interface AssignOptions {
   startedOn: string | null;
   stoppedOn: string | null;
+  /** Itinéraire technique (lot IT3) ; null ou absent : aucun. */
+  itineraryId?: string | null;
 }
 
 let seq = 0;
@@ -30,8 +32,12 @@ export function assignMain(draft: CropPlanDraft, keys: CropPlanParcelKey[], acti
   const assignments = [...draft.assignments];
   for (const key of keys) {
     const i = assignments.findIndex((a) => a.key === key && a.role === "main");
-    if (i >= 0) assignments[i] = { ...assignments[i]!, activityId, startedOn: opts.startedOn, stoppedOn: opts.stoppedOn };
-    else assignments.push({ id: newId(), key, role: "main", activityId, startedOn: opts.startedOn, stoppedOn: opts.stoppedOn });
+    const itk = opts.itineraryId ? { itineraryId: opts.itineraryId } : {};
+    if (i >= 0) {
+      const { itineraryId: _old, ...rest } = assignments[i]!;
+      void _old;
+      assignments[i] = { ...rest, activityId, startedOn: opts.startedOn, stoppedOn: opts.stoppedOn, ...itk };
+    } else assignments.push({ id: newId(), key, role: "main", activityId, startedOn: opts.startedOn, stoppedOn: opts.stoppedOn, ...itk });
   }
   return { ...draft, assignments, fallow: draft.fallow.filter((f) => !set.has(f.key)) };
 }

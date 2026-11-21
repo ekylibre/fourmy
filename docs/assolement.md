@@ -42,7 +42,7 @@ Un brouillon s'ouvre en plein écran : la carte occupe tout l'écran sous une ba
 
 1. **Préparer l'assolement** : le brouillon part des cultures déjà saisies ou importées pour l'année. Rien ne change dans les productions avant la validation.
 2. **Choisir des parcelles** : clic sur la carte, Maj + glisser, ou cases de l'onglet **Parcelles** (culture de l'an passé et culture prévue). Le filtre « Sans culture prévue » ne garde que celles-là, sur la liste comme sur la carte.
-3. **Affecter** (formulaire sous la carte) une activité avec ses dates prévues, pré-remplies d'après les dates types de Lexicon pour une culture annuelle ; ajouter une **culture dérobée** ; marquer **sans culture** (jachère) ; **retirer**. La sélection se vide après le geste : les parcelles prennent la couleur de leur activité.
+3. **Affecter** (formulaire sous la carte) une activité avec ses dates prévues, pré-remplies d'après les dates types de Lexicon pour une culture annuelle, et son **itinéraire technique** (proposé quand l'activité n'en a qu'un ; voir `docs/itineraires-techniques.md`) ; ajouter une **culture dérobée** ; marquer **sans culture** (jachère) ; **retirer**. La sélection se vide après le geste : les parcelles prennent la couleur de leur activité.
 
 Sur la carte : parcelles affectées à la couleur de leur activité, sans culture en gris, encore à affecter en pointillés rouges ; légende en haut à gauche (activités avec leur image et leur surface, parcelles à affecter).
 4. **Couvert d'interculture** (après la culture) : nature, famille, espèces, dates. Il est enregistré à la validation dans le cahier de fertilisation de la campagne suivante (un couvert par parcelle).
@@ -66,8 +66,10 @@ Données manquantes (parcelle sans culture prévue, culture sans code PAC, histo
 
 ## Valider, réviser
 
-- **Valider…** : aperçu des changements (campagne, productions, découpes et fusions, couverts), points bloquants avec « Voir », constats. Bloquent : une parcelle sans culture ni « sans culture », la suppression d'une culture qui porte des interventions réalisées, une date d'effet incohérente (avant la fin d'une culture, intervention réalisée ou prévue après sur la parcelle d'origine), des formes qui ne recouvrent pas la parcelle d'origine, une fusion de surfaces AB et non AB.
+- **Valider…** : aperçu des changements (campagne, productions, découpes et fusions, couverts), points bloquants avec « Voir », constats. Bloquent : une parcelle sans culture ni « sans culture », la suppression d'une culture qui porte des interventions réalisées, une date d'effet incohérente (avant la fin d'une culture, intervention réalisée après sur la parcelle d'origine), des formes qui ne recouvrent pas la parcelle d'origine, une fusion de surfaces AB et non AB.
+- **Découpe et interventions prévues** : celles qu'un itinéraire a générées sur la parcelle d'origine après la date d'effet sont annulées (« Préparer les interventions prévues » les repropose sur les morceaux) ; pour celles saisies à la main, la fenêtre de validation demande de choisir le morceau qui la reçoit, ou de la **répartir sur chaque morceau** (quantités totales au prorata des surfaces, doses à l'hectare gardées).
 - La validation crée les productions, les parcelles découpées ou fusionnées (avec leur filiation et leurs certifications) et les couverts, puis fige une **version** (changements, constats).
+- **Préparer les interventions prévues** (assolement validé) : pour chaque culture qui a un itinéraire, les interventions de ses étapes, datées d'après le semis et la récolte prévus. Cochez ce qui est à créer, mettre à jour ou retirer, ajustez les dates, puis confirmez. Relancée après une révision ou une modification d'un itinéraire, elle ne refait que ce qui a changé ; une intervention modifiée à la main ou réalisée n'est jamais touchée. Les étapes sans date (semis ou récolte inconnus) restent « à préciser ».
 - **Modifier** rouvre un assolement validé (le brouillon repart de l'état actuel) ; la nouvelle validation demande un motif (sortie d'hiver…). **Historique** : les versions et leurs changements. **Abandonner le brouillon** revient à la dernière version.
 
 ## Réglages (responsable)
@@ -78,9 +80,10 @@ Onglet **Réglages** : critère BCAE 7 mis en avant, ferme en plaine du Rhin (di
 
 - Repères agronomiques à relire par un agronome ; soja : pages divergentes (2 ans retenus).
 - BCAE 7 : barème à points de la plaine du Rhin non calculé ; liste des légumineuses de l'exemption reconstituée (à vérifier sur la notice Télépac).
-- Découpe : interventions prévues sur la parcelle d'origine à reporter à la main ; pas d'annulation d'une découpe validée (fusionner les morceaux) ; mobile mis à jour à la première synchronisation complète après la date d'effet.
+- Découpe : pas d'annulation d'une découpe validée (fusionner les morceaux) ; mobile mis à jour à la première synchronisation complète après la date d'effet ; une intervention prévue en attelages ou sur plusieurs parcelles se reporte sur un seul morceau.
+- Interventions prévues : une par parcelle et par étape (pas encore de chantier multi-parcelles) ; un intrant générique (« Azote 40 u ») est noté dans l'intervention, à préciser.
 - Zonages : chargés avec le référentiel Lexicon (jeux `protected_water_zones`, `protected_natural_zones`) ; sans eux, la section Réglementaire ne voit que les points d'eau.
 
 ## Suite
 
-Temps 2 (itinéraires techniques, temps de travaux, besoins en intrants) et temps 3 (module économique : prix, rendements, marges) : `claudedocs/besoins_assolement.md` §5 et §6.
+Temps 2 : itinéraires techniques et interventions prévues faits ; temps de travaux et besoins en intrants à venir. Temps 3 (module économique : prix, rendements, marges) : `claudedocs/besoins_assolement.md` §5 et §6.
