@@ -43,3 +43,28 @@ Sans prix propre, un matériel rattaché au barème BCMA (fiche du matériel ou
 éditeur d'itinéraire) est compté à son coût « façons culturales » : coûts
 fixe et variable, carburant compris. Le coût du barème s'affiche dans la
 colonne **Repère** ; « Rattacher au barème… » ouvre la fiche du matériel.
+
+## Repères Lexicon des produits
+
+Dans l'onglet **Produits**, chaque production à grain (blé, orge, maïs grain,
+colza, tournesol…) affiche des repères tirés du référentiel Lexicon :
+
+- prix payé aux producteurs, du département de la ferme et de France (Agreste) ;
+- cours **MATIF** ;
+- prix de marché européens relevés en France (Commission européenne,
+  places comme La Pallice, Rouen ou Bordeaux).
+
+« Reprendre » remplit le prix avec ce repère ; la ligne garde sa source
+(Lexicon), sa date et sa référence une fois enregistrée. Les repères de plus de
+3 ans et les places de marché qui ne sont plus relevées (6 mois de retard sur
+la plus récente) ne sont pas proposés. Les productions fourragères (maïs
+fourrage, prairies) n'ont pas de repère de prix du grain.
+
+Le département vient du code INSEE du siège de l'exploitation (profil de la
+ferme). Le **rendement Agreste** du département pour la dernière campagne
+s'affiche sous le nom de la production ; il servira de rendement par défaut
+à l'assolement quand la ferme n'a pas d'historique de récolte.
+
+Ces références sont chargées par la synchro Lexicon (jeux `productions` et
+`eu_market_prices`, en accès libre).
+

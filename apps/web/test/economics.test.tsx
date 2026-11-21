@@ -58,4 +58,43 @@ describe("module Économique", () => {
     await waitFor(() => expect(posted).toHaveLength(2));
     expect(posted[1]!.items).toEqual([expect.objectContaining({ kind: "article", unit: "liter", amount: 8 })]);
   });
+
+  it("produits : repères Lexicon, « Reprendre » garde la source", async () => {
+    const posted: { items: Record<string, unknown>[] }[] = [];
+    server.use(
+      http.get("*/prices", () => HttpResponse.json({ items: [] })),
+      http.get("*/prices/suggestions/products", () =>
+        HttpResponse.json({
+          department: "64",
+          items: [
+            {
+              activityId: "00000000-0000-7000-8000-0000000000f1",
+              production: "grain_corn",
+              specie: "zea_mays",
+              yields: [{ campaign: 2025, value: 69, unit: "quintal_per_hectare" }],
+              suggestions: [
+                { source: "lexicon", scope: "national", label: "Maïs", amount: 175, unit: "ton", date: "2025-06-01", ref: "production_prices:1" },
+                { source: "lexicon", scope: "market", label: "Feed maize Bordeaux", amount: 201.5, unit: "ton", date: "2026-04-13", ref: "eu_market_prices:MAI_FR" },
+              ],
+            },
+          ],
+        }),
+      ),
+      http.post("*/prices", async ({ request }) => {
+        posted.push((await request.json()) as (typeof posted)[number]);
+        return HttpResponse.json({ items: [] }, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(`/f/${FARM}/economics?tab=product`);
+    const table = await screen.findByRole("table", { name: "Production" }, { timeout: 10_000 });
+    expect(await within(table).findByText(/rendement Agreste 64 : 69 q\/ha en 2025/)).toBeInTheDocument();
+    expect(within(table).getByText(/marché européen \(Feed maize Bordeaux\)/)).toBeInTheDocument();
+    await user.click(within(table).getByRole("button", { name: "Reprendre marché européen pour Vignes AOP" }));
+    await user.click(screen.getByRole("button", { name: "Enregistrer (1)" }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]!.items).toEqual([
+      expect.objectContaining({ kind: "product", product: "principal", amount: 201.5, unit: "ton", source: "lexicon", sourceRef: "eu_market_prices:MAI_FR", sourceDate: "2026-04-13" }),
+    ]);
+  });
 });

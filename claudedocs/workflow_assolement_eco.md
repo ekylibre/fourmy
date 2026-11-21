@@ -85,3 +85,13 @@ flowchart LR
 - Tests : domaine (2), API (2), web (1). Essai dans Chrome sur la ferme de l'exploitant testeur : coût horaire enregistré.
 - Corrigé en essai : saisie décimale « 22,5 » effacée à la virgule ; unité « hour » non traduite ; matériel au barème affiché « à saisir ».
 - Documentation : `docs/economie.md`.
+
+### E2 — en partie fait (21/11)
+- Migration 0081 : `lexicon_production_yields`, `lexicon_production_prices`, `lexicon_market_prices` (référentiel commun).
+- Synchro : tables facultatives `master_production_yields` et `master_production_prices` du jeu `productions` (rechargé si la version est déjà en base mais qu'une table publiée est vide) ; jeu `eu_market_prices` s'il est publié, relevés français seulement. Base de développement : 4 942 rendements, 10 906 prix, 6 120 prix européens.
+- API `GET /prices/suggestions/products` : prix du grain (producteur du département et de France, MATIF, trois places européennes), rendements Agreste du département ; repères de plus de 3 ans et places en retard de 6 mois écartés ; rien pour les productions fourragères.
+- Web, onglet Produits : repères et « Reprendre » (source, date et référence gardées), rendement Agreste sous la production.
+- Constats : les prix producteurs d'Agreste s'arrêtent en 2021 dans Lexicon (donc écartés) ; le MATIF va jusqu'à décembre 2025, les prix européens jusqu'à avril 2026.
+- **Reste** : prix des intrants. Les jeux `fertilizers`, `phytosanitary_prices` et `seeds` répondent 403 sans clé, y compris leur structure : leur chargement attend la lecture de leur structure avec la clé d'adhérent.
+- Tests : chargeur (2 nouveaux), API (1), web (1).
+

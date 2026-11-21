@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { priceKind, pricesWrite } from "@fourmy/contracts";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
-import { addPrices, deletePrice, listPrices } from "../repos/prices.js";
+import { addPrices, deletePrice, listPrices, productSuggestions } from "../repos/prices.js";
 import { domainCtx, problem, uuidParam } from "./helpers.js";
 
 /** Prix de la ferme (temps 3, lot E1) : lecture pour les membres, saisie par le responsable. */
@@ -15,6 +15,8 @@ export const priceRoutes = new Hono<Env>()
     if (!/^\d{4}-\d{2}-\d{2}$/.test(at)) return problem(c, 400, "Date au format AAAA-MM-JJ");
     return c.json({ items: await listPrices(db(), c.get("farmId"), { kind: parsedKind?.data, at, history: c.req.query("history") === "1" }) });
   })
+  // Repères Lexicon (lot E2) : prix de vente proposés et rendements Agreste, par activité.
+  .get("/prices/suggestions/products", async (c) => c.json(await productSuggestions(db(), c.get("farmId"))))
   .post("/prices", requireOwner, async (c) => {
     const parsed = pricesWrite.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.issues.map((i) => i.message).join(" "));

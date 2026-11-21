@@ -8,7 +8,7 @@ import { useActivities, useArticles } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
 import { useEquipmentRates } from "../itk/work";
 import { PriceTable, fmtEuro, type PriceRow } from "./PriceTable";
-import { usePrices } from "./queries";
+import { useProductSuggestions, usePrices } from "./queries";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const TABS: PriceKind[] = ["article", "equipment", "labour", "service", "product"];
@@ -136,11 +136,34 @@ function ServicesTab({ farmId, owner }: { farmId: string; owner: boolean }) {
 function ProductsTab({ farmId, owner }: { farmId: string; owner: boolean }) {
   const activities = useActivities(farmId, new Date().getFullYear());
   const { q, get } = useCurrent(farmId, "product");
+  const refs = useProductSuggestions(farmId);
+  const byActivity = new Map((refs.data?.items ?? []).map((i) => [i.activityId, i]));
+  const dept = refs.data?.department;
   if (activities.isLoading || q.isLoading) return <Loading />;
   if (activities.error || q.error) return <ErrorAlert error={activities.error ?? q.error} />;
   // Un produit principal par activité au premier lot ; les autres produits (paille…) viendront avec les prévisions (lot E3).
   const rows: PriceRow[] = (activities.data?.items ?? [])
     .filter((a) => !a.suspended && PLANT_FAMILIES.includes(a.family))
-    .map((a) => ({ label: a.name, sub: "produit principal", ref: { activityId: a.id, product: "principal" }, unit: "ton", units: ["ton", "quintal", "kilogram", "hectoliter", "unity"], current: get({ activityId: a.id, product: "principal" }) }));
-  return <PriceTable farmId={farmId} kind="product" rows={rows} owner={owner} label="Production" />;
+    .map((a) => {
+      const ref = byActivity.get(a.id);
+      const y = ref?.yields[0];
+      return {
+        label: a.name,
+        sub: y ? `produit principal · rendement Agreste ${dept} : ${y.value.toLocaleString("fr-FR")} q/ha en ${y.campaign}` : "produit principal",
+        ref: { activityId: a.id, product: "principal" },
+        unit: "ton",
+        units: ["ton", "quintal", "kilogram", "hectoliter", "unity"],
+        current: get({ activityId: a.id, product: "principal" }),
+        suggestions: ref?.suggestions,
+      };
+    });
+  return (
+    <Stack gap="xs">
+      <Alert color="gray" p="xs">
+        Repères Lexicon pour les productions à grain : prix payés aux producteurs (Agreste, département et France), cours MATIF et prix de marché européens
+        (Commission européenne). « Reprendre » remplit le prix avec sa source ; il reste à l'enregistrer.
+      </Alert>
+      <PriceTable farmId={farmId} kind="product" rows={rows} owner={owner} label="Production" />
+    </Stack>
+  );
 }

@@ -61,7 +61,10 @@ const url = process.env.DATABASE_URL;
 /** Petit triangle (WKB hexadécimal, comme les CSV des zonages Lexicon). */
 const WKB = "0106000020e61000000100000001030000000100000004000000000000000000e03f666666666666464052b81e85eb51e03f666666666666464052b81e85eb51e03f48e17a14ae674640000000000000e03f6666666666664640";
 
-function fakeServer(phytoVersion: string, { agroedi = false, zones = false, seeds = false, apiKey }: { agroedi?: boolean; zones?: boolean; seeds?: boolean; apiKey?: string } = {}) {
+function fakeServer(
+  phytoVersion: string,
+  { agroedi = false, zones = false, seeds = false, prices = false, apiKey }: { agroedi?: boolean; zones?: boolean; seeds?: boolean; prices?: boolean; apiKey?: string } = {},
+) {
   const csv = (lines: string[]) => gzipSync(lines.join("\n") + "\n");
   const files: Record<string, string | Buffer> = {
     "index.json": JSON.stringify({
@@ -73,6 +76,7 @@ function fakeServer(phytoVersion: string, { agroedi = false, zones = false, seed
         ...(agroedi ? { agroedi: { current: "a1", versions: ["a1"] } } : {}),
         ...(zones ? { protected_water_zones: { current: "w1", versions: ["w1"] }, protected_natural_zones: { current: "n1", versions: ["n1"] } } : {}),
         ...(seeds ? { seed_varieties: { current: "sv1", versions: ["sv1"] } } : {}),
+        ...(prices ? { eu_market_prices: { current: "eu1", versions: ["eu1"] } } : {}),
       },
     }),
     [`phytosanitary/${phytoVersion}/manifest.json`]: JSON.stringify({
@@ -210,6 +214,41 @@ function fakeServer(phytoVersion: string, { agroedi = false, zones = false, seed
     ]);
     files["seed_varieties/sv1/manifest.json"] = JSON.stringify({ name: "seed_varieties", version: "sv1", tables: [{ name: "registered_seed_varieties", rows: 4, files: [{ path: "data/sv_0.csv.gz" }] }] });
   }
+  if (prices) {
+    // Tables facultatives de `productions` (rendements, prix) et prix européens.
+    const manifest = JSON.parse(files["productions/pr1/manifest.json"] as string) as { tables: unknown[] };
+    manifest.tables.push(
+      { name: "master_production_yields", rows: 3, files: [{ path: "data/y_0.csv.gz" }] },
+      { name: "master_production_prices", rows: 3, files: [{ path: "data/pp_0.csv.gz" }] },
+    );
+    files["productions/pr1/manifest.json"] = JSON.stringify(manifest);
+    files["productions/pr1/structure.sql"] += `
+      CREATE TABLE master_production_yields (department_zone character varying NOT NULL, specie character varying NOT NULL, production character varying NOT NULL,
+        yield_value numeric(8,2) NOT NULL, yield_unit character varying NOT NULL, campaign integer NOT NULL);
+      CREATE TABLE master_production_prices (department_zone character varying NOT NULL, started_on DATE NOT NULL, nature character varying,
+        price_duration interval NOT NULL, specie character varying NOT NULL, waiting_price numeric(8,2) NOT NULL, final_price numeric(8,2) NOT NULL,
+        currency character varying NOT NULL, price_unit character varying NOT NULL, product_output_specie character varying NOT NULL,
+        production_reference_name character varying, campaign integer, organic boolean, label character varying);`;
+    files["productions/pr1/data/y_0.csv.gz"] = csv([
+      `64,zea_mays,grain_corn,95.00,quintal_per_hectare,2024`,
+      `64,zea_mays,grain_corn,69.00,quintal_per_hectare,2025`,
+      `44,triticum_aestivum,winter_common_wheat,68.00,quintal_per_hectare,2025`,
+    ]);
+    files["productions/pr1/data/pp_0.csv.gz"] = csv([
+      `0,2025-12-01,matif_price,P1M,triticum_aestivum,0.00,250.50,EUR,ton,grain,,2025,,Blé MATIF`,
+      `44,2025-06-01,farmer_price,P1M,zea_mays,180.00,0.00,EUR,ton,grain,,2024,,Maïs`,
+      `0,2025-06-01,farmer_price,P1M,zea_mays,0.00,0.00,EUR,ton,grain,,2024,,Maïs`,
+    ]);
+    files["eu_market_prices/eu1/structure.sql"] = `CREATE TABLE registered_eu_market_prices (id character varying PRIMARY KEY NOT NULL, nature character varying,
+      category character varying, specie character varying, production_reference_name character varying, sector_code character varying,
+      product_code character varying, product_label character varying, product_description character varying, unit_value integer,
+      unit_name character varying, country character varying, price numeric(8,2), start_date date, end_date date);`;
+    files["eu_market_prices/eu1/data/eu_0.csv.gz"] = csv([
+      `MAI_FR_2026-04-13,eu_price,Vegetal Products,zea_mays,,CER,MAI,Feed maize Bordeaux,Rendu Port - Delivered,1,ton,FR,201.50,2026-04-13,2026-04-19`,
+      `MAI_DK_2026-04-13,eu_price,Vegetal Products,zea_mays,,CER,MAI,Feed maize Kobenhavn,Rendu Port - Delivered,1,ton,DK,190.00,2026-04-13,2026-04-19`,
+    ]);
+    files["eu_market_prices/eu1/manifest.json"] = JSON.stringify({ name: "eu_market_prices", version: "eu1", tables: [{ name: "registered_eu_market_prices", rows: 2, files: [{ path: "data/eu_0.csv.gz" }] }] });
+  }
   const fetchImpl = (async (input: string | URL, init?: RequestInit) => {
     const path = String(input).replace("http://lexicon.test/", "");
     requested.push(path);
@@ -267,6 +306,49 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", { timeout: 150_
       });
   });
 
+  it("rendements, prix des productions et prix européens (France), s'ils sont publiés", async () => {
+    await sql
+      .begin(async (tx) => {
+        const reports = await syncLexiconIn(tx, { base: "http://lexicon.test", fetchImpl: fakeServer("v1", { prices: true }).fetchImpl, force: true });
+        expect(reports.find((r) => r.name === "productions")).toEqual({ name: "productions", version: "pr1", status: "loaded", rows: 12 });
+        expect(reports.find((r) => r.name === "eu_market_prices")).toEqual({ name: "eu_market_prices", version: "eu1", status: "loaded", rows: 2 });
+        expect(await tx`SELECT department, production, yield_value::float8 AS y, campaign FROM lexicon_production_yields ORDER BY 1, 4`).toEqual([
+          { department: "44", production: "winter_common_wheat", y: 68, campaign: 2025 },
+          { department: "64", production: "grain_corn", y: 95, campaign: 2024 },
+          { department: "64", production: "grain_corn", y: 69, campaign: 2025 },
+        ]);
+        // Prix final, sinon prix d'attente ; un prix nul est écarté.
+        expect(await tx`SELECT zone, nature, specie, price::float8 AS price, label FROM lexicon_production_prices ORDER BY 1`).toEqual([
+          { zone: "0", nature: "matif_price", specie: "triticum_aestivum", price: 250.5, label: "Blé MATIF" },
+          { zone: "44", nature: "farmer_price", specie: "zea_mays", price: 180, label: "Maïs" },
+        ]);
+        expect(await tx`SELECT id, label, price::float8 AS price, started_on::text FROM lexicon_market_prices`).toEqual([
+          { id: "MAI_FR_2026-04-13", label: "Feed maize Bordeaux", price: 201.5, started_on: "2026-04-13" },
+        ]);
+        throw new Rollback();
+      })
+      .catch((e) => {
+        if (!(e instanceof Rollback)) throw e;
+      });
+  });
+
+  it("version déjà chargée : rechargée si une table facultative publiée est vide, pas sinon", async () => {
+    await sql
+      .begin(async (tx) => {
+        await syncLexiconIn(tx, { base: "http://lexicon.test", fetchImpl: fakeServer("v1").fetchImpl, force: true });
+        await tx`TRUNCATE lexicon_production_yields, lexicon_production_prices`;
+        const without = await syncLexiconIn(tx, { base: "http://lexicon.test", fetchImpl: fakeServer("v1").fetchImpl });
+        expect(without.find((r) => r.name === "productions")!.status).toBe("up-to-date");
+        const withPrices = await syncLexiconIn(tx, { base: "http://lexicon.test", fetchImpl: fakeServer("v1", { prices: true }).fetchImpl });
+        expect(withPrices.find((r) => r.name === "productions")!.status).toBe("loaded");
+        expect((await tx`SELECT count(*)::int AS n FROM lexicon_production_yields`)[0]!.n).toBe(3);
+        throw new Rollback();
+      })
+      .catch((e) => {
+        if (!(e instanceof Rollback)) throw e;
+      });
+  });
+
   it("charge produits, usages, ensembles et taxonomie ; une version connue n'est pas retéléchargée", async () => {
     await sql
       .begin(async (tx) => {
@@ -281,6 +363,7 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", { timeout: 150_
           { name: "protected_water_zones", version: "", status: "absent", rows: 0 },
           { name: "protected_natural_zones", version: "", status: "absent", rows: 0 },
           { name: "seed_varieties", version: "", status: "absent", rows: 0 },
+          { name: "eu_market_prices", version: "", status: "absent", rows: 0 },
         ]);
         expect(await tx`SELECT reference_name, started_on::text, stopped_on::text FROM lexicon_productions ORDER BY 1`).toEqual([
           { reference_name: "grain_corn", started_on: "2000-03-01", stopped_on: "2000-11-30" },
@@ -322,7 +405,7 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", { timeout: 150_
         // Même version : rien n'est retéléchargé.
         const again = fakeServer("v1");
         const second = await syncLexiconIn(tx, { base: "http://lexicon.test", fetchImpl: again.fetchImpl });
-        expect(second.map((r) => r.status)).toEqual(["up-to-date", "up-to-date", "up-to-date", "up-to-date", "absent", "absent", "absent", "absent"]);
+        expect(second.map((r) => r.status)).toEqual(["up-to-date", "up-to-date", "up-to-date", "up-to-date", "absent", "absent", "absent", "absent", "absent"]);
         expect(again.requested).toEqual(["index.json"]);
         throw new Rollback();
       })

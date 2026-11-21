@@ -82,3 +82,44 @@ export interface Price {
 /** Clé d'un prix : ce dont il est le prix. */
 export const priceKey = (p: Pick<Price, "kind" | "articleId" | "equipmentId" | "activityId" | "product" | "procedure">) =>
   [p.kind, p.articleId ?? "", p.equipmentId ?? "", p.activityId ?? "", p.product ?? "", p.procedure ?? ""].join("|");
+
+/**
+ * Prix proposé (lot E2) : repère tiré d'une référence, à reprendre ou non.
+ * `scope` : département de la ferme, France, ou marché (place de cotation).
+ */
+export interface PriceSuggestion {
+  source: PriceSource;
+  scope: "department" | "national" | "matif" | "market";
+  label: string;
+  amount: number;
+  unit: string;
+  /** Date du prix dans la source. */
+  date: string;
+  /** Identifiant de la ligne dans la source (repris dans `sourceRef`). */
+  ref: string;
+}
+
+export interface YieldReference {
+  campaign: number;
+  value: number;
+  unit: string;
+}
+
+/** Repères Lexicon d'une activité végétale : prix de vente proposés, rendements Agreste du département. */
+export interface ProductSuggestions {
+  department: string | null;
+  items: {
+    activityId: string;
+    production: string | null;
+    specie: string | null;
+    suggestions: PriceSuggestion[];
+    yields: YieldReference[];
+  }[];
+}
+
+export const PRICE_SCOPE_LABELS: Record<PriceSuggestion["scope"], string> = {
+  department: "prix producteur du département",
+  national: "prix producteur France",
+  matif: "MATIF",
+  market: "marché européen",
+};
