@@ -123,6 +123,14 @@ export function EconomyPanel({ editor, context }: { editor: CropPlanEditor; cont
             </Accordion.Panel>
           </Accordion.Item>
         </Accordion>
+      ) : previous.isLoading ? (
+        <Text size="xs" c="dimmed">
+          Chargement du réalisé {prevYear}…
+        </Text>
+      ) : previous.error ? (
+        <Alert color="red" p="xs">
+          Réalisé {prevYear} indisponible : {(previous.error as Error).message}
+        </Alert>
       ) : (
         previous.data && (
           <Text size="xs" c="dimmed">

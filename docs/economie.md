@@ -145,3 +145,15 @@ Limite : la comparaison avec le **prévu** de la campagne précédente (son
 assolement validé avec des itinéraires) n'est pas encore faite ; seule la
 comparaison avec le réalisé l'est.
 
+## Limites connues
+
+- Prix des intrants proposés par Lexicon (engrais, phyto, semences) : en
+  attente du bundle « fourmy » ; la saisie seule pour l'instant.
+- API agrifood de la Commission indisponible (point d'entrée suspendu le
+  21/11/2026) : les repères de prix de vente viennent de Lexicon.
+- Comparaison avec la campagne précédente : réalisé seulement, pas son prévu.
+- Pas de charges indirectes (fermage, amortissements hors barème…) ni de
+  réalisé détaillé : la marge directe est la dernière ligne.
+- Rendement des cultures fourragères selon la saisie des récoltes (matière
+  brute ou sèche).
+

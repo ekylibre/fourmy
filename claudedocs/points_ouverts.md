@@ -324,7 +324,7 @@ Besoins, conception et plans : `claudedocs/besoins_import_onboarding.md`, `claud
 122. **Essai de l'écran d'assolement avec l'exploitant testeur** : préparer 2027 sur sa ferme, retours à intégrer. *donnée · P2 · workflow_assolement Q5* — issue #112
 123. **Relecture des repères agronomiques** (délais de retour, précédents) par un agronome ; soja (2 ans ou 4 à 6 ans) et pomme de terre en priorité. *donnée · P2 · workflow_assolement Q3* — issue #113
 124. ~~**Temps 2 : itinéraires techniques** à l'affectation (catalogue Lexicon, ITK de la ferme), interventions proposées puis confirmées, temps de travaux (OSRM), besoins en intrants~~ : **fait le 21/11**, lots IT1 à IT6, PR #135 à #141 à fusionner (`claudedocs/workflow_assolement_itk.md`). Suites : 135 à 141. *évolution · P2 · besoins_assolement §5* — issue #114
-125. **Temps 3 : module économique** (prix des intrants par la clé d'adhérent Lexicon, prix de vente par l'API agrifood de la Commission, rendements et marges). *évolution · P3 · besoins_assolement §6* — issue #115
+125. ~~**Temps 3 : module économique** (prix des intrants par la clé d'adhérent Lexicon, prix de vente par l'API agrifood de la Commission, rendements et marges)~~ : **fait le 21/11**, lots E1-E6 (PR #144-#149) ; suites 142-147. *évolution · P3 · besoins_assolement §6* — issue #115
 126. **Découpe : annulation d'une découpe validée** (le report des interventions prévues sur les morceaux est fait, lot IT3) ; répartition d'une intervention en attelages ou à plusieurs parcelles. *évolution · P3 · workflow_assolement AS3, workflow_assolement_itk IT3* — issue #116
 127. **Mobile : parcellaire à la date d'effet d'une découpe** (synchronisation qui ne voit le changement qu'à la synchronisation complète suivante). *dette · P3 · workflow_assolement AS3* — issue #117
 128. **BCAE 7 : barème à points de la plaine du Rhin** (liste des communes de l'arrêté BCAE) et liste des légumineuses de l'exemption à vérifier sur la notice Télépac 2026. *donnée · P3 · docs/pac/rapport_pac.md* — issue #118
@@ -336,6 +336,12 @@ Besoins, conception et plans : `claudedocs/besoins_import_onboarding.md`, `claud
 139. **ITK pluriannuels** (vigne : plantation, P+1, pleine production ; luzerne) : une seule année d'exploitation par ITK aujourd'hui. *évolution · P3 · conception_assolement_itk §13.4*
 140. **Partage d'ITK entre fermes** (bibliothèque Fourmy, retour à l'idée du catalogue Lexicon avec des contenus refaits). *évolution · P3 · conception_assolement_itk §13.5*
 141. **Rattachement des matériels au barème BCMA** des deux fermes de test : propositions à confirmer sur la fiche de chaque matériel (le type et la largeur manquent souvent). *donnée · P2 · workflow_assolement_itk IT4*
+142. **Prix des intrants Lexicon** : bundle `fourmy` défini dans Lexicon (branche v2, 21/11) mais pas encore servi (404 sur `index.json`) ; une fois publié, charger `fertilizers`, `phytosanitary_prices`, `seeds` et proposer « Reprendre » dans l'onglet Intrants, avec l'attribution Cereapro et Germineo. *évolution · P2 · workflow_assolement_eco E2*
+143. **API agrifood de la Commission** : point d'entrée suspendu le 21/11 ; le worker réessaie chaque jour, Lexicon sert de repli. Vérifier le format des réponses au premier appel réussi (client écrit d'après le code de Lexicon). *suivi · P2 · workflow_assolement_eco E3*
+144. **Comparaison avec le prévu de la campagne précédente** (assolement N-1 validé avec itinéraires) : seule la comparaison avec le réalisé est faite. *évolution · P3 · workflow_assolement_eco E5*
+145. **Charges indirectes par clé de répartition et réalisé détaillé** (hors première version, décision A19). *évolution · P3 · besoins_assolement A19*
+146. **Recette économique avec les deux fermes de test** : saisir leurs prix (intrants, matériels, coût horaire, prestations, produits), enregistrer les récoltes 2026 de l'exploitant testeur ; les interventions de la GAEC n'ont qu'une date (pas d'heures) : main-d'œuvre réalisée incomplète. *recette · P2 · workflow_assolement_eco E6*
+147. **Rendement des cultures fourragères** : calculé sur des récoltes saisies tantôt en matière brute, tantôt en matière sèche (maïs fourrage de la GAEC : 41,8 puis 228,1 q/ha) ; unité à fixer par culture. *donnée · P3 · workflow_assolement_eco E3*
 
 ## 18. Semences
 
