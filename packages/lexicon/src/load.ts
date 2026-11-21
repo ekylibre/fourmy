@@ -14,7 +14,9 @@ import { fetchIndex, fetchManifest, fetchStructure, packageUrl, parseStructure, 
  * clé, ignoré s'il manque à l'index) ; `protected_water_zones` et
  * `protected_natural_zones` (aires de captage, Natura 2000 : assolement,
  * ignorés s'ils manquent à l'index) ; `seed_varieties` (catalogue des
- * variétés SEMAE : semences, ignoré s'il manque à l'index). Une version déjà chargée n'est pas
+ * variétés SEMAE : semences, ignoré s'il manque à l'index) ; rendements Agreste
+ * et prix des productions (tables facultatives de `productions`) et
+ * `eu_market_prices` (relevés français ; temps 3 de l'assolement). Une version déjà chargée n'est pas
  * retéléchargée ; une nouvelle version remplace l'ancienne d'un bloc, dans
  * une transaction (tout ou rien). Chaque fichier est vérifié par son sha256
  * quand le manifeste le donne.
@@ -40,21 +42,34 @@ const REQUIRED: Record<string, string[]> = {
   registered_protected_water_zones: ["id", "administrative_zone", "name", "updated_on", "shape"],
   registered_natural_zones: ["id", "name", "nature", "shape"],
   registered_seed_varieties: ["id", "id_specie", "specie_name_fra", "variety_name", "registration_date"],
+  master_production_yields: ["department_zone", "specie", "production", "yield_value", "yield_unit", "campaign"],
+  master_production_prices: ["department_zone", "started_on", "nature", "specie", "waiting_price", "final_price", "price_unit", "product_output_specie", "production_reference_name", "campaign", "organic", "label"],
+  registered_eu_market_prices: ["id", "specie", "product_code", "product_label", "product_description", "unit_name", "country", "price", "start_date", "end_date"],
 };
 
 /**
  * `optional` : jeu réservé aux adhérents, chargé seulement avec une clé (sinon « absent »).
  * `ifPublished` : jeu ouvert chargé s'il figure à l'index (zonages de l'assolement), « absent » sinon.
  */
-const PACKAGES: { name: string; tables: string[]; optional?: true; ifPublished?: true }[] = [
+/**
+ * `optionalTables` : tables chargées si la version les publie (sinon, leurs
+ * tables Fourmy sont laissées telles quelles), avec leurs propres transformations
+ * (`TABLE_TRANSFORMS`).
+ */
+const PACKAGES: { name: string; tables: string[]; optionalTables?: string[]; optional?: true; ifPublished?: true }[] = [
   { name: "phytosanitary", tables: ["registered_phytosanitary_products", "registered_phytosanitary_usages", "registered_phytosanitary_cropsets", "registered_phytosanitary_target_name_to_pfi_targets", "registered_phytosanitary_risks", "registered_phytosanitary_symbols"] },
   { name: "taxonomy", tables: ["master_taxonomy", "taxonomy__translations"] },
-  { name: "productions", tables: ["master_productions", "productions__translations", "master_crop_production_tfi_codes", "master_crop_production_cap_codes"] },
+  {
+    name: "productions",
+    tables: ["master_productions", "productions__translations", "master_crop_production_tfi_codes", "master_crop_production_cap_codes"],
+    optionalTables: ["master_production_yields", "master_production_prices"],
+  },
   { name: "agricultural_pictures", tables: ["master_agricultural_pictures"] },
   { name: "agroedi", tables: ["registered_agroedi_codes", "registered_agroedi_crops"], optional: true },
   { name: "protected_water_zones", tables: ["registered_protected_water_zones"], ifPublished: true },
   { name: "protected_natural_zones", tables: ["registered_natural_zones"], ifPublished: true },
   { name: "seed_varieties", tables: ["registered_seed_varieties"], ifPublished: true },
+  { name: "eu_market_prices", tables: ["registered_eu_market_prices"], ifPublished: true },
 ];
 
 /** Passage des tables temporaires (texte) aux tables de Fourmy, typées. */
@@ -171,6 +186,46 @@ const TRANSFORMS: Record<string, string[]> = {
   ],
 };
 
+/**
+ * Transformations des tables facultatives (temps 3, lot E2) : rendements
+ * Agreste, prix des productions ; prix de marché européens (relevés français).
+ */
+/** Table Fourmy remplie par chaque table facultative. */
+const OPTIONAL_TARGETS: Record<string, string> = {
+  master_production_yields: "lexicon_production_yields",
+  master_production_prices: "lexicon_production_prices",
+};
+
+const TABLE_TRANSFORMS: Record<string, string[]> = {
+  master_production_yields: [
+    `TRUNCATE lexicon_production_yields`,
+    `INSERT INTO lexicon_production_yields (department, specie, production, yield_value, yield_unit, campaign)
+     SELECT btrim(department_zone), specie, production, yield_value::numeric, yield_unit, campaign::int
+     FROM lx_master_production_yields
+     WHERE coalesce(btrim(department_zone), '') <> '' AND coalesce(production, '') <> '' AND yield_value ~ '^[0-9.]+$' AND campaign ~ '^[0-9]+$'
+     ON CONFLICT DO NOTHING`,
+  ],
+  // Prix final, sinon prix d'attente (acompte) ; un prix nul est écarté.
+  master_production_prices: [
+    `TRUNCATE lexicon_production_prices`,
+    `INSERT INTO lexicon_production_prices (zone, started_on, nature, specie, output, price, unit, production, campaign, organic, label)
+     SELECT btrim(department_zone), started_on::date, nullif(btrim(nature), ''), specie, product_output_specie,
+            coalesce(nullif(final_price::numeric, 0), nullif(waiting_price::numeric, 0)), price_unit,
+            nullif(btrim(production_reference_name), ''), nullif(campaign, '')::int, nullif(organic, '')::boolean, nullif(btrim(label), '')
+     FROM lx_master_production_prices
+     WHERE coalesce(nullif(final_price::numeric, 0), nullif(waiting_price::numeric, 0)) IS NOT NULL`,
+  ],
+};
+TRANSFORMS.eu_market_prices = [
+  `TRUNCATE lexicon_market_prices`,
+  `INSERT INTO lexicon_market_prices (id, specie, product_code, label, stage, unit, price, started_on, ended_on)
+   SELECT id, nullif(btrim(specie), ''), product_code, product_label, nullif(btrim(product_description), ''), unit_name, price::numeric,
+          start_date::date, nullif(end_date, '')::date
+   FROM lx_registered_eu_market_prices
+   WHERE country = 'FR' AND coalesce(price, '') <> '' AND coalesce(start_date, '') <> '' AND coalesce(product_code, '') <> ''
+   ON CONFLICT (id) DO NOTHING`,
+];
+
 export interface PackageReport {
   name: string;
   version: string;
@@ -193,7 +248,8 @@ export interface SyncOptions {
 const REFERENTIAL_TABLES = [
   "phyto_products", "phyto_usages", "phyto_cropsets", "phyto_target_pfi", "phyto_risks", "phyto_hazard_symbols", "taxonomy",
   "lexicon_productions", "lexicon_production_ift", "lexicon_cap_codes", "lexicon_pictures", "lexicon_agroedi_codes", "lexicon_agroedi_crops",
-  "lexicon_water_catchments", "lexicon_natura2000",
+  "lexicon_water_catchments", "lexicon_natura2000", "lexicon_seed_varieties",
+  "lexicon_production_yields", "lexicon_production_prices", "lexicon_market_prices",
 ];
 
 /**
@@ -239,7 +295,21 @@ export async function syncLexiconIn(tx: TransactionSql, { base, apiKey, force = 
     }
     if (!version) throw new Error(`Lexicon : paquet « ${pkg.name} » absent de l'index`);
     const [loaded] = await tx<{ version: string; rows: number }[]>`SELECT version, rows FROM lexicon_packages WHERE name = ${pkg.name}`;
-    if (!force && loaded?.version === version) {
+    // Version déjà chargée, mais une table facultative publiée par cette version
+    // est encore vide (table ajoutée à Fourmy depuis) : on recharge.
+    let missingOptional = false;
+    if (!force && loaded?.version === version && pkg.optionalTables?.length) {
+      const empty: string[] = [];
+      for (const t of pkg.optionalTables) {
+        const [r] = (await tx.unsafe(`SELECT NOT EXISTS (SELECT 1 FROM ${OPTIONAL_TARGETS[t]}) AS empty`)) as unknown as [{ empty: boolean }];
+        if (r.empty) empty.push(t);
+      }
+      if (empty.length) {
+        const published = await fetchManifest(base, pkg.name, version, fetchImpl);
+        missingOptional = empty.some((t) => published.tables.some((m) => m.name === t && m.rows > 0));
+      }
+    }
+    if (!force && loaded?.version === version && !missingOptional) {
       reports.push({ name: pkg.name, version, status: "up-to-date", rows: loaded.rows });
       continue;
     }
@@ -247,11 +317,14 @@ export async function syncLexiconIn(tx: TransactionSql, { base, apiKey, force = 
     const columns = parseStructure(await fetchStructure(base, pkg.name, version, fetchImpl));
     let rows = 0;
     for (const table of pkg.tables) rows += await stage(tx, base, manifest, table, columns.get(table), fetchImpl);
+    const extra = (pkg.optionalTables ?? []).filter((t) => columns.has(t) && manifest.tables.some((m) => m.name === t));
+    for (const table of extra) rows += await stage(tx, base, manifest, table, columns.get(table), fetchImpl);
     if (!locked) {
       await lockReferential(tx);
       locked = true;
     }
     for (const statement of TRANSFORMS[pkg.name]!) await tx.unsafe(statement);
+    for (const table of extra) for (const statement of TABLE_TRANSFORMS[table]!) await tx.unsafe(statement);
     await tx`
       INSERT INTO lexicon_packages (name, version, source, rows, loaded_at)
       VALUES (${pkg.name}, ${version}, ${base}, ${rows}, now())
@@ -276,6 +349,7 @@ async function stage(
   const entry = manifest.tables.find((t) => t.name === table);
   if (!entry) throw new Error(`Lexicon : ${table} absente du manifeste ${manifest.name} ${manifest.version}`);
   const staging = `lx_${table}`;
+  await tx.unsafe(`DROP TABLE IF EXISTS ${staging}`);
   await tx.unsafe(`CREATE TEMP TABLE ${staging} (${columns.map((c) => `"${c}" text`).join(", ")}) ON COMMIT DROP`);
   for (const file of entry.files) {
     const res = await fetchImpl(packageUrl(base, manifest.name, manifest.version, file.path), { signal: AbortSignal.timeout(300_000) });

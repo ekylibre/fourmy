@@ -1,6 +1,6 @@
 import { sql, type SQL } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
-import type { Price, PriceKind, priceWrite } from "@fourmy/contracts";
+import type { Price, PriceKind, PriceSuggestion, ProductSuggestions, priceWrite } from "@fourmy/contracts";
 import type { z } from "zod";
 import { BadRequest, NotFound } from "../routes/helpers.js";
 
@@ -105,3 +105,84 @@ export async function deletePrice(db: Database, farmId: string, id: string): Pro
 }
 
 
+
+/** Département d'un code INSEE (« 64488 » → « 64 », « 97411 » → « 974 »). */
+export const departmentOf = (insee: string | null | undefined): string | null => (insee ? (insee.startsWith("97") ? insee.slice(0, 3) : insee.slice(0, 2)) : null);
+
+/**
+ * Repères Lexicon des activités végétales de la ferme (lot E2) : prix de
+ * vente proposés (prix producteur du département, de France, MATIF,
+ * marchés européens) pour les productions à grain, et rendements Agreste du
+ * département sur les dernières campagnes.
+ */
+export async function productSuggestions(db: Database, farmId: string, today: string = new Date().toISOString().slice(0, 10)): Promise<ProductSuggestions> {
+  // Repères trop anciens écartés : plus de 3 ans ; une place de marché en retard de plus de 6 mois sur la plus récente.
+  const oldest = `${Number(today.slice(0, 4)) - 3}${today.slice(4)}`;
+  return withFarm(db, farmId, async (tx) => {
+    const [hq] = await rows<{ insee_code: string | null }>(tx, sql`SELECT insee_code FROM farm_sites WHERE is_headquarters LIMIT 1`);
+    const department = departmentOf(hq?.insee_code);
+    const acts = await rows<{ id: string; reference: string | null; specie: string | null; usage: string | null }>(
+      tx,
+      sql`SELECT a.id, a.reference, coalesce(lp.specie, a.cultivation) AS specie, lp.usage
+          FROM activities a LEFT JOIN lexicon_productions lp ON lp.reference_name = a.reference
+          WHERE a.family IN ('plant_farming', 'plant_nursery') AND NOT a.suspended`,
+    );
+    const species = [...new Set(acts.filter((a) => a.usage === "grain" && a.specie).map((a) => a.specie!))];
+    const productions = [...new Set(acts.map((a) => a.reference).filter((x): x is string => !!x))];
+    const arr = (xs: string[]) => `{${xs.join(",")}}`;
+    // Dernier prix producteur (département, France) et dernier MATIF, par espèce.
+    const prodPrices = species.length
+      ? await rows<{ id: string; zone: string; nature: string | null; specie: string; price: string; unit: string; started_on: string; label: string | null }>(
+          tx,
+          sql`SELECT DISTINCT ON (specie, zone, nature) id::text, zone, nature, specie, price::text, unit, started_on::text, label
+              FROM lexicon_production_prices
+              WHERE specie = ANY(${arr(species)}::text[]) AND output = 'grain' AND organic IS NOT TRUE
+                AND nature IN ('farmer_price', 'matif_price') AND (zone = '0' OR zone = ${department ?? "-"}) AND started_on >= ${oldest}::date
+              ORDER BY specie, zone, nature, started_on DESC`,
+        )
+      : [];
+    // Marchés européens (France) : les trois places au prix le plus récent, par espèce.
+    const market = species.length
+      ? await rows<{ id: string; specie: string; label: string; stage: string | null; price: string; unit: string; started_on: string }>(
+          tx,
+          sql`SELECT * FROM (
+                SELECT DISTINCT ON (specie, label) id, specie, label, stage, price::text, unit, started_on::text
+                FROM lexicon_market_prices WHERE specie = ANY(${arr(species)}::text[]) AND started_on >= ${oldest}::date
+                ORDER BY specie, label, started_on DESC) last
+              ORDER BY specie, started_on DESC`,
+        )
+      : [];
+    const yields =
+      department && productions.length
+        ? await rows<{ production: string; campaign: number; yield_value: string; yield_unit: string }>(
+            tx,
+            sql`SELECT production, campaign, yield_value::text, yield_unit FROM lexicon_production_yields
+                WHERE department = ${department} AND production = ANY(${arr(productions)}::text[]) ORDER BY production, campaign DESC`,
+          )
+        : [];
+    const items = acts.map((a) => {
+      const suggestions: PriceSuggestion[] = [];
+      if (a.usage === "grain" && a.specie) {
+        const pp = prodPrices.filter((p) => p.specie === a.specie);
+        const push = (p: (typeof pp)[number] | undefined, scope: PriceSuggestion["scope"]) =>
+          p && suggestions.push({ source: "lexicon", scope, label: p.label ?? a.specie!, amount: Number(p.price), unit: p.unit, date: p.started_on, ref: `production_prices:${p.id}` });
+        push(pp.find((p) => p.nature === "farmer_price" && p.zone === department), "department");
+        push(pp.find((p) => p.nature === "farmer_price" && p.zone === "0"), "national");
+        push(pp.find((p) => p.nature === "matif_price"), "matif");
+        const places = market.filter((x) => x.specie === a.specie);
+        const newest = places[0] ? Date.parse(places[0].started_on) : 0;
+        for (const m of places.filter((x) => newest - Date.parse(x.started_on) <= 183 * 86_400_000).slice(0, 3)) {
+          suggestions.push({ source: "lexicon", scope: "market", label: m.label, amount: Number(m.price), unit: m.unit, date: m.started_on, ref: `eu_market_prices:${m.id}` });
+        }
+      }
+      return {
+        activityId: a.id,
+        production: a.reference,
+        specie: a.specie,
+        suggestions,
+        yields: yields.filter((y) => y.production === a.reference).slice(0, 5).map((y) => ({ campaign: y.campaign, value: Number(y.yield_value), unit: y.yield_unit })),
+      };
+    });
+    return { department, items };
+  });
+}

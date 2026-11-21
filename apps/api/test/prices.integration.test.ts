@@ -32,6 +32,8 @@ describe.skipIf(!url)("prix de la ferme (intégration)", () => {
     await sql`INSERT INTO activities (id, farm_id, name, family) VALUES (${wheat}, ${farmId}, 'Blé tendre', 'plant_farming')`;
   });
   afterAll(async () => {
+    await sql`DELETE FROM activities WHERE farm_id = ${farmId}`;
+    await sql`DELETE FROM lexicon_productions WHERE reference_name IN ('zz_grain', 'zz_fodder')`;
     await teardown(sql, otherFarm, []);
     await teardown(sql, farmId, users);
     await sql.end();
@@ -57,6 +59,46 @@ describe.skipIf(!url)("prix de la ferme (intégration)", () => {
     expect(dec.items.find((p: { kind: string }) => p.kind === "article")).toMatchObject({ amount: 580.5, source: "lexicon", sourceDate: "2026-11-01" });
     const history = await (await send(worker, "GET", "/prices?kind=article&history=1")).json();
     expect(history.items.map((p: { amount: number }) => p.amount)).toEqual([580.5, 500]);
+  });
+
+  it("repères Lexicon : prix du grain (département, France, MATIF, marchés) et rendements Agreste du département", async () => {
+    // Références factices, propres au test (espèce et production inventées).
+    await sql`INSERT INTO lexicon_productions (reference_name, family, specie, usage, label) VALUES ('zz_grain', 'plant_farming', 'zz_specie', 'grain', 'Grain test'), ('zz_fodder', 'plant_farming', 'zz_specie', 'fodder', 'Fourrage test') ON CONFLICT DO NOTHING`;
+    await sql`INSERT INTO lexicon_production_prices (zone, started_on, nature, specie, output, price, unit, label) VALUES
+      ('64', '2025-01-01', 'farmer_price', 'zz_specie', 'grain', 170, 'ton', 'Test'), ('64', '2025-06-01', 'farmer_price', 'zz_specie', 'grain', 180, 'ton', 'Test'),
+      ('44', '2025-06-01', 'farmer_price', 'zz_specie', 'grain', 999, 'ton', 'Test'), ('0', '2025-06-01', 'farmer_price', 'zz_specie', 'grain', 175, 'ton', 'Test'),
+      ('0', '2025-12-01', 'matif_price', 'zz_specie', 'grain', 250.5, 'ton', 'Test MATIF'), ('44', '2019-06-01', 'farmer_price', 'zz_specie', 'grain', 1, 'ton', 'Trop ancien')`;
+    await sql`INSERT INTO lexicon_market_prices (id, specie, product_code, label, unit, price, started_on) VALUES
+      ('zz_1', 'zz_specie', 'ZZ', 'Test Bordeaux', 'ton', 200, '2026-04-06'), ('zz_2', 'zz_specie', 'ZZ', 'Test Bordeaux', 'ton', 201.5, '2026-04-13'),
+      ('zz_3', 'zz_specie', 'ZZ', 'Test Dunkerque (en retard)', 'ton', 190, '2025-02-01'), ('zz_4', 'zz_specie', 'ZZ', 'Test Rouen (trop ancien)', 'ton', 150, '2019-02-01')`;
+    await sql`INSERT INTO lexicon_production_yields (department, specie, production, yield_value, yield_unit, campaign) VALUES
+      ('64', 'zz_specie', 'zz_grain', 95, 'quintal_per_hectare', 2024), ('64', 'zz_specie', 'zz_grain', 69, 'quintal_per_hectare', 2025)`;
+    try {
+      // Le prix du 44 de 2019 et les places en retard ou trop anciennes sont écartés.
+      await sql`UPDATE farm_sites SET insee_code = '64488' WHERE farm_id = ${farmId} AND is_headquarters`;
+      const grain = crypto.randomUUID();
+      const fodder = crypto.randomUUID();
+      await sql`INSERT INTO activities (id, farm_id, name, family, reference) VALUES (${grain}, ${farmId}, 'Grain test', 'plant_farming', 'zz_grain'), (${fodder}, ${farmId}, 'Fourrage test', 'plant_farming', 'zz_fodder')`;
+      const res = await (await send(worker, "GET", "/prices/suggestions/products")).json();
+      expect(res.department).toBe("64");
+      const g = res.items.find((i: { activityId: string }) => i.activityId === grain);
+      expect(g.suggestions.map((s: { scope: string; amount: number; date: string }) => [s.scope, s.amount, s.date])).toEqual([
+        ["department", 180, "2025-06-01"],
+        ["national", 175, "2025-06-01"],
+        ["matif", 250.5, "2025-12-01"],
+        ["market", 201.5, "2026-04-13"],
+      ]);
+      expect(g.yields).toEqual([
+        { campaign: 2025, value: 69, unit: "quintal_per_hectare" },
+        { campaign: 2024, value: 95, unit: "quintal_per_hectare" },
+      ]);
+      // Fourrage : pas de prix du grain.
+      expect(res.items.find((i: { activityId: string }) => i.activityId === fodder).suggestions).toEqual([]);
+    } finally {
+      await sql`DELETE FROM lexicon_production_prices WHERE specie = 'zz_specie'`;
+      await sql`DELETE FROM lexicon_market_prices WHERE specie = 'zz_specie'`;
+      await sql`DELETE FROM lexicon_production_yields WHERE specie = 'zz_specie'`;
+    }
   });
 
   it("refuse une clé incohérente ou un article d'une autre ferme ; suppression d'une ligne", async () => {

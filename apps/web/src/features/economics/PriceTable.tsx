@@ -3,7 +3,7 @@ import { Alert, Badge, Button, Checkbox, Group, NumberInput, Paper, Popover, Sel
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { History, Save } from "lucide-react";
-import { PRICE_SOURCE_LABELS, priceKey, unitLabel, type Price, type PriceKind, type PriceWrite } from "@fourmy/contracts";
+import { PRICE_SCOPE_LABELS, PRICE_SOURCE_LABELS, priceKey, unitLabel, type Price, type PriceKind, type PriceSource, type PriceSuggestion, type PriceWrite } from "@fourmy/contracts";
 import { api, farmPath } from "../../app/api";
 import { pricesKey, usePriceHistory } from "./queries";
 
@@ -20,10 +20,15 @@ export interface PriceRow {
   hint?: React.ReactNode;
   /** Ce qui s'applique sans prix saisi (« barème BCMA ») ; sinon « à saisir ». */
   fallback?: string;
+  /** Prix proposés par une référence (Lexicon), à reprendre. */
+  suggestions?: PriceSuggestion[];
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
 const fmtDate = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("fr-FR", { timeZone: "UTC" });
+type Edit = { amount: number | string; unit: string; source?: PriceSource; sourceRef?: string; sourceDate?: string };
+const fmtMonth = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("fr-FR", { timeZone: "UTC", month: "short", year: "numeric" });
+
 /** Saisie d'un montant (« 22,5 », 22.5) → nombre ; null si vide ou invalide. */
 const toAmount = (v: number | string): number | null => {
   if (typeof v === "number") return Number.isFinite(v) && v >= 0 ? v : null;
@@ -42,7 +47,7 @@ export const fmtEuro = (n: number) => n.toLocaleString("fr-FR", { style: "curren
  */
 export function PriceTable({ farmId, kind, rows, owner, label }: { farmId: string; kind: PriceKind; rows: PriceRow[]; owner: boolean; label: string }) {
   const queryClient = useQueryClient();
-  const [edits, setEdits] = useState<Record<string, { amount: number | string; unit: string }>>({});
+  const [edits, setEdits] = useState<Record<string, Edit>>({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [validFrom, setValidFrom] = useState(today());
   const [bulk, setBulk] = useState<number | "">("");
@@ -61,7 +66,7 @@ export function PriceTable({ farmId, kind, rows, owner, label }: { farmId: strin
       api.post(farmPath(farmId, "/prices"), {
         items: changed.map((r) => {
           const e = edits[keyOf(r)]!;
-          return { kind, ...r.ref, unit: e.unit, amount: toAmount(e.amount)!, validFrom, source: "farm" };
+          return { kind, ...r.ref, unit: e.unit, amount: toAmount(e.amount)!, validFrom, source: e.source ?? "farm", sourceRef: e.sourceRef ?? null, sourceDate: e.sourceDate ?? null };
         }),
       }),
     onSuccess: async () => {
@@ -73,11 +78,12 @@ export function PriceTable({ farmId, kind, rows, owner, label }: { farmId: strin
     onError: (e) => notifications.show({ color: "red", message: e instanceof Error ? e.message : String(e) }),
   });
 
-  const edit = (r: PriceRow, patch: Partial<{ amount: number | string; unit: string }>) =>
+  // Une saisie à la main rend le prix « saisi » ; « Reprendre » garde la source proposée.
+  const edit = (r: PriceRow, patch: Partial<Edit>) =>
     setEdits((cur) => {
       const k = keyOf(r);
-      const base = cur[k] ?? { amount: r.current?.amount ?? "", unit: r.current?.unit ?? r.unit };
-      return { ...cur, [k]: { ...base, ...patch } };
+      const base: Edit = cur[k] ?? { amount: r.current?.amount ?? "", unit: r.current?.unit ?? r.unit };
+      return { ...cur, [k]: { ...base, source: undefined, sourceRef: undefined, sourceDate: undefined, ...patch } };
     });
   const applyBulk = (fn: (r: PriceRow) => number | null) => {
     for (const r of rows.filter((x) => selected.has(keyOf(x)))) {
@@ -214,7 +220,29 @@ export function PriceTable({ farmId, kind, rows, owner, label }: { farmId: strin
                       </Badge>
                     )}
                   </Table.Td>
-                  <Table.Td>{r.hint}</Table.Td>
+                  <Table.Td>
+                    <Stack gap={2}>
+                      {r.hint}
+                      {r.suggestions?.map((sg) => (
+                        <Group key={sg.ref} gap={4} wrap="nowrap">
+                          <Text size="xs" c="dimmed">
+                            {PRICE_SCOPE_LABELS[sg.scope]}
+                            {sg.scope === "market" ? ` (${sg.label})` : ""} : {fmtEuro(sg.amount)} / {priceUnitLabel(sg.unit)}, {fmtMonth(sg.date)}
+                          </Text>
+                          {owner && (
+                            <Button
+                              size="compact-xs"
+                              variant="subtle"
+                              onClick={() => edit(r, { amount: sg.amount, unit: sg.unit, source: sg.source, sourceRef: sg.ref, sourceDate: sg.date })}
+                              aria-label={`Reprendre ${PRICE_SCOPE_LABELS[sg.scope]} pour ${r.label}`}
+                            >
+                              Reprendre
+                            </Button>
+                          )}
+                        </Group>
+                      ))}
+                    </Stack>
+                  </Table.Td>
                 </Table.Tr>
               );
             })}
