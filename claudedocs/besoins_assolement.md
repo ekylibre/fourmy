@@ -37,6 +37,9 @@ Dans Fourmy aujourd'hui :
 | A10 | **Interventions prévues** (temps 2) : proposées d'après l'itinéraire, puis confirmées par l'utilisateur. |
 | A11 | **Prix réservés** (temps 3) : clé d'adhérent Lexicon (`FOURMY_LEXICON_API_KEY`, bundle « fourmy », déjà géré) ; ajouter au bundle les jeux de prix des intrants (`seeds`, `fertilizers`, `phytosanitary_prices`), avec attribution. |
 | A12 | **Prix de vente** : appel direct de l'**API agrifood de la Commission européenne** (`https://api.tech.ec.europa.eu/agrifood`, `GET /api/cereal/prices`, documentation OpenAPI `/agrifood/v3/api-docs`), prix de la France (`memberStateCodes=FR`) ; correspondance code produit → espèce reprise de Lexicon (`lib/datasources/eu_market_prices.rb`) ; cotations quotidiennes FranceAgriMer des céréales en complément ; pas de MATIF. |
+| A13 | (21/11) **Catalogue d'ITK** : les 62 itinéraires Lexicon (`technical_workflows`, 2021) sont repris dans l'esprit (production, système, cycle, étapes), pas dans leur contenu, qui est à refaire ; premiers ITK construits à partir des interventions des deux fermes de test. |
+| A14 | (21/11) **Interventions prévues créées campagne par campagne, sur demande**, pas à la validation de l'assolement (FR-AS-22 réécrit). |
+| A15 | (21/11) **Débit de chantier** calculé depuis le matériel (largeur × vitesse × rendement) **et saisissable dans l'ITK**. |
 
 ## 4. Exigences fonctionnelles — temps 1 (assolement)
 
@@ -66,8 +69,8 @@ Dans Fourmy aujourd'hui :
 ## 5. Exigences fonctionnelles — temps 2 (itinéraires techniques, temps de travaux)
 
 - **FR-AS-20** À l'affectation d'une activité, choix d'un **itinéraire technique** (ITK) : suite d'interventions prévisionnelles en dates relatives (au semis, à la récolte) ou absolues, avec procédures, intrants et doses, matériels et personnes.
-- **FR-AS-21** **Catalogue d'ITK** : itinéraires de référence de Lexicon (`technical_workflows`, `technical_workflow_sequences`, `intervention_models`), et **ITK de la ferme** construits à partir des interventions passées d'une activité (proposition « refaire comme en 2026 »), modifiables et enregistrables.
-- **FR-AS-22** À la validation de l'assolement, les interventions prévues de l'ITK sont créées (statut « prévue ») sur les parcelles, ou mises à jour lors d'une révision.
+- **FR-AS-21** **Catalogue d'ITK** : **ITK de la ferme** (A13 : structure inspirée des itinéraires Lexicon `technical_workflows`, contenus refaits) construits à partir des interventions passées d'une activité (proposition « refaire comme en 2026 »), modifiables et enregistrables.
+- **FR-AS-22** *(réécrit le 21/11, A14)* Sur un assolement validé, « Préparer les interventions prévues » propose, campagne par campagne, les interventions des ITK ; l'utilisateur les coche et ajuste, puis confirme (statut « prévue ») ; relancée après une révision, l'action met à jour sans toucher aux interventions modifiées, réalisées ou annulées.
 - **FR-AS-23** **Temps de travaux** : par intervention, durée au champ (surface × débit de chantier du matériel ou de l'attelage) et durée de route (trajets du siège ou du site aux parcelles par OSRM) ; cumul par personne, par matériel, par période (pointes de travail).
 - **FR-AS-24** **Besoins en intrants** : quantités par produit (semences, engrais, phyto) d'après les doses de l'ITK et les surfaces ; comparaison avec les stocks.
 - **FR-AS-25** **Récapitulatif enrichi** : temps de travaux, kilomètres, besoins en intrants par activité et pour l'assolement.
