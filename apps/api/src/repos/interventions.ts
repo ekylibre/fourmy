@@ -8,6 +8,10 @@ import {
   convertQuantity,
   unitScale,
   pickLot,
+  parseSeedUnit,
+  resolveTgw,
+  seedConversionGap,
+  seedRate,
   buildEvent,
   validateIntervention,
   periodBounds,
@@ -43,6 +47,8 @@ import {
   type TargetKind,
   type TreatmentPurpose,
 } from "@fourmy/contracts";
+import { tgwReference } from "@fourmy/certification-refs";
+import type { LotSeed, SeedConversion, TgwOrigin } from "@fourmy/contracts";
 import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
 import { checkCompliance, type CheckableBody } from "./phyto.js";
 import { checkApplicationTx } from "./fertilization-record.js";
@@ -304,18 +310,34 @@ export async function readIntervention(tx: Tx, id: string): Promise<Intervention
 // Validation : existence des références + règles de forme du domaine
 // ---------------------------------------------------------------------------
 
-type Article = { id: string; name: string; unit: string; kind: ArticleKind; density: number | null };
+/** Fiche d'une semence (lot SE5) : conversions grains, doses et masse. */
+type SeedOf = { species: string | null; isMixture: boolean; grainsPerDose: number | null; tgwG: number | null; tgwOrigin: TgwOrigin | null };
+type Article = { id: string; name: string; unit: string; kind: ArticleKind; density: number | null; seed: SeedOf | null };
 
 async function loadArticles(tx: Tx, ids: string[]): Promise<Map<string, Article>> {
   if (ids.length === 0) return new Map();
-  const list = await rows<Article>(
+  const list = await rows<Omit<Article, "seed"> & { has_seed: boolean; species: string | null; is_mixture: boolean | null; grains_per_dose: number | null; tgw_g: number | null; tgw_origin: TgwOrigin | null }>(
     tx,
     // Densité du fertilisant (kg/L) : conversion d'une saisie en litres d'un produit stocké en tonnes.
-    sql`SELECT a.id, a.name, a.unit, a.kind, f.density::float8 AS density
-        FROM articles a LEFT JOIN article_fertilizers f ON f.article_id = a.id
+    // Fiche d'une semence : PMG et grains par dose (grains, doses et masse).
+    sql`SELECT a.id, a.name, a.unit, a.kind, f.density::float8 AS density,
+               s.article_id IS NOT NULL AS has_seed, s.species, s.is_mixture, s.grains_per_dose, s.tgw_g::float8 AS tgw_g, s.tgw_origin
+        FROM articles a LEFT JOIN article_fertilizers f ON f.article_id = a.id LEFT JOIN article_seeds s ON s.article_id = a.id
         WHERE a.id IN (${sql.join([...new Set(ids)].map((i) => sql`${i}`), sql`, `)})`,
   );
-  return new Map(list.map((a) => [a.id, a]));
+  return new Map(
+    list.map((a) => [
+      a.id,
+      {
+        id: a.id,
+        name: a.name,
+        unit: a.unit,
+        kind: a.kind,
+        density: a.density,
+        seed: a.has_seed ? { species: a.species, isMixture: a.is_mixture ?? false, grainsPerDose: a.grains_per_dose, tgwG: a.tgw_g, tgwOrigin: a.tgw_origin } : null,
+      },
+    ]),
+  );
 }
 
 async function assertExist(tx: Tx, table: "land_parcels" | "equipments" | "places" | "containers" | "people", ids: string[], label: string) {
@@ -351,10 +373,14 @@ async function validate(tx: Tx, procedureCode: string, raw: Body, mode: "plan" |
     allowMissingDestination: origin === "import",
   });
   if (errors.length) throw new DomainError(errors.join(" "));
-  // Unité de saisie d'un intrant (fertilisants seulement) : convertible dans celle de l'article.
+  // Unité de saisie d'un intrant (fertilisants et semences) : convertible dans celle de l'article.
   for (const i of body.inputs) {
     const a = articles.get(i.articleId);
     if (!a || !i.unit || i.unit === a.unit) continue;
+    if (a.kind === "seed") {
+      await assertSeedUnit(tx, a, i.unit, i.lotId);
+      continue;
+    }
     if (a.kind !== "fertilizer") throw new DomainError(`${a.name} : se saisit dans son unité (${a.unit}).`);
     if (convertQuantity(1, i.unit, a.unit, a.density) === null) {
       throw new DomainError(
@@ -368,6 +394,42 @@ async function validate(tx: Tx, procedureCode: string, raw: Body, mode: "plan" |
   await assertExist(tx, "equipments", body.tools.map((t) => t.equipmentId), "Matériel");
   await assertExist(tx, "people", body.doers.map((d) => d.personId), "Personne");
   return articles;
+}
+
+/** PMG d'un lot de semence (lots.attrs.seed), s'il en a un. */
+async function lotSeedOf(tx: Tx, lotId: string | null | undefined): Promise<LotSeed | null> {
+  if (!lotId) return null;
+  const [l] = await rows<{ seed: LotSeed | null }>(tx, sql`SELECT attrs->'seed' AS seed FROM lots WHERE id = ${lotId}`);
+  return l?.seed ?? null;
+}
+
+/** PMG retenu pour un semis : lot, fiche, puis repère de l'espèce (« estimé »). */
+function seedTgw(a: Article, lot: LotSeed | null) {
+  const seed = a.seed;
+  if (seed?.isMixture) return null;
+  return resolveTgw({
+    lot: lot ? { tgwG: lot.tgwG, origin: lot.origin } : null,
+    article: seed ? { tgwG: seed.tgwG, origin: seed.tgwOrigin } : null,
+    reference: tgwReference(seed?.species),
+  });
+}
+
+const SEED_UNIT_ERRORS = {
+  unit_unknown: (a: Article, unit: string) => `${a.name} : ${unit} n'est pas une unité de semence convertible en ${a.unit}.`,
+  grains_per_dose_missing: (a: Article) => `${a.name} : nombre de grains par dose inconnu, à compléter dans Stocks → Semences.`,
+  tgw_missing: (a: Article) => `${a.name} : PMG inconnu, à compléter dans Stocks → Semences pour passer des grains à la masse.`,
+};
+
+/**
+ * Unité de saisie d'une semence (lot SE5, FR-SE-17 à 19) : grains, doses,
+ * masse ou grains/m², convertible dans l'unité de l'article avec le PMG
+ * retenu (lot, fiche ou repère) et le nombre de grains par dose.
+ */
+async function assertSeedUnit(tx: Tx, a: Article, unit: string, lotId: string | undefined) {
+  const { unit: base } = seedRate(unit);
+  const tgw = seedTgw(a, await lotSeedOf(tx, lotId));
+  const gap = seedConversionGap(base, a.unit, { tgwG: tgw?.tgwG ?? null, grainsPerDose: a.seed?.grainsPerDose ?? null });
+  if (gap) throw new DomainError(SEED_UNIT_ERRORS[gap](a, unit));
 }
 
 /** Noms des matériels et personnes des attelages, pour des messages lisibles. */
@@ -891,11 +953,36 @@ async function applyCompletion(
   // Intervention importée : pas de mouvement de stock (ni lot de récolte).
   for (const i of affectsStock ? input.inputs : []) {
     const article = articles.get(i.articleId)!;
-    const quantity = toStockQuantity({ quantity: i.quantity, unit: storedUnit(i.unit ?? article.unit, i.per), articleUnit: article.unit, areaHa, density: article.density });
+    // Lot d'abord (lot SE5) : le PMG d'un lot de semence l'emporte pour la conversion.
     const lots = await availableLots(tx, article.id, stoppedAt!);
     const byLot = new Map<string, number>();
     for (const l of lots) byLot.set(l.lot_id, (byLot.get(l.lot_id) ?? 0) + l.available);
     const lotId = i.lotId ?? pickLot([...byLot].map(([id, available]) => ({ lotId: id, available }))) ?? (await defaultLot(tx, farmId, ctx, article));
+    const entered = storedUnit(i.unit ?? article.unit, i.per);
+    let seed: { tgwG: number | null; grainsPerDose: number | null } | undefined;
+    if (article.kind === "seed") {
+      const tgw = seedTgw(article, await lotSeedOf(tx, lotId));
+      seed = { tgwG: tgw?.tgwG ?? null, grainsPerDose: article.seed?.grainsPerDose ?? null };
+      // Conversion figée sur l'intrant : une correction du PMG ne change pas ce stock.
+      const crossed = seedCrossesDimension(entered, article.unit, seed.grainsPerDose);
+      if (crossed.converted) {
+        const conversion: SeedConversion = {
+          tgwG: crossed.usesTgw ? (tgw?.tgwG ?? null) : null,
+          tgwOrigin: crossed.usesTgw ? (tgw?.origin ?? null) : null,
+          grainsPerDose: crossed.usesDose ? seed.grainsPerDose : null,
+          estimated: crossed.usesTgw && (tgw?.estimated ?? false),
+        };
+        await tx.execute(sql`
+          UPDATE intervention_parameters SET attrs = coalesce(attrs, '{}'::jsonb) || ${JSON.stringify({ seedConversion: conversion })}::jsonb
+          WHERE id = (SELECT id FROM intervention_parameters
+                      WHERE intervention_id = ${interventionId} AND role = 'input' AND ref_id = ${article.id}
+                        AND unit = ${entered} AND quantity = ${i.quantity} AND NOT coalesce(attrs ? 'seedConversion', false)
+                      LIMIT 1)`);
+      }
+    }
+    // Saisie dans l'unité de l'article (par hectare ou au total) : calcul d'avant, même pour une unité de semence illisible.
+    const sameUnit = seedRate(entered).unit === article.unit && !/_per_square_meter$/.test(entered);
+    const quantity = toStockQuantity({ quantity: i.quantity, unit: entered, articleUnit: article.unit, areaHa, density: article.density, ...(sameUnit ? {} : { seed }) });
     const best = lots.filter((l) => l.lot_id === lotId && l.available > 0).sort((a, b) => b.available - a.available)[0];
     const containerId = i.from?.containerId ?? (i.from?.placeId ? null : best?.container_id ?? null);
     const placeId = i.from?.placeId ?? (containerId ? null : best?.place_id ?? (await fallbackPlace(tx, farmId, ctx)));
@@ -929,6 +1016,16 @@ async function applyCompletion(
       notes = ${input.notes ?? null}, justification = ${input.justification ?? null}, bbch = ${input.bbch === undefined ? sql`bbch` : input.bbch}, updated_at = now()
     WHERE id = ${interventionId}`);
   return { plan, areaHa, warnings };
+}
+
+/** Une saisie de semence passe-t-elle par le PMG (grains ↔ masse) ou par la dose (doses ↔ grains) ? */
+function seedCrossesDimension(entered: string, articleUnit: string, grainsPerDose: number | null) {
+  const a = parseSeedUnit(seedRate(entered).unit, grainsPerDose);
+  const b = parseSeedUnit(articleUnit, grainsPerDose);
+  if (!a || !b) return { converted: false, usesTgw: false, usesDose: false };
+  const usesTgw = (a.dim === "mass") !== (b.dim === "mass");
+  const usesDose = (a.dim === "dose" || b.dim === "dose") && a.dim !== b.dim;
+  return { converted: usesTgw || usesDose, usesTgw, usesDose };
 }
 
 async function insertMovements(tx: Tx, farmId: string, interventionId: string, movements: StockMovement[]) {

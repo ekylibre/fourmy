@@ -65,6 +65,14 @@ export const syncArticle = z.object({
   kind: z.string(),
   unit: z.string(),
   amm: z.string().nullable(),
+  /**
+   * Semence (lot SE5) : grains par dose et PMG de la fiche, pour proposer les
+   * unités de semis (grains/m², kg/ha, doses/ha). Absent : saisie dans l'unité de l'article.
+   */
+  seed: z
+    .object({ grains_per_dose: z.number().nullable(), tgw_g: z.number().nullable(), tgw_origin: z.string().nullable(), species: z.string().nullable(), is_mixture: z.boolean() })
+    .nullable()
+    .optional(),
   updated_at_server: z.number(),
 });
 

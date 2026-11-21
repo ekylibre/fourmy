@@ -5,10 +5,11 @@ import { api, farmPath } from "../../app/api";
 /** Semences (lot SE3) : liste à la date de la frise, fiche, espèces proposées. */
 export const seedsKey = (farmId: string) => ["seeds", farmId] as const;
 
-export function useSeeds(farmId: string, at: string) {
+export function useSeeds(farmId: string, at: string, enabled = true) {
   return useQuery({
     queryKey: [...seedsKey(farmId), "list", at],
     queryFn: () => api.get<{ items: SeedListItem[] }>(farmPath(farmId, `/seeds?at=${encodeURIComponent(at)}`)),
+    enabled,
   });
 }
 

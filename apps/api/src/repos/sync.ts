@@ -46,7 +46,12 @@ export async function pull(db: Database, farmId: string, lastPulledAt: string | 
     );
     const articles = await rows<Record<string, unknown>>(
       tx,
-      sql`SELECT id, name, kind, unit, amm, updated_at FROM articles WHERE updated_at > ${since}::timestamptz`,
+      sql`SELECT a.id, a.name, a.kind, a.unit, a.amm, a.updated_at,
+                 CASE WHEN s.article_id IS NULL THEN NULL ELSE jsonb_build_object(
+                   'grains_per_dose', s.grains_per_dose, 'tgw_g', s.tgw_g::float8, 'tgw_origin', s.tgw_origin,
+                   'species', s.species, 'is_mixture', s.is_mixture) END AS seed
+          FROM articles a LEFT JOIN article_seeds s ON s.article_id = a.id
+          WHERE a.updated_at > ${since}::timestamptz`,
     );
     const equipments = await rows<Record<string, unknown>>(
       tx,
@@ -117,7 +122,7 @@ export async function pull(db: Database, farmId: string, lastPulledAt: string | 
       });
     }
     for (const a of articles) {
-      put("articles", { id: a.id, name: a.name, kind: a.kind, unit: a.unit, amm: a.amm ?? null, updated_at_server: ms(a.updated_at) });
+      put("articles", { id: a.id, name: a.name, kind: a.kind, unit: a.unit, amm: a.amm ?? null, ...(a.kind === "seed" ? { seed: a.seed ?? null } : {}), updated_at_server: ms(a.updated_at) });
     }
     for (const e of equipments) {
       put("equipments", {

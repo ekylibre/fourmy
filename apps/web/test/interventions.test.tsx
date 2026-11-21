@@ -133,6 +133,67 @@ describe("interventions", () => {
     expect(calls[1]).toMatchObject({ inputs: [{ articleId: ENGRAIS, quantity: 120, per: "hectare", unit: "Litre" }] });
   });
 
+  it("un maïs stocké en sacs de 50 000 grains se sème en grains/m² : densité, dose et PMG affichés (lot SE5)", async () => {
+    const MAIS = "00000000-0000-7000-8000-00000000f301";
+    const now = "2026-01-01T00:00:00.000Z";
+    const seed = {
+      articleId: MAIS,
+      name: "Maïs P0573",
+      unit: "Sac de 50 000 grains",
+      unitDim: "dose",
+      lexiconRef: null,
+      organicStatus: null,
+      seedTreated: null,
+      sheet: { articleId: MAIS, species: "zea_mays", varietyName: "P0573", gnisCode: null, category: null, isMixture: false, grainsPerDose: 50000, bagKg: null, tgwG: 300, tgwOrigin: "label", tgwOn: null, updatedAt: now },
+      speciesLabel: "Maïs",
+      importedSpecies: null,
+      importedGnis: null,
+      componentCount: 0,
+      reference: null,
+      tgw: { tgwG: 300, origin: "label", from: "article", estimated: false },
+      flags: [],
+      looksLikeMixture: false,
+      stock: 40,
+      usage: [],
+    };
+    const calls: Record<string, unknown>[] = [];
+    server.use(
+      http.get("*/articles", () =>
+        HttpResponse.json({ items: [{ id: MAIS, farmId: FARM, lexiconRef: null, name: "Maïs P0573", kind: "seed", unit: "Sac de 50 000 grains", createdAt: now, updatedAt: now }], nextCursor: null }),
+      ),
+      http.get("*/seeds", () => HttpResponse.json({ items: [seed] })),
+      http.post("*/interventions", async ({ request }) => HttpResponse.json(calls.push((await request.json()) as Record<string, unknown>) && {}, { status: 201 })),
+      http.post("*/interventions/:id/complete", async ({ request }) => {
+        calls.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ intervention: {}, movements: [], warnings: [] });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(`/f/${FARM}/interventions?at=2026-06-10`);
+    const button = await screen.findByRole("button", { name: "Nouvelle intervention" });
+    await vi.waitFor(() => expect(button).toBeEnabled());
+    await user.click(button);
+    const form = await screen.findByRole("form", { name: "Saisie de l'intervention" });
+    await user.click(within(form).getByRole("combobox", { name: "Intervention" }));
+    await user.click(await screen.findByRole("option", { name: "Semis" }));
+    await user.click(within(form).getByRole("combobox", { name: "Parcelles" }));
+    await user.click(await screen.findByRole("option", { name: /Les Rouffiats/ }));
+    await user.click(within(form).getByRole("combobox", { name: "Produit" }));
+    await user.click(await screen.findByRole("option", { name: /Maïs P0573/ }));
+    // Unités : la sienne, les grains/m², puis kg et milliers (PMG connu) et les grains.
+    const unit = await within(form).findByRole("combobox", { name: "Unité" });
+    await user.click(unit);
+    expect((await screen.findAllByRole("option")).map((o) => o.textContent)).toEqual(["Sac de 50 000 grains", "grains/m²", "kg", "milliers", "grains"]);
+    await user.click(screen.getByRole("option", { name: "grains/m²" }));
+    // Grains/m² : dose déjà par surface, pas de choix « par ha / au total ».
+    expect(within(form).queryByRole("radiogroup", { name: "Quantité par" })).not.toBeInTheDocument();
+    await user.type(within(form).getByRole("textbox", { name: "Quantité" }), "9");
+    expect(await within(form).findByLabelText("Densité de semis")).toHaveTextContent("≈ 9 grains/m² · 1,8 dose/ha · 27 kg/ha (PMG 300 g)");
+    await user.click(within(form).getByRole("button", { name: "Enregistrer" }));
+    await vi.waitFor(() => expect(calls).toHaveLength(2));
+    expect(calls[1]).toMatchObject({ inputs: [{ articleId: MAIS, quantity: 9, per: "total", unit: "grain_per_square_meter" }] });
+  });
+
   it("Entrée dans un champ n'envoie pas le formulaire ; deux envois portent le même identifiant", async () => {
     const ids: string[] = [];
     server.use(

@@ -267,3 +267,19 @@ flowchart LR
   - fiche : « Rattachement proposé », avec « Reprendre » ; tiroir avec un nom accessible.
 - Tests : API 4 (`seeds-catalog.integration.test.ts`, variétés fictives ZZ…), import Geofolia (fiches créées), web 2 de plus ; turbo vert.
 
+### SE5 — Conversions des semis (20/11/2026)
+
+- `repos/interventions.ts` :
+  - les articles chargés portent leur fiche semence (espèce, mélange, grains par dose, PMG) ;
+  - validation : une semence se saisit dans toute unité convertible vers la sienne (grains, milliers, doses, masse, grains/m²), avec le PMG retenu (lot indiqué, fiche, repère) ; sinon 422 avec le motif (« PMG inconnu, à compléter dans Stocks → Semences ») ;
+  - stock : le lot est choisi **avant** la conversion ; PMG du lot, sinon de la fiche, sinon repère ; `toStockQuantity` avec `seed` ;
+  - conversion figée dans `attrs.seedConversion` de l'intrant (PMG et origine si le PMG a servi, grains par dose si la dose a servi, « estimée » avec un repère) ;
+  - saisie dans l'unité de l'article (par hectare ou au total) : calcul d'avant, même pour une unité illisible.
+- `storedUnit` : une unité déjà rapportée à la surface (`grain_per_square_meter`) reste telle quelle.
+- Synchronisation mobile : champ `seed` (grains par dose, PMG, origine, espèce, mélange) sur les articles semence.
+- Web :
+  - formulaire : unités de semis proposées (la sienne, grains/m², kg, milliers, grains, doses selon le PMG et la dose) ; pas de « par ha / au total » en grains/m² ; ligne « ≈ 9 grains/m² · 1,8 dose/ha · 27 kg/ha (PMG 300 g) » ;
+  - fiche d'intervention : même ligne ; une dose en grains/m² s'affiche telle quelle, le total en grains.
+- Tests : API 6 (`seeds-sowing.integration.test.ts` : 18 doses pour 9 grains/m² sur 10 ha, repère estimé, PMG du lot, conversion figée, refus, unité illisible), domaine 1, web 1 (formulaire) ; tests de stock existants verts ; turbo : 82 tâches vertes.
+- Pas de parcours e2e dédié : le formulaire est couvert par le test web, le stock par les tests d'API.
+

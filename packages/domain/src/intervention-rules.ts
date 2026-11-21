@@ -176,8 +176,13 @@ export function periodBounds(periods: { startedAt: string; stoppedAt: string }[]
   return { startedAt: starts[0]!, stoppedAt: stops.at(-1)! };
 }
 
-/** Unité stockée : unité de l'article, suffixée « _per_hectare » pour une dose. */
+/**
+ * Unité stockée : unité de l'article, suffixée « _per_hectare » pour une dose.
+ * Une unité déjà rapportée à la surface (semis en `grain_per_square_meter`,
+ * lot SE5) reste telle quelle.
+ */
 export function storedUnit(articleUnit: string, per: "total" | "hectare"): string {
+  if (/_per_square_meter$/.test(articleUnit)) return articleUnit;
   return per === "hectare" ? `${articleUnit}_per_hectare` : articleUnit;
 }
 
