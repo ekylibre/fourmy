@@ -389,3 +389,62 @@ export interface ItkWorkContext {
   /** Citation du barème (affichée avec chaque débit qui en vient). */
   rateSource: string;
 }
+
+// ---------------------------------------------------------------------------
+// Lot IT5 : besoins en intrants de l'assolement, comparés aux stocks.
+
+/** Article cité par un ITK ou un plan de fumure, avec ce qui sert à convertir les doses. */
+export interface ItkArticleInfo {
+  id: string;
+  name: string;
+  kind: ArticleKind;
+  /** Unité du stock. */
+  unit: string;
+  /** Densité (kg/L) d'un engrais, pour passer de la masse au volume. */
+  density: number | null;
+  /** Semence : PMG (g) et grains par dose. */
+  tgwG: number | null;
+  grainsPerDose: number | null;
+  /** Engrais : teneurs (azote total, base) pour passer d'un apport d'azote à une quantité de produit. */
+  fertilizer: { basis: "mass_percent" | "kg_per_t" | "kg_per_m3"; nTotal: number; density: number | null } | null;
+}
+
+/** Apports prévus d'un plan de fumure établi (prioritaires sur la fertilisation minérale de l'ITK, §9.2). */
+export interface ItkPlanApplications {
+  planId: string;
+  applications: { articleId: string | null; stage: string; nTotalKgHa: number; plannedOn: string | null }[];
+}
+
+/** Contexte des besoins en intrants d'un assolement (`GET /crop-plans/:year/inputs-context`). */
+export interface ItkInputsContext {
+  year: number;
+  /** Date du stock (aujourd'hui). */
+  at: string;
+  articles: Record<string, ItkArticleInfo>;
+  /** Stock disponible, dans l'unité de l'article. */
+  stock: Record<string, number>;
+  /** Déjà réservé par des interventions prévues saisies à la main sur la campagne (pas celles des ITK). */
+  reserved: Record<string, number>;
+  /** Plans de fumure établis de la campagne, par parcelle (`p:<land_parcel_id>`). */
+  plans: Record<string, ItkPlanApplications>;
+}
+
+export interface InputNeedLine {
+  /** Article de la ferme ; null pour un intrant générique (« Azote 40 u ») ou un apport du plan sans engrais choisi. */
+  articleId: string | null;
+  label: string;
+  kind: ArticleKind;
+  /** Unité de la quantité : celle du stock pour un article converti, sinon celle de la dose. */
+  unit: string;
+  needed: number;
+  /** Étapes « si besoin » : comptées à part. */
+  optional: number;
+  stock: number | null;
+  reserved: number | null;
+  /** Quantité à acheter (besoin − (stock − réservé)) ; null si l'intrant ne se compare pas au stock. */
+  toBuy: number | null;
+  /** D'où vient le besoin : ITK, plan de fumure, ou les deux. */
+  sources: ("itk" | "plan")[];
+  /** La dose ne se convertit pas dans l'unité du stock (PMG, densité, unité) : quantité dans l'unité de la dose. */
+  unconvertible: boolean;
+}

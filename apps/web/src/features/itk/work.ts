@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import type { ItkEquipmentInfo, ItkMachineryRateInfo, ItkWorkContext } from "@fourmy/contracts";
+import type { ItkEquipmentInfo, ItkInputsContext, ItkMachineryRateInfo, ItkWorkContext } from "@fourmy/contracts";
 import { api, farmPath } from "../../app/api";
 
 /** Temps de travaux (lot IT4) : contexte de l'assolement, barème BCMA, rattachement des matériels. */
@@ -37,3 +37,12 @@ export function useEquipmentRates(farmId: string) {
 
 export const fmtH = (h: number) => `${h.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} h`;
 export const fmtRate = (h: number) => `${h.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ha/h`;
+
+/** Besoins en intrants (lot IT5) : articles, stock, réservé, plans de fumure. */
+export function useItkInputsContext(farmId: string, year: number) {
+  return useQuery({
+    queryKey: ["itk-inputs", farmId, year],
+    queryFn: () => api.get<ItkInputsContext>(farmPath(farmId, `/crop-plans/${year}/inputs-context`)),
+    staleTime: 60_000,
+  });
+}

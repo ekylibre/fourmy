@@ -394,7 +394,7 @@ function Editor({ detail, owner, refetch }: { detail: ItkDetail; owner: boolean;
           {perHa
             ? `Par hectare : ${fmtH(Math.round(totalPerHa * 100) / 100)} de chantier${unknownRates ? `, ${unknownRates} débit(s) inconnu(s) non comptés` : ""}. Débits : saisi, sinon observé sur vos chantiers, sinon ${work.data!.rateSource}.`
             : "Calcul des débits…"}
-          {" "}Besoins en intrants : à venir (lot IT5).
+          {" "}Besoins en intrants de l'assolement : onglet Intrants.
         </Text>
       </Paper>
 
