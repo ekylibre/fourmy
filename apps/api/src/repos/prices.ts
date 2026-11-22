@@ -1,6 +1,6 @@
 import { sql, type SQL } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
-import { priceKey, type EcoContext, type Price, type PriceKind, type PriceSuggestion, type ProductSuggestions, type priceWrite } from "@fourmy/contracts";
+import { priceKey, type ArticleSuggestions, type EcoContext, type Price, type PriceKind, type PriceSuggestion, type ProductSuggestions, type priceWrite } from "@fourmy/contracts";
 import type { z } from "zod";
 import { marketCodesFor } from "@fourmy/certification-refs";
 import { defaultPrice, defaultYield } from "@fourmy/domain";
@@ -256,5 +256,131 @@ export async function ecoContext(db: Database, farmId: string, year: number, tod
     });
     const labour = prices.find((p) => p.kind === "labour") ?? null;
     return { year, department: refs.department, activities: activities.map(({ yields: _y, ...a }) => a), labour };
+  });
+}
+
+const norm = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+const PACKAGING_LABELS: Record<string, string> = { bulk: "vrac", big_bag_600: "big bag 600 kg", big_bag_500: "big bag 500 kg", bag: "sac" };
+const MERCHANT_LABELS: Record<string, string> = { cereapro: "Cereapro", germineo: "Germineo" };
+const merchantLabel = (m: string) => m.split(", ").map((x) => MERCHANT_LABELS[x] ?? x).join(", ");
+const close = (a: number | null, b: number | null) => Math.abs((a ?? 0) - (b ?? 0)) < 0.5;
+
+/**
+ * Repères Lexicon des intrants de la ferme (point 142, jeux réservés aux
+ * adhérents) : prix de référence mensuels Cereapro et Germineo, rattachés
+ * à l'article par l'AMM (phyto), la variante Lexicon ou la composition N-P-K
+ * (engrais minéral), l'espèce, la variété (catalogue SEMAE) ou le nom (semence).
+ * Douze derniers mois ; dernier prix par conditionnement, marchand, bio.
+ */
+export async function articleSuggestions(db: Database, farmId: string, today: string = new Date().toISOString().slice(0, 10)): Promise<ArticleSuggestions> {
+  const since = `${Number(today.slice(0, 4)) - 1}${today.slice(4, 7)}-01`;
+  return withFarm(db, farmId, async (tx) => {
+    const articles = await rows<{
+      id: string;
+      name: string;
+      kind: "fertilizer" | "phyto" | "seed";
+      amm: string | null;
+      lexicon_ref: string | null;
+      organic: boolean;
+      basis: string | null;
+      n: string | null;
+      p: string | null;
+      k: string | null;
+      species: string | null;
+      variety: string | null;
+      mixture: boolean;
+    }>(
+      tx,
+      sql`SELECT a.id, a.name, a.kind, a.amm, a.lexicon_ref, coalesce(a.organic_status = 'organic', false) AS organic,
+                 f.basis, f.n_total::text AS n, f.p2o5::text AS p, f.k2o::text AS k, s.species, s.variety_name AS variety,
+                 coalesce(s.is_mixture, false) AS mixture
+          FROM articles a LEFT JOIN article_fertilizers f ON f.article_id = a.id LEFT JOIN article_seeds s ON s.article_id = a.id
+          WHERE a.kind IN ('fertilizer', 'phyto', 'seed')`,
+    );
+    if (!articles.length) return { items: [] };
+    const fertilizers = await rows<{ id: string; name: string; kind: string; nitrogen: string | null; phosphorus: string | null; potassium: string | null; variant: string | null }>(
+      tx,
+      sql`SELECT id, name, kind, nitrogen::text, phosphorus::text, potassium::text, variant FROM lexicon_fertilizer_refs`,
+    );
+    const species = await rows<{ id: string; name: string; taxon: string | null }>(tx, sql`SELECT id, name, taxon FROM lexicon_seed_species`);
+    const prices = await rows<{ id: string; kind: string; ref: string; packaging: string | null; organic: boolean | null; month: string; price: string; unit: string; merchant: string }>(
+      tx,
+      sql`SELECT DISTINCT ON (kind, ref, packaging, organic, merchant) id, kind, ref, packaging, organic, month::text, price::text, unit, merchant
+          FROM lexicon_input_prices WHERE month >= ${since}::date
+          ORDER BY kind, ref, packaging, organic, merchant, month DESC`,
+    );
+    if (!prices.length) return { items: [] };
+    // Variétés des semences nommées par leur variété : espèce si elle est unique dans le catalogue.
+    const names = [...new Set(articles.filter((a) => a.kind === "seed").flatMap((a) => [a.variety, a.name].filter((x): x is string => !!x).map((x) => x.trim().toUpperCase())))];
+    const varieties = names.length
+      ? await rows<{ name: string; species: string[] }>(
+          tx,
+          sql`SELECT upper(variety_name) AS name, array_agg(DISTINCT species) AS species FROM lexicon_seed_varieties
+              WHERE upper(variety_name) = ANY(${`{${names.map((n) => `"${n.replace(/"/g, "")}"`).join(",")}}`}::text[]) GROUP BY 1`,
+        )
+      : [];
+    const speciesOfVariety = new Map(varieties.filter((v) => v.species.length === 1).map((v) => [v.name, v.species[0]!]));
+    const month = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("fr-FR", { timeZone: "UTC", month: "short", year: "numeric" });
+
+    const items: ArticleSuggestions["items"] = [];
+    for (const a of articles) {
+      let refs: { kind: string; ref: string; name: string; how: string }[] = [];
+      if (a.kind === "phyto" && a.amm) refs = [{ kind: "phyto", ref: String(Number(a.amm)), name: a.name, how: `AMM ${a.amm}` }];
+      else if (a.kind === "fertilizer") {
+        const byVariant = a.lexicon_ref ? fertilizers.filter((f) => f.variant === a.lexicon_ref) : [];
+        const byComposition =
+          !byVariant.length && a.basis === "mass_percent" && a.n !== null
+            ? fertilizers.filter(
+                (f) =>
+                  f.kind === "mineral" &&
+                  // Composition connue des deux côtés : une référence sans teneur (ou un article presque vide) ne se rattache à rien.
+                  Number(f.nitrogen ?? 0) + Number(f.phosphorus ?? 0) + Number(f.potassium ?? 0) >= 1 &&
+                  Number(a.n ?? 0) + Number(a.p ?? 0) + Number(a.k ?? 0) >= 1 &&
+                  close(Number(f.nitrogen ?? 0), Number(a.n)) &&
+                  close(Number(f.phosphorus ?? 0), Number(a.p ?? 0)) &&
+                  close(Number(f.potassium ?? 0), Number(a.k ?? 0)),
+              )
+            : [];
+        refs = byVariant.length
+          ? byVariant.map((f) => ({ kind: "fertilizer", ref: f.id, name: f.name, how: "variante Lexicon" }))
+          : byComposition.slice(0, 2).map((f) => ({ kind: "fertilizer", ref: f.id, name: f.name, how: "même composition" }));
+      } else if (a.kind === "seed") {
+        const taxon = a.species ?? speciesOfVariety.get((a.variety ?? "").trim().toUpperCase()) ?? speciesOfVariety.get(a.name.trim().toUpperCase()) ?? null;
+        const byTaxon = taxon ? species.filter((s) => s.taxon === taxon) : [];
+        const n = norm(a.name);
+        // Par le nom, jamais pour un mélange (« Avoine + radis + phacélie » n'a pas le prix de l'avoine).
+        const mixture = a.mixture || /[+&]/.test(a.name);
+        const byName = byTaxon.length || mixture ? [] : species.filter((s) => n === norm(s.name) || n.startsWith(`${norm(s.name)} `));
+        refs = (byTaxon.length ? byTaxon : byName).slice(0, 1).map((s) => ({ kind: "seed", ref: s.id, name: s.name, how: byTaxon.length ? "espèce" : "nom" }));
+      }
+      const suggestions: PriceSuggestion[] = [];
+      for (const r of refs) {
+        const list = prices
+          .filter((p) => p.kind === r.kind && p.ref === r.ref)
+          // Semences : bio ou conventionnel selon l'article.
+          .filter((p) => p.organic === null || p.organic === a.organic)
+          .sort((x, y) => y.month.localeCompare(x.month) || Number(x.price) - Number(y.price));
+        for (const p of list.slice(0, 3)) {
+          const pack = p.packaging ? PACKAGING_LABELS[p.packaging] ?? p.packaging : null;
+          suggestions.push({
+            source: "lexicon",
+            scope: "reference",
+            label: [r.name, pack, p.organic ? "bio" : null, `${merchantLabel(p.merchant)}, ${month(p.month)}`].filter(Boolean).join(" · "),
+            amount: Number(p.price),
+            unit: p.unit,
+            date: p.month,
+            ref: `input_prices:${p.id}`,
+          });
+        }
+      }
+      if (suggestions.length) items.push({ articleId: a.id, match: `${refs.map((r) => r.name).join(", ")} (${refs[0]!.how})`, suggestions });
+    }
+    return { items };
   });
 }

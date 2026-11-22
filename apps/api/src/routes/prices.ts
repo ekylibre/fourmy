@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { priceKind, pricesWrite } from "@fourmy/contracts";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
-import { addPrices, deletePrice, ecoContext, listPrices, productSuggestions } from "../repos/prices.js";
+import { addPrices, articleSuggestions, deletePrice, ecoContext, listPrices, productSuggestions } from "../repos/prices.js";
 import { realizedFacts } from "../repos/eco-previous.js";
 import { domainCtx, problem, uuidParam } from "./helpers.js";
 
@@ -17,6 +17,8 @@ export const priceRoutes = new Hono<Env>()
     return c.json({ items: await listPrices(db(), c.get("farmId"), { kind: parsedKind?.data, at, history: c.req.query("history") === "1" }) });
   })
   // Repères Lexicon (lot E2) : prix de vente proposés et rendements Agreste, par activité.
+  // Prix de référence des intrants (point 142, jeux Lexicon réservés aux adhérents).
+  .get("/prices/suggestions/articles", async (c) => c.json(await articleSuggestions(db(), c.get("farmId"))))
   .get("/prices/suggestions/products", async (c) => c.json(await productSuggestions(db(), c.get("farmId"))))
   // Contexte économique d'une campagne d'assolement (lot E3) : défauts de rendement et de prix par activité.
   .get("/crop-plans/:year/eco-context", async (c) => {

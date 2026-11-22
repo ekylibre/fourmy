@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { EcoContext, Price, PriceKind, ProductSuggestions, RealizedFacts } from "@fourmy/contracts";
+import type { ArticleSuggestions, EcoContext, Price, PriceKind, ProductSuggestions, RealizedFacts } from "@fourmy/contracts";
 import { api, farmPath } from "../../app/api";
 
 /** Prix de la ferme (temps 3, lot E1). */
@@ -53,5 +53,14 @@ export function useEcoPrevious(farmId: string, year: number) {
     queryKey: [...pricesKey(farmId), "eco-previous", year],
     queryFn: () => api.get<RealizedFacts>(farmPath(farmId, `/crop-plans/${year}/eco-previous`)),
     staleTime: 5 * 60_000,
+  });
+}
+
+/** Prix de référence des intrants (point 142, jeux Lexicon réservés aux adhérents). */
+export function useArticleSuggestions(farmId: string) {
+  return useQuery({
+    queryKey: [...pricesKey(farmId), "suggestions", "articles"],
+    queryFn: () => api.get<ArticleSuggestions>(farmPath(farmId, "/prices/suggestions/articles")),
+    staleTime: 10 * 60_000,
   });
 }

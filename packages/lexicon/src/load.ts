@@ -44,6 +44,11 @@ const REQUIRED: Record<string, string[]> = {
   registered_seed_varieties: ["id", "id_specie", "specie_name_fra", "variety_name", "registration_date"],
   master_production_yields: ["department_zone", "specie", "production", "yield_value", "yield_unit", "campaign"],
   master_production_prices: ["department_zone", "started_on", "nature", "specie", "waiting_price", "final_price", "price_unit", "product_output_specie", "production_reference_name", "campaign", "organic", "label"],
+  registered_fertilizers: ["id", "name", "kind", "nitrogen", "phosphorus", "potassium", "sulfur", "variant_reference_name"],
+  registered_fertilizer_monthly_prices: ["id", "fertilizer_id", "packaging", "month", "price", "unit", "merchant", "observations"],
+  registered_phytosanitary_monthly_prices: ["id", "product_id", "month", "price", "unit", "merchant", "observations"],
+  registered_seed_species: ["id", "name", "latin_name", "category", "taxon_reference_name"],
+  registered_seed_monthly_prices: ["id", "species_id", "organic", "month", "price_per_kilogram", "offers", "merchants"],
   registered_eu_market_prices: ["id", "specie", "product_code", "product_label", "product_description", "unit_name", "country", "price", "start_date", "end_date"],
 };
 
@@ -70,6 +75,10 @@ const PACKAGES: { name: string; tables: string[]; optionalTables?: string[]; opt
   { name: "protected_natural_zones", tables: ["registered_natural_zones"], ifPublished: true },
   { name: "seed_varieties", tables: ["registered_seed_varieties"], ifPublished: true },
   { name: "eu_market_prices", tables: ["registered_eu_market_prices"], ifPublished: true },
+  // Prix de référence des intrants (Cereapro, Germineo) : réservés aux adhérents, avec la clé du bundle.
+  { name: "fertilizers", tables: ["registered_fertilizers", "registered_fertilizer_monthly_prices"], optional: true },
+  { name: "phytosanitary_prices", tables: ["registered_phytosanitary_monthly_prices"], optional: true },
+  { name: "seeds", tables: ["registered_seed_species", "registered_seed_monthly_prices"], optional: true },
 ];
 
 /** Passage des tables temporaires (texte) aux tables de Fourmy, typées. */
@@ -216,6 +225,35 @@ const TABLE_TRANSFORMS: Record<string, string[]> = {
      WHERE coalesce(nullif(final_price::numeric, 0), nullif(waiting_price::numeric, 0)) IS NOT NULL`,
   ],
 };
+TRANSFORMS.fertilizers = [
+  `TRUNCATE lexicon_fertilizer_refs`,
+  `DELETE FROM lexicon_input_prices WHERE kind = 'fertilizer'`,
+  `INSERT INTO lexicon_fertilizer_refs (id, name, kind, nitrogen, phosphorus, potassium, sulfur, variant)
+   SELECT id, name, kind, nullif(nitrogen, '')::numeric, nullif(phosphorus, '')::numeric, nullif(potassium, '')::numeric,
+          nullif(sulfur, '')::numeric, nullif(btrim(variant_reference_name), '')
+   FROM lx_registered_fertilizers ON CONFLICT (id) DO NOTHING`,
+  `INSERT INTO lexicon_input_prices (id, kind, ref, packaging, organic, month, price, unit, merchant, observations)
+   SELECT 'f:' || id, 'fertilizer', fertilizer_id, nullif(packaging, ''), NULL, month::date, price::numeric, unit, merchant, nullif(observations, '')::int
+   FROM lx_registered_fertilizer_monthly_prices WHERE price::numeric > 0 ON CONFLICT (id) DO NOTHING`,
+];
+TRANSFORMS.phytosanitary_prices = [
+  `DELETE FROM lexicon_input_prices WHERE kind = 'phyto'`,
+  `INSERT INTO lexicon_input_prices (id, kind, ref, packaging, organic, month, price, unit, merchant, observations)
+   SELECT 'p:' || id, 'phyto', product_id, NULL, NULL, month::date, price::numeric, unit, merchant, nullif(observations, '')::int
+   FROM lx_registered_phytosanitary_monthly_prices WHERE coalesce(product_id, '') <> '' AND price::numeric > 0 ON CONFLICT (id) DO NOTHING`,
+];
+TRANSFORMS.seeds = [
+  `TRUNCATE lexicon_seed_species`,
+  `DELETE FROM lexicon_input_prices WHERE kind = 'seed'`,
+  `INSERT INTO lexicon_seed_species (id, name, latin_name, category, taxon)
+   SELECT id, name, nullif(latin_name, ''), nullif(category, ''), nullif(btrim(taxon_reference_name), '')
+   FROM lx_registered_seed_species ON CONFLICT (id) DO NOTHING`,
+  // Marchands en liste (« {germineo,cereapro} ») : gardés joints par une virgule.
+  `INSERT INTO lexicon_input_prices (id, kind, ref, packaging, organic, month, price, unit, merchant, observations)
+   SELECT 's:' || id, 'seed', species_id, NULL, organic::boolean, month::date, price_per_kilogram::numeric, 'kilogram',
+          array_to_string(coalesce(merchants::text[], '{}'), ', '), nullif(offers, '')::int
+   FROM lx_registered_seed_monthly_prices WHERE price_per_kilogram::numeric > 0 ON CONFLICT (id) DO NOTHING`,
+];
 TRANSFORMS.eu_market_prices = [
   `TRUNCATE lexicon_market_prices`,
   `INSERT INTO lexicon_market_prices (id, specie, product_code, label, stage, unit, price, started_on, ended_on)
@@ -250,6 +288,7 @@ const REFERENTIAL_TABLES = [
   "lexicon_productions", "lexicon_production_ift", "lexicon_cap_codes", "lexicon_pictures", "lexicon_agroedi_codes", "lexicon_agroedi_crops",
   "lexicon_water_catchments", "lexicon_natura2000", "lexicon_seed_varieties",
   "lexicon_production_yields", "lexicon_production_prices", "lexicon_market_prices",
+  "lexicon_fertilizer_refs", "lexicon_seed_species", "lexicon_input_prices",
 ];
 
 /**

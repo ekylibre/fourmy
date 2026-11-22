@@ -8,7 +8,7 @@ import { useActivities, useArticles } from "../../app/queries";
 import { ErrorAlert, Loading } from "../../components/states";
 import { useEquipmentRates } from "../itk/work";
 import { PriceTable, fmtEuro, type PriceRow } from "./PriceTable";
-import { useProductSuggestions, usePrices } from "./queries";
+import { useArticleSuggestions, useProductSuggestions, usePrices } from "./queries";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const TABS: PriceKind[] = ["article", "equipment", "labour", "service", "product"];
@@ -62,6 +62,8 @@ export function EconomicsPage() {
 function InputsTab({ farmId, owner }: { farmId: string; owner: boolean }) {
   const articles = useArticles(farmId);
   const { q, get } = useCurrent(farmId, "article");
+  const refs = useArticleSuggestions(farmId);
+  const byArticle = new Map((refs.data?.items ?? []).map((i) => [i.articleId, i]));
   if (articles.isLoading || q.isLoading) return <Loading />;
   if (articles.error || q.error) return <ErrorAlert error={articles.error ?? q.error} />;
   const rows: PriceRow[] = (articles.data?.items ?? [])
@@ -74,8 +76,24 @@ function InputsTab({ farmId, owner }: { farmId: string; owner: boolean }) {
       unit: a.unit,
       units: [a.unit, ...MASS_UNITS, ...(a.kind === "seed" ? ["dose", "thousand"] : [])],
       current: get({ articleId: a.id }),
+      suggestions: byArticle.get(a.id)?.suggestions,
+      hint: byArticle.get(a.id) ? (
+        <Text size="xs" c="dimmed">
+          Référence : {byArticle.get(a.id)!.match}
+        </Text>
+      ) : undefined,
     }));
-  return <PriceTable farmId={farmId} kind="article" rows={rows} owner={owner} label="Intrant" />;
+  return (
+    <Stack gap="xs">
+      {(refs.data?.items.length ?? 0) > 0 && (
+        <Alert color="gray" p="xs">
+          Prix de référence relevés par Cereapro et Germineo (jeux Lexicon réservés aux adhérents, réutilisation avec attribution) : prix livrés hors taxes,
+          par conditionnement, du dernier mois relevé. « Reprendre » remplit le prix avec sa source ; il reste à l'enregistrer.
+        </Alert>
+      )}
+      <PriceTable farmId={farmId} kind="article" rows={rows} owner={owner} label="Intrant" />
+    </Stack>
+  );
 }
 
 function EquipmentTab({ farmId, owner }: { farmId: string; owner: boolean }) {

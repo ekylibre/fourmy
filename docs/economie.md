@@ -44,6 +44,24 @@ Sans prix propre, un matériel rattaché au barème BCMA (fiche du matériel ou
 fixe et variable, carburant compris. Le coût du barème s'affiche dans la
 colonne **Repère** ; « Rattacher au barème… » ouvre la fiche du matériel.
 
+## Prix de référence des intrants
+
+Avec la clé d'adhérent du bundle « fourmy » (`FOURMY_LEXICON_API_KEY`), la
+synchro Lexicon charge les prix de référence relevés chaque semaine par
+**Cereapro** et **Germineo** (réutilisation avec attribution) : engrais par
+conditionnement (vrac, big bag) en €/t, produits phyto par numéro d'AMM,
+semences par espèce en €/kg (conventionnel ou bio). L'onglet **Intrants**
+propose, pour chaque article rattaché, les prix du dernier mois relevé
+(douze derniers mois au plus), avec « Reprendre ».
+
+| Intrant | Rattachement |
+|---|---|
+| Produit phyto | numéro d'AMM de l'article |
+| Engrais | référence Lexicon de l'article (variante), sinon même composition N-P-K (engrais minéral à teneurs en %, composition connue des deux côtés) |
+| Semence | espèce de la fiche semence, sinon variété (catalogue SEMAE, si elle n'existe que pour une espèce), sinon nom de l'article commençant par le nom de l'espèce ; jamais par le nom pour un mélange |
+
+La référence retenue s'affiche sous l'article (« Référence : Avoine (nom) »).
+
 ## Repères Lexicon des produits
 
 Dans l'onglet **Produits**, chaque production à grain (blé, orge, maïs grain,
@@ -147,8 +165,9 @@ comparaison avec le réalisé l'est.
 
 ## Limites connues
 
-- Prix des intrants proposés par Lexicon (engrais, phyto, semences) : en
-  attente du bundle « fourmy » ; la saisie seule pour l'instant.
+- Prix de référence des intrants : 16 produits phyto seulement dans le jeu
+  Lexicon (aucun des produits des fermes de test) ; engrais et semences
+  bien couverts.
 - API agrifood de la Commission indisponible (point d'entrée suspendu le
   21/11/2026) : les repères de prix de vente viennent de Lexicon.
 - Comparaison avec la campagne précédente : réalisé seulement, pas son prévu.
