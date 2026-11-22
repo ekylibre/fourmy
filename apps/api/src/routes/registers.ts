@@ -20,7 +20,7 @@ const identity = z.object({
   pacage: z.string().trim().regex(/^\d{9}$/, "PACAGE : 9 chiffres").nullable(),
 });
 
-/** Registre phytosanitaire d'une campagne (FR-REG-1) : JSON ou CSV ; format réglementaire (lot X). */
+/** Registre phytosanitaire d'une campagne (FR-REG-1) : JSON, CSV ou PDF (édition imprimable) ; format réglementaire (lot X). */
 export const registerRoutes = new Hono<Env>()
   .get("/registers/phyto", async (c) => {
     const year = campaignOf(c.req.query("campaign"));
@@ -32,7 +32,9 @@ export const registerRoutes = new Hono<Env>()
         "content-disposition": `attachment; filename="registre-phyto-${year}.csv"`,
       });
     }
-    if (format === "pdf") return problem(c, 501, "Not Implemented", "Export PDF du registre : à venir.");
+    // PDF : édition imprimable de l'application (en-tête de la ferme, format réglementaire),
+    // enregistrée en PDF par le navigateur (issue #8).
+    if (format === "pdf") return c.redirect(`/f/${c.get("farmId")}/print/register/phyto?campaign=${year}`, 302);
     return c.json({ campaign: year, items: entries });
   })
   // Format réglementaire (arrêté du 24/12/2025, notice du 22/09/2026) :

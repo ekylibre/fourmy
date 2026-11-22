@@ -3,7 +3,8 @@ import { Alert, Badge, Button, Group, Paper, Stack, Text, TextInput } from "@man
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DataTable } from "mantine-datatable";
-import { Download } from "lucide-react";
+import { Download, Printer } from "lucide-react";
+import { Link } from "react-router";
 import type { FarmIdentity, OfficialRegister as Register, OfficialRegisterField, OfficialRegisterLine } from "@fourmy/contracts";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useColumns, type ColumnDef } from "../../app/columns";
@@ -110,6 +111,9 @@ export function OfficialRegister({ campaign }: { campaign: number }) {
         </Text>
         <Group gap="xs">
           <ColumnPicker columns={columns} />
+          <Button variant="light" leftSection={<Printer size={16} />} component={Link} to={`/f/${farm.id}/print/register/phyto?campaign=${campaign}`}>
+            Imprimer ou PDF
+          </Button>
           <Button variant="light" leftSection={<Download size={16} />} disabled={!r.lines.length} onClick={() => download("csv", `registre-phyto-reglementaire-${campaign}.csv`)}>
             CSV réglementaire
           </Button>

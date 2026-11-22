@@ -142,6 +142,12 @@ describe.skipIf(!url)("registre phyto réglementaire (intégration)", () => {
     expect(lines.map((l) => l.cultureOepp).sort()).toEqual(["LOLPE", "VITVI"]);
   });
 
+  it("PDF : renvoie vers l'édition imprimable du registre (issue #8)", async () => {
+    const res = await send("GET", "/registers/phyto?campaign=2026&format=pdf");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toMatch(/^\/f\/[0-9a-f-]{36}\/print\/register\/phyto\?campaign=2026$/);
+  });
+
   it("exports : CSV aux intitulés standard, JSON complet avec champs d'enquête", async () => {
     const bytes = new Uint8Array(await (await send("GET", "/registers/phyto/official?campaign=2026&format=csv")).arrayBuffer());
     expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]); // BOM UTF-8 (tableurs)

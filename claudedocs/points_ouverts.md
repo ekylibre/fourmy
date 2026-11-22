@@ -164,7 +164,7 @@ Plus trois points faits (17, 104 et 57, ce dernier en PR à fusionner), hors du 
     - zoom 18 autour des parcelles, seuils de 2 Go et 500 Mo.
 
     *décision · P2 · conception_ma_ferme §13*
-99. **En-tête imprimé du registre phyto officiel** (logo, raison sociale, SIRET), comme le plan de fumure. *évolution · P3 · conception_ma_ferme §12 quater*
+99. ~~**En-tête imprimé du registre phyto officiel**~~ : **fait le 22/11** avec l'édition imprimable (point 14), en-tête commun au plan de fumure. *évolution · P3 · conception_ma_ferme §12 quater*
 100. **E-mail d'échéance des certifications**, une fois le SMTP en place. Aujourd'hui, l'alerte est sur le tableau de bord. *évolution · P3 · conception_ma_ferme §12 quater*
 101. **Archive PMTiles pour la copie navigateur**, seulement si des fermes dépassent largement 50 000 tuiles. *évolution · P3 · conception_ma_ferme §12 septies*
 102. **Coût de main-d'œuvre**, à rouvrir avec le coût des chantiers. *évolution · P3 · besoins_equipe_personnes §6*
@@ -173,7 +173,7 @@ Plus trois points faits (17, 104 et 57, ce dernier en PR à fusionner), hors du 
 
 ## 4. Phyto et registre
 
-14. **Export PDF du registre phyto** : la route répond 501. *évolution · P2 · routes/registers.ts*
+14. ~~**Export PDF du registre phyto**~~ : **fait le 22/11** : édition imprimable au format réglementaire (A4 paysage, en-tête de la ferme), `?format=pdf` y renvoie. *évolution · P2 · routes/registers.ts*
 15. **Figer le format réglementaire** : dose en kg/hL ou L/hL, séparateur GPS, libellé BBCH. Le contrôle de Luhn du SIRET est fait (« Ma ferme » F1). *décision · P2 · specs §23.8*
 16. **Cas B à D de l'arrêté**, prestation de service, délai de rentrée anticipée, volume de bouillie. *évolution · P3 · phyto.md*
 17. ~~**Reprise du SIRET depuis Ekylibre**~~ : **fait le 2026-11-13**. L'import reprend l'identité de la ferme (SIRET, TVA, NAF, forme juridique, adresse), sans écraser ce qui est déjà saisi (« Ma ferme » F3). *évolution · P3 · specs §8.3*
@@ -351,7 +351,7 @@ Besoins, conception et plans : `claudedocs/besoins_import_onboarding.md`, `claud
 147. **Rendement des cultures fourragères** : calculé sur des récoltes saisies tantôt en matière brute, tantôt en matière sèche (maïs fourrage de la GAEC : 41,8 puis 228,1 q/ha) ; unité à fixer par culture. *donnée · P3 · workflow_assolement_eco E3* — brouillon du projet
 
 148. **Rapprochement douteux d'un engrais vers une référence de prix Lexicon** : « Solution azotée 32 » rapprochée d'« Ammonitrate 33.5 » (variante Lexicon de l'article). *bug · P2 · recette du 22/11* — issue #158
-149. **Test web instable** : `phyto.test.tsx` dépasse parfois son délai de 20 s en CI. *dette · P2 · CI de #152* — issue #159
+149. ~~**Test web instable**~~ : **corrigé le 22/11** (motif collé au lieu d'être tapé, délai de 40 s pour ce test ; dépassé deux fois en CI, #152 et #162). *dette · P2 · CI de #152* — issue #159
 150. **Semences de la ferme de grandes cultures** : stocks très négatifs et densités 2026 aberrantes (1,4 à 2,8 grains/m² de maïs), unités reprises à revoir. *donnée · P2 · recette du 22/11* — issue #160
 
 ## 18. Semences

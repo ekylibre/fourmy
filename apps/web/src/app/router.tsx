@@ -51,6 +51,7 @@ const InterventionPage = lazy(() => import("../features/interventions/Interventi
 const ActivityItineraryPage = lazy(() => import("../features/itinerary/ActivityItineraryPage").then((m) => ({ default: m.ActivityItineraryPage })));
 const CartoLabPage = lazy(() => import("../carto/CartoLabPage").then((m) => ({ default: m.CartoLabPage })));
 const PrintPage = lazy(() => import("../features/fertilization/PrintPage").then((m) => ({ default: m.PrintPage })));
+const RegisterPrintPage = lazy(() => import("../features/register/RegisterPrintPage").then((m) => ({ default: m.RegisterPrintPage })));
 const PlanPage = lazy(() => import("../features/fertilization/PlanPage").then((m) => ({ default: m.PlanPage })));
 const PrescriptionNewPage = lazy(() => import("../features/modulation/PrescriptionNewPage").then((m) => ({ default: m.PrescriptionNewPage })));
 const PrescriptionPage = lazy(() => import("../features/modulation/PrescriptionPage").then((m) => ({ default: m.PrescriptionPage })));
@@ -160,6 +161,19 @@ const pages = [
   { path: "/agrirouter/start", element: <RequireAuth><AgrirouterStartPage /></RequireAuth> },
   legacy("/connexion"),
   legacy("/fermes"),
+  // Éditions imprimables (sans menu) : registre phytosanitaire au format réglementaire.
+  {
+    path: "/f/:farmId/print/register/phyto",
+    element: (
+      <RequireAuth>
+        <FarmProvider fallback={<FarmFallback />}>
+          <Suspense fallback={<Loading />}>
+            <RegisterPrintPage />
+          </Suspense>
+        </FarmProvider>
+      </RequireAuth>
+    ),
+  },
   // Éditions imprimables (sans menu) : cahier d'enregistrement, plans de fumure.
   {
     path: "/f/:farmId/print/fertilization/:doc",

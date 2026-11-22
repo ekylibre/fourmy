@@ -1,9 +1,0 @@
-/* Éditions imprimables (lot AH) : lisibles à l'écran, propres à l'impression. */
-.print-page { max-width: 1100px; margin: 0 auto; padding: 24px 16px; background: var(--mantine-color-body); }
-.print-block { margin-bottom: 20px; break-inside: avoid; }
-@media print {
-  .no-print { display: none !important; }
-  .print-page { padding: 0; max-width: none; }
-  .print-break { break-before: page; }
-  body { background: #fff; }
-}

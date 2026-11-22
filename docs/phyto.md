@@ -202,11 +202,16 @@ réalisée (`officialRegisterLine`, `@fourmy/domain`) :
 anomalies), `&format=csv` (intitulés standard, « ; », UTF-8 avec BOM),
 `&format=export` (JSON complet : détenteur, campagne, champs d'enquête
 `campagne`, `pacage`, `surfaceParcelle`, `partSurfaceTraitee`) ;
+`GET /registers/phyto?format=pdf` renvoie (302) vers l'édition imprimable ;
 `GET|PUT /settings/identity` (SIRET, PACAGE ; écriture responsable) ;
 `GET /reference/phyto-crops`, `GET /reference/bbch?crop=CODE`.
 
 **Écrans** : Registre phyto › onglet « Format réglementaire » (détenteur,
-lignes, champs à compléter, exports) ; Activités : culture du registre
+lignes, champs à compléter, exports) ; bouton « Imprimer ou PDF » : édition
+imprimable (`/f/:ferme/print/register/phyto?campaign=AAAA`), A4 paysage, avec
+l'en-tête de la ferme (logo, raison sociale, SIRET, PACAGE) comme le plan de
+fumure ; un champ obligatoire manquant y est écrit « à compléter » ; le
+navigateur l'enregistre en PDF ; Activités : culture du registre
 (proposée ou choisie) ; formulaire d'un traitement : stade BBCH (stades de
 la culture des parcelles) ; fiche : stade.
 
