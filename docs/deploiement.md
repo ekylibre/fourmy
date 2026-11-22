@@ -24,6 +24,7 @@ l'application GitHub « Dokploy-ekylibre-org » et redéploie à chaque push sur
 | `api` | `Dockerfile`, cible `api` | API Hono ; applique les migrations au démarrage ; relaie les tuiles IGN (fonds de carte, relief et bâtiments de la 3D) et les garde dans le volume `fourmy_ign_cache` ; sert les fichiers reçus d'agrirouter (volume `fourmy_agrirouter_files`) |
 | `worker` | même image, `node apps/api/dist/worker.js` | synchronise les intégrations des fermes (Traccar : chaque minute ; stations Weenat et Sencrop : chaque heure), les parcours GPS (toutes les 5 minutes), le référentiel phyto Lexicon (chaque jour), l'eau autour des fermes (BD TOPO, tous les 30 jours), l'IFT et la météo des interventions réalisées, les heures estimées des matériels depuis Traccar (toutes les 15 minutes) les alertes d'entretien par e-mail (au plus une fois par heure), le préchargement des tuiles IGN autour des fermes (volume `fourmy_ign_cache`, partagé avec `api`) et le quota de ce cache (chaque jour) ; écoute en permanence les événements agrirouter (un seul worker à la fois, verrou en base), range les fichiers reçus dans le volume `fourmy_agrirouter_files` et les confirme à agrirouter |
 | `web` | `Dockerfile`, cible `web` (nginx) | application React + relais `/api` → `api` ; service worker `/sw.js` (copie hors ligne des fermes), servi sans cache ; relais `/version.json` → `site` (version affichée en pied de menu) |
+| `osrm` | `osrm/osrm-backend:v5.25.0` | routage tracteur auto-hébergé : trajets siège ↔ parcelles des chantiers (temps de travaux de l'assolement) et recalage du rejeu 3D. Graphe dans le volume `fourmy_osrm`, préparé à la main (« OSRM » ci-dessous) ; sans graphe, le service attend et l'API estime les trajets à vol d'oiseau |
 | `site` | `ghcr.io/ekylibre/fourmy-site:main`, construite par la CI depuis `docker/site.Dockerfile` (nginx) | site public fourmy.org ; relaie seulement `/api/public/` (formulaire de contact) ; `www` → apex |
 
 Sont exposés **`web`** (dev.fourmy.org, l'application) et **`site`**
@@ -47,7 +48,7 @@ l'API partagent la même origine : cookies de session sans CORS.
 | — | — | Météo : Open-Meteo sans clé par défaut ; les clés OpenWeather et meteoblue se saisissent par ferme dans **Intégrations** (`docs/meteo.md`), pas en variable du serveur |
 | `FOURMY_IFT_API_URL` | **en production** | API IFT du ministère (ouverte, sans compte). Par défaut la **préproduction** `https://ecoagri-pprd.api.agriculture.gouv.fr/ift/v5/api` (local, dev.fourmy.org) ; la production règle `https://ecoagri.api.agriculture.gouv.fr/ift/v5/api` |
 | `AGRIROUTER_CLIENT_ID`, `AGRIROUTER_CLIENT_SECRET`, `AGRIROUTER_APPLICATION_ID`, `AGRIROUTER_SOFTWARE_VERSION_ID` | non | application Fourmy enregistrée chez agrirouter (cartes de modulation vers les machines, [`modulation.md`](modulation.md)) ; sans elles, la connexion agrirouter est désactivée. `AGRIROUTER_REDIRECT_URI` vaut `${PUBLIC_URL}/agrirouter/callback` par défaut et doit être déclarée telle quelle dans le client OAuth ; `AGRIROUTER_ENVIRONMENT` : `production` (défaut) ou `qa` |
-| `FOURMY_OSRM_URL` | non | service OSRM auto-hébergé (profil tracteur) qui recale les déplacements du rejeu 3D sur la route ([`routage-osrm.md`](routage-osrm.md)) ; sans lui, la trace reste brute |
+| `FOURMY_OSRM_URL` | non | service OSRM (profil tracteur), `http://osrm:5000` par défaut, le service `osrm` du compose ([`routage-osrm.md`](routage-osrm.md)) ; s'il ne répond pas, la trace du rejeu reste brute et les trajets des chantiers sont estimés |
 | `SIRENE_API_KEY` | non | clé de l'API Sirene de l'INSEE (portail-api.insee.fr) : autocomplétion du SIRET et de la raison sociale dans l'assistant ; sans elle, saisie manuelle |
 | `EKYLIBRE_SOURCES_URL` | non | serveur des bases Ekylibre restaurées pour les imports depuis l'interface |
 | `FOURMY_IGN_CACHE_MAX_GB` | non | quota du cache des tuiles IGN, 20 Go par défaut (worker) ; au-delà, les tuiles les moins lues hors des zones des fermes sont supprimées d'abord |
@@ -167,6 +168,24 @@ puis tirée par Dokploy (`pull_policy: always`).
   variables.
 - Un historique superficiel fait échouer la construction avec un message
   explicite : rien de faux n'est publié.
+
+## OSRM
+
+Le graphe routier se prépare une fois sur le serveur, hors de Dokploy (2 Go
+de RAM environ au pic, quelques minutes), dans le volume Docker `fourmy_osrm`
+que lit le service `osrm`. Depuis une copie du dépôt sur le serveur (celle de
+Dokploy, ou un `git clone`) :
+
+```sh
+docker/osrm/prepare.sh europe/france/aquitaine europe/france/pays-de-la-loire
+docker restart $(docker ps -q --filter label=com.docker.compose.service=osrm)
+```
+
+Les régions couvrent les fermes servies (ici les deux fermes de test) ; en
+ajouter une se fait en relançant `prepare.sh` avec la liste complète. Relancer
+le script met aussi la carte à jour. Vérification : le journal du service
+commence par `OSRM : graphe aquitaine pays-de-la-loire` ; sinon il affiche
+`pas de graphe` et attend. Le volume n'a pas besoin de sauvegarde.
 
 ## Sauvegardes (à mettre en place)
 

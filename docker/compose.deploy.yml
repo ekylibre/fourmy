@@ -40,8 +40,9 @@ services:
       # La perdre rend les secrets illisibles (à ressaisir dans Intégrations).
       FOURMY_SECRETS_KEY: ${FOURMY_SECRETS_KEY:?FOURMY_SECRETS_KEY requis (openssl rand -base64 32)}
       FOURMY_IFT_API_URL: ${FOURMY_IFT_API_URL:-https://ecoagri-pprd.api.agriculture.gouv.fr/ift/v5/api}
-      # Routage tracteur (docs/routage-osrm.md) : vide, la trace du rejeu reste brute.
-      FOURMY_OSRM_URL: ${FOURMY_OSRM_URL:-}
+      # Routage tracteur (docs/routage-osrm.md) : service `osrm` ci-dessous ; sans réponse,
+      # la trace du rejeu reste brute et les trajets des chantiers sont estimés à vol d'oiseau.
+      FOURMY_OSRM_URL: ${FOURMY_OSRM_URL:-http://osrm:5000}
       # Formulaire de contact de fourmy.org (désactivé sans FOURMY_SMTP_HOST).
       FOURMY_SMTP_HOST: ${FOURMY_SMTP_HOST:-}
       FOURMY_SMTP_PORT: ${FOURMY_SMTP_PORT:-587}
@@ -136,6 +137,25 @@ services:
     # ports:
     #   - "8080:80"
 
+  # Routage tracteur (OSRM) : trajets siège ↔ parcelles des chantiers (assolement) et
+  # recalage du rejeu. Graphe à préparer une fois sur le serveur dans le volume
+  # `fourmy_osrm` (docker/osrm/prepare.sh, docs/deploiement.md « OSRM ») ; tant qu'il
+  # manque, le service attend sans redémarrer en boucle et l'API estime les trajets.
+  osrm:
+    image: osrm/osrm-backend:v5.25.0
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ ! -f /data/map.osrm.mldgr ]; then
+          echo "OSRM : pas de graphe dans le volume fourmy_osrm (docker/osrm/prepare.sh), service en attente"
+          exec sleep infinity
+        fi
+        echo "OSRM : graphe $$(cat /data/region 2>/dev/null)"
+        exec osrm-routed --algorithm mld --max-matching-size 500 /data/map.osrm
+    volumes:
+      - fourmy_osrm:/data:ro
+
   # Site public fourmy.org (+ www → fourmy.org). Relaie /api/public/ seulement.
   # Image construite par la CI (historique Git complet, absent du clone de
   # Dokploy) : .github/workflows/ci.yml, job site-image.
@@ -152,3 +172,6 @@ volumes:
   fourmy_ign_cache:
   fourmy_agrirouter_files:
   fourmy_ekylibre_uploads:
+  # Nom fixe : préparé hors de Compose par docker/osrm/prepare.sh.
+  fourmy_osrm:
+    name: fourmy_osrm

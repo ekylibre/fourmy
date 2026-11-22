@@ -425,6 +425,9 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", { timeout: 150_
   it("charge produits, usages, ensembles et taxonomie ; une version connue n'est pas retéléchargée", async () => {
     await sql
       .begin(async (tx) => {
+        // Tables facultatives de `productions` vides, comme sur une base neuve (CI) : le
+        // résultat ne dépend pas d'une synchro réelle faite sur la base de développement.
+        await tx`TRUNCATE lexicon_production_yields, lexicon_production_prices`;
         const server = fakeServer("v1");
         const first = await syncLexiconIn(tx, { base: "http://lexicon.test", fetchImpl: server.fetchImpl, force: true });
         expect(first).toEqual([
@@ -478,11 +481,12 @@ describe.skipIf(!url)("synchro du référentiel (intégration)", { timeout: 150_
           { reference_name: "zea_mays", parent: "zea", label: "Maïs" },
         ]);
 
-        // Même version : rien n'est retéléchargé.
+        // Même version : rien n'est retéléchargé. Seul le manifeste de `productions` est relu,
+        // ses tables facultatives (rendements, prix) étant vides ; il ne les publie pas.
         const again = fakeServer("v1");
         const second = await syncLexiconIn(tx, { base: "http://lexicon.test", fetchImpl: again.fetchImpl });
         expect(second.map((r) => r.status)).toEqual(["up-to-date", "up-to-date", "up-to-date", "up-to-date", "absent", "absent", "absent", "absent", "absent", "absent", "absent", "absent"]);
-        expect(again.requested).toEqual(["index.json"]);
+        expect(again.requested).toEqual(["index.json", "productions/pr1/manifest.json"]);
         throw new Rollback();
       })
       .catch((e) => {

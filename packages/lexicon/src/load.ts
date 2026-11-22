@@ -182,6 +182,8 @@ const TRANSFORMS: Record<string, string[]> = {
      ON CONFLICT (gnis_code) DO NOTHING`,
   ],
   agroedi: [
+    // Vidé avant rechargement : une nouvelle version retire ou renomme des codes.
+    `TRUNCATE lexicon_agroedi_codes, lexicon_agroedi_crops`,
     `INSERT INTO lexicon_agroedi_codes (table_id, reference_id, code, label, ekylibre_scope, ekylibre_value)
      SELECT repository_id::int, reference_id::int, btrim(reference_code), btrim(reference_label),
             nullif(btrim(ekylibre_scope), ''), nullif(btrim(ekylibre_value), '')
