@@ -97,3 +97,34 @@ describe("registre phyto : format réglementaire", () => {
     expect(click).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("registre phyto : édition imprimable (issue #8)", () => {
+  it("en-tête du détenteur, lignes au format réglementaire, champs manquants « à compléter »", async () => {
+    vi.spyOn(window, "print").mockImplementation(() => {});
+    server.use(
+      http.get("*/registers/phyto/official", () =>
+        HttpResponse.json({
+          campaign: 2026,
+          holder: { name: "Démo", siret: null, pacage: "032123456" },
+          generatedAt: "2026-11-10T00:00:00Z",
+          lines: [line({}), line({ idTraitement: "in-2:tg-1", nomProduit: "Herbicide Y", numeroAMMProduit: "", anomalies: ["numeroAMMProduit"], links: { interventionId: "int-2", landParcelId: "lp-2", parcelName: "Le Bourg", activityId: null } })],
+        } satisfies OfficialRegister),
+      ),
+    );
+    const user = userEvent.setup();
+    renderApp(`/f/${FARM}/print/register/phyto?campaign=2026`);
+    expect(await screen.findByRole("heading", { name: "Registre d'utilisation des produits phytopharmaceutiques" })).toBeVisible();
+    expect(screen.getByText(/PACAGE 032123456 · Campagne 2026/)).toBeVisible();
+    expect(screen.getByText(/SIRET du détenteur non renseigné/)).toBeVisible();
+    const table = screen.getByRole("table", { name: "Registre phytosanitaire 2026" });
+    const rows = within(table).getAllByRole("row");
+    expect(rows).toHaveLength(3);
+    expect(within(rows[1]!).getByText("Les Rouffiats")).toBeVisible();
+    expect(within(rows[1]!).getByText("2 L/ha")).toBeVisible();
+    expect(within(rows[1]!).getByText("1,20 ha")).toBeVisible();
+    expect(within(rows[2]!).getByText("à compléter")).toBeVisible();
+    expect(screen.getByText(/2 ligne\(s\) avec un champ obligatoire à compléter/)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Imprimer ou enregistrer en PDF" }));
+    expect(window.print).toHaveBeenCalled();
+  });
+});

@@ -157,7 +157,7 @@ Plus trois points faits (17, 104 et 57, ce dernier en PR à fusionner), hors du 
     - zoom 18 autour des parcelles, seuils de 2 Go et 500 Mo.
 
     *décision · P2 · conception_ma_ferme §13*
-99. **En-tête imprimé du registre phyto officiel** (logo, raison sociale, SIRET), comme le plan de fumure. *évolution · P3 · conception_ma_ferme §12 quater*
+99. ~~**En-tête imprimé du registre phyto officiel**~~ : **fait le 22/11** avec l'édition imprimable (point 14), en-tête commun au plan de fumure. *évolution · P3 · conception_ma_ferme §12 quater*
 100. **E-mail d'échéance des certifications**, une fois le SMTP en place. Aujourd'hui, l'alerte est sur le tableau de bord. *évolution · P3 · conception_ma_ferme §12 quater*
 101. **Archive PMTiles pour la copie navigateur**, seulement si des fermes dépassent largement 50 000 tuiles. *évolution · P3 · conception_ma_ferme §12 septies*
 102. **Coût de main-d'œuvre**, à rouvrir avec le coût des chantiers. *évolution · P3 · besoins_equipe_personnes §6*
@@ -166,7 +166,7 @@ Plus trois points faits (17, 104 et 57, ce dernier en PR à fusionner), hors du 
 
 ## 4. Phyto et registre
 
-14. **Export PDF du registre phyto** : la route répond 501. *évolution · P2 · routes/registers.ts*
+14. ~~**Export PDF du registre phyto**~~ : **fait le 22/11** : édition imprimable au format réglementaire (A4 paysage, en-tête de la ferme), `?format=pdf` y renvoie. *évolution · P2 · routes/registers.ts*
 15. **Figer le format réglementaire** : dose en kg/hL ou L/hL, séparateur GPS, libellé BBCH. Le contrôle de Luhn du SIRET est fait (« Ma ferme » F1). *décision · P2 · specs §23.8*
 16. **Cas B à D de l'arrêté**, prestation de service, délai de rentrée anticipée, volume de bouillie. *évolution · P3 · phyto.md*
 17. ~~**Reprise du SIRET depuis Ekylibre**~~ : **fait le 2026-11-13**. L'import reprend l'identité de la ferme (SIRET, TVA, NAF, forme juridique, adresse), sans écraser ce qui est déjà saisi (« Ma ferme » F3). *évolution · P3 · specs §8.3*

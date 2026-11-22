@@ -1,0 +1,15 @@
+/* Éditions imprimables (lot AH, registre phyto) : lisibles à l'écran, propres à l'impression. */
+.print-page { max-width: 1100px; margin: 0 auto; padding: 24px 16px; background: var(--mantine-color-body); }
+.print-block { margin-bottom: 20px; break-inside: avoid; }
+/* Tableau long (registre phyto) : en-têtes répétés sur chaque page, lignes entières. */
+.print-table thead { display: table-header-group; }
+.print-table tr { break-inside: avoid; }
+/* Registre phyto : A4 paysage (page nommée, les autres éditions restent en portrait). */
+@page landscape { size: A4 landscape; margin: 12mm; }
+.print-landscape { page: landscape; }
+@media print {
+  .no-print { display: none !important; }
+  .print-page { padding: 0; max-width: none; }
+  .print-break { break-before: page; }
+  body { background: #fff; }
+}
