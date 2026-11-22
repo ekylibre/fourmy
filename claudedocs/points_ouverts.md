@@ -19,6 +19,8 @@ Chaque point se lit ainsi : **titre** : description. *nature · priorité · sou
 - **Incident** : 502 pendant environ 3 h après un déploiement (nginx gardait l'ancienne adresse de l'API) ; corrigé par #154.
 - **CI de `main`** de nouveau verte (#151) ; site public à jour des développements du 19 au 22/11 (#153).
 - **Projet GitHub** : #114 close ; issues #155 (141), #156 (143), #157 (146), #158 à #160 (nouveaux points 148 à 150) ; brouillons pour 136, 138 à 140, 144, 145 et 147.
+- **Registre phyto imprimable** (#162, issue #8 close) : édition au format réglementaire, A4 paysage, en-tête de la ferme commun avec le plan de fumure (points 14 et 99 faits) ; test instable `phyto.test.tsx` corrigé (point 149, issue #159 close).
+- **Suite proposée** : relevé de compteur en fin de chantier dans le formulaire (point 9, issue #7).
 
 ## Mise à jour du 2026-11-21
 
