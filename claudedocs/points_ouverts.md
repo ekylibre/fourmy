@@ -13,6 +13,13 @@ Chaque point se lit ainsi : **titre** : description. *nature · priorité · sou
 
 **Numérotation :** les points 1 à 94 gardent leur numéro du 12/11. Les points nouveaux commencent à 95 et sont rangés dans leur thème.
 
+## Mise à jour du 2026-11-22
+
+- **dev.fourmy.org** : prix d'intrants Lexicon chargés (bundle `fourmy`, clé dans Dokploy) ; OSRM en service (137) ; ITK de l'exploitant testeur recréés (135) ; ferme de la GAEC copiée depuis la base de développement, avec le compte de son responsable et l'intégration Traccar (synchro sans boîtier pour l'instant : boîtiers à partager côté Traccar).
+- **Incident** : 502 pendant environ 3 h après un déploiement (nginx gardait l'ancienne adresse de l'API) ; corrigé par #154.
+- **CI de `main`** de nouveau verte (#151) ; site public à jour des développements du 19 au 22/11 (#153).
+- **Projet GitHub** : #114 close ; issues #155 (141), #156 (143), #157 (146), #158 à #160 (nouveaux points 148 à 150) ; brouillons pour 136, 138 à 140, 144, 145 et 147.
+
 ## Mise à jour du 2026-11-21
 
 - **Semences (SE1 à SE8, PR #121 à #127, puis la PR de SE8)** : Stocks → Semences, fiche (espèce, variété, code GNIS, conditionnement, PMG avec repères Arvalis et Terres Inovia), PMG par lot, catalogue officiel des variétés, rattachement proposé (code GNIS, espèce importée, référence Lexicon, nom repris d'Ekylibre), semis en grains/m², kg/ha, milliers ou doses avec conversion figée, mélanges dosés par espèce, couverts repris du semis, utilisation par campagne et export CSV (`docs/semences.md`). Restent les points 129 à 134 (thème 18, issues #129 à #134).
@@ -330,18 +337,22 @@ Besoins, conception et plans : `claudedocs/besoins_import_onboarding.md`, `claud
 128. **BCAE 7 : barème à points de la plaine du Rhin** (liste des communes de l'arrêté BCAE) et liste des légumineuses de l'exemption à vérifier sur la notice Télépac 2026. *donnée · P3 · docs/pac/rapport_pac.md* — issue #118
 
 135. **Relecture des itinéraires techniques des deux fermes de test** : 3 ITK pour l'exploitant testeur (maïs, avoine, triticale) et 13 pour la GAEC (étapes à compléter : travail du sol, matériels), créés depuis l'historique sur la base de développement. Le 22/11, les 3 ITK de l'exploitant testeur sont recréés sur dev.fourmy.org (mêmes campagnes, mêmes étapes : maïs 17, avoine 3, triticale 1) ; la GAEC n'existe pas encore sur dev (import à faire, point 121). Reste la relecture avec eux. *donnée · P2 · workflow_assolement_itk IT2* — issue #112 (élargie)
-136. **Chantiers multi-parcelles** : regrouper en une intervention prévue les parcelles d'une même étape à la même date (option du lot IT7). *évolution · P3 · conception_assolement_itk §13.1*
+136. **Chantiers multi-parcelles** : regrouper en une intervention prévue les parcelles d'une même étape à la même date (option du lot IT7). *évolution · P3 · conception_assolement_itk §13.1* — brouillon du projet
 137. ~~**OSRM sur le serveur**~~ : **fait le 22/11**. Service `osrm` dans le compose de déploiement, graphe Aquitaine + Pays de la Loire préparé sur le serveur de dev (volume `fourmy_osrm`, 2,8 Go ; copie du script dans `/root/fourmy-osrm`), trajets vérifiés depuis l'API (Bordeaux, Nantes). Mise à jour de la carte : relancer `prepare.sh` puis redémarrer le service (`docs/deploiement.md`, « OSRM »). *exploitation · P2 · workflow_assolement_itk IT4*
-138. **Capacité des pointes de travail** : elle compte toutes les personnes actives de la ferme (48 sur la ferme pilote, reprises d'Ekylibre) ; choisir les personnes qui comptent (salariés, saisonniers, période de présence) ? *décision · P3 · recette IT6*
-139. **ITK pluriannuels** (vigne : plantation, P+1, pleine production ; luzerne) : une seule année d'exploitation par ITK aujourd'hui. *évolution · P3 · conception_assolement_itk §13.4*
-140. **Partage d'ITK entre fermes** (bibliothèque Fourmy, retour à l'idée du catalogue Lexicon avec des contenus refaits). *évolution · P3 · conception_assolement_itk §13.5*
-141. **Rattachement des matériels au barème BCMA** des deux fermes de test : propositions à confirmer sur la fiche de chaque matériel (le type et la largeur manquent souvent). *donnée · P2 · workflow_assolement_itk IT4*
+138. **Capacité des pointes de travail** : elle compte toutes les personnes actives de la ferme (48 sur la ferme pilote, reprises d'Ekylibre) ; choisir les personnes qui comptent (salariés, saisonniers, période de présence) ? *décision · P3 · recette IT6* — brouillon du projet
+139. **ITK pluriannuels** (vigne : plantation, P+1, pleine production ; luzerne) : une seule année d'exploitation par ITK aujourd'hui. *évolution · P3 · conception_assolement_itk §13.4* — brouillon du projet
+140. **Partage d'ITK entre fermes** (bibliothèque Fourmy, retour à l'idée du catalogue Lexicon avec des contenus refaits). *évolution · P3 · conception_assolement_itk §13.5* — brouillon du projet
+141. **Rattachement des matériels au barème BCMA** des deux fermes de test : propositions à confirmer sur la fiche de chaque matériel (le type et la largeur manquent souvent). *donnée · P2 · workflow_assolement_itk IT4* — issue #155
 142. ~~**Prix des intrants Lexicon**~~ : **fait le 21/11** (bundle `fourmy` servi ; jeux `fertilizers`, `phytosanitary_prices`, `seeds` chargés ; « Reprendre » dans l'onglet Intrants ; 5 articles rattachés chez l'exploitant testeur, 27 à la GAEC ; aucun phyto des deux fermes dans les 16 produits du jeu). *évolution · P2 · workflow_assolement_eco E2*
-143. **API agrifood de la Commission** : point d'entrée suspendu le 21/11 ; le worker réessaie chaque jour, Lexicon sert de repli. Vérifier le format des réponses au premier appel réussi (client écrit d'après le code de Lexicon). *suivi · P2 · workflow_assolement_eco E3*
-144. **Comparaison avec le prévu de la campagne précédente** (assolement N-1 validé avec itinéraires) : seule la comparaison avec le réalisé est faite. *évolution · P3 · workflow_assolement_eco E5*
-145. **Charges indirectes par clé de répartition et réalisé détaillé** (hors première version, décision A19). *évolution · P3 · besoins_assolement A19*
-146. **Recette économique avec les deux fermes de test** : saisir leurs prix (intrants, matériels, coût horaire, prestations, produits), enregistrer les récoltes 2026 de l'exploitant testeur ; les interventions de la GAEC n'ont qu'une date (pas d'heures) : main-d'œuvre réalisée incomplète. *recette · P2 · workflow_assolement_eco E6*
-147. **Rendement des cultures fourragères** : calculé sur des récoltes saisies tantôt en matière brute, tantôt en matière sèche (maïs fourrage de la GAEC : 41,8 puis 228,1 q/ha) ; unité à fixer par culture. *donnée · P3 · workflow_assolement_eco E3*
+143. **API agrifood de la Commission** : point d'entrée suspendu le 21/11 ; le worker réessaie chaque jour, Lexicon sert de repli. Vérifier le format des réponses au premier appel réussi (client écrit d'après le code de Lexicon). *suivi · P2 · workflow_assolement_eco E3* — issue #156
+144. **Comparaison avec le prévu de la campagne précédente** (assolement N-1 validé avec itinéraires) : seule la comparaison avec le réalisé est faite. *évolution · P3 · workflow_assolement_eco E5* — brouillon du projet
+145. **Charges indirectes par clé de répartition et réalisé détaillé** (hors première version, décision A19). *évolution · P3 · besoins_assolement A19* — brouillon du projet
+146. **Recette économique avec les deux fermes de test** : saisir leurs prix (intrants, matériels, coût horaire, prestations, produits), enregistrer les récoltes 2026 de l'exploitant testeur ; les interventions de la GAEC n'ont qu'une date (pas d'heures) : main-d'œuvre réalisée incomplète. *recette · P2 · workflow_assolement_eco E6* — issue #157
+147. **Rendement des cultures fourragères** : calculé sur des récoltes saisies tantôt en matière brute, tantôt en matière sèche (maïs fourrage de la GAEC : 41,8 puis 228,1 q/ha) ; unité à fixer par culture. *donnée · P3 · workflow_assolement_eco E3* — brouillon du projet
+
+148. **Rapprochement douteux d'un engrais vers une référence de prix Lexicon** : « Solution azotée 32 » rapprochée d'« Ammonitrate 33.5 » (variante Lexicon de l'article). *bug · P2 · recette du 22/11* — issue #158
+149. **Test web instable** : `phyto.test.tsx` dépasse parfois son délai de 20 s en CI. *dette · P2 · CI de #152* — issue #159
+150. **Semences de la ferme de grandes cultures** : stocks très négatifs et densités 2026 aberrantes (1,4 à 2,8 grains/m² de maïs), unités reprises à revoir. *donnée · P2 · recette du 22/11* — issue #160
 
 ## 18. Semences
 
