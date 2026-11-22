@@ -23,6 +23,11 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | [![Fiche d'un traitement : pictogrammes, ZNT, contrôle des doses et des usages](apps/site/src/assets/captures/accueil-reglementaire.png)](apps/site/src/assets/captures/accueil-reglementaire.png) | [![Fiche d'une parcelle : culture, PAC, cadastre et photo IGN](apps/site/src/assets/captures/accueil-parcellaire.png)](apps/site/src/assets/captures/accueil-parcellaire.png) | [![Intervention tirée du GPS : attelage, parcours et trace sur la photo IGN](apps/site/src/assets/captures/accueil-interoperabilite.png)](apps/site/src/assets/captures/accueil-interoperabilite.png) |
 | Doses, usages, ZNT et pictogrammes vérifiés à chaque traitement | Culture, îlot PAC, cadastre et photo IGN de chaque parcelle | Attelage et parcours tirés du GPS du tracteur |
 
+| Assolement prévisionnel | Temps de travaux | Marges prévisionnelles |
+|---|---|---|
+| [![Assolement de la campagne suivante sur la photo IGN, avec les contrôles de rotation](apps/site/src/assets/captures/assolement.png)](apps/site/src/assets/captures/assolement.png) | [![Heures de travail par semaine de la campagne prévue, pointes et capacité de la ferme](apps/site/src/assets/captures/temps-travaux.png)](apps/site/src/assets/captures/temps-travaux.png) | [![Onglet Économie de l'assolement : produit, charges et marge directe par activité](apps/site/src/assets/captures/marges.png)](apps/site/src/assets/captures/marges.png) |
+| Cultures, dérobées et couverts ; BCAE 7, délais de retour, bio et HVE contrôlés en direct | Itinéraires tirés de l'historique, barème BCMA, trajets OSRM, pointes | Produit, charges et marge directe par activité, prix de référence publics |
+
 ## Documentation
 
 | Document | Contenu |
@@ -47,6 +52,8 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | [`docs/imports.md`](docs/imports.md) · [`claudedocs/conception_import_onboarding.md`](claudedocs/conception_import_onboarding.md) | Imports DAPLOS, Geofolia et TelePAC, assistant de premier démarrage : besoins, conception, plan (lots IM1 à IM7) et état |
 | [`docs/modele-parcelles-activites-productions.md`](docs/modele-parcelles-activites-productions.md) | Modèle des parcelles (versions datées, filiation), campagnes, activités, productions et assolement : modèle conceptuel, liens entre tables, règles |
 | [`docs/assolement.md`](docs/assolement.md) · [`claudedocs/conception_assolement.md`](claudedocs/conception_assolement.md) | Assolement prévisionnel : préparer, découper et fusionner, contrôles en direct (PAC, agronomie, certifications, réglementaire), valider ; besoins des trois temps, conception, plan (lots AS1 à AS4) |
+| [`docs/economie.md`](docs/economie.md) · [`claudedocs/conception_assolement_eco.md`](claudedocs/conception_assolement_eco.md) | Module économique : prix datés de la ferme, références Lexicon et prix de marché, rendement et prix par défaut, marges de l'assolement, comparaison au réalisé N-1 (lots E1 à E6) |
+| [`docs/semences.md`](docs/semences.md) · [`claudedocs/conception_assolement_itk.md`](claudedocs/conception_assolement_itk.md) | Semences (catalogue officiel, PMG, semis, mélanges) ; itinéraires techniques de la ferme, interventions prévues, temps de travaux et besoins en intrants (lots IT1 à IT6) |
 | [`docs/controles-hve-ab.md`](docs/controles-hve-ab.md) · [`claudedocs/conception_controle_hve_ab.md`](claudedocs/conception_controle_hve_ab.md) | Contrôles HVE (niveau 3) et Agriculture biologique : ce qui est contrôlé, où, exports ; besoins, conception, plan (lots CT1 à CT6) et état |
 | [`docs/specifications-metier.md`](docs/specifications-metier.md) | Spécification métier : toutes les règles de gestion (RG-…), par domaine |
 | [`claudedocs/besoins_ma_ferme.md`](claudedocs/besoins_ma_ferme.md) · [`claudedocs/conception_ma_ferme.md`](claudedocs/conception_ma_ferme.md) | « Ma ferme » : fiche de l'exploitation, sites, cache IGN sur le serveur, copie hors ligne dans le navigateur |
@@ -55,7 +62,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | [`claudedocs/besoins_navigation_compte.md`](claudedocs/besoins_navigation_compte.md) | Navigation : menu du compte, onglets Équipe et Préférences de « Ma ferme », version en pied de menu |
 | [`claudedocs/points_ouverts.md`](claudedocs/points_ouverts.md) | Points ouverts, par thème et priorité (alimente la roadmap GitHub) |
 
-## État du projet (2026-11-20)
+## État du projet (2026-11-22)
 
 | Étape | État |
 |---|---|
@@ -73,7 +80,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | Comptes better-auth (étape 2) | ✅ comptes locaux, sessions cookie + bearer (mobile), équipe (membres, personnes ↔ comptes) |
 | Intégrations par ferme | ✅ module Intégrations (Traccar) : accès chiffrés par ferme, testés avant enregistrement, worker de synchro chaque minute |
 | Déploiement | ✅ Dokploy : dev.fourmy.org et fourmy.org en ligne depuis le 07/11 (image construite par la CI) ; sauvegardes de la base à mettre en place |
-| Site public fourmy.org | ✅ présentation, fonctionnalités par module, comparatif, nouveautés automatiques (RSS), installation, contact ; page Fourmy d'ekylibre.com sur une branche |
+| Site public fourmy.org | ✅ présentation, fonctionnalités par module (à jour du 22/11), comparatif, nouveautés automatiques (RSS), installation, contact ; page Fourmy d'ekylibre.com sur une branche |
 | zero-mobile (étape 3) | ✅ branche `fourmy-backend` : compte Fourmy, catalogue, formulaire générique par forme, push par intervention ; vérifié contre l'API — reste le passage sur appareil |
 | Retours de test des pilotes (interventions, phyto, activités, parcelles) | ✅ lots A à H : saisie pleine page, contrôle réglementaire, précautions et mélanges, activités, certifications, parcelles depuis la carte (PAC, cadastre) |
 | Matériels et entretien (lots I à M) | ✅ fiche et relevés d'heures, plan d'entretien et échéances, import de la base matériel, interventions d'entretien, heures estimées par Traccar, pièces à commander, alertes, avatar 3D et rejeu dans le plan 3D (`docs/materiels.md`) |
@@ -89,7 +96,9 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | Itinéraires techniques (lots T0 à T3, 13/11) | ✅ frise TIKA d'une parcelle (campagne ou rotation) et d'une activité (vue fusionnée, groupes, descente sur une parcelle) ; fork TIKA `v1.3.0-ekylibre.3`, reversement à OSFarm à faire (`claudedocs/conception_itineraires_techniques.md`) |
 | Navigation et compte (13/11) | ✅ menu du compte en haut à droite (profil, ferme, mot de passe, déconnexion), équipe et préférences dans « Ma ferme », version en pied de menu (`claudedocs/besoins_navigation_compte.md`) |
 | Imports et assistant (lots IM1 à IM6, 17-19/11) | ✅ DAPLOS, Geofolia et TelePAC de bout en bout, historique N-1 à N-5, annulation d'un import, assistant de premier démarrage et reprise d'une sauvegarde Ekylibre ; recette avec l'exploitant testeur à faire (IM7) (`docs/imports.md`) |
-| Assolement prévisionnel, temps 1 (lots AS1a à AS4, 20/11) | ✅ menu Assolement dans Activités ; carte et liste des parcelles, affectation des cultures, dérobées, couverts, découpe et fusion datées ; contrôles en direct (BCAE 7, délais de retour, AB et HVE, ZNT, captages, Natura 2000) ; validation qui crée productions, parcelles et couverts, versions ; essai avec l'exploitant testeur à faire. Temps 2 (itinéraires) et 3 (économique) à venir (`docs/assolement.md`) |
+| Assolement prévisionnel, temps 1 (lots AS1a à AS4, 20/11) | ✅ menu Assolement dans Activités ; carte et liste des parcelles, affectation des cultures, dérobées, couverts, découpe et fusion datées ; contrôles en direct (BCAE 7, délais de retour, AB et HVE, ZNT, captages, Natura 2000) ; validation qui crée productions, parcelles et couverts, versions ; essai avec l'exploitant testeur à faire (`docs/assolement.md`) |
+| Assolement, temps 2 : itinéraires techniques (lots IT1 à IT6, 21/11) | ✅ ITK de la ferme tirés de l'historique et édités, affectés dans l'assolement ; interventions prévues créées sur demande ; temps de travaux (débits des matériels, barème BCMA, trajets OSRM, pointes) ; besoins en intrants comparés aux stocks (`docs/assolement.md`) |
+| Assolement, temps 3 : économique (lots E1 à E6, 21-22/11) | ✅ module Économique : prix datés de la ferme, références Lexicon (rendements, prix des productions, prix des engrais, phyto et semences du bundle `fourmy`), prix européens ; marges jusqu'à la marge directe dans l'onglet Économie de l'assolement, comparées au réalisé N-1 ; recette avec les fermes de test à faire (`docs/economie.md`) |
 | Semences (lots SE1 à SE8, 20-21/11) | ✅ Stocks → Semences : fiche (espèce, variété, code GNIS, PMG avec repères Arvalis et Terres Inovia), PMG par lot, catalogue officiel des variétés, rattachement proposé ; semis en grains/m², kg/ha, milliers ou doses, stock converti ; mélanges dosés par espèce, couverts repris du semis ; utilisation par campagne et export CSV (`docs/semences.md`) |
 | Contrôles HVE et AB (lots CT1 à CT6a, 19-20/11) | 🟡 menu Réglementaire selon les certifications ; HVE niveau 3 (quatre indicateurs, IAE, questionnaire, IFT certifié) ; AB (règles R1 à R34, conversion déduite, cuivre, annexe II consolidée au 01/01/2026, semences, rotation) ; feux à la saisie ; registre AB et liasse HVE. Reste l'export de la grille HVE officielle remplie, qui attend une grille de référence remplie à la main (`docs/controles-hve-ab.md`) |
 | Migration réelle et recette | ✅ trois fermes reprises (08/11) ; recettes des 11 et 12/11 sur la ferme pilote de grandes cultures (`claudedocs/plan_de_test_global.md`), spécification métier (`docs/specifications-metier.md`) |

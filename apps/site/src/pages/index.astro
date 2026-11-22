@@ -29,7 +29,7 @@ const reels = [
   },
 ];
 
-/** Les trois domaines de la page d'accueil : une capture, et ce que chacun couvre. */
+/** Les quatre domaines de la page d'accueil : une capture, et ce que chacun couvre. */
 const pillars = [
   {
     id: "interoperabilite",
@@ -42,6 +42,7 @@ const pillars = [
       ["agrirouter", "Cartes de modulation envoyées aux consoles ; travaux réalisés et télémétrie des machines reçus et proposés comme interventions (en test)."],
       ["Météo", "Chaque intervention garde sa météo, heure par heure. Open-Meteo, OpenWeather, meteoblue ou vos stations Weenat et Sencrop."],
       ["Satellite", "NDVI, NDRE et NDMI de chaque parcelle d'après Sentinel-2, et zones de modulation tirées de l'image (en test)."],
+      ["Imports", "Vos campagnes passées reprises d'un fichier DAPLOS, d'un export Geofolia, du dossier TéléPAC ou d'une sauvegarde Ekylibre."],
     ],
   },
   {
@@ -55,6 +56,21 @@ const pillars = [
       ["Pulvérisation", "Conditions du jour comparées aux seuils de la ferme (vent, hygrométrie, température, pluie)."],
       ["Registre et IFT", "Registre phytosanitaire au format réglementaire 2027 ; IFT de chaque traitement calculé par le service du ministère de l'Agriculture."],
       ["Fertilisation", "Plan prévisionnel de fumure, cahier d'enregistrement et calendrier de la directive nitrates (en test)."],
+      ["HVE et bio", "Indicateurs HVE calculés depuis vos données, règles de l'Agriculture biologique vérifiées sur les parcelles certifiées, liasse HVE et registre bio exportés."],
+    ],
+  },
+  {
+    id: "campagne",
+    title: "Préparer la campagne",
+    text: "L'assolement de l'an prochain sur la carte, avec ses itinéraires, ses heures de travail et ses marges.",
+    capture: "assolement",
+    alt: "Assolement prévisionnel sur la photo aérienne : parcelles colorées par culture, panneau d'affectation et contrôles de rotation",
+    items: [
+      ["Assolement", "Culture, dérobée et couvert de chaque parcelle ; BCAE 7, délais de retour, bio, HVE, ZNT et captages contrôlés pendant que vous affectez."],
+      ["Itinéraires", "Les itinéraires techniques tirés de vos campagnes passées, affectés aux parcelles ; les interventions prévues créées quand vous le décidez."],
+      ["Travaux", "Heures de chaque chantier d'après vos matériels ou le barème BCMA, trajets calculés sur la route, pointes de la saison."],
+      ["Intrants", "Engrais, phyto et semences à prévoir, comparés aux stocks."],
+      ["Marges", "Produit, charges et marge directe par activité, avec vos prix ou les prix de référence, comparés à la campagne passée."],
     ],
   },
   {
@@ -74,7 +90,7 @@ const pillars = [
 ] as const;
 ---
 
-<Base title="Fourmy" description="Fourmy, le jumeau numérique de la ferme : parcelles, interventions, stocks, cuverie et traces GPS, à n'importe quelle date. Logiciel libre, nouvelle génération d'Ekylibre.">
+<Base title="Fourmy" description="Fourmy, le jumeau numérique de la ferme : parcelles, interventions, stocks, cuverie et traces GPS, à n'importe quelle date, et l'assolement de la campagne suivante avec ses marges. Logiciel libre, nouvelle génération d'Ekylibre.">
   <section class="home-hero">
     <div class="wrap home-hero-head">
       <h1>Le jumeau numérique de votre ferme</h1>

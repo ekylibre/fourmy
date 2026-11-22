@@ -1,8 +1,9 @@
 # Comparatif de fourmy.org (/comparatif/). Chaque case d'un autre logiciel renvoie à la page de
 # l'éditeur qui la justifie (u). Statuts (s) : oui | partiel (en partie, option payante ou module
 # tiers) | non | nt (rien trouvé chez l'éditeur : pas une absence prouvée).
-# Pages des éditeurs lues le 18/11/2026 ; une case de Fourmy peut renvoyer à sa fonctionnalité (f).
-date: 18/11/2026
+# Pages des éditeurs lues le 18/11/2026, et le 22/11/2026 pour les critères « Prévisionnel et économie »,
+# reprise de données et semences ; une case de Fourmy peut renvoyer à sa fonctionnalité (f).
+date: 22/11/2026
 logiciels:
   - id: mp
     nom: MesParcelles
@@ -25,6 +26,8 @@ sources:
   mpD: &mpD https://mesparcelles.fr/nos-solutions-metiers/echanges-de-donnees
   smag: &smag https://smag.tech/nos-logiciels/logiciel-de-gestion-de-parcelles/
   geo: &geo https://www.isagri.fr/geofolia/logiciel-de-gestion-parcellaire
+  mpEco: &mpEco https://mesparcelles.fr/nos-solutions-metiers/suivi-technico-economique
+  smagPac: &smagPac https://smag.tech/nos-logiciels/declaration-pac/
   mpTarifs: &mpTarifs https://cmds.chambres-agriculture.fr/sinformer/mon-exploitation/mesparcelles/mesparcelles-tarifs-et-formules
 
 # Prix publics : ce que chaque éditeur affiche, et ce que le prix comprend.
@@ -87,7 +90,7 @@ groupes:
         smag: { s: oui, t: "gestion du parcellaire", u: *smag }
         geo: { s: oui, t: "cartographie", u: *geo }
       - nom: PAC
-        fourmy: { s: partiel, t: "îlots et parcelles du registre graphique repris ; pas d'export TéléPAC" }
+        fourmy: { s: partiel, t: "îlots du registre graphique et dossier TéléPAC importés ; pas d'export TéléPAC", f: imports }
         mp: { s: oui, t: "aide à la déclaration, transfert vers TéléPAC", u: *mpC }
         smag: { s: oui, t: "import du dossier PAC, export vers TéléPAC", u: *smag }
         geo: { s: partiel, t: "diagnostics PAC cités, export non détaillé", u: *geo }
@@ -145,10 +148,48 @@ groupes:
         smag: { s: nt }
         geo: { s: partiel, t: "cahier d'épandage, directive non citée", u: *geo }
       - nom: Documents de certification (HVE, bio)
-        fourmy: { s: partiel, t: "certifications des parcelles et produits utilisables en bio ; pas de dossier HVE" }
+        fourmy: { s: oui, t: "contrôles HVE et bio, liasse HVE, registre bio ; grille HVE officielle à venir", f: controle-hve }
         mp: { s: oui, t: "HVE et GlobalG.A.P. cités", u: *mpC }
         smag: { s: partiel, t: "option HVE", u: *smag }
         geo: { s: oui, t: "HVE, bio, GlobalG.A.P.", u: *geo }
+
+  - titre: Prévisionnel et économie
+    criteres:
+      - nom: Assolement prévisionnel
+        fourmy: { s: oui, t: "sur la carte : culture, dérobée, couvert, découpe datée", f: assolement }
+        mp: { s: nt }
+        smag: { s: partiel, t: "« saisir les prévisions d'assolement », avec Smag Expert", u: *smagPac }
+        geo: { s: partiel, t: "« Pilotage de l'assolement », formule environnement +", u: *geo }
+      - nom: Contrôles réglementaires sur l'assolement prévu
+        fourmy: { s: oui, t: "BCAE 7, délais de retour, bio, HVE, ZNT, captages, en direct", f: assolement }
+        mp: { s: nt }
+        smag: { s: partiel, t: "écran BCAE 7 et prévision du score, avec Smag Expert", u: *smagPac }
+        geo: { s: partiel, t: "« diagnostics (phyto, ferti, PAC) »", u: *geo }
+      - nom: Itinéraires techniques et interventions prévues
+        fourmy: { s: oui, t: "itinéraires tirés de l'historique, interventions prévues sur demande", f: itk-ferme }
+        mp: { s: partiel, t: "travaux transmis à la console, « d'une prévision ou non »", u: *mpD }
+        smag: { s: oui, t: "« planifier et d'enregistrer rapidement vos interventions »", u: *smag }
+        geo: { s: oui, t: "« Saisie des travaux réalisés ou prévisionnels »", u: *geo }
+      - nom: Temps de travaux prévus
+        fourmy: { s: oui, t: "débits des matériels ou barème BCMA, trajets routiers, pointes", f: temps-travaux }
+        mp: { s: nt }
+        smag: { s: partiel, t: "« Gestion de la main-d'œuvre », sans planning de charge", u: *smag }
+        geo: { s: partiel, t: "option EasyTrack, temps de main-d'œuvre", u: *geo }
+      - nom: Besoins en intrants comparés aux stocks
+        fourmy: { s: oui, t: "engrais, phyto et semences de l'assolement prévu", f: besoins-intrants }
+        mp: { s: nt }
+        smag: { s: partiel, t: "gestion des stocks, besoins prévus non décrits", u: *smag }
+        geo: { s: partiel, t: "« Gestion des stocks », besoins prévus non décrits", u: *geo }
+      - nom: Marges prévisionnelles
+        fourmy: { s: oui, t: "jusqu'à la marge directe, prix de la ferme ou de référence", f: marges }
+        mp: { s: partiel, t: "onglet « Marges » sur le réalisé", u: *mpEco }
+        smag: { s: partiel, t: "« Marges brutes et semi-nettes », prévisionnel non précisé", u: *smag }
+        geo: { s: partiel, t: "marges en formule Performance, prévisionnel non précisé", u: *geo }
+      - nom: Comparaison avec la campagne passée
+        fourmy: { s: oui, t: "marges prévues face au réalisé de la campagne précédente", f: marges }
+        mp: { s: nt }
+        smag: { s: nt }
+        geo: { s: partiel, t: "« historique des pratiques sur 8 ans »", u: *geo }
 
   - titre: Matériels, stocks et échanges
     criteres:
@@ -172,6 +213,16 @@ groupes:
         mp: { s: partiel, t: "par un prestataire, envoyées à la console", u: *mpD }
         smag: { s: partiel, t: "par des outils partenaires", u: *smag }
         geo: { s: partiel, t: "modulation azotée en option (Spotifarm)", u: *geo }
+      - nom: Reprise d'un autre logiciel
+        fourmy: { s: oui, t: "DAPLOS, Geofolia, TéléPAC et Ekylibre, cinq campagnes", f: imports }
+        mp: { s: nt }
+        smag: { s: oui, t: "migration depuis Geofolia ou MesParcelles, 3 campagnes", u: *smag }
+        geo: { s: oui, t: "reprise des « 3 campagnes précédentes »", u: *geo }
+      - nom: Semences (catalogue, PMG, densité)
+        fourmy: { s: oui, t: "catalogue officiel, PMG, semis en grains/m², mélanges", f: semences }
+        mp: { s: nt }
+        smag: { s: nt }
+        geo: { s: nt }
       - nom: Échanges avec coopérative et négoce
         fourmy: { s: non }
         mp: { s: partiel, t: "données partagées avec vos partenaires", u: *mpD }
