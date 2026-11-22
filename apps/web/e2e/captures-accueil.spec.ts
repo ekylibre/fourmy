@@ -93,13 +93,19 @@ const anonymize = (page: Page) =>
     }
   }, process.env.CAPTURES_HIDE ?? "");
 
-test("assolement prévisionnel : carte et parcelles de la campagne suivante", async ({ page }) => {
+test("assolement prévisionnel : plein écran du brouillon de la campagne suivante", async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto(PLAN);
-  await expect(page.getByText(/Assolement 2027/)).toBeVisible({ timeout: 30_000 });
-  await page.getByRole("tab", { name: "Parcelles" }).click();
+  await expect(page.getByText(/Assolement 2027/).first()).toBeVisible({ timeout: 30_000 });
+  // « Modifier » ouvre un brouillon de révision, en plein écran ; il est abandonné après la
+  // capture : la version validée reste celle de la ferme.
+  await page.getByRole("button", { name: "Modifier" }).click();
+  await expect(page.getByRole("region", { name: "Assolement 2027 en plein écran" })).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(6000);
   await snap(page, "assolement");
+  await page.getByRole("button", { name: "Abandonner le brouillon" }).first().click();
+  await page.getByRole("dialog").getByRole("button", { name: "Abandonner" }).click();
+  await expect(page.getByRole("region", { name: "Assolement 2027 en plein écran" })).toBeHidden({ timeout: 30_000 });
 });
 
 test("temps de travaux : heures par semaine et pointes de la campagne", async ({ page }) => {

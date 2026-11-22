@@ -25,7 +25,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 
 | Assolement prévisionnel | Temps de travaux | Marges prévisionnelles |
 |---|---|---|
-| [![Assolement de la campagne suivante sur la photo IGN, avec les contrôles de rotation](apps/site/src/assets/captures/assolement.png)](apps/site/src/assets/captures/assolement.png) | [![Heures de travail par semaine de la campagne prévue, pointes et capacité de la ferme](apps/site/src/assets/captures/temps-travaux.png)](apps/site/src/assets/captures/temps-travaux.png) | [![Onglet Économie de l'assolement : produit, charges et marge directe par activité](apps/site/src/assets/captures/marges.png)](apps/site/src/assets/captures/marges.png) |
+| [![Assolement de la campagne suivante en plein écran sur la photo IGN : découpe, fusion et cultures prévues](apps/site/src/assets/captures/assolement.png)](apps/site/src/assets/captures/assolement.png) | [![Heures de travail par semaine de la campagne prévue, pointes et capacité de la ferme](apps/site/src/assets/captures/temps-travaux.png)](apps/site/src/assets/captures/temps-travaux.png) | [![Onglet Économie de l'assolement : produit, charges et marge directe par activité](apps/site/src/assets/captures/marges.png)](apps/site/src/assets/captures/marges.png) |
 | Cultures, dérobées et couverts ; BCAE 7, délais de retour, bio et HVE contrôlés en direct | Itinéraires tirés de l'historique, barème BCMA, trajets OSRM, pointes | Produit, charges et marge directe par activité, prix de référence publics |
 
 ## Documentation
