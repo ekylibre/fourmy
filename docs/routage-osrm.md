@@ -43,11 +43,13 @@ docker/osrm/prepare.sh                         # Aquitaine, dans le volume fourm
 docker/osrm/prepare.sh europe/france/midi-pyrenees   # autre région
 # Plusieurs régions, fusionnées en un seul graphe (osmium merge) :
 docker/osrm/prepare.sh europe/france/aquitaine europe/france/pays-de-la-loire
-docker compose -f docker/compose.dev.yml --profile osrm up -d osrm   # port 5000
+docker compose -f docker/compose.dev.yml --profile osrm up -d osrm   # port 5000 (dev)
 FOURMY_OSRM_URL=http://localhost:5000          # côté API
 ```
 
 Relancer `prepare.sh` met la carte à jour ; redémarrer ensuite le service.
+En production, le service `osrm` fait partie du compose de déploiement
+(`FOURMY_OSRM_URL=http://osrm:5000` par défaut) : voir `deploiement.md`, « OSRM ».
 Plusieurs régions : télécharger un extrait plus large (`europe/france`,
 4 Go, ~12 Go de RAM au prétraitement) ou fusionner les extraits avec
 `osmium merge` avant l'extraction.
@@ -74,7 +76,5 @@ brute : le recalage n'embellit que le rejeu et ne bloque jamais rien.
 ## Suite
 
 - Recalage aussi sur la carte 2D des parcours.
-- Durée et distance des trajets siège ↔ parcelles, pour le temps de
-  déplacement des chantiers et le choix de l'ordre des parcelles.
-- Service OSRM en production : volume préparé sur le serveur, puis
-  `FOURMY_OSRM_URL=http://osrm:5000` (à ajouter au compose de déploiement).
+- Choix de l'ordre des parcelles d'un chantier (la durée et la distance des
+  trajets siège ↔ parcelles sont faites, lot IT4 de l'assolement).
