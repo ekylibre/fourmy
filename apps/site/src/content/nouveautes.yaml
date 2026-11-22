@@ -1,6 +1,10 @@
 # Titres des livraisons de la page Nouveautés (fourmy.org/changelog/), par jour de
 # livraison (date des commits, AAAA-MM-JJ). Une livraison sans titre affiche sa date seule.
 livraisons:
+  "2026-11-22": "Correctif : synchro Lexicon et routage tracteur au déploiement"
+  "2026-11-21": Itinéraires techniques, temps de travaux et marges
+  "2026-11-20": Contrôles HVE et bio, assolement prévisionnel, semences
+  "2026-11-19": Imports DAPLOS, Geofolia et TéléPAC, assistant de démarrage
   "2026-11-18": Rejeu 3D et fiche d'intervention
   "2026-11-16": "agrirouter : les machines parlent à Fourmy"
   "2026-11-13": Ma ferme, itinéraires techniques et cartes hors ligne

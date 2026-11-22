@@ -7,7 +7,7 @@ const cell = (c: Cell, key: string) => ({ ...c, key });
 const legend: Cell["s"][] = ["oui", "partiel", "non", "nt"];
 ---
 
-<Base title="Comparatif" description="Fourmy comparé à MesParcelles, Smag Farmer et Geofolia : accès et prix, parcellaire, interventions et réglementaire, matériels et échanges, chaque case avec sa source.">
+<Base title="Comparatif" description="Fourmy comparé à MesParcelles, Smag Farmer et Geofolia : accès et prix, parcellaire, interventions et réglementaire, prévisionnel et économie, matériels et échanges, chaque case avec sa source.">
   <div class="wrap compare">
     <h1>Fourmy et les autres logiciels</h1>
     <p class="lead muted">
@@ -25,7 +25,10 @@ const legend: Cell["s"][] = ["oui", "partiel", "non", "nt"];
           <li>Les parcours GPS deviennent des interventions : attelage, horaires et parcelles pré-remplis.</li>
           <li>Les contrôles réglementaires à la saisie, chacun avec son voyant, et le registre au format 2027.</li>
           <li>Les machines reliées en ISO-XML et par agrirouter, dans les deux sens (en test).</li>
-          <li>La reprise complète des fermes Ekylibre, registre phytosanitaire identique.</li>
+          <li>L'assolement de la campagne suivante contrôlé pendant qu'on le prépare : BCAE 7, rotation, bio, HVE, ZNT.</li>
+          <li>Des itinéraires tirés de l'historique de la ferme, des temps de travaux avec les vrais trajets routiers.</li>
+          <li>Des marges prévisionnelles avec des prix de référence publics, repris en un clic.</li>
+          <li>La reprise complète des fermes Ekylibre, registre phytosanitaire identique, et l'import DAPLOS, Geofolia et TéléPAC.</li>
         </ul>
       </section>
       <section aria-labelledby="pas-encore">
@@ -35,7 +38,8 @@ const legend: Cell["s"][] = ["oui", "partiel", "non", "nt"];
           <li>Pas d'export vers TéléPAC pour la déclaration.</li>
           <li>Plan de fumure en test, pour la Nouvelle-Aquitaine seulement.</li>
           <li>Pas d'échange de bons d'apport ou de livraison avec les coopératives et les négoces.</li>
-          <li>Pas de dossier de certification HVE.</li>
+          <li>La grille d'audit HVE officielle ne se remplit pas encore toute seule (la liasse HVE, oui).</li>
+          <li>Pas de charges indirectes ni de coût complet : les marges s'arrêtent à la marge directe.</li>
         </ul>
       </section>
     </div>

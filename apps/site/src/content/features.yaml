@@ -18,9 +18,12 @@ modules:
   - id: materiels
     title: Matériels et traces GPS
     text: Chaque tracteur et chaque outil, leurs heures, leur entretien et leurs parcours.
+  - id: economie
+    title: Économique
+    text: Les prix de la ferme, les prix de référence et les marges de la campagne.
   - id: stocks
-    title: Stocks et cuverie
-    text: Ce qui entre, ce qui sort, et ce que contient chaque cuve.
+    title: Stocks, semences et cuverie
+    text: Ce qui entre, ce qui sort, les semences et ce que contient chaque cuve.
   - id: reglementaire
     title: Réglementaire
     text: Les contrôles à la saisie et les registres tenus tout seuls.
@@ -92,8 +95,9 @@ features:
     module: activites
     title: Itinéraires techniques
     text: >-
-      La frise des travaux d'une parcelle sur la campagne ou la rotation, et celle d'une
-      activité, toutes parcelles réunies, avec descente sur chaque parcelle.
+      La frise des travaux réalisés d'une parcelle sur la campagne ou la rotation, et celle
+      d'une activité, toutes parcelles réunies, avec descente sur chaque parcelle. Pour
+      préparer la campagne suivante, voir les itinéraires techniques de la ferme.
     status: disponible
     since: 0.111.0
   - id: interventions
@@ -222,6 +226,111 @@ features:
       ce qu'il reste à saisir, avec un lien vers chaque écran.
     status: en-test
     since: 0.78.0
+  - id: assolement
+    module: activites
+    title: Assolement prévisionnel sur la carte
+    text: >-
+      Préparez la campagne suivante parcelle par parcelle, sur la carte ou en liste :
+      culture principale, dérobée, couvert, découpe ou fusion de parcelles à une date
+      donnée. Les contrôles s'affichent pendant que vous affectez (BCAE 7, délais de retour
+      entre cultures, règles bio et HVE, zones non traitées, captages, Natura 2000). Une fois
+      validé, l'assolement crée les productions de la campagne et garde ses versions.
+    status: disponible
+    capture: assolement
+    since: 0.147.0
+  - id: itk-ferme
+    module: activites
+    title: Itinéraires techniques de la ferme
+    text: >-
+      Les itinéraires de vos cultures, tirés de vos interventions des campagnes passées :
+      étapes datées par rapport au semis ou à la récolte, produits et doses, matériels et
+      débits observés. Ils se corrigent dans un éditeur, se dupliquent, et s'affectent aux
+      parcelles dans l'assolement.
+    status: disponible
+    capture: itk
+    since: 0.160.0
+  - id: temps-travaux
+    module: activites
+    title: Temps de travaux et pointes de la campagne
+    text: >-
+      Les heures de chaque chantier prévu, d'après le débit de vos matériels ou le barème
+      BCMA des coûts des façons culturales, plus les trajets entre le siège et les parcelles
+      calculés sur la route pour un tracteur. Les heures se cumulent par semaine pour faire
+      voir les pointes face aux personnes disponibles.
+    status: disponible
+    capture: temps-travaux
+    since: 0.163.0
+  - id: interventions-prevues
+    module: interventions
+    title: Interventions prévues depuis l'assolement
+    text: >-
+      Quand vous le demandez, les itinéraires affectés deviennent des interventions
+      planifiées de la campagne, proposées puis confirmées une à une, avec les contrôles de
+      la saisie. Un assolement modifié ensuite les met à jour sans toucher à ce qui est fait.
+    status: disponible
+    since: 0.162.0
+  - id: prix
+    module: economie
+    title: Prix de la ferme et prix de référence
+    text: >-
+      Prix de vente, prix des intrants, coût horaire de la main-d'œuvre et coûts des
+      matériels, datés : un changement de prix n'efface pas l'ancien. Fourmy propose des
+      références à reprendre en un clic : prix des productions et rendements de référence,
+      cotations européennes et MATIF, prix indicatifs des engrais, produits phyto et
+      semences du référentiel Lexicon.
+    status: disponible
+    since: 0.166.0
+  - id: marges
+    module: economie
+    title: Marges prévisionnelles de l'assolement
+    text: >-
+      Pour chaque activité de l'assolement : produit attendu (rendement de la ferme ou de
+      référence, prix de vente), charges d'intrants, de matériel et de main-d'œuvre tirées
+      des itinéraires, jusqu'à la marge directe, à l'hectare et au total. Ce qui manque est
+      listé plutôt que compté à zéro, et la campagne précédente réalisée sert de comparaison.
+    status: disponible
+    capture: marges
+    since: 0.169.0
+  - id: semences
+    module: stocks
+    title: Semences
+    text: >-
+      Chaque semence avec son espèce, sa variété du catalogue officiel, son conditionnement
+      et son poids de mille grains, avec des repères quand il manque. Le semis se saisit en
+      grains au mètre carré, en kilos à l'hectare ou en doses, et le stock suit ; les
+      mélanges de couverts se dosent espèce par espèce. Utilisation par campagne exportable.
+    status: disponible
+    capture: semences
+    since: 0.155.0
+  - id: besoins-intrants
+    module: stocks
+    title: Besoins en intrants de la campagne
+    text: >-
+      Les quantités d'engrais, de produits phyto et de semences qu'appelle l'assolement
+      prévu, comparées aux stocks : ce qu'il reste à commander, produit par produit.
+    status: disponible
+    since: 0.164.0
+  - id: controle-hve
+    module: reglementaire
+    title: Contrôle HVE
+    text: >-
+      Les quatre indicateurs de la certification environnementale calculés depuis vos
+      parcelles et vos interventions : biodiversité, stratégie phytosanitaire, fertilisation
+      et irrigation, avec le questionnaire de l'année et un feu à la saisie quand une
+      intervention fait perdre des points. Liasse exportée pour l'auditeur ; la grille
+      officielle remplie est à venir.
+    status: disponible
+    since: 0.132.0
+  - id: controle-ab
+    module: reglementaire
+    title: Contrôle Agriculture biologique
+    text: >-
+      Les règles du règlement bio vérifiées sur les parcelles certifiées : conversion,
+      produits phyto et fertilisants autorisés, cuivre, 170 kg d'azote, semences et
+      dérogations, mixité, matériel partagé, rotation. Ce qui ne se contrôle pas depuis les
+      données est dit « non contrôlé ». Registre bio exporté.
+    status: disponible
+    since: 0.133.0
   - id: traces
     module: materiels
     title: Traces GPS des tracteurs
@@ -332,6 +441,24 @@ features:
       ce que vous avez saisi dans Fourmy.
     status: disponible
     since: 0.9.0
+  - id: imports
+    module: interoperabilite
+    title: Import DAPLOS, Geofolia et TéléPAC
+    text: >-
+      Reprenez vos campagnes passées depuis un autre logiciel : fichiers d'échange DAPLOS,
+      export Geofolia et dossier TéléPAC, sur cinq campagnes. Les cultures et les produits
+      sont reconnus, les doublons entre fichiers écartés, et un import se défait en entier.
+    status: disponible
+    since: 0.127.0
+  - id: assistant
+    module: ferme
+    title: Assistant de premier démarrage
+    text: >-
+      À la création de la ferme, un assistant guide les premières étapes : identité
+      pré-remplie (annuaire Sirene ou vos fichiers), dépôt de vos fichiers, rapprochement des
+      cultures, des personnes et des produits, ou reprise d'une sauvegarde Ekylibre.
+    status: disponible
+    since: 0.131.0
   - id: stations-meteo
     module: interoperabilite
     title: Vos stations météo Weenat et Sencrop
