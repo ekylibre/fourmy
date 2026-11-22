@@ -155,11 +155,15 @@ describe("contrôle réglementaire dans le formulaire", () => {
     const go = within(modal).getByRole("button", { name: "Enregistrer malgré tout" });
     expect(go).toBeDisabled();
     expect(completeBody).toBeNull();
-    await user.type(within(modal).getByRole("textbox", { name: "Motif" }), "Dose d'attaque validée");
+    // Collé d'un coup : la frappe touche par touche rend tout le formulaire à chaque caractère
+    // (délai dépassé en CI, issue #159).
+    await user.click(within(modal).getByRole("textbox", { name: "Motif" }));
+    await user.paste("Dose d'attaque validée");
     await user.click(go);
     expect(await screen.findByText("Intervention enregistrée.")).toBeInTheDocument();
     expect(completeBody).toMatchObject({ compliance: { reason: "Dose d'attaque validée", usages: {} } });
-  });
+    // Formulaire complet rempli à la souris : le plus long du fichier, marge pour la CI chargée.
+  }, 40_000);
 });
 
 describe("fiche : contrôle et IFT", () => {
