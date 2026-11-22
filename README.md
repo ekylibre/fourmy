@@ -62,7 +62,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | [`claudedocs/besoins_navigation_compte.md`](claudedocs/besoins_navigation_compte.md) | Navigation : menu du compte, onglets Équipe et Préférences de « Ma ferme », version en pied de menu |
 | [`claudedocs/points_ouverts.md`](claudedocs/points_ouverts.md) | Points ouverts, par thème et priorité (alimente la roadmap GitHub) |
 
-## État du projet (2026-11-22)
+## État du projet (2026-11-22, soir)
 
 | Étape | État |
 |---|---|
@@ -88,7 +88,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | Retours de test du 10/11/2026 (lots S à X) | ✅ menus en sections, intégrations par thème, formulaire d'intervention réordonné, choix des colonnes des listes, widget Parcours GPS du tableau de bord, registre phyto au format réglementaire (OEPP, BBCH, SIRET), stations Weenat et Sencrop (`claudedocs/workflow_retours_10112026.md`) |
 | Télédétection, croissance, irrigation, 3D (lots Y à AC) | ✅ Sentinel-2 par ferme (NDVI, NDRE, NDMI), récoltes probables, végétation et météo du plan 3D, modèle de croissance, bilan hydrique et irrigations (`docs/teledetection.md`, `docs/modele-croissance.md`, `docs/jumeau-3d.md`) |
 | Modulation (lot AD) | ✅ cartes de modulation par zones, export ISO-XML et Shapefile, envoi agrirouter (`docs/modulation.md`) |
-| agrirouter (lots AR1 à AR5, 16/11) | 🟡 application « Fourmy » enregistrée en production (version 1 soumise pour revue). AR1 fusionné : connexion conforme à la revue, lancée aussi depuis agrirouter (`fourmy.org/agrirouter`), déconnexion constatée. AR2 à AR5 en PR (#62 à #65) : écoute des événements et fichiers reçus, file d'envoi avec reprise, TaskData reçus proposés en intervention, journaux EFDI versés aux parcours GPS. Pas encore d'essai sur console (IO-Tool et validation de la version attendus) ; AR7 (parcelles) et AR8 (revue) à faire (`claudedocs/conception_agrirouter.md`) |
+| agrirouter (lots AR1 à AR5, 16/11) | 🟡 application « Fourmy » enregistrée en production (version 1 soumise pour revue). AR1 fusionné : connexion conforme à la revue, lancée aussi depuis agrirouter (`fourmy.org/agrirouter`), déconnexion constatée. AR2 à AR5 fusionnés (#62 à #65, 18/11) : écoute des événements et fichiers reçus, file d'envoi avec reprise, TaskData reçus proposés en intervention, journaux EFDI versés aux parcours GPS. Pas encore d'essai sur console (IO-Tool et validation de la version attendus) ; AR7 (parcelles) et AR8 (revue) à faire (`claudedocs/conception_agrirouter.md`) |
 | Fertilisation azotée (lots AE à AQ) | ✅ zonage nitrates, sols et analyses, plan prévisionnel de fumure (Nouvelle-Aquitaine), contrôles à la saisie, cahier d'enregistrement ; saisie des engrais en kg ou en litres (`docs/fertilisation.md`) |
 | Équipe et personnes (lots P1 à P5) | ✅ équipe en pavés (onglet de « Ma ferme » depuis le 13/11) et fiche personne (photo, coordonnées réservées, contrat, Certiphyto), rôle lecture seule, temps de travaux d'après les interventions, invitations par email ou lien, import Ekylibre des personnes, fiche et heures pour le mobile (`docs/equipe-personnes-design.md`) |
 | Plan 3D et matériels (12/11) | ✅ vue pleine hauteur, couches en barre d'icônes, plein écran, barre de temps ; outil Traccar attelé au rejeu ; trajets recalés par OSRM ; types de matériel porteurs de l'avatar, largeur de rampe (`docs/jumeau-3d.md`, `docs/routage-osrm.md`, `docs/materiels.md`) |
@@ -101,25 +101,31 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | Assolement, temps 3 : économique (lots E1 à E6, 21-22/11) | ✅ module Économique : prix datés de la ferme, références Lexicon (rendements, prix des productions, prix des engrais, phyto et semences du bundle `fourmy`), prix européens ; marges jusqu'à la marge directe dans l'onglet Économie de l'assolement, comparées au réalisé N-1 ; recette avec les fermes de test à faire (`docs/economie.md`) |
 | Semences (lots SE1 à SE8, 20-21/11) | ✅ Stocks → Semences : fiche (espèce, variété, code GNIS, PMG avec repères Arvalis et Terres Inovia), PMG par lot, catalogue officiel des variétés, rattachement proposé ; semis en grains/m², kg/ha, milliers ou doses, stock converti ; mélanges dosés par espèce, couverts repris du semis ; utilisation par campagne et export CSV (`docs/semences.md`) |
 | Contrôles HVE et AB (lots CT1 à CT6a, 19-20/11) | 🟡 menu Réglementaire selon les certifications ; HVE niveau 3 (quatre indicateurs, IAE, questionnaire, IFT certifié) ; AB (règles R1 à R34, conversion déduite, cuivre, annexe II consolidée au 01/01/2026, semences, rotation) ; feux à la saisie ; registre AB et liasse HVE. Reste l'export de la grille HVE officielle remplie, qui attend une grille de référence remplie à la main (`docs/controles-hve-ab.md`) |
+| Registre phyto imprimable (22/11) | ✅ édition au format réglementaire en A4 paysage, en-tête de la ferme commun avec le plan de fumure, `?format=pdf` (#162) (`docs/phyto.md`) |
+| Déploiement du 22/11 | ✅ CI de `main` de nouveau verte (#151) ; OSRM en service sur dev.fourmy.org (graphe Aquitaine + Pays de la Loire) ; nginx résout l'API à chaque requête (#154, après une panne de 502) ; prix d'intrants Lexicon chargés (clé `bundle:fourmy`) (`docs/deploiement.md`) |
 | Migration réelle et recette | ✅ trois fermes reprises (08/11) ; recettes des 11 et 12/11 sur la ferme pilote de grandes cultures (`claudedocs/plan_de_test_global.md`), spécification métier (`docs/specifications-metier.md`) |
 
 ### À reprendre
 
-La liste complète des points ouverts (134 au 21/11/2026, par thème et par
+La liste complète des points ouverts (150 au 22/11/2026, par thème et par
 priorité) est dans `claudedocs/points_ouverts.md` ; elle alimente la
 roadmap du projet GitHub [Fourmy — Roadmap](https://github.com/orgs/ekylibre/projects/2)
-(issues pour P1 et P2, brouillons pour P3). Avant l'envoi à la ferme pilote : sauvegardes,
-vérification sur dev.fourmy.org des lots du 12 et 13/11 (déployés le 13/11,
-version 0.113.1 : worker, préchargement IGN, copie hors ligne),
-outils Traccar reliés, données de la ferme à compléter (SIRET, sols, 14-48
-liquide dans Ekylibre, Arion 430) et validation par la ferme pilote des
-phrases qui lui sont prêtées (l'accord écrit pour les captures est obtenu).
+(issues pour P1 et P2, brouillons pour P3). Avant l'envoi à la ferme pilote :
+sauvegardes de la base et coffre des clés, outils Traccar reliés, données de
+la ferme à compléter (SIRET, sols, 14-48 liquide dans Ekylibre, Arion 430)
+et validation par la ferme pilote des phrases qui lui sont prêtées (l'accord
+écrit pour les captures est obtenu).
+
+Recettes avec les deux fermes de test, sur dev.fourmy.org (au 22/11 : ITK de
+l'exploitant testeur recréés ; ferme de la GAEC copiée depuis la base de
+développement, compte de son responsable et intégration Traccar, boîtiers à
+partager côté Traccar) : relecture des itinéraires (point 135), assolement
+2027 (#112), prix et marges (#157), matériels au barème BCMA (#155).
 
 agrirouter (point 55 et suivants) : envoyer le message au support (IO-Tool,
-validation de la version 1, déclaration des parcelles, contrat), relire et
-fusionner les PR #62 à #65 dans l'ordre, poser les variables `AGRIROUTER_*`
-et le volume `fourmy_agrirouter_files` sur dev.fourmy.org, puis essayer sur
-console avec l'IO-Tool avant la synchro des parcelles (AR7) et la revue (AR8).
+validation de la version 1, déclaration des parcelles, contrat), puis essayer
+sur console avec l'IO-Tool avant la synchro des parcelles (AR7) et la revue
+(AR8). AR2 à AR5 sont fusionnés.
 
 ### Démarrage local
 
