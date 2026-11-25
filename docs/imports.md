@@ -86,7 +86,7 @@ Ce que devient le dossier PAC exporté de TelePAC (XML « Echanges-producteur »
 | Demandeur | fiche « Ma ferme » : SIRET, n° PACAGE, raison sociale, courriel, seulement s'ils sont vides |
 | Parcelle PAC | reliée à la parcelle de la ferme qui la recouvre (IoU ≥ 0,8), sinon parcelle créée avec une production de la campagne (activité d'après le code culture, table `lexicon_cap_codes`) ; une parcelle qui a déjà une culture pour la campagne n'en reçoit pas d'autre |
 | Îlot, parcelle PAC | références `cap_islet` et `cap` de chaque parcelle recouverte (5 % de la plus petite surface au moins), avec la surface commune, le code culture et la surface admissible |
-| SNA, ZDH | éléments du paysage déclarés (`farm_landscape_features`) : couche « Éléments déclarés à la PAC » de la carte, `GET /landscape-features` |
+| SNA, ZDH | éléments du paysage déclarés (`farm_landscape_features`) : couche « Éléments déclarés à la PAC » de la carte, `GET /landscape-features` ; une SNA créée dans la campagne, sans `numeroSna`, est gardée sous la référence `<campagne>-creation-<numeroSnacreationTas>` |
 | Effectifs animaux | mentionnés au rapport, non importés |
 
 Types de SNA (le code d'origine est gardé ; table **déduite** d'un dossier
