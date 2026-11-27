@@ -200,4 +200,21 @@ Chemin critique : AM0 → AM1 → AM2 → AM4 → AM5 → AM6. AM3 et AM7 peuven
 
 ## 5. Réalisé
 
-*(à remplir lot par lot)*
+### AM0 — fait (27/11)
+- Note [`essai_api_mcp.md`](essai_api_mcp.md). Code d'essai sur la branche locale `essai/api-mcp-am0`, non fusionné. Base isolée `fourmy_essai`.
+- Retenus : les plugins `api-key`, `jwt` et `mcp` (1.7.12) ; le choix de la ferme par `postLogin` ; la vérification locale du jeton avec `jose` ; CIMD en plus de l'enregistrement dynamique.
+- Le connecteur réel s'essaiera sur dev.fourmy.org après AM6.
+
+### AM1 — fait (27/11)
+- **Contrat** `packages/contracts/src/access.ts` : `accessModules` (11 modules), `accessLevel`, `accessGrant` et les libellés.
+- **Domaine** `packages/domain/src/access/grants.ts` : `memberGrant`, `normalizeGrant`, `intersectGrants`, `levelAllows`, `isEmptyGrant`, `capGrant`.
+- **Migration 0084** : la colonne s'appelle **`access_grant`**, et non `grant`, qui est un mot réservé en SQL.
+  - Elle est ajoutée à `memberships` et à `person_invitations`.
+  - Le rôle `guest` est autorisé, avec la contrainte « des droits si et seulement si `guest` ».
+- **Contexte** : `farmScope` pose `principal`, `grant` et `external`. Un `guest` est externe. Les rôles `owner`, `worker` et `reader` ne changent pas.
+- **Liste des routes** (`apps/api/src/external/routes.ts`) : 82 routes GET ouvertes, classées par module, et 58 fermées avec leur raison, soit les 140 routes GET de la ferme.
+- **`externalGuard`** porte sur la route réellement choisie par Hono (`matchedRoutes`) : route fermée ou écriture → 404, module non ouvert → 403 qui nomme le module.
+- **Écarts avec le plan** :
+  - les tests utilisent de vrais membres `guest` au lieu d'un en-tête réservé aux tests, ce qui évite une porte dérobée ;
+  - un `guest` limité à des activités est **refusé** (403) jusqu'à AM2, plutôt que de laisser fuir des données hors de son périmètre.
+- **Tests** : domaine (8), couverture des routes (3), matrice avec de vrais membres `guest` (6). La suite complète passe sans aucun test existant modifié.
