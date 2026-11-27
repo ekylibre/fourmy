@@ -1,6 +1,6 @@
 # API ouverte et serveur MCP — conception
 
-*Conception du 27/11/2026, d'après `claudedocs/besoins_api_mcp.md` (B1 à B10, API-1 à API-28). Étape suivante : `/sc:workflow` (plan par lots).*
+*Conception du 27/11/2026, d'après `claudedocs/besoins_api_mcp.md` (B1 à B10, API-1 à API-28). Étape suivante : `/sc:workflow` (plan par lots). Corrigée le 27/11 après l'essai AM0 ([`essai_api_mcp.md`](essai_api_mcp.md) §3).*
 
 ## 1. Ce qui existe et ce qui contraint la conception
 
@@ -257,9 +257,10 @@ sequenceDiagram
 - Le plugin `@better-auth/oauth-provider` 1.7.12 sur la même instance better-auth. Il gère :
   - l'autorisation par code, avec PKCE obligatoire ;
   - les jetons de rafraîchissement ;
-  - l'enregistrement dynamique des clients, dont les connecteurs MCP ont besoin ;
+  - l'enregistrement dynamique des clients, et les Client ID Metadata Documents (`@better-auth/cimd`, profil MCP 2026-07-28), avec un fetch sortant encadré : HTTPS seulement, taille et délai limités, pas d'adresse privée ;
   - les métadonnées `/.well-known/oauth-authorization-server`.
 - **Scopes OAuth grossiers** : `fourmy:read` et `fourmy:write`. Le détail (ferme, modules, activités) **ne passe pas par les scopes** : il se choisit sur l'écran de consentement et se range dans `farm_accesses`.
+- **Choix de la ferme** (web, `/oauth/ferme`). C'est l'étape `postLogin` du plugin : la ferme choisie est rangée dans `auth_sessions.active_farm_id`, devient la référence du consentement (`consentReferenceId`) et revient dans le jeton sous la revendication `fourmy_farm` (essai AM0).
 - **Écran de consentement** (web, `/oauth/consentement`). L'utilisateur y voit l'application, puis choisit :
   - la ferme ;
   - les modules et leurs niveaux, préremplis à partir du scope et plafonnés par son propre rôle ;
@@ -272,7 +273,8 @@ sequenceDiagram
 ### 7.2 Serveur MCP (API-15 à API-17)
 
 - Route `POST /mcp` en **Streamable HTTP sans état**, avec `@modelcontextprotocol/sdk` (version 1.32.2, compatible avec zod 4). Elle est montée dans Hono et protégée par le même `auth`.
-- `/.well-known/oauth-protected-resource` est servi pour la découverte par les clients MCP. `@better-auth/mcp` fournit cet assistant ; s'il fait double emploi avec oauth-provider, on le retient ou on l'écarte au lot 0.
+- `@better-auth/mcp` est retenu. Il lie les jetons à l'audience `/mcp` et sert `/.well-known/oauth-protected-resource/mcp` à la racine du site, où `/.well-known/*` est routé vers better-auth.
+- `requireMcpAuth` est écarté, car il va chercher les clés de signature par HTTP sur sa propre URL. On vérifie le jeton localement avec `jose` (`jwtVerify` sur les clés lues par `auth.api.getJwks()`), et on produit nous-mêmes le `WWW-Authenticate`.
 - **Un outil = une fonction qui appelle `/api/v1` en interne.** Chaque appel passe par `app.request` avec le principal courant. Les droits, la RLS, le prorata et le journal s'appliquent donc sans rien écrire de plus. Chaque outil déclare son module, et `tools/list` ne renvoie que les outils permis (API-16).
 - **Ferme.** L'outil `fermes` liste les fermes accessibles. Les autres outils prennent `ferme` en option, par défaut la seule ferme consentie, et sinon renvoient une erreur claire.
 
@@ -330,9 +332,8 @@ CREATE TABLE external_proposals (
 - **Dépôt** (`POST /proposals`, outil `proposer_intervention`) :
   - le corps est validé par le contrat de `POST /interventions` ;
   - les cibles doivent être dans le scope (API-24) ;
-  - les contrôles sont faits **à blanc** par les services de domaine (phyto, ZNT, IFT), sans rien écrire, et leur résultat est renvoyé tout de suite (API-22).
-
-  *À vérifier au lot 0* : que le contrôle phyto puisse tourner sans enregistrer. Sinon, il faut l'extraire en fonction pure.
+  - les contrôles sont faits **à blanc**, sans rien écrire, et leur résultat est renvoyé tout de suite (API-22). Ils existent déjà : `checkComplianceFor` (phyto et ZNT), la vérification nitrates et le contrôle HVE et AB, derrière `/phyto/check`, `/fertilization/check` et `/control/check`.
+  - L'IFT, calculé par le worker après la réalisation, est calculé à l'acceptation.
 - **Validation (web).** Une liste « À valider » apparaît, avec un compteur dans la navigation.
   - Le formulaire d'intervention s'ouvre prérempli avec la proposition. Le responsable corrige et enregistre : l'intervention est créée par le chemin habituel, avec `origin = 'api'` ou `'mcp'`, les contrôles refaits, le registre et les stocks.
   - La proposition passe en `accepted` avec `result_id`.
