@@ -55,3 +55,13 @@ export async function teardown(sql: Sql, farmId: string, userIds: string[]) {
 export async function ensurePhytoReferential(sql: Sql): Promise<void> {
   await sql`INSERT INTO lexicon_packages (name, version, source, rows) VALUES ('phytosanitary', 'test-fourmy', 'test', 0) ON CONFLICT DO NOTHING`;
 }
+
+/** Membre restreint (`guest`, lot AM1) avec ses droits ; renvoie ses en-têtes d'appel. */
+export async function addGuest(sql: Sql, farmId: string, grant: { modules: Record<string, string>; activities: "all" | string[] }) {
+  const email = `${crypto.randomUUID()}@test.fourmy`;
+  const userId = await upsertLocalUser(db(), { email, password: TEST_PASSWORD });
+  await sql`INSERT INTO memberships (id, farm_id, user_id, role, access_grant)
+            VALUES (${crypto.randomUUID()}, ${farmId}, ${userId}, 'guest', ${sql.json(grant)})`;
+  const token = await signIn(email);
+  return { userId, email, headers: { authorization: `Bearer ${token}`, "content-type": "application/json" } as Record<string, string> };
+}
