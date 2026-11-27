@@ -32,6 +32,10 @@ export const OPEN_ROUTES: readonly OpenRoute[] = [
   get("/remote-sensing/anomalies", "parcels", "Télédétection : anomalies"),
   get("/remote-sensing/scenes", "parcels", "Télédétection : scènes disponibles"),
   get("/remote-sensing/status", "parcels", "Télédétection : état"),
+  // État consolidé du web (carte, listes) : équipements, cuves et lieux retirés si leur module est fermé.
+  get("/snapshot", "parcels", "État de la ferme à une date (parcelles, productions…)"),
+  // Fonds de carte IGN (données publiques relayées par la ferme) : la carte du web en dépend.
+  get("/ign/tiles/:layer/:z/:x/:y", "parcels", "Tuiles de fond de carte IGN"),
 
   // Activités et assolement
   get("/activities", "activities", "Activités"),
@@ -135,7 +139,6 @@ export const CLOSED_ROUTES: Readonly<Record<string, string>> = {
   "/imports/:id": "imports",
   "/members": "membres",
   "/sync/pull": "synchronisation mobile",
-  "/snapshot": "état consolidé multi-modules",
   "/assets/:id": "fichier",
   "/settings/certification": "réglages",
   "/settings/crop-plan": "réglages",
@@ -149,7 +152,6 @@ export const CLOSED_ROUTES: Readonly<Record<string, string>> = {
   "/land-parcels/identify": "service externe",
   "/ign/cache": "tuiles",
   "/ign/cache/manifest": "tuiles",
-  "/ign/tiles/:layer/:z/:x/:y": "tuiles",
   "/terrain/heightmap/:z/:x/:y": "tuiles",
   "/plan3d": "3D",
   "/landscape3d": "3D",

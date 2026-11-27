@@ -5,14 +5,20 @@ import { useQuery } from "@tanstack/react-query";
 import { BadgeCheck, Box, Boxes, Grid3x3, Leaf, ClipboardList, Database, Euro, FileText, LayoutDashboard, Map, Plug, Scale, Wine, FlaskConical, Sprout, Tractor, Wheat, type LucideIcon } from "lucide-react";
 import { Link, Outlet, useLocation } from "react-router";
 import { Wordmark } from "@fourmy/ui-lyvre";
-import { useFarm } from "../app/farm";
+import type { AccessModule } from "@fourmy/contracts";
+import { moduleOpen, useFarm, type MyFarm } from "../app/farm";
 import { useAt } from "../app/at";
 import { useControlAvailability } from "../features/certification/controls";
 import { Timeline } from "./Timeline";
 import { UserMenu } from "./UserMenu";
 
 /** `when` : entrée affichée seulement si une parcelle porte cette certification pendant la campagne de la frise (D2). */
-type NavItem = { path: string; label: string; icon: LucideIcon; ownerOnly?: boolean; when?: "hve" | "ab" };
+/**
+ * `module` : module des droits d'accès (lot AM3) — l'entrée disparaît pour un
+ * invité restreint qui ne l'a pas ; `noGuest` : jamais pour un invité (écrans
+ * qui reposent sur des routes fermées aux accès restreints).
+ */
+type NavItem = { path: string; label: string; icon: LucideIcon; ownerOnly?: boolean; when?: "hve" | "ab"; module?: AccessModule; noGuest?: boolean };
 type NavGroup = { label: string; icon: LucideIcon; ownerOnly?: boolean; children: NavItem[] };
 type NavEntry = NavItem | NavGroup;
 
@@ -23,39 +29,39 @@ type NavEntry = NavItem | NavGroup;
  * ferme », claudedocs/besoins_navigation_compte.md).
  */
 export const NAVIGATION: NavEntry[] = [
-  { path: "", label: "Tableau de bord", icon: LayoutDashboard },
+  { path: "", label: "Tableau de bord", icon: LayoutDashboard, noGuest: true },
   {
     label: "Cartes",
     icon: Map,
     children: [
-      { path: "/map", label: "Plan 2D", icon: Map },
-      { path: "/3d-plan", label: "Plan 3D", icon: Box },
-      { path: "/prescriptions", label: "Modulation", icon: Grid3x3 },
+      { path: "/map", label: "Plan 2D", icon: Map, module: "parcels" },
+      { path: "/3d-plan", label: "Plan 3D", icon: Box, noGuest: true },
+      { path: "/prescriptions", label: "Modulation", icon: Grid3x3, module: "fertilization" },
     ],
   },
-  { path: "/activities", label: "Activités", icon: Sprout },
-  { path: "/interventions", label: "Interventions", icon: ClipboardList },
-  { path: "/equipments", label: "Matériels", icon: Tractor },
-  { path: "/economics", label: "Économique", icon: Euro },
+  { path: "/activities", label: "Activités", icon: Sprout, module: "activities" },
+  { path: "/interventions", label: "Interventions", icon: ClipboardList, module: "interventions" },
+  { path: "/equipments", label: "Matériels", icon: Tractor, module: "equipments" },
+  { path: "/economics", label: "Économique", icon: Euro, module: "economics" },
   {
     label: "Stocks",
     icon: Boxes,
     children: [
-      { path: "/stocks", label: "État des stocks", icon: Boxes },
-      { path: "/seeds", label: "Semences", icon: Wheat },
-      { path: "/phyto", label: "Produits phyto", icon: FlaskConical },
-      { path: "/fertilizers", label: "Fertilisants", icon: Leaf },
-      { path: "/cellar", label: "Cuverie", icon: Wine },
+      { path: "/stocks", label: "État des stocks", icon: Boxes, module: "stocks" },
+      { path: "/seeds", label: "Semences", icon: Wheat, module: "stocks" },
+      { path: "/phyto", label: "Produits phyto", icon: FlaskConical, module: "phyto" },
+      { path: "/fertilizers", label: "Fertilisants", icon: Leaf, module: "fertilization" },
+      { path: "/cellar", label: "Cuverie", icon: Wine, module: "stocks" },
     ],
   },
   {
     label: "Réglementaire",
     icon: Scale,
     children: [
-      { path: "/register", label: "Registre phyto", icon: FileText },
-      { path: "/fertilization", label: "Fertilisation azotée", icon: Leaf },
-      { path: "/control/hve", label: "Contrôle HVE", icon: BadgeCheck, when: "hve" },
-      { path: "/control/ab", label: "Contrôle AB", icon: BadgeCheck, when: "ab" },
+      { path: "/register", label: "Registre phyto", icon: FileText, module: "phyto" },
+      { path: "/fertilization", label: "Fertilisation azotée", icon: Leaf, module: "fertilization" },
+      { path: "/control/hve", label: "Contrôle HVE", icon: BadgeCheck, when: "hve", module: "certifications" },
+      { path: "/control/ab", label: "Contrôle AB", icon: BadgeCheck, when: "ab", module: "certifications" },
     ],
   },
   {
@@ -71,6 +77,26 @@ export const NAVIGATION: NavEntry[] = [
 
 const isGroup = (e: NavEntry): e is NavGroup => "children" in e;
 
+/** Entrée ouverte au compte (rôle et droits ; la disponibilité des contrôles se vérifie à part). */
+export function navAllowed(farm: MyFarm, e: NavItem): boolean {
+  if (e.ownerOnly && farm.role !== "owner") return false;
+  if (farm.role !== "guest") return true;
+  return !e.noGuest && (!e.module || moduleOpen(farm, e.module));
+}
+
+/** Première page d'un invité restreint (il n'a pas de tableau de bord), ou null s'il n'a rien. */
+export function guestHome(farm: MyFarm): string | null {
+  for (const e of NAVIGATION) {
+    if (isGroup(e)) {
+      if (e.ownerOnly && farm.role !== "owner") continue;
+      const first = e.children.find((c) => !c.when && navAllowed(farm, c));
+      if (first) return first.path;
+    } else if (navAllowed(farm, e)) return e.path;
+  }
+  return null;
+}
+
+
 /** Entrée active : égalité pour le tableau de bord, préfixe de segment sinon. */
 export function isActivePath(current: string, path: string): boolean {
   return path === "" ? current === "" || current === "/" : current === path || current.startsWith(`${path}/`);
@@ -82,7 +108,7 @@ export function Layout() {
   const [opened, { toggle, close }] = useDisclosure();
   const { day } = useAt();
   const availability = useControlAvailability(farm.id, Number(day.slice(0, 4))).data;
-  const visible = (e: NavItem) => (!e.ownerOnly || farm.role === "owner") && (!e.when || !!availability?.[e.when]);
+  const visible = (e: NavItem) => navAllowed(farm, e) && (!e.when || !!availability?.[e.when]);
   const location = useLocation();
   const base = `/f/${farm.id}`;
   const current = location.pathname.slice(base.length);
@@ -120,7 +146,8 @@ export function Layout() {
       <AppShell.Navbar className="lv-nav" p="sm">
         <Stack gap={4} component="nav" aria-label="Menu principal">
           {NAVIGATION.filter((e) => !e.ownerOnly || farm.role === "owner").map((entry) => {
-            if (!isGroup(entry)) return item(entry);
+            if (!isGroup(entry)) return visible(entry) ? item(entry) : null;
+            if (!entry.children.some(visible)) return null;
             const active = entry.children.some((c) => isActivePath(current, c.path));
             const Icon = entry.icon;
             return (

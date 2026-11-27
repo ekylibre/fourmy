@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { memberRole, personInvite, personProfileWrite, uuid } from "@fourmy/contracts";
+import { personAccountWrite, personInvite, personProfileWrite, uuid } from "@fourmy/contracts";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import { createPerson, erasePerson, getPhoto, personOfUser, listPeople, personSheet, removeAccount, setAccountRole, setPhoto, updatePerson, PHOTO_MAX_BYTES, type Viewer } from "../repos/people.js";
@@ -90,7 +90,7 @@ export const peopleRoutes = new Hono<Env>()
   // Invitation à avoir un compte (lot P3) : email si SMTP, sinon lien à transmettre.
   .post("/people/:id/invitations", requireOwner, async (c) => {
     const parsed = personInvite.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.message);
+    if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.issues[0]?.message ?? parsed.error.message);
     const appUrl = process.env.BETTER_AUTH_URL ?? new URL(c.req.url).origin;
     const r = await invitePerson(db(), c.get("farmId"), uuidParam(c, "id"), { ...parsed.data, invitedBy: c.get("userId"), appUrl, mailer: appMailer() });
     return c.json(r, 201);
@@ -106,9 +106,9 @@ export const peopleRoutes = new Hono<Env>()
   })
   // Compte de la personne : rôle, retrait de l'accès (la personne reste).
   .patch("/people/:id/account", requireOwner, async (c) => {
-    const parsed = z.object({ role: memberRole }).safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.message);
-    await setAccountRole(db(), c.get("farmId"), uuidParam(c, "id"), parsed.data.role);
+    const parsed = personAccountWrite.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.issues[0]?.message ?? parsed.error.message);
+    await setAccountRole(db(), c.get("farmId"), uuidParam(c, "id"), parsed.data.role, parsed.data.grant);
     return c.body(null, 204);
   })
   .delete("/people/:id/account", requireOwner, async (c) => {

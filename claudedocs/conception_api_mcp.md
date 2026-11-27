@@ -224,6 +224,9 @@ type OpenRoute = {
   - prix et marges ;
   - certifications et contrôles.
 - **Jamais ouvertes** : les routes de membres, invitations, intégrations, agrirouter, imports, synchronisation, `me`, ainsi que les images et exports lourds (3D, tuiles), qui ne sont pas utiles à un client externe.
+- **Ajouts d'AM3, pour le web d'un invité restreint** :
+  - `/snapshot` est ouvert avec le module Parcellaire, mais les matériels, cuves et lieux en sont retirés si leur module est fermé ;
+  - `/ign/tiles/…` est ouvert, puisque ce sont des fonds de carte publics relayés par la ferme. Sans eux, la carte reste vide.
 - **Test de couverture.** Chaque entrée de la liste correspond à une route réelle de l'application (`app.routes`). Chaque route GET de l'application est soit dans la liste, soit explicitement marquée « fermée ». Une nouvelle route oblige donc à choisir.
 
 ### 6.2 Authentification d'un appel externe

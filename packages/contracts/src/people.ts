@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isoDate, uuid } from "./primitives.js";
 import { person } from "./entities/interventions.js";
+import { accessGrant } from "./access.js";
 
 /**
  * Équipe et personnes, lot P1 (docs/equipe-personnes-design.md §3, §4) :
@@ -8,10 +9,21 @@ import { person } from "./entities/interventions.js";
  * personnelles (`private`) ne sont envoyées qu'au responsable et à elle-même.
  */
 
-/** Rôle d'un compte sur la ferme. */
-export const memberRole = z.enum(["owner", "worker", "reader"]);
+/** Rôle d'un compte sur la ferme. `guest` : invité restreint (conseiller…), droits par module et activité (lot AM3). */
+export const memberRole = z.enum(["owner", "worker", "reader", "guest"]);
 export type MemberRole = z.infer<typeof memberRole>;
-export const MEMBER_ROLE_LABELS: Record<MemberRole, string> = { owner: "Responsable", worker: "Salarié", reader: "Lecture seule" };
+export const MEMBER_ROLE_LABELS: Record<MemberRole, string> = {
+  owner: "Responsable",
+  worker: "Salarié",
+  reader: "Lecture seule",
+  guest: "Invité restreint",
+};
+
+/** Des droits si et seulement si le rôle est `guest`. */
+const grantMatchesRole = (v: { role: MemberRole; grant?: unknown }, ctx: z.RefinementCtx) => {
+  if (v.role === "guest" && !v.grant) ctx.addIssue({ code: "custom", path: ["grant"], message: "Un invité restreint a des droits (modules et activités)." });
+  if (v.role !== "guest" && v.grant) ctx.addIssue({ code: "custom", path: ["grant"], message: "Seul un invité restreint a des droits par module." });
+};
 
 export const certiphytoCategory = z.enum(["decideur_entreprise", "decideur_prestation", "operateur", "conseil", "vente"]);
 export type CertiphytoCategory = z.infer<typeof certiphytoCategory>;
@@ -50,7 +62,16 @@ export function certiphytoStatusAt(validUntil: string | null | undefined, at: st
 }
 
 export const accountStatus = z.enum(["none", "invited", "active"]);
-export const personAccount = z.object({ status: accountStatus, role: memberRole.nullable() });
+export const personAccount = z.object({
+  status: accountStatus,
+  role: memberRole.nullable(),
+  /** Droits d'un invité restreint ; envoyés au responsable seulement. */
+  grant: accessGrant.nullable().optional(),
+});
+
+/** Changement de rôle d'un compte (PATCH /people/:id/account). */
+export const personAccountWrite = z.object({ role: memberRole, grant: accessGrant.optional() }).superRefine(grantMatchesRole);
+export type PersonAccountWrite = z.infer<typeof personAccountWrite>;
 
 /** Pavé de la grille Équipe : visible de tous les membres. */
 export const personCard = person.extend({
@@ -106,7 +127,10 @@ export const personSheet = personCard.extend({
   canEditContact: z.boolean(),
   private: personPrivate.optional(),
   /** Invitation en cours (responsable seulement). */
-  invitation: z.object({ email: z.string(), role: memberRole, expiresAt: z.string(), sentByEmail: z.boolean() }).nullable().optional(),
+  invitation: z
+    .object({ email: z.string(), role: memberRole, grant: accessGrant.nullable().optional(), expiresAt: z.string(), sentByEmail: z.boolean() })
+    .nullable()
+    .optional(),
 });
 export type PersonSheet = z.infer<typeof personSheet>;
 
@@ -188,7 +212,9 @@ export const personIntervention = z.object({
 export type PersonIntervention = z.infer<typeof personIntervention>;
 
 /** Invitation d'une personne à avoir un compte (lot P3). */
-export const personInvite = z.object({ email: z.string().trim().toLowerCase().email().max(254).optional(), role: memberRole });
+export const personInvite = z
+  .object({ email: z.string().trim().toLowerCase().email().max(254).optional(), role: memberRole, grant: accessGrant.optional() })
+  .superRefine(grantMatchesRole);
 export type PersonInvite = z.infer<typeof personInvite>;
 export const invitationResult = z.object({
   status: z.enum(["sent", "link"]),

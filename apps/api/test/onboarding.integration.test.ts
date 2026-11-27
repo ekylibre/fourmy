@@ -1,3 +1,4 @@
+import { FULL_GRANT } from "@fourmy/domain";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -80,7 +81,7 @@ describe.skipIf(!url)("assistant de premier démarrage (intégration)", () => {
 
     const me = await (await app.request("/api/v1/me/farms", { headers: u.headers })).json();
     expect(me.canCreateFarm).toBe(false);
-    expect(me.items).toEqual([{ id, name: "GAEC Pilote Test", role: "owner", onboarding: { step: "files", completedAt: null } }]);
+    expect(me.items).toEqual([{ id, name: "GAEC Pilote Test", role: "owner", onboarding: { step: "files", completedAt: null }, grant: FULL_GRANT }]);
     const [farm] = await sql`SELECT siret, pacage, legal_name FROM farms WHERE id = ${id}`;
     expect(farm).toEqual({ siret: "40000000000003", pacage: "040000003", legal_name: "GAEC PILOTE TEST" });
     const [state] = await sql`

@@ -79,9 +79,11 @@ export function UserMenu() {
               Changer de ferme
             </Menu.Item>
           )}
-          <Menu.Item component={Link} to={`/f/${farm.id}/farm`} leftSection={<Building size={16} />}>
-            Ma ferme
-          </Menu.Item>
+          {farm.role !== "guest" && (
+            <Menu.Item component={Link} to={`/f/${farm.id}/farm`} leftSection={<Building size={16} />}>
+              Ma ferme
+            </Menu.Item>
+          )}
           <Menu.Item leftSection={<KeyRound size={16} />} onClick={() => setPassword(true)}>
             Changer de mot de passe
           </Menu.Item>

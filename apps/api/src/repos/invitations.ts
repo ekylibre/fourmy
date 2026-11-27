@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { Transporter } from "nodemailer";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
-import type { MemberRole } from "@fourmy/contracts";
+import type { AccessGrant, MemberRole } from "@fourmy/contracts";
 import { MEMBER_ROLE_LABELS } from "@fourmy/contracts";
 import { createLocalUserIfAbsent } from "../users.js";
 import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
@@ -25,7 +25,7 @@ export async function invitePerson(
   db: Database,
   farmId: string,
   personId: string,
-  input: { email?: string; role: MemberRole; invitedBy: string; appUrl: string; mailer: Transporter | null },
+  input: { email?: string; role: MemberRole; grant?: AccessGrant; invitedBy: string; appUrl: string; mailer: Transporter | null },
 ): Promise<InvitationResult> {
   const token = randomBytes(32).toString("base64url");
   const link = `${input.appUrl.replace(/\/$/, "")}/invitation/${token}`;
@@ -40,12 +40,14 @@ export async function invitePerson(
     if (p.user_id) throw new Conflict("Cette personne a déjà un compte sur la ferme.");
     const to = (input.email ?? p.email ?? "").trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw new BadRequest("Email de la personne requis (fiche ou formulaire).");
+    if (input.grant) await assertFarmActivities(tx, input.grant);
     await tx.execute(sql`UPDATE person_invitations SET revoked_at = now() WHERE person_id = ${personId} AND accepted_at IS NULL AND revoked_at IS NULL`);
     const id = crypto.randomUUID();
     const [row] = await rows<{ expires_at: string }>(
       tx,
-      sql`INSERT INTO person_invitations (id, farm_id, person_id, email, role, token_hash, expires_at, created_by)
-          VALUES (${id}, ${farmId}, ${personId}, ${to}, ${input.role}, ${hashToken(token)}, now() + ${`${INVITATION_DAYS} days`}::interval, ${input.invitedBy})
+      sql`INSERT INTO person_invitations (id, farm_id, person_id, email, role, access_grant, token_hash, expires_at, created_by)
+          VALUES (${id}, ${farmId}, ${personId}, ${to}, ${input.role}, ${input.grant ? JSON.stringify(input.grant) : null}::jsonb,
+                  ${hashToken(token)}, now() + ${`${INVITATION_DAYS} days`}::interval, ${input.invitedBy})
           RETURNING expires_at`,
     );
     return { email: to, farmName: p.farm, firstName: p.first_name ?? p.name, expiresAt: new Date(row!.expires_at).toISOString(), invitationId: id };
@@ -91,12 +93,14 @@ export async function revokeInvitation(db: Database, farmId: string, personId: s
 
 /** Invitation ouverte d'une personne (fiche, responsable). */
 export async function openInvitation(tx: Tx, personId: string) {
-  const [i] = await rows<{ email: string; expires_at: string; sent_by_email: boolean; role: MemberRole }>(
+  const [i] = await rows<{ email: string; expires_at: string; sent_by_email: boolean; role: MemberRole; access_grant: AccessGrant | null }>(
     tx,
-    sql`SELECT email, expires_at, sent_by_email, role FROM person_invitations
+    sql`SELECT email, expires_at, sent_by_email, role, access_grant FROM person_invitations
         WHERE person_id = ${personId} AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at > now()`,
   );
-  return i ? { email: i.email, role: i.role, expiresAt: new Date(i.expires_at).toISOString(), sentByEmail: i.sent_by_email } : null;
+  return i
+    ? { email: i.email, role: i.role, grant: i.access_grant, expiresAt: new Date(i.expires_at).toISOString(), sentByEmail: i.sent_by_email }
+    : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,4 +164,15 @@ export async function acceptInvitation(
     if (code === "P0001") throw new Conflict(err.cause?.message ?? err.message ?? "Invitation refusée.");
     throw e;
   }
+}
+
+/** Les activités d'un périmètre sont celles de la ferme (sinon 400). */
+export async function assertFarmActivities(tx: Tx, grant: AccessGrant): Promise<void> {
+  if (grant.activities === "all") return;
+  const ids = [...new Set(grant.activities)];
+  const [r] = await rows<{ n: number }>(tx, sql`SELECT count(*)::int AS n FROM activities WHERE id IN (${sql.join(
+      ids.map((id) => sql`${id}::uuid`),
+      sql`, `,
+    )})`);
+  if ((r?.n ?? 0) !== ids.length) throw new BadRequest("Activité inconnue sur cette ferme dans les droits.");
 }
