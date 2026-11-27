@@ -4,18 +4,21 @@ import { matchedRoutes } from "hono/route";
 import { sql } from "drizzle-orm";
 import { runWithActivityScope, withFarm } from "@fourmy/db";
 import { ACCESS_MODULE_LABELS, accessGrant } from "@fourmy/contracts";
-import { isEmptyGrant, levelAllows, memberGrant, type EffectiveGrant } from "@fourmy/domain";
+import { intersectGrants, isEmptyGrant, levelAllows, memberGrant, normalizeGrant, type EffectiveGrant } from "@fourmy/domain";
 import { openRoute } from "./external/routes.js";
 import { db } from "./db.js";
-import { getAuth } from "./auth.js";
+import { API_KEY_PREFIX, getAuth } from "./auth.js";
 
 export type Role = "owner" | "worker" | "reader" | "guest";
 
 /**
- * Qui appelle (conception_api_mcp.md §3.3). Lot AM1 : la session seulement ;
- * les clés d'API (AM4) et les jetons OAuth (AM5) viendront s'y ajouter.
+ * Qui appelle (conception_api_mcp.md §3.3) : une session (web, mobile), ou
+ * une clé d'API (lot AM4) ; les jetons OAuth (AM5) viendront s'y ajouter.
+ * `accessId` : l'accès externe de la ferme, posé par `farmScope`.
  */
-export type Principal = { kind: "session"; userId: string; accessId: null; clientId: null };
+export type Principal =
+  | { kind: "session"; userId: string; accessId: null; clientId: null }
+  | { kind: "api_key"; userId: string; apiKeyId: string; accessId: string | null; clientId: null };
 
 /** Variables de contexte posées par les middlewares et lues par les routes. */
 export type Env = {
@@ -47,6 +50,21 @@ const deny = (status: 400 | 401 | 403, title: string, detail?: string) =>
  */
 export const auth: MiddlewareHandler<Env> = createMiddleware<Env>(async (c, next) => {
   const h = c.req.raw.headers;
+  // Clé d'API (lot AM4) : `x-api-key`, ou `Authorization: Bearer fmy_…`.
+  const bearer = h.get("authorization")?.match(/^Bearer (.+)$/)?.[1];
+  const key = h.get("x-api-key") ?? (bearer?.startsWith(API_KEY_PREFIX) ? bearer : undefined);
+  if (key) {
+    const v = await getAuth().api.verifyApiKey({ body: { key } }).catch(() => null);
+    if (!v?.valid || !v.key) return deny(401, "Unauthorized", "Clé d'API invalide, expirée ou révoquée.");
+    // Une clé n'ouvre que les routes d'une ferme (pas « Mes fermes », ni le compte).
+    if (!/^\/api\/v1\/farms\/[^/]+\//.test(c.req.path)) return deny(403, "Accès refusé", "Une clé d'API n'ouvre que les routes de sa ferme.");
+    const [u] = (await db().execute(sql`SELECT id, email, name FROM users WHERE id = ${v.key.referenceId}::uuid`)) as unknown as { id: string; email: string; name: string | null }[];
+    if (!u) return deny(401, "Unauthorized", "Clé d'API invalide, expirée ou révoquée.");
+    c.set("userId", u.id);
+    c.set("user", { id: u.id, email: u.email, name: u.name || null });
+    c.set("principal", { kind: "api_key", userId: u.id, apiKeyId: v.key.id, accessId: null, clientId: null });
+    return next();
+  }
   // Ni cookie ni jeton : inutile d'interroger la base.
   if (!h.get("cookie") && !h.get("authorization")) return deny(401, "Unauthorized", "Connexion requise.");
   const session = await getAuth().api.getSession({ headers: h });
@@ -72,16 +90,33 @@ export const farmScope: MiddlewareHandler<Env> = createMiddleware<Env>(async (c,
   if (!role) return deny(403, "Accès refusé", "Vous n'êtes pas membre de cette ferme.");
   // Membre restreint (B7) : ses droits enregistrés ; illisibles = aucun droit.
   const stored = role === "guest" ? accessGrant.safeParse(rows[0]!.access_grant) : null;
-  const grant = memberGrant(role, stored?.success ? stored.data : null);
-  if (role === "guest" && isEmptyGrant(grant)) return deny(403, "Accès refusé", "Votre accès à cette ferme ne couvre aucun module.");
+  let grant = memberGrant(role, stored?.success ? stored.data : null);
+  const principal = c.get("principal") ?? { kind: "session", userId: c.get("userId"), accessId: null, clientId: null };
+  if (principal.kind === "api_key") {
+    // Clé d'API : son accès sur cette ferme, ni révoqué ni expiré ; droits = membre ∩ clé (API-4).
+    const [a] = (await withFarm(db(), farmId, (tx) =>
+      tx.execute(sql`SELECT id, access_grant FROM farm_accesses
+                     WHERE api_key_id = ${principal.apiKeyId} AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())`),
+    )) as unknown as { id: string; access_grant: unknown }[];
+    const keyGrant = a ? accessGrant.safeParse(a.access_grant) : null;
+    if (!a || !keyGrant?.success) return deny(403, "Accès refusé", "Cette clé d'API n'ouvre pas cette ferme.");
+    grant = intersectGrants(grant, normalizeGrant(keyGrant.data));
+    c.set("principal", { ...principal, accessId: a.id });
+  } else {
+    c.set("principal", principal);
+  }
+  const external = role === "guest" || principal.kind !== "session";
+  if (external && isEmptyGrant(grant)) return deny(403, "Accès refusé", "Cet accès à la ferme ne couvre aucun module.");
   c.set("farmId", farmId);
-  c.set("role", role);
-  c.set("principal", { kind: "session", userId: c.get("userId"), accessId: null, clientId: null });
+  // Un accès externe est vu des routes comme un invité restreint : jamais les privilèges du
+  // responsable (données privées des personnes, routes réservées), quel que soit son auteur.
+  c.set("role", external ? "guest" : role);
   c.set("grant", grant);
-  c.set("external", role === "guest");
+  c.set("external", external);
   // Lecture seule (conseiller, comptable) : aucune écriture, sauf sur sa propre
   // fiche (coordonnées, photo), que la route vérifie (docs/equipe-personnes-design.md §3.2).
-  if (role === "reader" && !READ_METHODS.has(c.req.method) && !OWN_PROFILE_RE.test(c.req.path)) {
+  // Ses propres clés d'API aussi (Q4 : en lecture seulement, plafonnées par ses droits).
+  if (role === "reader" && !external && !READ_METHODS.has(c.req.method) && !OWN_PROFILE_RE.test(c.req.path) && !OWN_ACCESS_RE.test(c.req.path)) {
     return deny(403, "Accès refusé", "Compte en lecture seule : consultation et exports seulement.");
   }
   // Périmètre d'activités (lot AM2) : toutes les requêtes en base de la suite le portent (RLS).
@@ -91,6 +126,7 @@ export const farmScope: MiddlewareHandler<Env> = createMiddleware<Env>(async (c,
 
 const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const OWN_PROFILE_RE = /\/people\/[0-9a-f-]{36}(\/photo)?$/i;
+const OWN_ACCESS_RE = /\/accesses(\/[0-9a-f-]{36})?$/i;
 
 /** Réserve une route au rôle `owner` (parcellaire, corrections, imports…). */
 export const requireOwner: MiddlewareHandler<Env> = createMiddleware<Env>(async (c, next) => {

@@ -251,6 +251,11 @@ sequenceDiagram
 
 - **Clé d'API.** Elle arrive par l'en-tête `x-api-key` (ou par `Authorization: Bearer fmy_…`, que l'on reconnaît à son préfixe). Elle est **liée à une ferme** par `farm_accesses`. Un appel vers une autre ferme répond 403.
 - **Jeton OAuth.** Il est vérifié par le plugin oauth-provider. Il donne l'utilisateur et le client ; `farm_accesses (farm_id, oauth_client_id, user_id)` donne les droits. Sans ligne pour la ferme demandée, la réponse est 403.
+- **Ce qu'a fixé AM4** :
+  - **Rôle vu des routes.** Un accès externe est vu des routes comme un invité restreint (`role = "guest"`). Il n'a jamais les privilèges du responsable, même si c'est le responsable qui l'a créé : pas de données privées des personnes, pas de route réservée.
+  - **Périmètre d'une clé.** Une clé n'ouvre que les routes `/api/v1/farms/:farmId/…`. « Mes fermes » et le compte lui répondent 403.
+  - **Ordre des middlewares.** Le journal et le débit passent **avant** la garde, pour que les refus soient aussi comptés et notés.
+  - **Début de la clé.** `farm_accesses.key_start` garde les premiers caractères de la clé pour l'affichage, car le rôle applicatif ne lit pas la table des clés.
 - **Débit (NF-2).** Un compteur en mémoire par accès, 120 requêtes par minute et 10 000 par jour, avec 429 et `Retry-After`. L'API tourne en une seule instance sur Dokploy. Avec plusieurs instances, il faudra un compteur dans PostgreSQL.
 
 ### 6.3 Documentation OpenAPI (API-13)

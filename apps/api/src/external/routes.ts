@@ -138,6 +138,8 @@ export const CLOSED_ROUTES: Readonly<Record<string, string>> = {
   "/imports": "imports",
   "/imports/:id": "imports",
   "/members": "membres",
+  "/accesses": "gestion des accès externes",
+  "/accesses/:id/log": "gestion des accès externes",
   "/sync/pull": "synchronisation mobile",
   "/assets/:id": "fichier",
   "/settings/certification": "réglages",
