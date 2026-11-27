@@ -14,7 +14,7 @@
 | 6 | SDK MCP dans Hono ? | **Oui.** `WebStandardStreamableHTTPServerTransport` (Request vers Response, sans état, réponse JSON) fonctionne dans une route Hono. Un client du SDK branché sur `app.fetch` liste les outils et les appelle. Sans jeton : 401 avec `WWW-Authenticate` et `resource_metadata`. Jeton altéré : 401. | Retenu. Un serveur MCP est créé par requête, sans état, ce qui va avec une API sans session MCP. |
 | 7 | Coût d'un outil qui appelle l'API en interne (`app.request`) ? | Appel interne : **0,4 ms**. Appel d'outil complet (vérification du JWT, protocole MCP, appel interne) : **0,7 ms en médiane**, 1,2 ms au plus, sans la base. | Le principe « l'outil MCP est un client de `/api/v1` » est confirmé (conception §2, point 4). Le principal est transmis à l'appel interne par un contexte que seule l'application pose, jamais par un en-tête accepté de l'extérieur. |
 | 8 | Contrôles réglementaires à blanc pour les propositions ? | **Déjà là.** `POST /phyto/check` (`checkComplianceFor` : feux, ZNT, délais), `POST /fertilization/check` (nitrates) et `POST /control/check` (HVE et AB) contrôlent une saisie sans l'enregistrer : le web s'en sert avant l'enregistrement. L'**IFT** est calculé plus tard par le worker (API du ministère), après la réalisation. | AM8 n'a rien à extraire : une proposition appelle les trois contrôles. L'IFT n'est pas connu au dépôt ; il est calculé à l'acceptation, comme aujourd'hui. On corrige la conception §8 (« phyto, ZNT, IFT » devient « phyto, ZNT, nitrates, HVE et AB »). |
-| 9 | Connecteur réel d'un assistant du marché | **Pas fait.** Il faut une URL publique en HTTPS, soit un déploiement séparé de la branche d'essai, soit un tunnel. Cela attend l'accord de l'utilisateur. | À faire au plus tard en AM6, sur dev.fourmy.org (recette US-7). Tout le parcours a été rejoué localement avec le SDK et des requêtes réelles. |
+| 9 | Connecteur réel d'un assistant du marché | **Pas fait.** Il faut une URL publique en HTTPS, soit un déploiement séparé de la branche d'essai, soit un tunnel. Cela attend l'accord de l'utilisateur. | **Décidé le 27/11 : l'essai se fera directement sur dev.fourmy.org**, une fois AM6 fusionné (recette US-7), sans déploiement séparé ni tunnel. Tout le parcours a été rejoué localement avec le SDK et des requêtes réelles. |
 
 ## 2. Point nouveau : Client ID Metadata Documents
 
@@ -37,5 +37,5 @@ La version 2026-07-28 de la spécification MCP fait des **Client ID Metadata Doc
 ## 4. Suite
 
 - AM1 peut commencer. Aucune des incertitudes ne change le découpage.
-- Le connecteur réel (point 9) est à planifier avec l'utilisateur : déploiement séparé ou tunnel, au plus tard en AM6.
+- Le connecteur réel (point 9) s'essaiera sur dev.fourmy.org après la fusion d'AM6.
 - La base `fourmy_essai` peut être supprimée à la fin d'AM5.

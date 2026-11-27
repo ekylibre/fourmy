@@ -42,7 +42,7 @@ Chemin critique : AM0 → AM1 → AM2 → AM4 → AM5 → AM6. AM3 et AM7 peuven
   - `mcp` : est-il utile en plus d'`oauth-provider`, ou fait-il double emploi ?
 - **Tables des plugins** : générer leur schéma (`npx @better-auth/cli generate`) et le traduire en migration SQL à notre façon.
 - **SDK MCP** : `StreamableHTTPServerTransport` sans état, monté dans une route Hono (requête et réponse Web), un outil `ping`, puis un client du SDK en mémoire.
-- **Un vrai connecteur** : brancher l'essai sur une URL publique, par exemple une branche déployée à part sur dev ou un tunnel. Puis ajouter le connecteur dans un assistant du marché et vérifier le parcours de bout en bout : découverte, enregistrement, consentement, jeton, appel d'outil.
+- **Un vrai connecteur** : reporté en AM6 (décision du 27/11). L'essai se fera directement sur dev.fourmy.org une fois AM6 fusionné : découverte, enregistrement, consentement, jeton, appel d'outil.
 - **Contrôle phyto à blanc** : vérifier que le contrôle réglementaire (feux, ZNT) et l'IFT se calculent sans écrire, pour la conception §8. Sinon, noter l'extraction à prévoir en AM8.
 - **Appels internes** : mesurer le coût d'un `app.request` interne (latence, transaction), pour la conception §7.2.
 - **Sortie** : la note d'essai, avec une décision par point. On met à jour la conception (§7) si un choix change.
@@ -150,7 +150,7 @@ Chemin critique : AM0 → AM1 → AM2 → AM4 → AM5 → AM6. AM3 et AM7 peuven
 - **Journal** : `channel = 'mcp'`, avec le nom de l'outil.
 - **Documentation** : la page web « Connecter un assistant », avec l'URL `/mcp` et les étapes pour les principaux assistants, et `docs/acces-externes.md`.
 - **Tests** : un client du SDK en mémoire, avec `tools/list` filtré selon trois profils de droits et chaque outil appelé sur la ferme Vigne et Blé (scope, prorata).
-- **Recette** : US-7. Un assistant réel, branché sur dev.fourmy.org, répond à « qu'est-ce qui a été traité sur la parcelle X cette semaine ? ».
+- **Recette** : US-7, avec le premier branchement d'un assistant réel, directement sur dev.fourmy.org après la fusion. L'assistant répond à « qu'est-ce qui a été traité sur la parcelle X cette semaine ? ». Le parcours OAuth complet (découverte, enregistrement ou CIMD, choix de la ferme, consentement) y est vérifié de bout en bout.
 
 ### AM7 — OpenAPI et page Développeurs (taille M)
 - **Schémas de réponse** qui manquent dans `packages/contracts` pour les routes ouvertes. Les routes doivent renvoyer ces formes : c'est vérifié par un test de conformité, qui fait passer chaque réponse de la matrice AM1 par son schéma.
