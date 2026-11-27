@@ -218,3 +218,32 @@ Chemin critique : AM0 → AM1 → AM2 → AM4 → AM5 → AM6. AM3 et AM7 peuven
   - les tests utilisent de vrais membres `guest` au lieu d'un en-tête réservé aux tests, ce qui évite une porte dérobée ;
   - un `guest` limité à des activités est **refusé** (403) jusqu'à AM2, plutôt que de laisser fuir des données hors de son périmètre.
 - **Tests** : domaine (8), couverture des routes (3), matrice avec de vrais membres `guest` (6). La suite complète passe sans aucun test existant modifié.
+
+### AM2 — fait (27/11)
+- **Migration 0085** :
+  - `current_activity_scope()` ;
+  - `fourmy_scope_parcels()` et `fourmy_scope_targets()`, des ensembles calculés une fois par requête ;
+  - `fourmy_parcel_in_scope_on()` et `fourmy_intervention_scope_share()`, toutes deux `SECURITY DEFINER` et bornées à la ferme ;
+  - **35 politiques `activity_scope`**, restrictives et en lecture seulement ;
+  - l'index `productions (land_parcel_id, campaign_id)`.
+- **Assolement sous périmètre** : `crop_plans`, `crop_plan_versions`, `land_parcel_lineage` et `parcel_routes` sont invisibles. `getCropPlan` retombe alors sur `liveDraft`, qui reconstruit l'assolement à partir des productions visibles, sans changer le code.
+- **`withFarm`** pose `fourmy.activity_scope` à partir d'un `AsyncLocalStorage` (`runWithActivityScope`), rempli par `farmScope`. Le refus des invités limités à des activités, mis en place en AM1, est levé.
+- **Prorata** (`repos/interventions.ts`) : la part visible est calculée par la base, sans rien de plus quand il n'y a pas de périmètre. Seules les quantités totales sont réduites, pas les doses à l'hectare. La réponse porte `shared: true`, les contrôles qui citent des parcelles sont réduits, et les contrôles nitrates et HVE/AB sont retirés.
+- **`fourmy_input_applicators`** devient `SECURITY DEFINER`, bornée à la ferme. Sinon, le registre phyto prenait 1,9 s sous périmètre.
+- **Exemption** : `stock_movements` (API-9).
+- **Tests** :
+  - scénario Vigne + Blé (6) : activités, parcelles (dont une ancienne vigne), fiche, interventions, 404, intervention mixte au prorata (10 L sur 40), registre phyto, assolement reconstruit, et le responsable qui voit tout ;
+  - couverture de la RLS (3) ;
+  - le test AM1 est adapté.
+  - La suite API passe en entier : 460 tests.
+- **Mesures** sur la ferme de l'exploitant testeur (174 parcelles, 681 interventions), avec un invité limité au maïs et en médiane :
+
+  | Route | Avec périmètre | Sans périmètre |
+  |---|---|---|
+  | Interventions d'une campagne | 47 à 82 ms | 13 à 22 ms |
+  | Registre phyto | 26 ms | 12 ms |
+  | Assolement | 14 ms | 6 ms |
+  | Cahier de fertilisation | 108 ms | 67 ms |
+
+  NF-3 (moins de 300 ms) est tenu.
+

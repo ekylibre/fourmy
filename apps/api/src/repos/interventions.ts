@@ -236,6 +236,7 @@ async function readInterventions(tx: Tx, where: SQL, limit = 1000): Promise<Inte
     tx,
     sql`
       SELECT i.id, i.farm_id, i.procedure, i.status, i.started_at, i.stopped_at, i.origin, i.client_id, i.staffing,
+             fourmy_intervention_scope_share(i.id) AS scope_share,
              i.purposes, i.notes, i.bbch, (SELECT st.label FROM ref_bbch_stages st WHERE st.code = i.bbch) AS bbch_label, i.compliance, i.nitrate_check, i.certification_check, i.justification, i.ift, i.weather, i.maintenance, i.irrigation,
              i.sowing, i.period_precision, i.affects_stock, i.created_at, i.updated_at,
              (SELECT coalesce(json_agg(json_build_object('equipment_id', m.equipment_id, 'value', m.value, 'correction', m.correction,
@@ -267,7 +268,42 @@ async function readInterventions(tx: Tx, where: SQL, limit = 1000): Promise<Inte
       ORDER BY coalesce(i.started_at, i.stopped_at, i.created_at), i.id
       LIMIT ${limit}`,
   );
-  return list.map(toIntervention);
+  return list.map((r) => restrictToScope(toIntervention(r), Number(r.scope_share ?? 1)));
+}
+
+/** Contrôles phyto qui ne parlent pas des parcelles : gardés tels quels sous périmètre. */
+const PARCEL_FREE_INDICATORS = new Set(["authorization", "organic", "dose", "applications", "applicator"]);
+const SHARED_NOTE = "Détail non disponible : intervention partagée avec d'autres cultures.";
+
+/**
+ * Intervention partagée avec des cultures hors du périmètre d'un accès
+ * restreint (B5, conception_api_mcp.md §5.3) : la RLS a déjà retiré les
+ * parcelles cachées ; les quantités totales sont ramenées à la part visible
+ * (les doses à l'hectare ne changent pas) et les contrôles qui citent des
+ * parcelles sont réduits. Part 1 (pas de périmètre, ou tout est visible) :
+ * l'intervention telle quelle.
+ */
+function restrictToScope(i: Intervention, share: number): Intervention {
+  if (!(share < 1)) return i;
+  const scale = <T extends { quantity: number; per: "total" | "hectare" }>(q: T): T =>
+    q.per === "total" ? { ...q, quantity: Math.round(q.quantity * share * 1000) / 1000 } : q;
+  return {
+    ...i,
+    shared: true,
+    inputs: i.inputs.map(scale),
+    outputs: i.outputs.map(scale),
+    compliance: i.compliance
+      ? {
+          ...i.compliance,
+          checks: i.compliance.checks.map((c) => ({
+            ...c,
+            indicators: c.indicators.map((ind) => (PARCEL_FREE_INDICATORS.has(ind.code) ? ind : { ...ind, message: SHARED_NOTE })),
+          })),
+        }
+      : null,
+    nitrateCheck: null,
+    certificationCheck: null,
+  };
 }
 
 /** Lecture structurée selon un filtre SQL (synchro mobile). */

@@ -2,7 +2,7 @@ import type { MiddlewareHandler } from "hono";
 import { createMiddleware } from "hono/factory";
 import { matchedRoutes } from "hono/route";
 import { sql } from "drizzle-orm";
-import { withFarm } from "@fourmy/db";
+import { runWithActivityScope, withFarm } from "@fourmy/db";
 import { ACCESS_MODULE_LABELS, accessGrant } from "@fourmy/contracts";
 import { isEmptyGrant, levelAllows, memberGrant, type EffectiveGrant } from "@fourmy/domain";
 import { openRoute } from "./external/routes.js";
@@ -73,11 +73,7 @@ export const farmScope: MiddlewareHandler<Env> = createMiddleware<Env>(async (c,
   // Membre restreint (B7) : ses droits enregistrés ; illisibles = aucun droit.
   const stored = role === "guest" ? accessGrant.safeParse(rows[0]!.access_grant) : null;
   const grant = memberGrant(role, stored?.success ? stored.data : null);
-  if (role === "guest") {
-    if (isEmptyGrant(grant)) return deny(403, "Accès refusé", "Votre accès à cette ferme ne couvre aucun module.");
-    // Le périmètre d'activités n'est appliqué qu'au lot AM2 (RLS) : d'ici là, refus plutôt que fuite.
-    if (grant.activities !== "all") return deny(403, "Accès refusé", "Les accès limités à certaines activités ne sont pas encore disponibles.");
-  }
+  if (role === "guest" && isEmptyGrant(grant)) return deny(403, "Accès refusé", "Votre accès à cette ferme ne couvre aucun module.");
   c.set("farmId", farmId);
   c.set("role", role);
   c.set("principal", { kind: "session", userId: c.get("userId"), accessId: null, clientId: null });
@@ -88,6 +84,8 @@ export const farmScope: MiddlewareHandler<Env> = createMiddleware<Env>(async (c,
   if (role === "reader" && !READ_METHODS.has(c.req.method) && !OWN_PROFILE_RE.test(c.req.path)) {
     return deny(403, "Accès refusé", "Compte en lecture seule : consultation et exports seulement.");
   }
+  // Périmètre d'activités (lot AM2) : toutes les requêtes en base de la suite le portent (RLS).
+  if (grant.activities !== "all") return runWithActivityScope(grant.activities, () => next());
   await next();
 });
 

@@ -336,6 +336,11 @@ export const intervention = z
     /** Stade BBCH du traitement (registre réglementaire) et son libellé. */
     bbch: z.object({ code: z.string(), label: z.string() }).nullable().optional(),
     origin: interventionOrigin,
+    /**
+     * Intervention partagée avec des cultures hors du périmètre d'un accès
+     * restreint (lot AM2) : parcelles et quantités totales réduites à la part visible.
+     */
+    shared: z.boolean().optional(),
     clientId: z.string().nullable(),
     /** Contrôle réglementaire enregistré (traitements saisis dans Fourmy). */
     compliance: complianceResult.nullable().optional(),
