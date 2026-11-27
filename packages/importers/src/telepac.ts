@@ -213,7 +213,9 @@ export function readTelepac(bytes: Uint8Array, fileName: string): ImportBundle {
   // --- Surfaces non agricoles (SNA) -------------------------------------------------
   for (const sna of kids(rpg, "sna-declaree")) {
     const geometry = geometryOf(kid(sna, "geometrie"), project);
-    const ref = txt(sna, "numeroSna");
+    // SNA créée dans la campagne : pas encore de `numeroSna`, son numéro de création en tient lieu.
+    const created = txt(sna, "numeroSnacreationTas");
+    const ref = txt(sna, "numeroSna") ?? (created ? `${campaign}-creation-${created}` : null);
     if (!geometry || !ref) continue;
     const capType = txt(sna, "typeSna") ?? "?";
     const known = SNA_TYPES[capType];

@@ -54,20 +54,20 @@ describe.skipIf(!url)("import TelePAC (intégration)", () => {
     expect(preview.notImported).toEqual([{ kind: "animals", label: "Animaux déclarés (AV)", count: 1000 }]);
     expect(preview.reconciliation.parcels).toEqual({ create: 16, link: 0, skip: 0 });
     expect(preview.reconciliation.capRefs).toMatchObject({ islets: 4, parcels: 16 });
-    expect(preview.reconciliation.landscape).toMatchObject({ create: 134, link: 0 });
+    expect(preview.reconciliation.landscape).toMatchObject({ create: 135, link: 0 });
 
     expect(done.status, JSON.stringify(done.report)).toBe("completed");
     expect(done.report.counts.parcels.created).toBe(16);
     expect(done.report.counts.productions.created).toBe(16);
     expect(done.report.counts.capRefs.parcels).toBeGreaterThanOrEqual(16);
     expect(done.report.counts.capRefs.islets).toBeGreaterThanOrEqual(16);
-    expect(done.report.counts.landscape.created).toBe(134);
+    expect(done.report.counts.landscape.created).toBe(135);
 
     const [farmRow] = await sql`SELECT siret, pacage, legal_name, email FROM farms WHERE id = ${farm.farmId}`;
     expect(farmRow).toEqual({ siret: "40000000000003", pacage: "040000003", legal_name: "GAEC PILOTE TEST", email: "pilote@exemple.test" });
     const kinds = await sql`SELECT kind, count(*)::int AS n FROM farm_landscape_features WHERE farm_id = ${farm.farmId} GROUP BY 1 ORDER BY 1`;
-    expect(Object.fromEntries(kinds.map((k) => [k.kind, k.n]))).toMatchObject({ hedge: 47, tree: 54, tree_row: 20, hedge_densification: 6 });
-    expect(kinds.reduce((n, k) => n + k.n, 0)).toBe(134);
+    expect(Object.fromEntries(kinds.map((k) => [k.kind, k.n]))).toMatchObject({ hedge: 48, tree: 54, tree_row: 20, hedge_densification: 6 });
+    expect(kinds.reduce((n, k) => n + k.n, 0)).toBe(135);
     // Chaque parcelle porte sa parcelle PAC (code culture, surface admissible) et son îlot.
     const refs = await sql`
       SELECT lp.id, count(*) FILTER (WHERE r.kind = 'cap')::int AS cap, count(*) FILTER (WHERE r.kind = 'cap_islet')::int AS islet
@@ -82,7 +82,7 @@ describe.skipIf(!url)("import TelePAC (intégration)", () => {
     // Carte : les éléments déclarés en GeoJSON ; fiche : la parcelle PAC et l'îlot.
     const fc = await (await app.request(`/api/v1/farms/${farm.farmId}/landscape-features`, { headers: farm.headers })).json();
     expect(fc.type).toBe("FeatureCollection");
-    expect(fc.features).toHaveLength(134);
+    expect(fc.features).toHaveLength(135);
     expect(fc.features.find((f: { properties: { kind: string } }) => f.properties.kind === "tree").geometry.type).toBe("Point");
     const parcelId = refs[0]!.id;
     const sheet = await (await app.request(`/api/v1/farms/${farm.farmId}/land-parcels/${parcelId}/sheet`, { headers: farm.headers })).json();
@@ -96,7 +96,7 @@ describe.skipIf(!url)("import TelePAC (intégration)", () => {
     const { preview, done } = await importFile(farm, copy, "copie.xml");
     expect(preview.reconciliation.parcels).toEqual({ create: 0, link: 16, skip: 0 });
     expect(preview.reconciliation.productions.create).toBe(0);
-    expect(preview.reconciliation.landscape).toMatchObject({ create: 0, link: 134 });
+    expect(preview.reconciliation.landscape).toMatchObject({ create: 0, link: 135 });
     expect(done.report.counts.landscape.created).toBe(0);
     expect(done.report.counts.capRefs).toEqual({ islets: 0, parcels: 0 });
   });

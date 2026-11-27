@@ -32,9 +32,9 @@ describe("lecteur TelePAC", () => {
   });
 
   it("SNA et ZDH : type, largeur, surface ; arbres isolés en points", () => {
-    expect(bundle.landscape).toHaveLength(134);
+    expect(bundle.landscape).toHaveLength(135);
     const byKind = bundle.landscape.reduce<Record<string, number>>((acc, l) => ((acc[String(l.attrs.kind)] = (acc[String(l.attrs.kind)] ?? 0) + 1), acc), {});
-    expect(byKind).toMatchObject({ hedge: 47, tree: 54, tree_row: 20, hedge_densification: 6 });
+    expect(byKind).toMatchObject({ hedge: 48, tree: 54, tree_row: 20, hedge_densification: 6 });
     expect(bundle.landscape.filter((l) => l.capType === "V1").every((l) => l.geometry.type === "Point")).toBe(true);
     const hedge = bundle.landscape.find((l) => l.capType === "V4")!;
     expect(hedge.widthM).toBeGreaterThan(0);
@@ -43,6 +43,21 @@ describe("lecteur TelePAC", () => {
     // A1 n'a pas de correspondance : « autre élément », signalé.
     expect(bundle.landscape.find((l) => l.capType === "A1")?.attrs.kind).toBe("other");
     expect(bundle.warnings.some((w) => /A1/.test(w.message))).toBe(true);
+  });
+
+  it("chaque SNA déclarée devient un élément, avec ou sans numeroSna", () => {
+    const declared = new TextDecoder("latin1").decode(fixture).match(/<sna-declaree>/g)!.length;
+    const snas = bundle.landscape.filter((l) => l.source === "telepac.sna");
+    expect(snas).toHaveLength(declared);
+    // La seule SNA du jeu créée dans la campagne : une haie V4 de 5,08 ares.
+    expect(snas.filter((l) => l.capType === "V4" && l.areaM2 === 508)).toHaveLength(1);
+  });
+
+  it("références des SNA : non vides, distinctes, stables d'une lecture à l'autre", () => {
+    const refs = (b: typeof bundle) => b.landscape.filter((l) => l.source === "telepac.sna").map((l) => l.ref);
+    expect(refs(bundle).every(Boolean)).toBe(true);
+    expect(new Set(refs(bundle)).size).toBe(refs(bundle).length);
+    expect(refs(readTelepac(fixture, "Dossier-PAC-2026.xml"))).toEqual(refs(bundle));
   });
 
   it("effectifs animaux : mentionnés, non importés", () => {
