@@ -210,7 +210,7 @@ importers:
         version: 9.7.3(@mantine/core@9.7.3(@mantine/hooks@9.7.3(react@19.2.9))(@types/react@19.2.18)(react-dom@19.2.9(react@19.2.9))(react@19.2.9))(@mantine/hooks@9.7.3(react@19.2.9))(react-dom@19.2.9(react@19.2.9))(react@19.2.9)
       '@osfarm/itineraire-technique':
         specifier: github:ekylibre/itineraire-technique#v1.3.0-ekylibre.3
-        version: git+https://git@github.com:ekylibre/itineraire-technique.git#702ad30c32000f87cd0c651973fb1d6e234c152b(echarts@6.0.0)
+        version: https://codeload.github.com/ekylibre/itineraire-technique/tar.gz/702ad30c32000f87cd0c651973fb1d6e234c152b(echarts@6.0.0)
       '@tanstack/react-query':
         specifier: 5.104.5
         version: 5.104.5(@types/react@19.2.18)(react@19.2.9)
@@ -467,7 +467,7 @@ importers:
         version: link:../isoxml
       '@osfarm/agroedei-edifact-daplos-reader':
         specifier: github:ekylibre/agroedei-edifact-daplos-reader#8eaf6a623e930f2c275fa4fdc10735b0a769f33f
-        version: git+https://git@github.com:ekylibre/agroedei-edifact-daplos-reader.git#8eaf6a623e930f2c275fa4fdc10735b0a769f33f
+        version: https://codeload.github.com/ekylibre/agroedei-edifact-daplos-reader/tar.gz/8eaf6a623e930f2c275fa4fdc10735b0a769f33f
       proj4:
         specifier: 2.20.9
         version: 2.20.9
@@ -1465,12 +1465,12 @@ packages:
   '@open-draft/until@2.1.0':
     resolution: {integrity: sha512-U69T3ItWHvLwGg5eJ0n3I62nWuE6ilHlmz7zM0npLBRvPRd7e6NYmg54vvRtP5mZG7kZqZCFVdsTWo7BPtBujg==}
 
-  '@osfarm/agroedei-edifact-daplos-reader@git+https://git@github.com:ekylibre/agroedei-edifact-daplos-reader.git#8eaf6a623e930f2c275fa4fdc10735b0a769f33f':
-    resolution: {commit: 8eaf6a623e930f2c275fa4fdc10735b0a769f33f, repo: git@github.com:ekylibre/agroedei-edifact-daplos-reader.git, type: git}
+  '@osfarm/agroedei-edifact-daplos-reader@https://codeload.github.com/ekylibre/agroedei-edifact-daplos-reader/tar.gz/8eaf6a623e930f2c275fa4fdc10735b0a769f33f':
+    resolution: {tarball: https://codeload.github.com/ekylibre/agroedei-edifact-daplos-reader/tar.gz/8eaf6a623e930f2c275fa4fdc10735b0a769f33f}
     version: 2.0.0
 
-  '@osfarm/itineraire-technique@git+https://git@github.com:ekylibre/itineraire-technique.git#702ad30c32000f87cd0c651973fb1d6e234c152b':
-    resolution: {commit: 702ad30c32000f87cd0c651973fb1d6e234c152b, repo: git@github.com:ekylibre/itineraire-technique.git, type: git}
+  '@osfarm/itineraire-technique@https://codeload.github.com/ekylibre/itineraire-technique/tar.gz/702ad30c32000f87cd0c651973fb1d6e234c152b':
+    resolution: {tarball: https://codeload.github.com/ekylibre/itineraire-technique/tar.gz/702ad30c32000f87cd0c651973fb1d6e234c152b}
     version: 1.3.0-ekylibre.3
     peerDependencies:
       echarts: ^6.0.0
@@ -5353,13 +5353,13 @@ snapshots:
 
   '@open-draft/until@2.1.0': {}
 
-  '@osfarm/agroedei-edifact-daplos-reader@git+https://git@github.com:ekylibre/agroedei-edifact-daplos-reader.git#8eaf6a623e930f2c275fa4fdc10735b0a769f33f':
+  '@osfarm/agroedei-edifact-daplos-reader@https://codeload.github.com/ekylibre/agroedei-edifact-daplos-reader/tar.gz/8eaf6a623e930f2c275fa4fdc10735b0a769f33f':
     dependencies:
       proj4: 2.20.9
     transitivePeerDependencies:
       - geotiff
 
-  '@osfarm/itineraire-technique@git+https://git@github.com:ekylibre/itineraire-technique.git#702ad30c32000f87cd0c651973fb1d6e234c152b(echarts@6.0.0)':
+  '@osfarm/itineraire-technique@https://codeload.github.com/ekylibre/itineraire-technique/tar.gz/702ad30c32000f87cd0c651973fb1d6e234c152b(echarts@6.0.0)':
     optionalDependencies:
       echarts: 6.0.0
 
