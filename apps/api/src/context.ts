@@ -94,6 +94,54 @@ export const auth: MiddlewareHandler<Env> = createMiddleware<Env>(async (c, next
   await next();
 });
 
+/** Accès d'un principal à une ferme : rôle, droits effectifs, accès externe ; sinon le refus. */
+export type FarmAccessResult =
+  | { ok: true; role: Role; grant: EffectiveGrant; external: boolean; accessId: string | null }
+  | { ok: false; detail: string };
+
+/**
+ * Droits d'un principal sur une ferme (conception_api_mcp.md §3) : ceux du
+ * membre, croisés avec ceux de la clé ou du consentement OAuth. Partagé par
+ * `farmScope` et le serveur MCP (outils permis).
+ */
+export async function resolveFarmAccess(farmId: string, principal: Principal): Promise<FarmAccessResult> {
+  const rows = (await withFarm(db(), farmId, (tx) =>
+    tx.execute(sql`SELECT role, access_grant FROM memberships WHERE farm_id = ${farmId} AND user_id = ${principal.userId}`),
+  )) as unknown as { role: Role; access_grant: unknown }[];
+  const role = rows[0]?.role;
+  if (!role) return { ok: false, detail: "Vous n'êtes pas membre de cette ferme." };
+  // Membre restreint (B7) : ses droits enregistrés ; illisibles = aucun droit.
+  const stored = role === "guest" ? accessGrant.safeParse(rows[0]!.access_grant) : null;
+  let grant = memberGrant(role, stored?.success ? stored.data : null);
+  let accessId: string | null = null;
+  if (principal.kind === "api_key") {
+    // Clé d'API : son accès sur cette ferme, ni révoqué ni expiré ; droits = membre ∩ clé (API-4).
+    const [a] = (await withFarm(db(), farmId, (tx) =>
+      tx.execute(sql`SELECT id, access_grant FROM farm_accesses
+                     WHERE api_key_id = ${principal.apiKeyId} AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())`),
+    )) as unknown as { id: string; access_grant: unknown }[];
+    const keyGrant = a ? accessGrant.safeParse(a.access_grant) : null;
+    if (!a || !keyGrant?.success) return { ok: false, detail: "Cette clé d'API n'ouvre pas cette ferme." };
+    grant = intersectGrants(grant, normalizeGrant(keyGrant.data));
+    accessId = a.id;
+  } else if (principal.kind === "oauth") {
+    // Jeton OAuth : le consentement de cet utilisateur à cette application, pour cette ferme (§7.1).
+    const [a] = (await withFarm(db(), farmId, (tx) =>
+      tx.execute(sql`SELECT id, access_grant FROM farm_accesses
+                     WHERE kind = 'oauth' AND oauth_client_id = ${principal.clientId} AND user_id = ${principal.userId} AND revoked_at IS NULL`),
+    )) as unknown as { id: string; access_grant: unknown }[];
+    const consented = a ? accessGrant.safeParse(a.access_grant) : null;
+    if (!a || !consented?.success) return { ok: false, detail: "Cette application n'a pas été autorisée sur cette ferme." };
+    grant = intersectGrants(grant, normalizeGrant(consented.data));
+    // Sans le scope d'écriture, la lecture seulement, quel que soit le consentement.
+    if (!principal.scopes.includes(OAUTH_SCOPES.write)) grant = intersectGrants(grant, READ_ONLY);
+    accessId = a.id;
+  }
+  const external = role === "guest" || principal.kind !== "session";
+  if (external && isEmptyGrant(grant)) return { ok: false, detail: "Cet accès à la ferme ne couvre aucun module." };
+  return { ok: true, role, grant, external, accessId };
+}
+
 /**
  * Autorisation par ferme : l'utilisateur doit en être membre. La RLS isole
  * les fermes entre elles ; ce contrôle décide **qui** peut entrer dans une
@@ -102,42 +150,11 @@ export const auth: MiddlewareHandler<Env> = createMiddleware<Env>(async (c, next
 export const farmScope: MiddlewareHandler<Env> = createMiddleware<Env>(async (c, next) => {
   const farmId = c.req.param("farmId");
   if (!isUuid(farmId)) return deny(400, "Ferme invalide", "farmId doit être un UUID.");
-  const rows = (await withFarm(db(), farmId, (tx) =>
-    tx.execute(sql`SELECT role, access_grant FROM memberships WHERE farm_id = ${farmId} AND user_id = ${c.get("userId")}`),
-  )) as unknown as { role: Role; access_grant: unknown }[];
-  const role = rows[0]?.role;
-  if (!role) return deny(403, "Accès refusé", "Vous n'êtes pas membre de cette ferme.");
-  // Membre restreint (B7) : ses droits enregistrés ; illisibles = aucun droit.
-  const stored = role === "guest" ? accessGrant.safeParse(rows[0]!.access_grant) : null;
-  let grant = memberGrant(role, stored?.success ? stored.data : null);
   const principal = c.get("principal") ?? { kind: "session", userId: c.get("userId"), accessId: null, clientId: null };
-  if (principal.kind === "api_key") {
-    // Clé d'API : son accès sur cette ferme, ni révoqué ni expiré ; droits = membre ∩ clé (API-4).
-    const [a] = (await withFarm(db(), farmId, (tx) =>
-      tx.execute(sql`SELECT id, access_grant FROM farm_accesses
-                     WHERE api_key_id = ${principal.apiKeyId} AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())`),
-    )) as unknown as { id: string; access_grant: unknown }[];
-    const keyGrant = a ? accessGrant.safeParse(a.access_grant) : null;
-    if (!a || !keyGrant?.success) return deny(403, "Accès refusé", "Cette clé d'API n'ouvre pas cette ferme.");
-    grant = intersectGrants(grant, normalizeGrant(keyGrant.data));
-    c.set("principal", { ...principal, accessId: a.id });
-  } else if (principal.kind === "oauth") {
-    // Jeton OAuth : le consentement de cet utilisateur à cette application, pour cette ferme (§7.1).
-    const [a] = (await withFarm(db(), farmId, (tx) =>
-      tx.execute(sql`SELECT id, access_grant FROM farm_accesses
-                     WHERE kind = 'oauth' AND oauth_client_id = ${principal.clientId} AND user_id = ${principal.userId} AND revoked_at IS NULL`),
-    )) as unknown as { id: string; access_grant: unknown }[];
-    const consented = a ? accessGrant.safeParse(a.access_grant) : null;
-    if (!a || !consented?.success) return deny(403, "Accès refusé", "Cette application n'a pas été autorisée sur cette ferme.");
-    grant = intersectGrants(grant, normalizeGrant(consented.data));
-    // Sans le scope d'écriture, la lecture seulement, quel que soit le consentement.
-    if (!principal.scopes.includes(OAUTH_SCOPES.write)) grant = intersectGrants(grant, READ_ONLY);
-    c.set("principal", { ...principal, accessId: a.id });
-  } else {
-    c.set("principal", principal);
-  }
-  const external = role === "guest" || principal.kind !== "session";
-  if (external && isEmptyGrant(grant)) return deny(403, "Accès refusé", "Cet accès à la ferme ne couvre aucun module.");
+  const access = await resolveFarmAccess(farmId, principal);
+  if (!access.ok) return deny(403, "Accès refusé", access.detail);
+  const { role, grant, external } = access;
+  c.set("principal", principal.kind === "session" ? principal : { ...principal, accessId: access.accessId });
   c.set("farmId", farmId);
   // Un accès externe est vu des routes comme un invité restreint : jamais les privilèges du
   // responsable (données privées des personnes, routes réservées), quel que soit son auteur.

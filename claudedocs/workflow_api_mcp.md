@@ -330,3 +330,21 @@ Chemin critique : AM0 → AM1 → AM2 → AM4 → AM5 → AM6. AM3 et AM7 peuven
 - **Pas fait** :
   - les jetons opaques (une application qui ne demande aucune ressource) ne sont pas acceptés par l'API : elle doit demander la ressource `/api/v1` ou `/mcp` ;
   - « Mes accès » (la liste de ses propres applications, toutes fermes confondues) : elles restent visibles et révocables ferme par ferme dans « Accès externes ».
+
+### AM6 — fait (27/11)
+- **Route `/mcp`** (`mcp/server.ts`) : Streamable HTTP sans état (`WebStandardStreamableHTTPServerTransport`, réponses JSON), un serveur MCP par requête ; POST seulement (GET et DELETE : 405).
+  - Accès par jeton OAuth (vérifié localement, audience `/mcp` ou `/api/v1`) ou par clé d'API. Sans identifiant : 401 avec `WWW-Authenticate` et `resource_metadata` (RFC 9728) ; jeton invalide : `error="invalid_token"`.
+  - Les fermes de l'appelant viennent de `fourmy_user_farms`, filtrées par `resolveFarmAccess`, extrait de `farmScope` pour être partagé.
+  - `tools/list` ne propose que les outils d'un module ouvert sur au moins une ferme ; sur une ferme où le module est fermé, l'outil répond une erreur claire.
+  - Ferme par défaut : la seule ferme accessible ; sinon le paramètre `ferme` (nom ou identifiant), et l'outil `fermes`.
+- **Outils** (`mcp/tools.ts`) : 12 outils de lecture (`fermes` et 11 outils de module). Chacun appelle `/api/v1` par l'application elle-même, avec l'identifiant de l'appelant (`mcp/client.ts`) : droits, RLS, périmètre d'activités, prorata et débit s'appliquent sans rien réécrire. Les libellés (noms de parcelles, d'articles, de matériels, types d'intervention) sont relus une fois par appel, et vides si leur module est fermé.
+- **Format** (`mcp/format.ts`) : un résumé en français, puis le JSON (`structuredContent`, recopié dans le texte) ; hectares, dates de Paris, doses avec leur unité ; 50 éléments par page, avec un curseur.
+- **Journal** : l'appel principal d'un outil est compté et journalisé (canal `mcp`, opération « outil (GET /route) ») ; les appels de libellés ne le sont pas. Ils sont reconnus par un en-tête dont la valeur secrète n'existe que dans le processus.
+- **Web** : un encadré « Connecter un assistant IA » dans « Accès externes », avec l'adresse `/mcp` à copier.
+- **Mesures** sur la ferme pilote de développement (11 parcelles, 588 interventions) : de 7 à 65 ms par appel d'outil.
+- **Tests** :
+  - API (5) : 401 et métadonnées ; outils listés selon trois profils de droits ; ferme Vigne + Blé avec un accès Vigne (parcelles, interventions prévues au prorata, intervention du blé refusée, assolement, fiche par nom) ; journal ; jeton OAuth d'audience `/mcp` ;
+  - web : l'adresse MCP affichée.
+- **Pas fait** :
+  - l'outil `marges` : les marges sont calculées dans le web (lots E3 à E5) à partir de plusieurs écrans internes ; il faudra d'abord les calculer côté API ;
+  - l'essai d'un vrai connecteur sur dev.fourmy.org, après la fusion.

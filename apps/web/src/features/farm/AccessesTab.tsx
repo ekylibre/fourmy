@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Alert, Badge, Button, CopyButton, Group, Modal, Select, Stack, Table, Text, TextInput } from "@mantine/core";
+import { Alert, Badge, Button, CopyButton, Group, Modal, Paper, Select, Stack, Table, Text, TextInput } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, KeyRound, ScrollText, Trash2 } from "lucide-react";
+import { Bot, Copy, KeyRound, ScrollText, Trash2 } from "lucide-react";
 import { ACCESS_MODULE_LABELS, accessModules, type AccessGrant, type AccessLogEntry, type FarmAccess, type FarmAccessCreated } from "@fourmy/contracts";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
@@ -68,6 +68,7 @@ export function AccessesTab() {
         n'ouvre que les modules et les activités choisis, jamais plus que vos propres droits, et ne peut rien modifier.
         {farm.role !== "owner" && " Vous voyez ici vos propres clés."}
       </Text>
+      <ConnectAssistant />
       <Group>
         <Button leftSection={<KeyRound size={16} />} onClick={() => setCreating(true)}>
           Créer une clé
@@ -189,6 +190,41 @@ export function AccessesTab() {
         {logOf && <AccessLog farmId={farm.id} access={logOf} />}
       </Modal>
     </Stack>
+  );
+}
+
+/**
+ * Connecter un assistant IA (lot AM6) : l'adresse du serveur MCP de Fourmy et
+ * les étapes. L'assistant s'autorise lui-même (OAuth) : écran de consentement.
+ */
+function ConnectAssistant() {
+  const url = `${globalThis.location?.origin ?? ""}/mcp`;
+  return (
+    <Paper withBorder p="md" radius="md">
+      <Stack gap="xs">
+        <Group gap="xs">
+          <Bot size={18} />
+          <Text fw={600}>Connecter un assistant IA</Text>
+        </Group>
+        <Text size="sm">
+          Ajoutez Fourmy comme connecteur MCP dans votre assistant (Claude, ChatGPT, Le Chat…) avec cette adresse. L'assistant vous renvoie ici pour vous
+          connecter, choisir la ferme et ce qu'il pourra consulter. Il apparaît ensuite dans la liste ci-dessous.
+        </Text>
+        <Group gap="xs" wrap="nowrap">
+          <TextInput value={url} readOnly aria-label="Adresse du serveur MCP" style={{ flex: 1 }} ff="monospace" onFocus={(e) => e.currentTarget.select()} />
+          <CopyButton value={url}>
+            {({ copied, copy }) => (
+              <Button variant="light" leftSection={<Copy size={14} />} onClick={copy}>
+                {copied ? "Copiée" : "Copier"}
+              </Button>
+            )}
+          </CopyButton>
+        </Group>
+        <Text size="xs" c="dimmed">
+          Un script peut aussi s'y connecter avec une clé d'API, dans l'en-tête <code>x-api-key</code>. L'assistant ne peut rien modifier.
+        </Text>
+      </Stack>
+    </Paper>
   );
 }
 

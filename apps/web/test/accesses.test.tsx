@@ -35,6 +35,7 @@ describe("accès externes", () => {
     const user = userEvent.setup();
     renderApp(`/f/${FARM}/farm?tab=accesses`);
     const table = await screen.findByRole("table", { name: "Accès externes" });
+    expect(screen.getByRole("textbox", { name: "Adresse du serveur MCP" })).toHaveValue(`${location.origin}/mcp`);
     expect(within(table).getByText("Export compta")).toBeInTheDocument();
     expect(within(table).getByText("Stocks et semences, Économique · toutes activités")).toBeInTheDocument();
     expect(within(table).getByText("fmy_ab…")).toBeInTheDocument();
