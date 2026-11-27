@@ -24,8 +24,8 @@ const rows = async <T>(tx: Tx, q: ReturnType<typeof sql>) => (await tx.execute(q
 const iso = (v: unknown) => (v ? new Date(v as string).toISOString() : null);
 const day = (v: unknown) => (v ? (typeof v === "string" ? v.slice(0, 10) : new Date(v as Date).toISOString().slice(0, 10)) : null);
 
-/** Lecteur de la fiche : son rôle et son compte (accès aux données personnelles). */
-export type Viewer = { userId: string; role: MemberRole };
+/** Lecteur de la fiche : son rôle et son compte (accès aux données personnelles). Un invité restreint (`guest`) ne voit pas les données privées. */
+export type Viewer = { userId: string; role: MemberRole | "guest" };
 
 /**
  * Tout membre a une personne (design §1) : celles qui manquent (comptes

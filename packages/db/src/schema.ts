@@ -48,6 +48,8 @@ export const memberships = pgTable("memberships", {
   farmId: uuid("farm_id").notNull(),
   userId: uuid("user_id").notNull(),
   role: text("role").notNull(),
+  /** Droits d'un membre `guest` (contrat `accessGrant`, migration 0084). */
+  accessGrant: jsonb("access_grant"),
 });
 
 export const campaigns = pgTable("campaigns", {
