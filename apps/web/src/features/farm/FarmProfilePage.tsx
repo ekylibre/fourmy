@@ -6,6 +6,7 @@ import { ErrorAlert, Loading } from "../../components/states";
 import { IdentityTab } from "./IdentityTab";
 import { SitesTab } from "./SitesTab";
 import { IgnTab } from "./IgnTab";
+import { AccessesTab } from "./AccessesTab";
 import { DisplaySettings, PreferencesTab, type PreferenceSection } from "./SettingsTabs";
 import { TeamPage } from "../team/TeamPage";
 
@@ -14,7 +15,7 @@ import { TeamPage } from "../team/TeamPage";
  * onglet précis (E22). Tous les membres la consultent, le responsable la
  * modifie (E3). Onglets Équipe et Préférences : claudedocs/besoins_navigation_compte.md.
  */
-const TABS = ["identity", "team", "sites", "ign", "preferences"] as const;
+const TABS = ["identity", "team", "sites", "ign", "accesses", "preferences"] as const;
 type Tab = (typeof TABS)[number];
 /** Anciens onglets, devenus des sections de Préférences : les liens existants restent valables. */
 const LEGACY_SECTIONS: Record<string, PreferenceSection> = { maintenance: "maintenance", tracks: "tracks", spraying: "spraying", brands: "brands" };
@@ -59,10 +60,12 @@ export function FarmProfilePage() {
           <Tabs.Tab value="team">Équipe</Tabs.Tab>
           <Tabs.Tab value="sites">Sites et cartes</Tabs.Tab>
           <Tabs.Tab value="ign">Données IGN</Tabs.Tab>
+          <Tabs.Tab value="accesses">Accès externes</Tabs.Tab>
           <Tabs.Tab value="preferences">Préférences</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="team">{tab === "team" && <TeamPage embedded />}</Tabs.Panel>
         <Tabs.Panel value="ign">{tab === "ign" && <IgnTab />}</Tabs.Panel>
+        <Tabs.Panel value="accesses">{tab === "accesses" && <AccessesTab />}</Tabs.Panel>
         <Tabs.Panel value="identity">
           <IdentityTab key={JSON.stringify(p.identity)} profile={p} />
         </Tabs.Panel>

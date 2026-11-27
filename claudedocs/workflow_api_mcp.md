@@ -270,3 +270,34 @@ Chemin critique : AM0 → AM1 → AM2 → AM4 → AM5 → AM6. AM3 et AM7 peuven
   - web (4) : menu, accueil, menu du compte, invitation avec droits ;
   - deux tests de « Mes fermes » sont adaptés au nouveau champ `grant`.
 - **Pas fait** : le test e2e Playwright de l'invitation, laissé à la recette sur dev.fourmy.org.
+
+### AM4 — fait (27/11)
+- **Migration 0087** :
+  - `auth_api_keys`, la table du plugin, d'après le SQL de l'essai AM0 ;
+  - `farm_accesses`, avec `key_start` (le début de la clé, pour l'affichage) ;
+  - `access_log`, avec la RLS par ferme.
+- **Authentification** (`auth.ts`) :
+  - le plugin `api-key` (préfixe `fmy_`, limite intégrée coupée, tables en snake_case calculées) ;
+  - un journal better-auth qui ignore les clés refusées ;
+  - `getAuth()` reçoit un type écrit à la main : le type inféré avec le plugin dépassait la limite du compilateur (TS7056).
+- **Contexte** (`context.ts`) :
+  - `x-api-key` ou `Bearer fmy_…` donnent un principal `api_key` ;
+  - une clé n'ouvre que les routes d'une ferme ;
+  - `farmScope` vérifie l'accès de la clé sur la ferme (ni révoqué, ni expiré) et calcule les droits : membre ∩ clé ;
+  - un accès externe est vu des routes comme `guest`.
+- **Débit et journal** (`external/audit.ts`) : 120 appels par minute et 10 000 par jour, en mémoire, avec 429 et `Retry-After`. Le journal est écrit de façon asynchrone, et `last_used_at` au plus une fois par minute. Ils s'appliquent avant la garde.
+- **Routes** :
+  - `GET`, `POST`, `PATCH` et `DELETE /accesses`, plus `GET /accesses/:id/log` ;
+  - le responsable voit tout, un autre membre ses propres clés ;
+  - un lecteur peut créer une clé, plafonnée en lecture (Q4) ;
+  - ces routes sont fermées aux accès externes.
+- **Worker** : purge du journal à 90 jours.
+- **Web** : onglet « Accès externes » de « Ma ferme ». On y trouve la liste des clés (droits, auteur, début de la clé, dernière utilisation, état), la création avec durée et éditeur de droits, la clé affichée une seule fois, le journal et la révocation.
+- **Tests** :
+  - API (7) : débit ; création (seul le haché est stocké) ; appel limité à la ferme, aux modules et aux activités ; écriture, compte et autre ferme refusés ; données privées cachées ; journal ; révocation et expiration ; plafond du lecteur ; auteur retiré ;
+  - web (2) : liste, création, journal, révocation ;
+  - le test de l'ordre des onglets est adapté.
+  - Suites complètes : API 470 tests, web 283.
+- **Pas fait** :
+  - l'e-mail à la création d'une clé en écriture (API-28). Une clé ne peut pas encore écrire, cela attend AM8 ;
+  - un invité restreint ne peut pas créer de clé, car la garde ferme `/accesses`.

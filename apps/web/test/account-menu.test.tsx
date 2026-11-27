@@ -130,10 +130,10 @@ describe("pied du menu", () => {
 });
 
 describe("onglets de « Ma ferme »", () => {
-  it("dans l'ordre : Identité, Équipe, Sites et cartes, Données IGN, Préférences", async () => {
+  it("dans l'ordre : Identité, Équipe, Sites et cartes, Données IGN, Accès externes, Préférences", async () => {
     renderApp(`/f/${FARM}/farm`);
     await screen.findByRole("tab", { name: "Identité", selected: true }, { timeout: 10_000 });
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Identité", "Équipe", "Sites et cartes", "Données IGN", "Préférences"]);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Identité", "Équipe", "Sites et cartes", "Données IGN", "Accès externes", "Préférences"]);
   });
 
   it("responsable : Préférences regroupe Entretien, Parcours et Marques ; un ancien lien y défile", async () => {

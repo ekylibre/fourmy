@@ -19,6 +19,7 @@ import { confirmAgrirouterInbox, runAgrirouterListener } from "./integrations/ag
 import { drainAgrirouterOutbox } from "./integrations/agrirouter-outbox.js";
 import { readAgrirouterInbox } from "./integrations/agrirouter-read.js";
 import { purgeExpiredImportFiles } from "./repos/file-imports.js";
+import { purgeAccessLog } from "./repos/accesses.js";
 import { ekylibreUploadsTick } from "./repos/ekylibre-uploads.js";
 import { agrifoodBaseFromEnv, refreshMarketPrices } from "./agrifood.js";
 
@@ -199,6 +200,15 @@ async function importFilesTick(): Promise<void> {
   if (r.files || r.runs) console.log(`[worker] imports : ${r.files} fichier(s) expiré(s) supprimé(s), ${r.runs} analyse(s) abandonnée(s)`);
 }
 
+let accessLogPurgedAt = 0;
+/** Journal des appels externes : plus de 90 jours, supprimé une fois par jour (lot AM4, Q6). */
+async function accessLogTick(): Promise<void> {
+  if (Date.now() - accessLogPurgedAt < IMPORT_PURGE_EVERY_MS) return;
+  accessLogPurgedAt = Date.now();
+  const n = await purgeAccessLog(db());
+  if (n) console.log(`[worker] accès externes : ${n} appel(s) de plus de 90 jours retiré(s) du journal`);
+}
+
 /**
  * Reprise d'Ekylibre déposée dans l'interface : restauration, migration,
  * nettoyage. Toutes les 15 s, hors de la boucle (une grosse sauvegarde se
@@ -223,6 +233,7 @@ async function tick(): Promise<void> {
     ["quota IGN", ignPurgeTick],
     ["agrirouter", agrirouterTick],
     ["fichiers d'import", importFilesTick],
+    ["journal des accès", accessLogTick],
   ] as const) {
     if (stopping) return;
     await job().catch((e) => console.warn(`[worker] ${name} : ${e instanceof Error ? e.message : e}`));

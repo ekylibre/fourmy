@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { bearer } from "better-auth/plugins/bearer";
+import { apiKey } from "@better-auth/api-key";
 import pg from "pg";
 
 /**
@@ -50,6 +51,24 @@ function trustedOrigins(): string[] {
 const snake = <K extends string>(...keys: K[]) =>
   Object.fromEntries(keys.map((k) => [k, k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)])) as Record<K, string>;
 
+/** Champs d'un plugin en snake_case (majuscules consécutives comprises : requirePKCE → require_pkce). */
+const snakeFields = (fields: Record<string, unknown>) =>
+  Object.fromEntries(Object.keys(fields).map((f) => [f, f.replace(/([a-z0-9])([A-Z]+)/g, (_m, a: string, b: string) => `${a}_${b.toLowerCase()}`)]));
+
+/**
+ * Clés d'API (lot AM4, claudedocs/essai_api_mcp.md §1) : préfixe `fmy_`,
+ * seul le haché est stocké ; ferme et droits dans `farm_accesses`. La limite
+ * de débit du plugin (10 requêtes par jour par défaut) est coupée : l'API
+ * compte elle-même par accès (external/rate-limit.ts).
+ */
+export const API_KEY_PREFIX = "fmy_";
+function apiKeys() {
+  const options = { defaultPrefix: API_KEY_PREFIX, enableMetadata: true, apiKeyHeaders: ["x-api-key"], rateLimit: { enabled: false } };
+  const probe = apiKey(options);
+  const schema = { apikey: { modelName: "auth_api_keys", fields: snakeFields(probe.schema.apikey.fields) } };
+  return apiKey({ ...options, schema } as typeof options);
+}
+
 function create() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL manquant");
@@ -90,15 +109,39 @@ function create() {
       minPasswordLength: 10,
     },
     trustedOrigins: trustedOrigins(),
-    plugins: [bearer({ requireSignature: true })],
+    plugins: [bearer({ requireSignature: true }), apiKeys()],
+    // Une clé refusée (fausse, expirée, désactivée) est un cas attendu : pas d'erreur au journal.
+    logger: {
+      log: (level, message, ...args) => {
+        if (/API key/i.test(message) && level === "error") return;
+        (level === "error" ? console.error : level === "warn" ? console.warn : console.log)(`[better-auth] ${message}`, ...args);
+      },
+    },
     telemetry: { enabled: false },
   });
 }
 
-let instance: ReturnType<typeof create> | null = null;
+/** Clé telle que le plugin la renvoie (création, vérification). */
+export type ApiKeyRecord = { id: string; referenceId: string; start: string | null; expiresAt: Date | string | null; enabled: boolean | null };
+
+/**
+ * Ce que l'API utilise de better-auth. Type écrit à la main : le type inféré
+ * avec les plugins dépasse ce que le compilateur sait écrire dans les
+ * déclarations (TS7056).
+ */
+export type FourmyAuth = {
+  handler: (request: Request) => Promise<Response>;
+  api: {
+    getSession(args: { headers: Headers }): Promise<{ user: { id: string; email: string; name: string | null } } | null>;
+    verifyApiKey(args: { body: { key: string } }): Promise<{ valid: boolean; key: ApiKeyRecord | null }>;
+    createApiKey(args: { body: { userId: string; name: string; expiresIn?: number | null; metadata?: Record<string, unknown> } }): Promise<ApiKeyRecord & { key: string }>;
+  };
+};
+
+let instance: FourmyAuth | null = null;
 
 /** Instance unique, créée au premier usage (les tests sans base n'en ont pas besoin). */
-export function getAuth() {
-  instance ??= create();
+export function getAuth(): FourmyAuth {
+  instance ??= create() as unknown as FourmyAuth;
   return instance;
 }

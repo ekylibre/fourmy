@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { DomainError } from "@fourmy/domain";
 import { ImportFileError } from "@fourmy/importers";
 import { auth, externalGuard, farmScope, type Env } from "./context.js";
+import { externalAudit } from "./external/audit.js";
 import { getAuth } from "./auth.js";
 import { contactRoutes } from "./contact.js";
 import { farmRoutes } from "./routes/farm.js";
@@ -38,7 +39,7 @@ export function createApp() {
   // Invitations (lot P3) : lues et acceptées par leur jeton, avant toute ferme.
   app.route("/api/v1/invitations", invitationRoutes);
   app.route("/api/v1/me", new Hono<Env>().use(auth).route("/", meRoutes));
-  app.route("/api/v1/farms/:farmId", new Hono<Env>().use(auth).use(farmScope).use(externalGuard).route("/", farmRoutes));
+  app.route("/api/v1/farms/:farmId", new Hono<Env>().use(auth).use(farmScope).use(externalAudit).use(externalGuard).route("/", farmRoutes));
 
   const problem = (status: number, title: string, detail?: string) =>
     new Response(JSON.stringify({ type: "about:blank", title, status, detail }), {
