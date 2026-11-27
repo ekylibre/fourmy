@@ -10,7 +10,18 @@ import { atOrNow, domainCtx, problem, uuidParam } from "./helpers.js";
 
 /** Snapshot, bâtiments, cuves et stocks (FR-TIME-1, FR-STK-1, US-3, US-9). */
 export const inventoryRoutes = new Hono<Env>()
-  .get("/snapshot", async (c) => c.json(await snapshotAt(db(), c.get("farmId"), atOrNow(c))))
+  .get("/snapshot", async (c) => {
+    const snap = await snapshotAt(db(), c.get("farmId"), atOrNow(c));
+    if (!c.get("external")) return c.json(snap);
+    // Accès restreint (lot AM3) : ouvert avec le parcellaire ; les autres modules seulement s'ils sont ouverts.
+    const m = c.get("grant").modules;
+    return c.json({
+      ...snap,
+      places: m.farm === "none" ? [] : snap.places,
+      containers: m.stocks === "none" ? [] : snap.containers,
+      equipments: m.equipments === "none" ? [] : snap.equipments,
+    });
+  })
   .get("/places", async (c) => {
     const items = await listPlacesAt(db(), c.get("farmId"), atOrNow(c));
     return c.json({ items, nextCursor: null });

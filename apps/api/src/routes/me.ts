@@ -3,7 +3,9 @@ import { bodyLimit } from "hono/body-limit";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { analyzeFile, IMPORT_FORMATS, MAX_FILE_BYTES } from "@fourmy/importers";
-import type { Env } from "../context.js";
+import { accessGrant } from "@fourmy/contracts";
+import { memberGrant } from "@fourmy/domain";
+import type { Env, Role } from "../context.js";
 import { db } from "../db.js";
 import { createFarm, NoFarmQuota } from "../repos/farms.js";
 import { BadRequest, problem } from "./helpers.js";
@@ -35,12 +37,18 @@ export const meRoutes = new Hono<Env>()
   .get("/farms", async (c) => {
     const { items, quota } = await db().transaction(async (tx) => {
       await tx.execute(sql`SET LOCAL ROLE fourmy_app`);
-      const items = (await tx.execute(sql`SELECT farm_id AS id, name, role, onboarding FROM fourmy_user_farms(${c.get("userId")})`)) as unknown as {
+      const rows = (await tx.execute(sql`SELECT farm_id AS id, name, role, onboarding, access_grant FROM fourmy_user_farms(${c.get("userId")})`)) as unknown as {
         id: string;
         name: string;
-        role: "owner" | "worker" | "reader";
+        role: Role;
         onboarding: { step?: string; completedAt?: string | null } | null;
+        access_grant: unknown;
       }[];
+      // Droits effectifs (lot AM3) : le web masque ce qu'ils n'ouvrent pas.
+      const items = rows.map(({ access_grant, ...f }) => {
+        const stored = f.role === "guest" ? accessGrant.safeParse(access_grant) : null;
+        return { ...f, grant: memberGrant(f.role, stored?.success ? stored.data : null) };
+      });
       const [u] = (await tx.execute(sql`SELECT farm_creation_quota AS quota FROM users WHERE id = ${c.get("userId")}`)) as unknown as { quota: number }[];
       return { items, quota: u?.quota ?? 0 };
     });

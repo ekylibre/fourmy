@@ -1,13 +1,17 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router";
+import type { AccessLevel, AccessModule } from "@fourmy/contracts";
 import { api } from "./api";
 
-export type Role = "owner" | "worker" | "reader";
+/** `guest` : invité restreint (conseiller…), droits par module et activité (lot AM3). */
+export type Role = "owner" | "worker" | "reader" | "guest";
 export interface MyFarm {
   id: string;
   name: string;
   role: Role;
+  /** Droits effectifs sur la ferme (GET /me/farms) : tous les modules sauf pour un invité restreint. */
+  grant?: { modules: Partial<Record<AccessModule, AccessLevel>>; activities: "all" | string[] };
   /** Assistant de premier démarrage (lot IM6) : étape en cours, ou fini ; null hors assistant. */
   onboarding?: { step?: string; completedAt?: string | null } | null;
 }
@@ -44,7 +48,17 @@ export function useFarmId(): string | null {
   return useContext(FarmContext)?.id ?? null;
 }
 
-/** Le compte peut-il saisir sur la ferme ? Non en lecture seule (l'API le refuse de toute façon). */
+/**
+ * Le compte peut-il saisir sur la ferme ? Non en lecture seule, ni pour un
+ * invité restreint, qui ne fait que consulter (l'API le refuse de toute façon).
+ */
 export function useCanWrite(): boolean {
-  return useFarm().role !== "reader";
+  const { role } = useFarm();
+  return role !== "reader" && role !== "guest";
+}
+
+/** Le module est-il ouvert au compte ? Toujours, sauf pour un invité restreint dont les droits le ferment. */
+export function moduleOpen(farm: MyFarm, module: AccessModule): boolean {
+  if (farm.role !== "guest") return true;
+  return (farm.grant?.modules[module] ?? "none") !== "none";
 }

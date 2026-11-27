@@ -6,7 +6,7 @@ import { Alert, Button, Center, Stack } from "@mantine/core";
 import { Layout } from "../components/Layout";
 import { Loading } from "../components/states";
 import { CellarPage } from "../features/cellar/CellarPage";
-import { DashboardPage } from "../features/dashboard/DashboardPage";
+import { FarmHome } from "../components/FarmHome";
 import { FarmsPage } from "../features/farms/FarmsPage";
 import { OnboardingFarmPage } from "../features/onboarding/OnboardingFarmPage";
 import { OnboardingPage } from "../features/onboarding/OnboardingPage";
@@ -198,7 +198,7 @@ const pages = [
     ),
     errorElement: <RouteError />,
     children: [
-      { index: true, element: <DashboardPage /> },
+      { index: true, element: <FarmHome /> },
       { path: "map", element: <Suspense fallback={<Loading />}><MapPage /></Suspense> },
       { path: "map/tools", element: <Suspense fallback={<Loading />}><CartoLabPage /></Suspense> },
       { path: "3d-plan", element: <MapBoundary what="la vue 3D"><Suspense fallback={<Loading />}><Plan3DPage /></Suspense></MapBoundary> },

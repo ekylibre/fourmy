@@ -3,8 +3,9 @@ import { useLocation, useNavigate } from "react-router";
 import { Alert, Button, CopyButton, Group, Modal, Paper, Select, Stack, Text, TextInput, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Copy, MailPlus, Trash2, UserMinus, X } from "lucide-react";
-import { MEMBER_ROLE_LABELS, type InvitationResult, type MemberRole, type PersonSheet } from "@fourmy/contracts";
+import { Copy, MailPlus, ShieldCheck, Trash2, UserMinus, X } from "lucide-react";
+import { MEMBER_ROLE_LABELS, type AccessGrant, type InvitationResult, type MemberRole, type PersonSheet } from "@fourmy/contracts";
+import { AccessGrantEditor, DEFAULT_GUEST_GRANT, grantUsable } from "./AccessGrantEditor";
 import { api, ApiError, farmPath } from "../../app/api";
 import { formatDateTime } from "../../app/labels";
 
@@ -21,14 +22,18 @@ export function AccountPanel({ farmId, sheet: s }: { farmId: string; sheet: Pers
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ["people", farmId] });
   const fail = (e: unknown) => notifications.show({ color: "brique", title: "Refusé", message: message(e) });
 
+  // Droits d'un invité restreint en cours de saisie (passage au rôle, ou modification).
+  const [grantDraft, setGrantDraft] = useState<AccessGrant | null>(null);
   const changeRole = useMutation({
-    mutationFn: (r: MemberRole) => api.patch(farmPath(farmId, `/people/${s.id}/account`), { role: r }),
+    mutationFn: (body: { role: MemberRole; grant?: AccessGrant }) => api.patch(farmPath(farmId, `/people/${s.id}/account`), body),
     onSuccess: () => {
-      notifications.show({ color: "lichen", message: "Rôle modifié." });
+      notifications.show({ color: "lichen", message: "Rôle et droits enregistrés." });
+      setGrantDraft(null);
       refresh();
     },
     onError: fail,
   });
+  const pickRole = (r: MemberRole) => (r === "guest" ? setGrantDraft(s.account.grant ?? DEFAULT_GUEST_GRANT) : changeRole.mutate({ role: r }));
   const remove = useMutation({
     mutationFn: () => api.delete(farmPath(farmId, `/people/${s.id}/account`)),
     onSuccess: () => {
@@ -46,10 +51,31 @@ export function AccountPanel({ farmId, sheet: s }: { farmId: string; sheet: Pers
       </Title>
       {s.account.status === "active" && s.account.role ? (
         <Stack gap="sm">
-          <Select label="Rôle sur la ferme" data={ROLE_OPTIONS} value={s.account.role} allowDeselect={false} onChange={(v) => v && changeRole.mutate(v as MemberRole)} />
+          <Select label="Rôle sur la ferme" data={ROLE_OPTIONS} value={s.account.role} allowDeselect={false} onChange={(v) => v && pickRole(v as MemberRole)} />
           <Text size="xs" c="dimmed">
-            Lecture seule : consulte la ferme et exporte les registres, sans rien saisir ni voir les coordonnées.
+            Lecture seule : consulte la ferme et exporte les registres, sans rien saisir ni voir les coordonnées. Invité restreint (conseiller, technicien) : consulte
+            seulement les modules et les activités que vous choisissez.
           </Text>
+          {s.account.role === "guest" && (
+            <Button variant="light" leftSection={<ShieldCheck size={16} />} w="fit-content" onClick={() => setGrantDraft(s.account.grant ?? DEFAULT_GUEST_GRANT)}>
+              Modifier les droits
+            </Button>
+          )}
+          <Modal opened={grantDraft !== null} onClose={() => setGrantDraft(null)} title={`Droits de ${s.name}`} size="lg">
+            {grantDraft && (
+              <Stack gap="md">
+                <AccessGrantEditor farmId={farmId} value={grantDraft} onChange={setGrantDraft} />
+                <Group justify="flex-end">
+                  <Button variant="default" onClick={() => setGrantDraft(null)}>
+                    Annuler
+                  </Button>
+                  <Button disabled={!grantUsable(grantDraft)} loading={changeRole.isPending} onClick={() => changeRole.mutate({ role: "guest", grant: grantDraft })}>
+                    Enregistrer
+                  </Button>
+                </Group>
+              </Stack>
+            )}
+          </Modal>
           <Button variant="subtle" color="brique" leftSection={<UserMinus size={16} />} onClick={() => setConfirm(true)} w="fit-content">
             Retirer l'accès
           </Button>
@@ -76,9 +102,11 @@ export function AccountPanel({ farmId, sheet: s }: { farmId: string; sheet: Pers
 function Invite({ farmId, sheet: s, onChange }: { farmId: string; sheet: PersonSheet; onChange: () => void }) {
   const [email, setEmail] = useState(s.invitation?.email ?? s.private?.email ?? "");
   const [role, setRole] = useState<MemberRole>(s.invitation?.role ?? "worker");
+  const [grant, setGrant] = useState<AccessGrant>(s.invitation?.grant ?? DEFAULT_GUEST_GRANT);
   const [result, setResult] = useState<InvitationResult | null>(null);
   const invite = useMutation({
-    mutationFn: () => api.post<InvitationResult>(farmPath(farmId, `/people/${s.id}/invitations`), { email: email.trim() || undefined, role }),
+    mutationFn: () =>
+      api.post<InvitationResult>(farmPath(farmId, `/people/${s.id}/invitations`), { email: email.trim() || undefined, role, ...(role === "guest" ? { grant } : {}) }),
     onSuccess: (r) => {
       setResult(r);
       notifications.show({ color: "lichen", message: r.sentByEmail ? `Invitation envoyée à ${r.email}.` : "Invitation créée : lien à transmettre." });
@@ -126,8 +154,14 @@ function Invite({ farmId, sheet: s, onChange }: { farmId: string; sheet: PersonS
       )}
       <TextInput label="Email" type="email" value={email} onChange={(e) => setEmail(e.currentTarget.value)} />
       <Select label="Rôle" data={ROLE_OPTIONS} value={role} allowDeselect={false} onChange={(v) => v && setRole(v as MemberRole)} />
+      {role === "guest" && <AccessGrantEditor farmId={farmId} value={grant} onChange={setGrant} />}
       <Group gap="xs">
-        <Button leftSection={<MailPlus size={16} />} disabled={!email.trim()} loading={invite.isPending} onClick={() => invite.mutate()}>
+        <Button
+          leftSection={<MailPlus size={16} />}
+          disabled={!email.trim() || (role === "guest" && !grantUsable(grant))}
+          loading={invite.isPending}
+          onClick={() => invite.mutate()}
+        >
           {s.invitation ? "Renvoyer une invitation" : "Inviter"}
         </Button>
         {s.invitation && (

@@ -4,6 +4,7 @@ import { withFarm, type Database, type Tx } from "@fourmy/db";
 import {
   certiphytoStatusAt,
   displayName,
+  type AccessGrant,
   type MemberRole,
   type PersonCard,
   type PersonPrivate,
@@ -13,7 +14,7 @@ import {
 import type { DomainCtx } from "@fourmy/domain";
 import { BadRequest, Conflict, NotFound } from "../routes/helpers.js";
 import { cardsWork } from "./people-work.js";
-import { openInvitation } from "./invitations.js";
+import { assertFarmActivities, openInvitation } from "./invitations.js";
 
 /**
  * Équipe et personnes, lot P1 (docs/equipe-personnes-design.md) : grille,
@@ -148,7 +149,13 @@ export async function personSheet(db: Database, farmId: string, id: string, at: 
       const [p] = await rows<PrivateRow>(tx, sql`SELECT * FROM person_private WHERE person_id = ${id}`);
       sheet.private = toPrivate(p);
     }
-    if (viewer.role === "owner") sheet.invitation = await openInvitation(tx, id);
+    if (viewer.role === "owner") {
+      sheet.invitation = await openInvitation(tx, id);
+      if (sheet.account.role === "guest") {
+        const [m] = await rows<{ access_grant: AccessGrant | null }>(tx, sql`SELECT m.access_grant FROM memberships m JOIN people p ON p.user_id = m.user_id WHERE p.id = ${id}`);
+        sheet.account = { ...sheet.account, grant: m?.access_grant ?? null };
+      }
+    }
     return sheet;
   });
 }
@@ -332,11 +339,14 @@ async function assertAnotherOwner(tx: Tx, userId: string) {
   if (!r || r.n === 0) throw new Conflict("La ferme doit garder au moins un responsable.");
 }
 
-export async function setAccountRole(db: Database, farmId: string, id: string, role: MemberRole): Promise<void> {
+export async function setAccountRole(db: Database, farmId: string, id: string, role: MemberRole, grant?: AccessGrant): Promise<void> {
   await withFarm(db, farmId, async (tx) => {
     const userId = await memberOf(tx, id);
     if (role !== "owner") await assertAnotherOwner(tx, userId);
-    await tx.execute(sql`UPDATE memberships SET role = ${role} WHERE user_id = ${userId}`);
+    if (grant) await assertFarmActivities(tx, grant);
+    // Invité restreint : ses droits ; autres rôles : aucun (contrainte memberships_grant_check).
+    await tx.execute(sql`UPDATE memberships SET role = ${role}, access_grant = ${role === "guest" && grant ? JSON.stringify(grant) : null}::jsonb
+                         WHERE user_id = ${userId}`);
   });
 }
 

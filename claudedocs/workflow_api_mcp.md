@@ -247,3 +247,26 @@ Chemin critique : AM0 → AM1 → AM2 → AM4 → AM5 → AM6. AM3 et AM7 peuven
 
   NF-3 (moins de 300 ms) est tenu.
 
+### AM3 — fait (27/11)
+- **Contrats** :
+  - `memberRole` accepte `guest`, avec le libellé « Invité restreint » ;
+  - `personInvite` et `personAccountWrite` exigent des droits si et seulement si le rôle est `guest` ;
+  - `personAccount.grant` et `invitation.grant` sont visibles du responsable seulement.
+- **Migration 0086** :
+  - `fourmy_accept_invitation` recopie `access_grant` dans l'appartenance ;
+  - `fourmy_user_farms` renvoie les droits.
+- **API** :
+  - l'invitation et le changement de rôle (`PATCH /people/:id/account`) prennent les droits, et refusent une activité qui n'est pas de la ferme ;
+  - `GET /me/farms` renvoie les droits effectifs (`grant`) de chaque ferme ;
+  - `/snapshot` et les tuiles IGN sont ouverts aux accès restreints, le snapshot étant réduit aux modules ouverts.
+- **Web** :
+  - l'éditeur de droits (`AccessGrantEditor`) propose aucun ou lecture par module, puis toutes les activités ou une liste ;
+  - il apparaît dans l'invitation et dans « Modifier les droits » sur la fiche ;
+  - le menu est filtré par module ;
+  - un invité n'a ni tableau de bord, ni plan 3D, ni « Ma ferme », et l'accueil le mène à sa première page ;
+  - `useCanWrite` est faux pour un invité.
+- **Tests** :
+  - API (3) : invitation « Vigne », acceptation, « Mes fermes », périmètre, snapshot réduit, droits élargis, retour au rôle lecteur, données privées cachées ;
+  - web (4) : menu, accueil, menu du compte, invitation avec droits ;
+  - deux tests de « Mes fermes » sont adaptés au nouveau champ `grant`.
+- **Pas fait** : le test e2e Playwright de l'invitation, laissé à la recette sur dev.fourmy.org.
