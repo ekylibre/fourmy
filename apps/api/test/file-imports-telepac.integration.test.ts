@@ -1,10 +1,28 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import postgres from "postgres";
 import { createApp } from "../src/app.js";
 import { pendingImports } from "../src/routes/imports.js";
 import { setupFarm, teardown } from "./helpers.js";
+
+/** Faux API Carto : une parcelle cadastrale partout, aucune parcelle RPG. */
+const carto = () => {
+  const calls: string[] = [];
+  const realFetch = globalThis.fetch;
+  const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
+    const u = input instanceof Request ? input.url : String(input);
+    if (!u.includes("apicarto")) return realFetch(input, init);
+    calls.push(u);
+    if (u.includes("/rpg/")) return Response.json({ type: "FeatureCollection", features: [] });
+    const square = { type: "MultiPolygon", coordinates: [[[[0.5, 44.8], [0.501, 44.8], [0.501, 44.801], [0.5, 44.801], [0.5, 44.8]]]] };
+    return Response.json({
+      type: "FeatureCollection",
+      features: [{ properties: { idu: "33001000AB0012", section: "AB", numero: "0012", nom_com: "Commune d'essai", code_insee: "33001", contenance: 5200 }, geometry: square }],
+    });
+  }) as typeof fetch;
+  return { fetchImpl, calls };
+};
 
 /**
  * Import TelePAC, lot IM3 : dossier PAC seul (la ferme naît du dossier), puis
@@ -48,7 +66,9 @@ describe.skipIf(!url)("import TelePAC (intégration)", () => {
 
   it("dossier PAC seul : identité, parcelles et cultures PAC, références, éléments du paysage", { timeout: 120_000 }, async () => {
     const farm = farms[0]!;
-    const { preview, done } = await importFile(farm, telepac, "Dossier-PAC-2026.xml");
+    const fake = carto();
+    vi.stubGlobal("fetch", fake.fetchImpl);
+    const { preview, done } = await importFile(farm, telepac, "Dossier-PAC-2026.xml").finally(() => vi.unstubAllGlobals());
     expect(preview.readable).toBe(true);
     expect(preview.farm.identity).toMatchObject({ siret: "40000000000003", pacage: "040000003", name: "GAEC PILOTE TEST" });
     expect(preview.notImported).toEqual([{ kind: "animals", label: "Animaux déclarés (AV)", count: 1000 }]);
@@ -74,6 +94,14 @@ describe.skipIf(!url)("import TelePAC (intégration)", () => {
       FROM land_parcels lp LEFT JOIN parcel_references r ON r.land_parcel_id = lp.id WHERE lp.farm_id = ${farm.farmId} GROUP BY 1`;
     expect(refs).toHaveLength(16);
     expect(refs.every((r) => r.cap >= 1 && r.islet >= 1)).toBe(true);
+    // Issue #165 : les parcelles créées reçoivent leurs références cadastrales après l'import,
+    // sans perdre celles du dossier PAC.
+    expect(fake.calls.some((u) => u.includes("/cadastre/"))).toBe(true);
+    const cadastre = await sql`
+      SELECT lp.id, count(r.*) FILTER (WHERE r.kind = 'cadastre')::int AS cadastre,
+             count(r.*) FILTER (WHERE r.attrs->>'source' = 'telepac')::int AS telepac
+      FROM land_parcels lp LEFT JOIN parcel_references r ON r.land_parcel_id = lp.id WHERE lp.farm_id = ${farm.farmId} GROUP BY 1`;
+    expect(cadastre.every((r) => r.cadastre === 1 && r.telepac >= 1)).toBe(true);
     // Certaines parcelles PAC (bandes tampons…) n'ont pas de surface admissible.
     const [code] = await sql`SELECT code, area_m2::float8 AS area FROM parcel_references WHERE farm_id = ${farm.farmId} AND kind = 'cap' AND code IS NOT NULL AND area_m2 IS NOT NULL LIMIT 1`;
     expect(code!.code).toMatch(/^[A-Z0-9]{3}$/);

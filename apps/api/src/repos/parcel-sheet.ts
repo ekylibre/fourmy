@@ -158,6 +158,37 @@ export async function refreshReferences(db: Database, farmId: string, parcelId: 
   return { cadastre: cadastre.length, cap: caps.length };
 }
 
+/**
+ * Références des parcelles créées par un import (issue #165) : comme à la
+ * création sur la carte, au mieux. Deux parcelles à la fois (chacune fait une
+ * dizaine d'appels à l'API Carto) ; une parcelle en échec n'arrête pas les
+ * autres et se rattrape par « Actualiser PAC et cadastre ». Ne lève jamais.
+ */
+export async function refreshImportedParcels(
+  db: Database,
+  farmId: string,
+  runId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ parcels: number; failed: number }> {
+  const ids = await withFarm(db, farmId, (tx) =>
+    rows<{ id: string }>(
+      tx,
+      sql`SELECT DISTINCT l.entity_id AS id FROM import_links l
+          WHERE l.run_id = ${runId} AND l.entity = 'land_parcel' AND l.created
+            AND EXISTS (SELECT 1 FROM land_parcel_versions v WHERE v.land_parcel_id = l.entity_id)`,
+    ),
+  ).catch(() => []);
+  let failed = 0;
+  const queue = ids.map((r) => r.id);
+  const worker = async () => {
+    for (let id = queue.shift(); id; id = queue.shift()) {
+      await refreshReferences(db, farmId, id, fetchImpl).catch(() => failed++);
+    }
+  };
+  await Promise.all([worker(), worker()]);
+  return { parcels: ids.length, failed };
+}
+
 /** Fiche d'une parcelle : forme et surface, activités par campagne, références, eau, interventions. */
 export async function parcelSheet(db: Database, farmId: string, parcelId: string): Promise<ParcelSheet> {
   return withFarm(db, farmId, async (tx) => {

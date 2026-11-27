@@ -7,6 +7,7 @@ import { analyzeFile, buildPreview, detectFormat, isBlocked, type FileAnalysis, 
 import { Conflict, NotFound } from "../routes/helpers.js";
 import { applyPlan } from "./import-apply.js";
 import { reconcile } from "./import-reconcile.js";
+import { refreshImportedParcels } from "./parcel-sheet.js";
 
 /**
  * Imports de fichiers DAPLOS, Geofolia, TelePAC
@@ -229,7 +230,9 @@ export async function purgeExpiredImportFiles(db: Database): Promise<{ files: nu
  * Écriture d'un import analysé (lot IM2) : contrôlé ici (fichier présent,
  * aucun avertissement bloquant, aucun autre import en cours), puis mené en
  * tâche de fond dans une seule transaction — rapprochement recalculé, puis
- * écriture. Réponse immédiate : l'import passe « en cours ».
+ * écriture. Réponse immédiate : l'import passe « en cours ». Une fois
+ * l'import terminé, les parcelles créées reçoivent leurs références cadastre
+ * et RPG (API Carto), comme une parcelle dessinée sur la carte.
  */
 export async function applyRun(
   db: Database,
@@ -270,15 +273,22 @@ export async function applyRun(
     const report = await applyPlan(tx, farmId, ctx, id, analysis.bundle!, plan);
     await tx.execute(sql`
       UPDATE import_runs SET status = 'completed', finished_at = now(), report = ${JSON.stringify(report)}::jsonb WHERE id = ${id}`);
-  }).catch(async (e: unknown) => {
-    console.error(`[imports] import ${id} en échec :`, e);
-    await withFarm(db, farmId, (tx) =>
-      tx.execute(sql`
-        UPDATE import_runs SET status = 'failed', finished_at = now(),
-          report = ${JSON.stringify({ error: e instanceof Error ? e.message : String(e) })}::jsonb
-        WHERE id = ${id}`),
-    );
-  });
+  }).then(
+    // Import terminé : références cadastre et RPG des parcelles créées, après coup (#165).
+    async () => {
+      const refs = await refreshImportedParcels(db, farmId, id);
+      if (refs.failed) console.warn(`[imports] import ${id} : références de ${refs.failed}/${refs.parcels} parcelles non rafraîchies (API Carto)`);
+    },
+    async (e: unknown) => {
+      console.error(`[imports] import ${id} en échec :`, e);
+      await withFarm(db, farmId, (tx) =>
+        tx.execute(sql`
+          UPDATE import_runs SET status = 'failed', finished_at = now(),
+            report = ${JSON.stringify({ error: e instanceof Error ? e.message : String(e) })}::jsonb
+          WHERE id = ${id}`),
+      );
+    },
+  );
   onSettled?.(job);
   return run;
 }

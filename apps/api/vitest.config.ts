@@ -28,5 +28,6 @@ export default defineConfig({
     hookTimeout: 60_000,
     env: { FOURMY_IGN_CACHE_DIR: ignCacheDir },
     globalSetup: ["./test/global-setup.ts"],
+    setupFiles: ["./test/no-carto.ts"],
   },
 });
