@@ -9,6 +9,7 @@ import { farmRoutes } from "./routes/farm.js";
 import { meRoutes } from "./routes/me.js";
 import { invitationRoutes } from "./routes/invitations.js";
 import { oauthRoutes } from "./routes/oauth.js";
+import { mcpHandler } from "./mcp/server.js";
 import { readPicture } from "./repos/activities.js";
 import { db } from "./db.js";
 import { BadRequest, NotFound, Conflict } from "./routes/helpers.js";
@@ -30,6 +31,9 @@ export function createApp() {
   app.on(["GET", "POST"], "/api/auth/*", (c) => getAuth().handler(c.req.raw));
   // Métadonnées OAuth à la racine du site (RFC 8414, RFC 9728) : servies par better-auth.
   app.get("/.well-known/*", (c) => getAuth().handler(c.req.raw));
+  // Serveur MCP (lot AM6) : ses outils appellent /api/v1 par cette même application.
+  const mcp = mcpHandler((request) => Promise.resolve(app.fetch(request)));
+  app.all("/mcp", (c) => mcp(c.req.raw));
 
   // Images du référentiel Lexicon (activités, variétés) : données publiques, sans session.
   app.get("/api/v1/lexicon/pictures/:domain/:name", async (c) => {

@@ -38,6 +38,20 @@ export function resetRateLimits() {
   lastUse.clear();
 }
 
+/**
+ * Appels internes d'un outil MCP (lot AM6) : l'outil appelle `/api/v1` avec
+ * le jeton de l'appelant et cet en-tête, dont la valeur secrète n'existe que
+ * dans ce processus (un client ne peut pas s'en servir). Seul l'appel
+ * principal d'un outil est compté et journalisé, sous le nom de l'outil.
+ */
+export const MCP_CALL_HEADER = "x-fourmy-mcp-call";
+const MCP_SECRET = crypto.randomUUID();
+export const mcpCallHeader = (tool: string, primary: boolean) => `${MCP_SECRET} ${primary ? 1 : 0} ${tool}`;
+function mcpCall(value: string | undefined): { tool: string; primary: boolean } | null {
+  const [secret, primary, tool] = value?.split(" ") ?? [];
+  return secret === MCP_SECRET && tool ? { tool, primary: primary === "1" } : null;
+}
+
 /** Écritures du journal en cours (attendues par les tests). */
 export const pendingLogs = new Set<Promise<unknown>>();
 
@@ -45,6 +59,9 @@ export const externalAudit: MiddlewareHandler<Env> = createMiddleware<Env>(async
   const p = c.get("principal");
   if (!c.get("external") || p.kind === "session" || !p.accessId) return next();
   const accessId = p.accessId;
+  const mcp = mcpCall(c.req.header(MCP_CALL_HEADER));
+  // Appel secondaire d'un outil (libellés, noms) : ni compté ni journalisé.
+  if (mcp && !mcp.primary) return next();
   const wait = consume(accessId);
   if (wait !== null) {
     return new Response(JSON.stringify({ type: "about:blank", title: "Trop de requêtes", status: 429, detail: `Limite de ${RATE_LIMITS.perMinute} appels par minute et ${RATE_LIMITS.perDay} par jour.` }), {
@@ -55,14 +72,16 @@ export const externalAudit: MiddlewareHandler<Env> = createMiddleware<Env>(async
   const t0 = performance.now();
   await next();
   const route = matchedRoutes(c).find((r) => r.method !== "ALL")?.path ?? c.req.path;
-  const operation = `${c.req.method} ${route.startsWith(FARM_PREFIX) ? route.slice(FARM_PREFIX.length) || "/" : route}`.slice(0, 200);
+  const rest = `${c.req.method} ${route.startsWith(FARM_PREFIX) ? route.slice(FARM_PREFIX.length) || "/" : route}`;
+  const operation = (mcp ? `${mcp.tool} (${rest})` : rest).slice(0, 200);
+  const channel = mcp ? "mcp" : "rest";
   const farmId = c.get("farmId");
   const now = Date.now();
   const touch = now - (lastUse.get(accessId) ?? 0) >= 60_000;
   if (touch) lastUse.set(accessId, now);
   const job = withFarm(db(), farmId, async (tx) => {
     await tx.execute(sql`INSERT INTO access_log (farm_id, access_id, user_id, channel, operation, status, duration_ms)
-                         VALUES (${farmId}, ${accessId}, ${p.userId}, 'rest', ${operation}, ${c.res.status}, ${Math.round(performance.now() - t0)})`);
+                         VALUES (${farmId}, ${accessId}, ${p.userId}, ${channel}, ${operation}, ${c.res.status}, ${Math.round(performance.now() - t0)})`);
     // Dernière utilisation : au plus une écriture par minute et par accès.
     if (touch) await tx.execute(sql`UPDATE farm_accesses SET last_used_at = now() WHERE id = ${accessId}`);
   }).catch((e: unknown) => console.error("[accès externes] journal :", e));

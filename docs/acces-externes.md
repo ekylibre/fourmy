@@ -1,6 +1,6 @@
 # Accès externes : clés d'API et applications
 
-*Lots AM4 et AM5 ([conception](../claudedocs/conception_api_mcp.md)). Pour l'exploitant et pour qui branche un logiciel sur Fourmy.*
+*Lots AM4, AM5 et AM6 ([conception](../claudedocs/conception_api_mcp.md)). Pour l'exploitant et pour qui branche un logiciel sur Fourmy.*
 
 Un logiciel peut lire les données d'une ferme sans le mot de passe de personne, de deux façons :
 
@@ -13,6 +13,36 @@ Dans les deux cas :
 - il ne peut **rien modifier** pour l'instant (les propositions à valider viendront plus tard) ;
 - il est **journalisé** (90 jours) et limité à 120 appels par minute et 10 000 par jour ;
 - il se **révoque** dans *Ma ferme → Accès externes*, avec effet immédiat.
+
+## Connecter un assistant IA (MCP)
+
+Fourmy est un serveur MCP (*Model Context Protocol*, Streamable HTTP) à l'adresse **`https://<fourmy>/mcp`**, affichée dans *Ma ferme → Accès externes*.
+
+1. Dans l'assistant (Claude, ChatGPT, Le Chat…), ajouter un connecteur MCP personnalisé avec cette adresse.
+2. L'assistant découvre seul le serveur d'autorisation (`/.well-known/oauth-protected-resource/mcp`) et ouvre Fourmy : connexion, choix de la ferme, consentement.
+3. Ses outils apparaissent ensuite, selon les modules ouverts.
+
+| Outil | Module | Ce qu'il donne |
+|---|---|---|
+| `fermes` | — | Fermes accessibles et ce que chacune ouvre |
+| `parcelles` | Parcellaire | Parcelles, surface, îlot PAC, activités ; recherche |
+| `fiche_parcelle` | Parcellaire | Surface, îlot, productions par campagne, points d'eau |
+| `interventions_periode` | Interventions | Interventions d'une période ; filtres parcelle, activité, type, statut |
+| `detail_intervention` | Interventions | Dates, parcelles, intrants et doses, récoltes, matériels, cibles |
+| `interventions_prevues` | Interventions | Interventions prévues à venir |
+| `registre_phyto` | Phytosanitaire | Registre d'une campagne : produit, AMM, dose |
+| `assolement` | Activités | Surface et parcelles de chaque activité pour une campagne |
+| `activites` | Activités | Activités, culture, surface |
+| `stock` | Stocks | Stock par article ; recherche par nom ou famille |
+| `materiels` | Matériels | Matériels, compteur, entretiens en retard ou bientôt dus |
+| `controles_certification` | Certifications | Contrôle HVE ou AB indicatif : verdict, points, écarts |
+
+- Tous les outils sont **en lecture** ; un outil d'un module fermé n'est pas proposé.
+- Réponses en français : un résumé, puis les données (surfaces en hectares, dates en heure de Paris, doses avec leur unité). Les listes vont par 50, avec un curseur pour la suite.
+- Avec plusieurs fermes consenties, le paramètre `ferme` (nom ou identifiant) choisit la ferme ; avec une seule, il est inutile.
+- Une intervention partagée avec des activités hors de l'accès est ramenée à sa part (surfaces et quantités) et signalée.
+- Chaque appel d'outil est une ligne du journal, au nom de l'outil (canal `mcp`), et compte dans la limite de débit.
+- Un script peut se connecter avec une clé d'API (`x-api-key` ou `Authorization: Bearer fmy_…`) au lieu d'OAuth.
 
 ## Clés d'API
 
