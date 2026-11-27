@@ -8,6 +8,7 @@ import { contactRoutes } from "./contact.js";
 import { farmRoutes } from "./routes/farm.js";
 import { meRoutes } from "./routes/me.js";
 import { invitationRoutes } from "./routes/invitations.js";
+import { oauthRoutes } from "./routes/oauth.js";
 import { readPicture } from "./repos/activities.js";
 import { db } from "./db.js";
 import { BadRequest, NotFound, Conflict } from "./routes/helpers.js";
@@ -25,8 +26,10 @@ export function createApp() {
   // Points d'entrée publics du site fourmy.org (sans session).
   app.route("/api/public", contactRoutes);
 
-  // Connexion, déconnexion, session (better-auth).
+  // Connexion, déconnexion, session (better-auth), et serveur d'autorisation OAuth (lot AM5).
   app.on(["GET", "POST"], "/api/auth/*", (c) => getAuth().handler(c.req.raw));
+  // Métadonnées OAuth à la racine du site (RFC 8414, RFC 9728) : servies par better-auth.
+  app.get("/.well-known/*", (c) => getAuth().handler(c.req.raw));
 
   // Images du référentiel Lexicon (activités, variétés) : données publiques, sans session.
   app.get("/api/v1/lexicon/pictures/:domain/:name", async (c) => {
@@ -39,6 +42,7 @@ export function createApp() {
   // Invitations (lot P3) : lues et acceptées par leur jeton, avant toute ferme.
   app.route("/api/v1/invitations", invitationRoutes);
   app.route("/api/v1/me", new Hono<Env>().use(auth).route("/", meRoutes));
+  app.route("/api/v1/oauth", new Hono<Env>().use(auth).route("/", oauthRoutes));
   app.route("/api/v1/farms/:farmId", new Hono<Env>().use(auth).use(farmScope).use(externalAudit).use(externalGuard).route("/", farmRoutes));
 
   const problem = (status: number, title: string, detail?: string) =>

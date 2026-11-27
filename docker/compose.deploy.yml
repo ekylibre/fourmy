@@ -58,6 +58,8 @@ services:
       # Recherche Sirene de l'INSEE (assistant : identité de la ferme) ; vide, saisie manuelle.
       SIRENE_API_KEY: ${SIRENE_API_KEY:-}
       SIRENE_API_URL: ${SIRENE_API_URL:-https://api.insee.fr/api-sirene/4}
+      # Applications OAuth déclarées d'avance (Aiffel, services maison) : JSON, voir docs/acces-externes.md.
+      FOURMY_OAUTH_CLIENTS: ${FOURMY_OAUTH_CLIENTS:-}
       # agrirouter (cartes de modulation vers les machines) : désactivé sans identifiants.
       AGRIROUTER_CLIENT_ID: ${AGRIROUTER_CLIENT_ID:-}
       AGRIROUTER_CLIENT_SECRET: ${AGRIROUTER_CLIENT_SECRET:-}

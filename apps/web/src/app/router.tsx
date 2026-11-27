@@ -32,6 +32,7 @@ import { ParcelCreatePage } from "../features/parcels/ParcelCreatePage";
 import { ParcelSheetPage } from "../features/parcels/ParcelSheetPage";
 import { LoginPage } from "../features/login/LoginPage";
 import { InvitationPage } from "../features/invitation/InvitationPage";
+import { OAuthConsentPage, OAuthFarmPage } from "../features/oauth/OAuthPages";
 import { RegisterPage } from "../features/register/RegisterPage";
 import { StockPage } from "../features/stock/StockPage";
 import { PersonSheetPage } from "../features/team/PersonSheetPage";
@@ -142,6 +143,9 @@ const pages = [
   { path: "/login", element: <LoginPage /> },
   // Invitation à rejoindre une ferme (lot P3) : publique, avant connexion.
   { path: "/invitation/:token", element: <InvitationPage /> },
+  // Autorisation d'une application OAuth (lot AM5) : ferme, puis consentement.
+  { path: "/oauth/ferme", element: <RequireAuth><OAuthFarmPage /></RequireAuth> },
+  { path: "/oauth/consentement", element: <RequireAuth><OAuthConsentPage /></RequireAuth> },
   { path: "/farms", element: <RequireAuth><FarmsPage /></RequireAuth> },
   // Assistant de premier démarrage (lot IM6) : création de la ferme, puis étapes dans la ferme, sans le menu.
   { path: "/onboarding", element: <RequireAuth><OnboardingFarmPage /></RequireAuth> },

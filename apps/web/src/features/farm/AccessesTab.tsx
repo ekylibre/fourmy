@@ -53,7 +53,7 @@ export function AccessesTab() {
   const revoke = useMutation({
     mutationFn: (id: string) => api.delete(farmPath(farm.id, `/accesses/${id}`)),
     onSuccess: () => {
-      notifications.show({ color: "lichen", message: "Clé révoquée : elle est refusée dès maintenant." });
+      notifications.show({ color: "lichen", message: "Accès révoqué : il est refusé dès maintenant." });
       setRevoking(null);
       refresh();
     },
@@ -63,7 +63,8 @@ export function AccessesTab() {
   return (
     <Stack gap="md" maw={1100}>
       <Text size="sm" c="dimmed">
-        Une clé d'API permet à un script ou à un logiciel (comptabilité, outil d'un conseiller) de lire les données de la ferme, sans votre mot de passe. Elle
+        Une clé d'API permet à un script ou à un logiciel (comptabilité, outil d'un conseiller) de lire les données de la ferme, sans votre mot de passe. Une
+        application (assistant IA, service connecté) s'autorise elle-même : vous choisissez alors ce qu'elle voit sur l'écran de consentement. Un accès
         n'ouvre que les modules et les activités choisis, jamais plus que vos propres droits, et ne peut rien modifier.
         {farm.role !== "owner" && " Vous voyez ici vos propres clés."}
       </Text>
@@ -79,7 +80,7 @@ export function AccessesTab() {
         </Text>
       )}
       {!!list.data?.items.length && (
-        <Table striped highlightOnHover aria-label="Clés d'API">
+        <Table striped highlightOnHover aria-label="Accès externes">
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Nom</Table.Th>
@@ -95,7 +96,14 @@ export function AccessesTab() {
           <Table.Tbody>
             {list.data.items.map((a) => (
               <Table.Tr key={a.id}>
-                <Table.Td>{a.name}</Table.Td>
+                <Table.Td>
+                  <Group gap={6} wrap="nowrap">
+                    {a.name}
+                    <Badge size="xs" variant="light" color={a.kind === "oauth" ? "lichen" : "ardoise"}>
+                      {a.kind === "oauth" ? "Application" : "Clé"}
+                    </Badge>
+                  </Group>
+                </Table.Td>
                 <Table.Td>
                   <Text size="xs">{grantSummary(a.grant)}</Text>
                 </Table.Td>
@@ -162,8 +170,12 @@ export function AccessesTab() {
           </Stack>
         )}
       </Modal>
-      <Modal opened={revoking !== null} onClose={() => setRevoking(null)} title="Révoquer la clé">
-        <Text size="sm">La clé « {revoking?.name} » sera refusée dès maintenant. Les logiciels qui l'utilisent n'auront plus accès à la ferme.</Text>
+      <Modal opened={revoking !== null} onClose={() => setRevoking(null)} title={revoking?.kind === "oauth" ? "Retirer l'accès de l'application" : "Révoquer la clé"}>
+        <Text size="sm">
+          {revoking?.kind === "oauth"
+            ? `L'application « ${revoking.name} » n'aura plus accès à la ferme, dès maintenant. Pour la reconnecter, il faudra l'autoriser à nouveau.`
+            : `La clé « ${revoking?.name ?? ""} » sera refusée dès maintenant. Les logiciels qui l'utilisent n'auront plus accès à la ferme.`}
+        </Text>
         <Group justify="flex-end" mt="md">
           <Button variant="default" onClick={() => setRevoking(null)}>
             Annuler

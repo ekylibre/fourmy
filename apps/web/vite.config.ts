@@ -34,6 +34,13 @@ function versionJson(): Plugin {
   return { name: "fourmy-version-json", configureServer: serve, configurePreviewServer: serve };
 }
 
+const API_TARGET = process.env.FOURMY_API_URL ?? "http://localhost:3000";
+// /api, et la racine OAuth et MCP (lots AM5, AM6) : relayés vers l'API.
+const API_PROXY = {
+  "/api": { target: API_TARGET, changeOrigin: true },
+  "^/\\.well-known/oauth-": { target: API_TARGET, changeOrigin: true },
+  "^/mcp$": { target: API_TARGET, changeOrigin: true },
+};
 // En dev, /api est relayé vers l'API Fourmy (apps/api, port 3000).
 export default defineConfig({
   plugins: [react(), versionJson()],
@@ -49,11 +56,11 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    proxy: { "/api": { target: process.env.FOURMY_API_URL ?? "http://localhost:3000", changeOrigin: true } },
+    proxy: API_PROXY,
   },
   preview: {
     port: 4173,
-    proxy: { "/api": { target: process.env.FOURMY_API_URL ?? "http://localhost:3000", changeOrigin: true } },
+    proxy: API_PROXY,
   },
   test: {
     environment: "jsdom",
