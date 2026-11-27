@@ -104,3 +104,31 @@ export const accessLogEntry = z.object({
   durationMs: z.number().int().nullable(),
 });
 export type AccessLogEntry = z.infer<typeof accessLogEntry>;
+
+/** Demande d'autorisation OAuth en cours (GET /api/v1/oauth/request, lot AM5). */
+export const oauthRequest = z.object({
+  client: z.object({ id: z.string(), name: z.string(), uri: z.string().nullable(), icon: z.string().nullable() }),
+  /** Écriture demandée (scope `fourmy:write`) ; sinon lecture seulement. */
+  write: z.boolean(),
+  /** Fermes de l'utilisateur, avec ses propres droits (plafond du consentement). */
+  farms: z.array(z.object({ id: z.uuid(), name: z.string(), role: z.enum(["owner", "worker", "reader", "guest"]), grant: accessGrant })),
+  /** Ferme choisie (étape « ferme ») et droits déjà consentis sur elle, s'il y en a. */
+  farmId: z.uuid().nullable(),
+  current: accessGrant.nullable(),
+});
+export type OAuthRequest = z.infer<typeof oauthRequest>;
+
+/** Choix de la ferme (POST /api/v1/oauth/farm). */
+export const oauthFarmChoice = z.object({ farmId: z.uuid(), oauthQuery: z.string().min(1).max(8000) });
+export type OAuthFarmChoice = z.infer<typeof oauthFarmChoice>;
+
+/** Réponse au consentement (POST /api/v1/oauth/consent). */
+export const oauthConsent = z.discriminatedUnion("accept", [
+  z.object({ accept: z.literal(true), grant: accessGrant, oauthQuery: z.string().min(1).max(8000) }),
+  z.object({ accept: z.literal(false), oauthQuery: z.string().min(1).max(8000) }),
+]);
+export type OAuthConsent = z.infer<typeof oauthConsent>;
+
+/** Suite du parcours : l'adresse où envoyer le navigateur. */
+export const oauthNext = z.object({ url: z.string() });
+export type OAuthNext = z.infer<typeof oauthNext>;

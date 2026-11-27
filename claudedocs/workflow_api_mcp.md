@@ -301,3 +301,32 @@ Chemin critique : AM0 → AM1 → AM2 → AM4 → AM5 → AM6. AM3 et AM7 peuven
 - **Pas fait** :
   - l'e-mail à la création d'une clé en écriture (API-28). Une clé ne peut pas encore écrire, cela attend AM8 ;
   - un invité restreint ne peut pas créer de clé, car la garde ferme `/accesses`.
+
+### AM5 — fait (27/11)
+- **Migration 0088** : les tables des plugins `jwt` et oauth-provider (`auth_jwks`, `auth_oauth_*`, 8 tables), d'après le SQL produit par `getMigrations` puis relu, et `auth_sessions.active_farm_id`.
+- **Authentification** (`auth.ts`) :
+  - les plugins `jwt` (émetteur `…/api/auth`), `mcp` (oauth-provider lié à la ressource `/mcp`) et `cimd` (profil MCP 2026-07-28, lecture du document du client par `@better-auth/cimd/node` : HTTPS, adresses publiques seulement, sans redirection) ;
+  - deux ressources protégées : `/mcp` et `/api/v1` ;
+  - enregistrement dynamique ouvert, lecture seule par défaut, jeton d'1 h, rafraîchissement ;
+  - `postLogin` : la ferme se choisit **à chaque autorisation** (`/oauth/ferme`), devient la référence du consentement et revient dans le jeton (`fourmy_farm`).
+- **Contexte** (`context.ts`, `external/oauth.ts`) : un `Bearer` au format JWT est vérifié localement avec `jose` (clés lues en base, relues sur une clé inconnue ; émetteur ; audience `/mcp` ou `/api/v1`). Il donne un principal `oauth`. `farmScope` cherche le consentement de cet utilisateur à cette application sur la ferme visée (`farm_accesses`) : droits = membre ∩ consentement, et lecture seule sans `fourmy:write`.
+- **Consentement** (`routes/oauth.ts`, `repos/oauth.ts`) :
+  - `GET /api/v1/oauth/request`, `POST /api/v1/oauth/farm` et `POST /api/v1/oauth/consent`, réservés à une session ;
+  - les points du plugin (`continue`, `consent`) sont appelés par son gestionnaire HTTP, car un appel direct échoue (« request not found ») ;
+  - les droits consentis sont plafonnés par ceux de l'utilisateur et ramenés à la lecture (pas d'écriture avant AM8) ;
+  - si le plugin refuse le consentement, l'accès tout juste créé est supprimé ;
+  - un e-mail part aux responsables de la ferme à la première connexion d'une application (API-28).
+- **Révocation** : retirer une application dans « Accès externes » efface aussi son consentement et ses jetons de rafraîchissement. Le jeton d'accès en cours est refusé dès l'appel suivant, et une nouvelle autorisation repasse par le consentement.
+- **Applications déclarées** (`FOURMY_OAUTH_CLIENTS`, JSON) : enregistrées au démarrage de l'API (secret haché comme le plugin), reliées aux deux ressources.
+- **Routage** : `/.well-known/oauth-*` et `/mcp` vont à l'API (nginx, proxy Vite).
+- **Web** :
+  - la page de connexion reprend l'autorisation après la connexion ;
+  - `/oauth/ferme` (choisie d'office s'il n'y a qu'une ferme), puis `/oauth/consentement` (application, ferme, éditeur de droits, « Autoriser » ou « Refuser ») ;
+  - « Accès externes » distingue les clés et les applications.
+- **Tests** :
+  - API (9) : métadonnées ; parcours complet avec PKCE, consentement réduit, appel limité, autre ferme refusée et rafraîchissement ; connexion puis reprise ; jeton altéré ; révocation ; invité plafonné ; refus ; requête altérée ; applications déclarées ;
+  - web (4) : choix de la ferme et consentement, refus, demande invalide, reprise après connexion.
+  - Suites complètes : API 479 tests, web 287.
+- **Pas fait** :
+  - les jetons opaques (une application qui ne demande aucune ressource) ne sont pas acceptés par l'API : elle doit demander la ressource `/api/v1` ou `/mcp` ;
+  - « Mes accès » (la liste de ses propres applications, toutes fermes confondues) : elles restent visibles et révocables ferme par ferme dans « Accès externes ».

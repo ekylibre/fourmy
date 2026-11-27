@@ -52,7 +52,7 @@ const toView = (r: AccessRow): FarmAccess => ({
 });
 
 /** Droits enregistrés : les modules ouverts seulement. */
-const toStored = (g: EffectiveGrant): AccessGrant => ({
+export const toStored = (g: EffectiveGrant): AccessGrant => ({
   modules: Object.fromEntries(accessModules.filter((m) => g.modules[m] !== "none").map((m) => [m, g.modules[m]])),
   activities: g.activities,
 });
@@ -66,7 +66,7 @@ async function memberCap(tx: Tx, userId: string): Promise<EffectiveGrant | null>
 }
 
 /** Plafonne et vérifie des droits demandés (activités de la ferme, au moins un module). */
-async function capped(tx: Tx, userId: string, requested: AccessGrant) {
+export async function capped(tx: Tx, userId: string, requested: AccessGrant) {
   await assertFarmActivities(tx, requested);
   const cap = await memberCap(tx, userId);
   if (!cap) throw new BadRequest("L'auteur de cet accès n'est plus membre de la ferme.");
@@ -125,16 +125,26 @@ export async function updateAccess(db: Database, farmId: string, viewer: Viewer,
 
 /** Révoque un accès : refusé dès la requête suivante ; la clé est aussi désactivée. */
 export async function revokeAccess(db: Database, farmId: string, viewer: Viewer, id: string): Promise<void> {
-  const keyId = await withFarm(db, farmId, async (tx) => {
+  const { keyId, oauth } = await withFarm(db, farmId, async (tx) => {
     const r = await readOne(tx, viewer, id);
-    const [a] = await rows<{ api_key_id: string | null }>(
+    const [a] = await rows<{ api_key_id: string | null; oauth_client_id: string | null; user_id: string }>(
       tx,
-      sql`UPDATE farm_accesses SET revoked_at = coalesce(revoked_at, now()) WHERE id = ${r.id} RETURNING api_key_id`,
+      sql`UPDATE farm_accesses SET revoked_at = coalesce(revoked_at, now()) WHERE id = ${r.id} RETURNING api_key_id, oauth_client_id, user_id`,
     );
-    return a?.api_key_id ?? null;
+    return { keyId: a?.api_key_id ?? null, oauth: a?.oauth_client_id ? { clientId: a.oauth_client_id, userId: a.user_id } : null };
   });
-  // Table du plugin, hors RLS (rôle de connexion).
+  // Application OAuth : son consentement sur cette ferme et ses jetons de rafraîchissement tombent ;
+  // une nouvelle autorisation repassera par l'écran de consentement.
+  if (oauth) await forgetOAuthConsent(db, farmId, oauth.clientId, oauth.userId);
+  // Tables des plugins, hors RLS (rôle de connexion).
   if (keyId) await db.execute(sql`UPDATE auth_api_keys SET enabled = false, updated_at = now() WHERE id = ${keyId}`);
+}
+
+/** Efface le consentement OAuth d'un utilisateur à une application pour une ferme (tables du plugin). */
+export async function forgetOAuthConsent(db: Database, farmId: string, clientId: string, userId: string): Promise<void> {
+  await db.execute(sql`DELETE FROM auth_oauth_consents WHERE client_id = ${clientId} AND user_id = ${userId}::uuid AND reference_id = ${farmId}`);
+  await db.execute(sql`UPDATE auth_oauth_refresh_tokens SET revoked = now()
+                       WHERE client_id = ${clientId} AND user_id = ${userId}::uuid AND reference_id = ${farmId} AND revoked IS NULL`);
 }
 
 /** Journal des appels d'un accès, du plus récent au plus ancien (90 jours). */

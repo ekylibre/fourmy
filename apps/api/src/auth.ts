@@ -1,6 +1,10 @@
-import { betterAuth } from "better-auth";
+import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { bearer } from "better-auth/plugins/bearer";
+import { jwt } from "better-auth/plugins/jwt";
 import { apiKey } from "@better-auth/api-key";
+import { mcp } from "@better-auth/mcp";
+import { cimd } from "@better-auth/cimd";
+import { fetchClientMetadataResource } from "@better-auth/cimd/node";
 import pg from "pg";
 
 /**
@@ -69,13 +73,87 @@ function apiKeys() {
   return apiKey({ ...options, schema } as typeof options);
 }
 
-function create() {
+/**
+ * Adresse publique de Fourmy (web et API sur la même origine, docker/nginx.conf).
+ * L'émetteur des jetons OAuth et les ressources protégées en dépendent.
+ */
+export function publicOrigin(): string {
+  return (process.env.BETTER_AUTH_URL ?? "http://localhost:3000").replace(/\/$/, "");
+}
+/** Ressources protégées (RFC 8707) : le serveur MCP (AM6) et l'API REST. */
+export const mcpResource = () => `${publicOrigin()}/mcp`;
+export const apiResource = () => `${publicOrigin()}/api/v1`;
+export const oauthIssuer = () => `${publicOrigin()}/api/auth`;
+export const OAUTH_SCOPES = { read: "fourmy:read", write: "fourmy:write" } as const;
+
+/** Tables des plugins OAuth, à nos noms (claudedocs/essai_api_mcp.md §1). */
+const OAUTH_TABLES: Record<string, string> = {
+  jwks: "auth_jwks",
+  oauthClient: "auth_oauth_clients",
+  oauthResource: "auth_oauth_resources",
+  oauthClientResource: "auth_oauth_client_resources",
+  oauthRefreshToken: "auth_oauth_refresh_tokens",
+  oauthAccessToken: "auth_oauth_access_tokens",
+  oauthConsent: "auth_oauth_consents",
+  oauthClientAssertion: "auth_oauth_client_assertions",
+};
+type PluginWithSchema = { schema?: Record<string, { fields: Record<string, unknown> }> };
+function tables(plugin: PluginWithSchema) {
+  const out: Record<string, { modelName: string; fields: Record<string, string> }> = {};
+  for (const [model, t] of Object.entries(plugin.schema ?? {})) {
+    const modelName = OAUTH_TABLES[model];
+    if (modelName) out[model] = { modelName, fields: snakeFields(t.fields) };
+  }
+  return out;
+}
+
+/**
+ * Serveur d'autorisation OAuth (lot AM5, conception_api_mcp.md §7.1) :
+ * code avec PKCE, rafraîchissement, enregistrement dynamique et CIMD. Les
+ * scopes restent grossiers (lecture, écriture) ; la ferme se choisit après la
+ * connexion (`/oauth/ferme`, étape postLogin) et devient la référence du
+ * consentement ; modules et activités se choisissent au consentement
+ * (`/oauth/consentement`) et vivent dans `farm_accesses`.
+ */
+function oauthPlugins() {
+  const options = {
+    loginPage: "/login",
+    consentPage: "/oauth/consentement",
+    resource: mcpResource(),
+    resources: [{ identifier: apiResource(), name: "API Fourmy" }],
+    clientRegistrationDefaultResources: [apiResource()],
+    allowDynamicClientRegistration: true,
+    allowUnauthenticatedClientRegistration: true,
+    scopes: ["openid", "profile", "email", "offline_access", OAUTH_SCOPES.read, OAUTH_SCOPES.write],
+    // Un client enregistré n'obtient que ce qu'il demande, lecture par défaut (essai AM0 §2).
+    clientRegistrationDefaultScopes: [OAUTH_SCOPES.read, "offline_access"],
+    clientRegistrationAllowedScopes: [OAUTH_SCOPES.read, OAUTH_SCOPES.write, "offline_access", "openid", "profile", "email"],
+    accessTokenExpiresIn: 3600,
+    postLogin: {
+      page: "/oauth/ferme",
+      consentReferenceId: ({ session }: { session: Record<string, unknown> }) => (session.activeFarmId as string | null | undefined) ?? undefined,
+      // La ferme se choisit à chaque autorisation (une autre ferme = un autre consentement).
+      shouldRedirect: ({ session, isContinuation }: { session: Record<string, unknown>; isContinuation: boolean }) => !isContinuation || !session.activeFarmId,
+    },
+    customAccessTokenClaims: ({ referenceId }: { referenceId?: string }) => ({ fourmy_farm: referenceId ?? null }),
+  };
+  const jwtProbe = jwt() as PluginWithSchema;
+  const mcpProbe = mcp(options as never) as unknown as PluginWithSchema;
+  return [
+    jwt({ schema: tables(jwtProbe), jwt: { issuer: oauthIssuer() }, disableSettingJwtHeader: true } as never),
+    mcp({ ...options, schema: tables(mcpProbe) } as never),
+    // CIMD : Fourmy lit le document du client ; HTTPS, adresses publiques seulement, sans suivre de redirection.
+    cimd({ fetchClientMetadataResource, metadataProfile: "mcp-2026-07-28" } as never),
+  ];
+}
+
+function options() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL manquant");
-  return betterAuth({
+  return {
     appName: "Fourmy",
     basePath: "/api/auth",
-    baseURL: process.env.BETTER_AUTH_URL,
+    baseURL: publicOrigin(),
     secret: secret(),
     database: new pg.Pool({ connectionString: url, max: 5 }),
     // Tables et colonnes Fourmy (snake_case, identifiants UUID générés par Postgres).
@@ -83,6 +161,8 @@ function create() {
     session: {
       modelName: "auth_sessions",
       fields: snake("userId", "expiresAt", "ipAddress", "userAgent", "createdAt", "updatedAt"),
+      // Ferme choisie pendant une autorisation OAuth (référence du consentement, lot AM5).
+      additionalFields: { activeFarmId: { type: "string", required: false, input: false, fieldName: "active_farm_id" } },
     },
     account: {
       modelName: "auth_accounts",
@@ -109,7 +189,7 @@ function create() {
       minPasswordLength: 10,
     },
     trustedOrigins: trustedOrigins(),
-    plugins: [bearer({ requireSignature: true }), apiKeys()],
+    plugins: [bearer({ requireSignature: true }), apiKeys(), ...oauthPlugins()],
     // Une clé refusée (fausse, expirée, désactivée) est un cas attendu : pas d'erreur au journal.
     logger: {
       log: (level, message, ...args) => {
@@ -118,7 +198,14 @@ function create() {
       },
     },
     telemetry: { enabled: false },
-  });
+  } satisfies BetterAuthOptions;
+}
+
+/** Options complètes (génération du SQL des plugins : `getMigrations`). */
+export const authOptionsForMigration = (): BetterAuthOptions => options();
+
+function create() {
+  return betterAuth(options());
 }
 
 /** Clé telle que le plugin la renvoie (création, vérification). */
@@ -132,7 +219,8 @@ export type ApiKeyRecord = { id: string; referenceId: string; start: string | nu
 export type FourmyAuth = {
   handler: (request: Request) => Promise<Response>;
   api: {
-    getSession(args: { headers: Headers }): Promise<{ user: { id: string; email: string; name: string | null } } | null>;
+    getSession(args: { headers: Headers }): Promise<{ user: { id: string; email: string; name: string | null }; session: { id: string; activeFarmId?: string | null } } | null>;
+    getJwks(): Promise<{ keys: Record<string, unknown>[] }>;
     verifyApiKey(args: { body: { key: string } }): Promise<{ valid: boolean; key: ApiKeyRecord | null }>;
     createApiKey(args: { body: { userId: string; name: string; expiresIn?: number | null; metadata?: Record<string, unknown> } }): Promise<ApiKeyRecord & { key: string }>;
   };

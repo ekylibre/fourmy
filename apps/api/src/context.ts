@@ -3,27 +3,31 @@ import { createMiddleware } from "hono/factory";
 import { matchedRoutes } from "hono/route";
 import { sql } from "drizzle-orm";
 import { runWithActivityScope, withFarm } from "@fourmy/db";
-import { ACCESS_MODULE_LABELS, accessGrant } from "@fourmy/contracts";
+import { ACCESS_MODULE_LABELS, accessGrant, accessModules } from "@fourmy/contracts";
 import { intersectGrants, isEmptyGrant, levelAllows, memberGrant, normalizeGrant, type EffectiveGrant } from "@fourmy/domain";
 import { openRoute } from "./external/routes.js";
 import { db } from "./db.js";
-import { API_KEY_PREFIX, getAuth } from "./auth.js";
+import { API_KEY_PREFIX, getAuth, OAUTH_SCOPES } from "./auth.js";
+import { looksLikeJwt, verifyOAuthToken } from "./external/oauth.js";
 
 export type Role = "owner" | "worker" | "reader" | "guest";
 
 /**
  * Qui appelle (conception_api_mcp.md §3.3) : une session (web, mobile), ou
- * une clé d'API (lot AM4) ; les jetons OAuth (AM5) viendront s'y ajouter.
- * `accessId` : l'accès externe de la ferme, posé par `farmScope`.
+ * une clé d'API (lot AM4) ou un jeton OAuth (lot AM5). `accessId` : l'accès
+ * externe de la ferme, posé par `farmScope`.
  */
 export type Principal =
   | { kind: "session"; userId: string; accessId: null; clientId: null }
-  | { kind: "api_key"; userId: string; apiKeyId: string; accessId: string | null; clientId: null };
+  | { kind: "api_key"; userId: string; apiKeyId: string; accessId: string | null; clientId: null }
+  | { kind: "oauth"; userId: string; clientId: string; scopes: string[]; accessId: string | null };
 
 /** Variables de contexte posées par les middlewares et lues par les routes. */
 export type Env = {
   Variables: {
     userId: string;
+    /** Session better-auth (web, mobile) ; absente pour une clé ou un jeton OAuth. */
+    sessionId: string | null;
     user: { id: string; email: string; name: string | null };
     farmId: string;
     role: Role;
@@ -61,8 +65,22 @@ export const auth: MiddlewareHandler<Env> = createMiddleware<Env>(async (c, next
     const [u] = (await db().execute(sql`SELECT id, email, name FROM users WHERE id = ${v.key.referenceId}::uuid`)) as unknown as { id: string; email: string; name: string | null }[];
     if (!u) return deny(401, "Unauthorized", "Clé d'API invalide, expirée ou révoquée.");
     c.set("userId", u.id);
+    c.set("sessionId", null);
     c.set("user", { id: u.id, email: u.email, name: u.name || null });
     c.set("principal", { kind: "api_key", userId: u.id, apiKeyId: v.key.id, accessId: null, clientId: null });
+    return next();
+  }
+  // Jeton d'accès OAuth (lot AM5) : un JWT signé par Fourmy, pour /api/v1 ou /mcp.
+  if (bearer && looksLikeJwt(bearer)) {
+    const t = await verifyOAuthToken(bearer);
+    if (!t) return deny(401, "Unauthorized", "Jeton OAuth invalide ou expiré.");
+    if (!/^\/api\/v1\/farms\/[^/]+\//.test(c.req.path)) return deny(403, "Accès refusé", "Un jeton OAuth n'ouvre que les routes des fermes consenties.");
+    const [u] = (await db().execute(sql`SELECT id, email, name FROM users WHERE id = ${t.userId}::uuid`)) as unknown as { id: string; email: string; name: string | null }[];
+    if (!u) return deny(401, "Unauthorized", "Jeton OAuth invalide ou expiré.");
+    c.set("userId", u.id);
+    c.set("sessionId", null);
+    c.set("user", { id: u.id, email: u.email, name: u.name || null });
+    c.set("principal", { kind: "oauth", userId: u.id, clientId: t.clientId, scopes: [...t.scopes], accessId: null });
     return next();
   }
   // Ni cookie ni jeton : inutile d'interroger la base.
@@ -71,6 +89,7 @@ export const auth: MiddlewareHandler<Env> = createMiddleware<Env>(async (c, next
   if (!session) return deny(401, "Unauthorized", "Connexion requise.");
   const { id, email, name } = session.user;
   c.set("userId", id);
+  c.set("sessionId", session.session.id);
   c.set("user", { id, email, name: name || null });
   await next();
 });
@@ -102,6 +121,18 @@ export const farmScope: MiddlewareHandler<Env> = createMiddleware<Env>(async (c,
     if (!a || !keyGrant?.success) return deny(403, "Accès refusé", "Cette clé d'API n'ouvre pas cette ferme.");
     grant = intersectGrants(grant, normalizeGrant(keyGrant.data));
     c.set("principal", { ...principal, accessId: a.id });
+  } else if (principal.kind === "oauth") {
+    // Jeton OAuth : le consentement de cet utilisateur à cette application, pour cette ferme (§7.1).
+    const [a] = (await withFarm(db(), farmId, (tx) =>
+      tx.execute(sql`SELECT id, access_grant FROM farm_accesses
+                     WHERE kind = 'oauth' AND oauth_client_id = ${principal.clientId} AND user_id = ${principal.userId} AND revoked_at IS NULL`),
+    )) as unknown as { id: string; access_grant: unknown }[];
+    const consented = a ? accessGrant.safeParse(a.access_grant) : null;
+    if (!a || !consented?.success) return deny(403, "Accès refusé", "Cette application n'a pas été autorisée sur cette ferme.");
+    grant = intersectGrants(grant, normalizeGrant(consented.data));
+    // Sans le scope d'écriture, la lecture seulement, quel que soit le consentement.
+    if (!principal.scopes.includes(OAUTH_SCOPES.write)) grant = intersectGrants(grant, READ_ONLY);
+    c.set("principal", { ...principal, accessId: a.id });
   } else {
     c.set("principal", principal);
   }
@@ -125,6 +156,8 @@ export const farmScope: MiddlewareHandler<Env> = createMiddleware<Env>(async (c,
 });
 
 const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+/** Plafond « lecture partout » (jeton sans `fourmy:write`). */
+const READ_ONLY: EffectiveGrant = { modules: Object.fromEntries(accessModules.map((m) => [m, "read"])) as EffectiveGrant["modules"], activities: "all" };
 const OWN_PROFILE_RE = /\/people\/[0-9a-f-]{36}(\/photo)?$/i;
 const OWN_ACCESS_RE = /\/accesses(\/[0-9a-f-]{36})?$/i;
 

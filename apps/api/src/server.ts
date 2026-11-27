@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { sql } from "drizzle-orm";
 import { createApp } from "./app.js";
 import { db } from "./db.js";
+import { syncDeclaredClients } from "./external/declared-clients.js";
 
 const port = Number(process.env.PORT ?? 3000);
 serve({ fetch: createApp().fetch, port }, (info) =>
@@ -23,3 +24,8 @@ db()
     }
   })
   .catch((e: unknown) => console.warn(`⚠ Référentiel Lexicon : vérification impossible (${e instanceof Error ? e.message : String(e)}).`));
+
+// Applications OAuth déclarées d'avance (FOURMY_OAUTH_CLIENTS, lot AM5).
+syncDeclaredClients(db())
+  .then((n) => n && console.log(`Applications OAuth déclarées : ${n}.`))
+  .catch((e: unknown) => console.error(`⚠ FOURMY_OAUTH_CLIENTS : ${e instanceof Error ? e.message : String(e)}`));
