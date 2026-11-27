@@ -55,6 +55,13 @@ x-api-key: fmy_…
 
 `Authorization: Bearer fmy_…` est accepté aussi. Une clé n'ouvre que sa ferme.
 
+## Documentation de l'API (OpenAPI)
+
+- **`GET /api/v1/openapi.json`** : document OpenAPI 3.1, public, généré à partir de la liste des routes ouvertes (`apps/api/src/external/routes.ts`). Il décrit chaque route accessible avec une clé ou un jeton, et seulement celles-là : chemin, paramètres, schéma de réponse, module (`x-fourmy-module`) et sécurité (`apiKey`, `oauth2`).
+- **Page `/developpeurs`** : authentification (clé, OAuth, MCP), un premier appel `curl`, et la référence par module, avec un filtre. *Accès externes* y renvoie avec l'identifiant de la ferme (`?ferme=…`), qui remplit les exemples.
+- **Schémas de réponse** (`packages/contracts/src/responses/`, un fichier par module) : tirés des types TypeScript des routes. Le test `apps/api/test/openapi.integration.test.ts` fait passer les réponses réelles d'une ferme importée (jeu Geofolia anonymisé) par leur schéma : une route qui change de forme fait échouer le test.
+- **Ajouter une route ouverte** : une ligne dans `OPEN_ROUTES`, avec son schéma de réponse (export de `@fourmy/contracts/responses`) et ses paramètres de requête.
+
 ## Applications (OAuth 2.1)
 
 Fourmy est un serveur d'autorisation OAuth 2.1 : code d'autorisation avec **PKCE obligatoire**, jetons d'accès d'une heure, jetons de rafraîchissement.
