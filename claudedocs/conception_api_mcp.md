@@ -152,6 +152,8 @@ CREATE TABLE external_proposals ( ... );
 - `withFarm` pose en plus `fourmy.activity_scope` : la liste des uuid des activités autorisées, ou une chaîne vide pour « toutes ». La valeur vient des droits effectifs, posés par `farmScope`, et passe par un `AsyncLocalStorage` pour ne pas modifier les quelque 300 appels à `withFarm`.
 - Fonction `current_activity_scope() RETURNS uuid[]` : elle vaut `NULL` quand il n'y a pas de scope. C'est le cas du web habituel, où chaque policy se réduit alors à `NULL IS NULL`.
 - Les policies **restrictives** (`AS RESTRICTIVE`) s'ajoutent aux policies par ferme. Elles ne peuvent que retirer des lignes.
+- **En lecture seulement** (`FOR SELECT`, réalisé en AM2). Les écritures d'un accès restreint sont refusées par la garde ; les caches écrits pendant une lecture (trajets OSRM, indices) restent possibles.
+- **Calcul par ensemble** (réalisé en AM2). Les policies appellent `fourmy_scope_parcels()` et `fourmy_scope_targets()`, des fonctions `SECURITY DEFINER` qui renvoient les parcelles et les couples (intervention, parcelle) visibles. Elles le font en sous-requête non corrélée (`id IN (SELECT …)`), que PostgreSQL ne calcule qu'une fois par requête. Une fonction appelée à chaque ligne faisait passer le registre phyto de 45 ms à 900 ms sur la ferme de l'exploitant testeur.
 
 ```sql
 CREATE POLICY activity_scope ON productions AS RESTRICTIVE FOR SELECT
@@ -180,7 +182,11 @@ CREATE POLICY activity_scope ON productions AS RESTRICTIVE FOR SELECT
 - La RLS cache les cibles hors scope. Les **intrants** et les **totaux** de l'intervention restent pourtant ceux de l'intervention entière. La route `GET /interventions/:id`, et la liste, appliquent donc un **prorata** quand un scope est posé.
 - La fonction `SECURITY DEFINER` `fourmy_intervention_scope_share(intervention_id)` renvoie la part visible : surface travaillée des cibles visibles divisée par la surface travaillée totale. Elle **ne renvoie que ce nombre**, rien des cibles cachées.
 - Le repo multiplie les quantités d'intrants par cette part et ajoute `shared: true` à la réponse, affiché « intervention partagée avec d'autres cultures ».
-- L'IFT reste celui de l'intervention : c'est une dose par hectare, que le prorata ne change pas. `compliance` est renvoyé sans le détail des parcelles cachées.
+- L'IFT reste celui de l'intervention : c'est une dose par hectare, que le prorata ne change pas.
+- Les contrôles d'une intervention partagée sont réduits (réalisé en AM2) :
+  - les indicateurs phyto qui peuvent citer une parcelle (ZNT, délai avant récolte, rentrée) gardent leur niveau, mais leur message est remplacé par « Détail non disponible : intervention partagée avec d'autres cultures » ;
+  - les contrôles nitrates et HVE/AB, calculés parcelle par parcelle, sont retirés.
+- La fonction `fourmy_input_applicators`, appelée à chaque ligne du registre phyto, devient `SECURITY DEFINER`, bornée à la ferme courante.
 
 ### 5.4 Ce qui reste du ressort des repos
 

@@ -85,14 +85,12 @@ describe.skipIf(!url)("garde des accès restreints (intégration)", () => {
     expect(await guardDenied(post)).toBe("404");
   });
 
-  it("invité sans module, ou limité à des activités (avant AM2) : refusé", async () => {
+  it("invité sans module : refusé ; limité à des activités : admis (périmètre AM2)", async () => {
     const none = await addGuest(sql, farm.farmId, { modules: {}, activities: "all" });
     const scoped = await addGuest(sql, farm.farmId, { modules: allRead, activities: [ID] });
     users.push(none.userId, scoped.userId);
-    expect((await get(none.headers, "/interventions")).status).toBe(403);
-    const res = await get(scoped.headers, "/interventions");
-    expect(res.status).toBe(403);
-    expect((await res.json()).detail).toContain("pas encore disponibles");
+    expect((await get(none.headers, "/interventions?campaign=2026")).status).toBe(403);
+    expect((await get(scoped.headers, "/interventions?campaign=2026")).status).toBe(200);
   });
 
   it("owner, worker et reader : rien ne change", async () => {
