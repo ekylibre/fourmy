@@ -5,6 +5,7 @@ import { inventoryRoutes } from "./inventory.js";
 import { registerRoutes } from "./registers.js";
 import { trackRoutes } from "./tracks.js";
 import { interventionRoutes } from "./interventions.js";
+import { proposalRoutes } from "./proposals.js";
 import { syncRoutes } from "./sync.js";
 import { importRoutes } from "./imports.js";
 import { articleRoutes } from "./articles.js";
@@ -59,6 +60,7 @@ export const farmRoutes = new Hono<Env>()
   .route("/", registerRoutes)
   .route("/", trackRoutes)
   .route("/", interventionRoutes)
+  .route("/", proposalRoutes)
   .route("/", crewTemplateRoutes)
   .route("/", syncRoutes)
   .route("/", importRoutes)

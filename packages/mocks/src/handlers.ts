@@ -107,6 +107,8 @@ export const handlers = [
     return HttpResponse.json({ enabled: false, from: u.searchParams.get("from"), to: u.searchParams.get("to"), items: [] });
   }),
   http.get(`*${base}/integrations`, () => HttpResponse.json({ providers: INTEGRATION_PROVIDERS, items: [] })),
+  // Propositions des accès externes (lot AM8) : aucune en attente par défaut.
+  http.get(`*${base}/proposals`, () => HttpResponse.json({ items: [], pending: 0 })),
   // « Ma ferme » (lot F1) : siège sans point, aucune certification ; les écritures renvoient ce qu'elles reçoivent.
   http.get(`*${base}/farm`, () => HttpResponse.json(demoFarmProfile())),
   http.get(`*${base}/settings/maintenance`, () => HttpResponse.json({ soonHours: 50, soonMonths: 1, notify: [] })),

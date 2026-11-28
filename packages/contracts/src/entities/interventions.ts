@@ -21,7 +21,7 @@ export type InterventionStatus = z.infer<typeof interventionStatus>;
 export const interventionDisplayStatus = z.enum(["planned", "in_progress", "done", "cancelled"]);
 export type InterventionDisplayStatus = z.infer<typeof interventionDisplayStatus>;
 
-export const interventionOrigin = z.enum(["web", "mobile", "migration", "plugin", "import"]);
+export const interventionOrigin = z.enum(["web", "mobile", "migration", "plugin", "import", "api", "mcp"]);
 
 /** Rôle d'une ligne de paramètre en base (stockage) ; l'API expose la forme structurée. */
 export const parameterRole = z.enum(["target", "input", "output", "tool", "doer"]);
@@ -261,6 +261,12 @@ const interventionBody = z.object({
    * fichier de la boîte de réception passe « validé » à l'enregistrement.
    */
   agrirouterInbox: z.object({ id: uuid, task: z.number().int().min(0).max(999) }).optional(),
+  /**
+   * Proposition d'un accès externe acceptée par cet enregistrement (lot AM8) :
+   * elle passe « acceptée », l'intervention prend son origine (`api`, `mcp`).
+   * Réservé au responsable de la ferme.
+   */
+  proposal: uuid.optional(),
 });
 
 /** Planification (POST /interventions). `id` client → idempotent. */

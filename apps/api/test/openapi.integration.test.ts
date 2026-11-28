@@ -20,7 +20,7 @@ const url = process.env.DATABASE_URL;
 const app = createApp();
 const fixture = readFileSync(join(import.meta.dirname, "..", "..", "..", "packages", "importers", "test", "fixtures", "geofolia-pilote.zip"));
 
-type Doc = { openapi: string; paths: Record<string, { get: Record<string, unknown> }> };
+type Doc = { openapi: string; paths: Record<string, Record<string, Record<string, unknown>>> };
 const openApiPath = (p: string) => `/farms/{farmId}${p.replace(/:([a-zA-Z]+)/g, "{$1}")}`;
 
 describe("document OpenAPI", () => {
@@ -34,9 +34,9 @@ describe("document OpenAPI", () => {
   });
 
   it("décrit chaque route ouverte, et seulement elles", () => {
-    expect(Object.keys(doc.paths).sort()).toEqual(OPEN_ROUTES.map((r) => openApiPath(r.path)).sort());
+    expect(Object.keys(doc.paths).sort()).toEqual([...new Set(OPEN_ROUTES.map((r) => openApiPath(r.path)))].sort());
     for (const r of OPEN_ROUTES) {
-      const op = doc.paths[openApiPath(r.path)]!.get;
+      const op = doc.paths[openApiPath(r.path)]![r.method.toLowerCase()];
       expect(op["x-fourmy-module"], r.path).toBe(r.module);
       expect(op.summary, r.path).toBe(r.summary);
     }
@@ -47,7 +47,7 @@ describe("document OpenAPI", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("access-control-allow-origin")).toBe("*");
     const body = (await res.json()) as Doc;
-    expect(Object.keys(body.paths)).toHaveLength(OPEN_ROUTES.length);
+    expect(Object.keys(body.paths)).toHaveLength(new Set(OPEN_ROUTES.map((r) => r.path)).size);
   });
 });
 
@@ -115,7 +115,7 @@ describe.skipIf(!url)("conformité des réponses (intégration)", () => {
     const failures: string[] = [];
     const checked = new Set<string>();
     for (const r of OPEN_ROUTES) {
-      if (!r.response) continue;
+      if (!r.response || r.method !== "GET") continue;
       const concrete: string[] = [];
       if (r.path.includes(":id")) for (const id of ids[owner(r.path)!] ?? []) concrete.push(r.path.replace(":id", id));
       else if (r.path === "/control/:kind") concrete.push("/control/hve", "/control/ab");

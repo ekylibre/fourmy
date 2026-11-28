@@ -1,5 +1,5 @@
 import { Checkbox, Radio, SegmentedControl, Stack, Table, Text } from "@mantine/core";
-import { ACCESS_MODULE_LABELS, accessModules, type AccessGrant, type AccessLevel } from "@fourmy/contracts";
+import { ACCESS_MODULE_LABELS, accessModules, WRITABLE_MODULES, type AccessGrant, type AccessLevel } from "@fourmy/contracts";
 import { useActivities } from "../../app/queries";
 
 /** Droits de départ d'un invité restreint : la carte, les activités et les interventions, en lecture. */
@@ -11,10 +11,22 @@ export const grantUsable = (g: AccessGrant) =>
 
 /**
  * Éditeur de droits d'un accès restreint (lot AM3, conception_api_mcp.md §9) :
- * un niveau par module, puis toutes les activités ou une liste. Lot AM3 :
- * aucun ou lecture ; « lecture et propositions » viendra avec les propositions (AM8).
+ * un niveau par module, puis toutes les activités ou une liste. Aucun ou
+ * lecture ; avec `writable`, « lecture et propositions » sur les modules qui
+ * en reçoivent (Interventions, lot AM8) : l'accès propose, le responsable valide.
  */
-export function AccessGrantEditor({ farmId, value, onChange }: { farmId: string; value: AccessGrant; onChange: (g: AccessGrant) => void }) {
+export function AccessGrantEditor({
+  farmId,
+  value,
+  onChange,
+  writable = false,
+}: {
+  farmId: string;
+  value: AccessGrant;
+  onChange: (g: AccessGrant) => void;
+  /** Propose « Lecture et propositions » (clé d'API, application qui demande l'écriture). */
+  writable?: boolean;
+}) {
   const activities = useActivities(farmId, new Date().getFullYear());
   const setLevel = (m: (typeof accessModules)[number], level: AccessLevel) => onChange({ ...value, modules: { ...value.modules, [m]: level } });
   const chosen = value.activities === "all" ? [] : value.activities;
@@ -31,11 +43,12 @@ export function AccessGrantEditor({ farmId, value, onChange }: { farmId: string;
                 <SegmentedControl
                   size="xs"
                   aria-label={`Accès au module ${ACCESS_MODULE_LABELS[m]}`}
-                  value={value.modules[m] === "read" || value.modules[m] === "write" ? "read" : "none"}
+                  value={levelShown(value.modules[m], writable && WRITABLE_MODULES.includes(m))}
                   onChange={(v) => setLevel(m, v as AccessLevel)}
                   data={[
                     { value: "none", label: "Aucun" },
                     { value: "read", label: "Lecture" },
+                    ...(writable && WRITABLE_MODULES.includes(m) ? [{ value: "write", label: "Lecture et propositions" }] : []),
                   ]}
                 />
               </Table.Td>
@@ -68,9 +81,21 @@ export function AccessGrantEditor({ farmId, value, onChange }: { farmId: string;
           </Stack>
         </Checkbox.Group>
       )}
+      {writable && (
+        <Text size="xs" c="dimmed">
+          « Lecture et propositions » : l'accès peut proposer des interventions. Rien n'est enregistré sans la validation du responsable de la ferme, dans
+          « À valider ».
+        </Text>
+      )}
       <Text size="xs" c="dimmed">
         Un invité restreint consulte seulement : il ne saisit rien et ne voit ni les coordonnées des personnes, ni les réglages de la ferme.
       </Text>
     </Stack>
   );
+}
+
+/** Niveau affiché : l'écriture ne se montre que là où elle est proposée. */
+function levelShown(level: AccessLevel | undefined, writable: boolean): AccessLevel {
+  if (level === "write") return writable ? "write" : "read";
+  return level === "read" ? "read" : "none";
 }

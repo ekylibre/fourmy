@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { interventionPlanWrite, interventionCompleteWrite, interventionUpdateWrite } from "@fourmy/contracts";
 import type { Env } from "../context.js";
@@ -13,6 +13,10 @@ import {
   campaignWindow,
 } from "../repos/interventions.js";
 import { BadRequest, domainCtx, problem, uuidParam, window } from "./helpers.js";
+
+/** Accepter une proposition en enregistrant l'intervention : le responsable seulement (B9). */
+const proposalDenied = (c: Context<Env>, body: { proposal?: string }) =>
+  body.proposal && c.get("role") !== "owner" ? problem(c, 403, "Accès refusé", "Seul le responsable de la ferme accepte une proposition.") : null;
 
 const cancelWrite = z.object({ reason: z.string().trim().min(3, "Motif d'annulation requis.") });
 
@@ -43,6 +47,8 @@ export const interventionRoutes = new Hono<Env>()
   .post("/interventions", async (c) => {
     const parsed = interventionPlanWrite.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.message);
+    const denied = proposalDenied(c, parsed.data);
+    if (denied) return denied;
     const { intervention, created, warnings } = await planIntervention(db(), c.get("farmId"), domainCtx(c), parsed.data);
     // Alertes non bloquantes (cultures qui se recoupent…) à côté de l'intervention.
     return c.json({ ...intervention, warnings }, created ? 201 : 200);
@@ -56,6 +62,8 @@ export const interventionRoutes = new Hono<Env>()
   .post("/interventions/:id/complete", async (c) => {
     const parsed = interventionCompleteWrite.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return problem(c, 400, "Corps invalide", parsed.error.message);
+    const denied = proposalDenied(c, parsed.data);
+    if (denied) return denied;
     return c.json(await completeIntervention(db(), c.get("farmId"), domainCtx(c), uuidParam(c, "id"), parsed.data));
   })
   .post("/interventions/:id/cancel", async (c) => {

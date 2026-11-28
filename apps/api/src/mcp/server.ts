@@ -10,6 +10,7 @@ import { db } from "../db.js";
 import { FarmApi, ToolError, type Fetch, type McpFarm } from "./client.js";
 import { fold } from "./format.js";
 import { TOOLS, type ToolDef } from "./tools.js";
+import { PROPOSAL_TOOLS } from "./proposal-tools.js";
 
 /**
  * Serveur MCP de Fourmy (lot AM6, conception_api_mcp.md §7.2) : Streamable
@@ -27,7 +28,8 @@ function challenge(error?: "invalid_token") {
     status: 401,
     headers: {
       "content-type": "application/json",
-      "www-authenticate": `Bearer resource_metadata="${meta}", scope="${OAUTH_SCOPES.read}"${error ? `, error="${error}"` : ""}`,
+      // Portée d'écriture demandée aussi : l'utilisateur choisit au consentement d'ouvrir ou non les propositions (lot AM8).
+      "www-authenticate": `Bearer resource_metadata="${meta}", scope="${OAUTH_SCOPES.read} ${OAUTH_SCOPES.write}"${error ? `, error="${error}"` : ""}`,
     },
   });
 }
@@ -107,21 +109,22 @@ function buildServer(fetch: Fetch, credentials: Headers, farms: McpFarm[]) {
     },
   );
 
-  const available = (t: ToolDef) => farms.some((f) => opened(f).includes(t.module));
-  for (const tool of TOOLS.filter(available)) {
+  const allows = (f: McpFarm, t: ToolDef) => (t.level === "write" ? f.grant.modules[t.module] === "write" : opened(f).includes(t.module));
+  const available = (t: ToolDef) => farms.some((f) => allows(f, t));
+  for (const tool of [...TOOLS, ...PROPOSAL_TOOLS].filter(available)) {
     server.registerTool(
       tool.name,
       {
         title: tool.title,
         description: `${tool.description} Module : ${ACCESS_MODULE_LABELS[tool.module]}.`,
         inputSchema: { ...tool.input, ferme },
-        annotations: { readOnlyHint: true, openWorldHint: false },
+        annotations: tool.level === "write" ? { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false } : { readOnlyHint: true, openWorldHint: false },
       },
       async (args: Record<string, unknown>) => {
         try {
           const farm = pickFarm(farms, args.ferme);
-          if (!opened(farm).includes(tool.module)) {
-            throw new ToolError(`Cet accès n'ouvre pas le module « ${ACCESS_MODULE_LABELS[tool.module]} » sur la ferme ${farm.name}.`);
+          if (!allows(farm, tool)) {
+            throw new ToolError(`Cet accès n'ouvre pas le module « ${ACCESS_MODULE_LABELS[tool.module]} »${tool.level === "write" ? " en écriture" : ""} sur la ferme ${farm.name}.`);
           }
           const r = await tool.run(new FarmApi(fetch, credentials, tool.name, farm), args);
           const head = farms.length > 1 ? `[${farm.name}] ` : "";

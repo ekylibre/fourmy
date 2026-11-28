@@ -20,6 +20,7 @@ import { drainAgrirouterOutbox } from "./integrations/agrirouter-outbox.js";
 import { readAgrirouterInbox } from "./integrations/agrirouter-read.js";
 import { purgeExpiredImportFiles } from "./repos/file-imports.js";
 import { purgeAccessLog } from "./repos/accesses.js";
+import { expireProposals } from "./repos/proposals.js";
 import { ekylibreUploadsTick } from "./repos/ekylibre-uploads.js";
 import { agrifoodBaseFromEnv, refreshMarketPrices } from "./agrifood.js";
 
@@ -207,6 +208,9 @@ async function accessLogTick(): Promise<void> {
   accessLogPurgedAt = Date.now();
   const n = await purgeAccessLog(db());
   if (n) console.log(`[worker] accès externes : ${n} appel(s) de plus de 90 jours retiré(s) du journal`);
+  // Propositions (lot AM8, API-23c) : expirées après 90 jours sans suite, effacées 90 jours après un refus ou l'expiration.
+  const p = await expireProposals(db());
+  if (p.expired || p.purged) console.log(`[worker] propositions : ${p.expired} expirée(s), ${p.purged} effacée(s)`);
 }
 
 /**

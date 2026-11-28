@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { withFarm, type Database } from "@fourmy/db";
-import { accessGrant, ACCESS_MODULE_LABELS, accessModules, type AccessGrant, type OAuthRequest } from "@fourmy/contracts";
+import { accessGrant, ACCESS_MODULE_LABELS, accessModules, grantWrites, writableOnly, type AccessGrant, type OAuthRequest } from "@fourmy/contracts";
 import { memberGrant, type MemberRole } from "@fourmy/domain";
 import type { Transporter } from "nodemailer";
 import { OAUTH_SCOPES } from "../auth.js";
@@ -92,16 +92,15 @@ export async function recordOAuthConsent(db: Database, s: Session, oauthQuery: s
   const app = await client(db, clientId);
   const farmId = await activeFarm(db, s);
   if (!farmId) throw new BadRequest("Choisissez d'abord la ferme.");
-  // Pas d'écriture tant que les propositions n'existent pas (lot AM8) : lecture au plus.
-  const readOnly: AccessGrant = {
-    modules: Object.fromEntries(Object.entries(requested.modules).map(([m, l]) => [m, l === "write" ? "read" : l])),
-    activities: requested.activities,
-  };
+  // Écriture (lot AM8) : seulement là où l'on dépose des propositions (Interventions),
+  // et seulement si l'application a demandé la portée d'écriture.
+  const writes = parseQuery(oauthQuery).scopes.includes(OAUTH_SCOPES.write);
+  const allowed = writableOnly(writes ? requested : { ...requested, modules: Object.fromEntries(Object.entries(requested.modules).map(([m, l]) => [m, l === "write" ? "read" : l])) });
   return withFarm(db, farmId, async (tx) => {
-    const { grant } = await capped(tx, s.userId, readOnly);
+    const { grant } = await capped(tx, s.userId, allowed);
     const stored = JSON.stringify(toStored(grant));
-    const [existing] = (await tx.execute(sql`SELECT id FROM farm_accesses
-      WHERE kind = 'oauth' AND oauth_client_id = ${clientId} AND user_id = ${s.userId} AND revoked_at IS NULL`)) as unknown as { id: string }[];
+    const [existing] = (await tx.execute(sql`SELECT id, access_grant FROM farm_accesses
+      WHERE kind = 'oauth' AND oauth_client_id = ${clientId} AND user_id = ${s.userId} AND revoked_at IS NULL`)) as unknown as { id: string; access_grant: AccessGrant }[];
     let created: string | null = null;
     if (existing) {
       await tx.execute(sql`UPDATE farm_accesses SET access_grant = ${stored}::jsonb, name = ${app.name} WHERE id = ${existing.id}`);
@@ -113,7 +112,10 @@ export async function recordOAuthConsent(db: Database, s: Session, oauthQuery: s
     const [row] = (await tx.execute(sql`SELECT count(*)::int AS n FROM farm_accesses WHERE kind = 'oauth' AND oauth_client_id = ${clientId}`)) as unknown as {
       n: number;
     }[];
-    return { farmId, app, grant: toStored(grant), created, first: row?.n === 1 && !existing };
+    const g = toStored(grant);
+    // Écriture nouvelle pour cette application (API-28) : les responsables sont prévenus.
+    const newWrite = grantWrites(g) && !(existing && grantWrites(existing.access_grant));
+    return { farmId, app, grant: g, created, first: row?.n === 1 && !existing, newWrite };
   });
 }
 
@@ -129,40 +131,69 @@ export async function clearOAuthFarm(db: Database, s: Session): Promise<void> {
 
 /**
  * Prévient les responsables de la ferme à la première connexion d'une
- * application (API-28). Sans serveur d'envoi configuré, rien ne part.
+ * application (API-28).
  */
 export async function notifyOwnersOfNewApp(
   db: Database,
   mailer: Transporter | null,
   input: { farmId: string; appName: string; grant: AccessGrant; userName: string; appUrl: string },
 ): Promise<number> {
+  const modules = accessModules.filter((m) => input.grant.modules[m] && input.grant.modules[m] !== "none").map((m) => ACCESS_MODULE_LABELS[m]);
+  const writes = grantWrites(input.grant);
+  return mailOwners(db, mailer, input.farmId, (farm) => ({
+    subject: `Fourmy · nouvelle application connectée à ${farm}`,
+    text: [
+      "Bonjour,",
+      "",
+      `${input.userName} vient d'autoriser l'application « ${input.appName} » à consulter la ferme « ${farm} » sur Fourmy${writes ? " et à y proposer des interventions" : ""}.`,
+      `Modules ouverts : ${modules.join(", ") || "aucun"} ; ${input.grant.activities === "all" ? "toutes les activités" : `${input.grant.activities.length} activité(s)`}.`,
+      ...(writes ? ["Ses propositions n'écrivent rien : elles attendent votre validation dans « À valider »."] : []),
+      "",
+      "Vous pouvez voir ses appels ou lui retirer l'accès dans Ma ferme → Accès externes :",
+      `${input.appUrl}/f/${input.farmId}/farm?tab=accesses`,
+    ].join("\n"),
+  }));
+}
+
+/**
+ * Prévient les responsables à l'ouverture d'un accès en écriture (API-28) :
+ * clé d'API créée ou modifiée, ou application déjà connue qui reçoit l'écriture.
+ */
+export async function notifyOwnersOfWriteAccess(
+  db: Database,
+  mailer: Transporter | null,
+  input: { farmId: string; accessName: string; kind: "api_key" | "oauth"; userName: string; appUrl: string },
+): Promise<number> {
+  return mailOwners(db, mailer, input.farmId, (farm) => ({
+    subject: `Fourmy · accès en écriture ouvert sur ${farm}`,
+    text: [
+      "Bonjour,",
+      "",
+      `${input.userName} vient d'ouvrir ${input.kind === "api_key" ? "la clé d'API" : "à l'application"} « ${input.accessName} » l'écriture sur la ferme « ${farm} » :`,
+      "elle peut désormais proposer des interventions. Ses propositions n'écrivent rien : elles attendent votre validation dans « À valider ».",
+      "",
+      "Vous pouvez voir ses appels ou lui retirer l'accès dans Ma ferme → Accès externes :",
+      `${input.appUrl}/f/${input.farmId}/farm?tab=accesses`,
+    ].join("\n"),
+  }));
+}
+
+/** Un e-mail à chaque responsable de la ferme ; sans serveur d'envoi configuré, rien ne part. */
+async function mailOwners(db: Database, mailer: Transporter | null, farmId: string, compose: (farm: string) => { subject: string; text: string }): Promise<number> {
   if (!mailer) return 0;
-  const { farm, owners } = await withFarm(db, input.farmId, async (tx) => {
-    const [f] = (await tx.execute(sql`SELECT name FROM farms WHERE id = ${input.farmId}`)) as unknown as { name: string }[];
+  const { farm, owners } = await withFarm(db, farmId, async (tx) => {
+    const [f] = (await tx.execute(sql`SELECT name FROM farms WHERE id = ${farmId}`)) as unknown as { name: string }[];
     const o = (await tx.execute(sql`SELECT u.email FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.role = 'owner'`)) as unknown as { email: string }[];
     return { farm: f?.name ?? "", owners: o.map((r) => r.email) };
   });
-  const modules = accessModules.filter((m) => input.grant.modules[m] && input.grant.modules[m] !== "none").map((m) => ACCESS_MODULE_LABELS[m]);
+  const { subject, text } = compose(farm);
   let sent = 0;
   for (const to of owners) {
     try {
-      await mailer.sendMail({
-        from: { name: "Fourmy", address: process.env.FOURMY_SMTP_FROM ?? "no-reply@fourmy.org" },
-        to,
-        subject: `Fourmy · nouvelle application connectée à ${farm}`,
-        text: [
-          "Bonjour,",
-          "",
-          `${input.userName} vient d'autoriser l'application « ${input.appName} » à consulter la ferme « ${farm} » sur Fourmy.`,
-          `Modules ouverts : ${modules.join(", ") || "aucun"} ; ${input.grant.activities === "all" ? "toutes les activités" : `${input.grant.activities.length} activité(s)`}.`,
-          "",
-          "Vous pouvez voir ses appels ou lui retirer l'accès dans Ma ferme → Accès externes :",
-          `${input.appUrl}/f/${input.farmId}/farm?tab=accesses`,
-        ].join("\n"),
-      });
+      await mailer.sendMail({ from: { name: "Fourmy", address: process.env.FOURMY_SMTP_FROM ?? "no-reply@fourmy.org" }, to, subject, text });
       sent++;
     } catch (e) {
-      console.error("[oauth] e-mail aux responsables :", e);
+      console.error("[accès externes] e-mail aux responsables :", e);
     }
   }
   return sent;

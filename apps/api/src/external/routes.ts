@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { articleKind, priceKind, seedUsageBy, vegetationIndex, type AccessModule } from "@fourmy/contracts";
+import { articleKind, priceKind, proposal, proposalList, proposalStatus, proposalWrite, seedUsageBy, vegetationIndex, type AccessModule } from "@fourmy/contracts";
 import * as R from "@fourmy/contracts/responses";
 
 /**
@@ -10,14 +10,15 @@ import * as R from "@fourmy/contracts/responses";
  * Refus par défaut : une route absente d'ici répond 404 à un accès restreint.
  * Toute route GET de la ferme figure soit dans `OPEN_ROUTES`, soit dans
  * `CLOSED_ROUTES` (test external-routes.test.ts) : une nouvelle route oblige à
- * choisir. Lot AM1 : lecture seulement.
+ * choisir. Lot AM1 : lecture seulement ; lot AM8 : une écriture, le dépôt
+ * d'une proposition (`POST /proposals`, module Interventions en écriture).
  */
 
 /** Paramètre de requête d'une route ouverte (documentation OpenAPI, lot AM7). */
 export type QueryParam = { name: string; schema: z.ZodType; description: string; required: boolean };
 
 export type OpenRoute = {
-  method: "GET";
+  method: "GET" | "POST";
   path: string;
   module: AccessModule;
   summary: string;
@@ -26,7 +27,12 @@ export type OpenRoute = {
   query: QueryParam[];
   /** Type de contenu d'une réponse binaire (tuiles). */
   binary?: string;
+  /** Corps JSON d'une écriture (POST), réponse 201. */
+  body?: z.ZodType;
 };
+
+/** Schémas des routes ouvertes hors de @fourmy/contracts/responses, par nom de composant OpenAPI. */
+export const EXTRA_SCHEMAS: Readonly<Record<string, z.ZodType>> = { proposals: proposalList, proposal, proposalWrite };
 
 const get = (path: string, module: AccessModule, summary: string, response: z.ZodType | null, query: QueryParam[] = [], binary?: string): OpenRoute => ({
   method: "GET",
@@ -36,6 +42,16 @@ const get = (path: string, module: AccessModule, summary: string, response: z.Zo
   response,
   query,
   ...(binary ? { binary } : {}),
+});
+
+const post = (path: string, module: AccessModule, summary: string, body: z.ZodType, response: z.ZodType): OpenRoute => ({
+  method: "POST",
+  path,
+  module,
+  summary,
+  response,
+  query: [],
+  body,
 });
 
 const param = (name: string, schema: z.ZodType, description: string, required = false): QueryParam => ({ name, schema, description, required });
@@ -97,6 +113,10 @@ export const OPEN_ROUTES: readonly OpenRoute[] = [
   get("/land-parcels/:id/itinerary", "interventions", "Interventions d'une parcelle", R.landParcelsItineraryResponse, [q.year, q.int("years", "Nombre de campagnes (1 à 20), défaut 1")]),
   get("/procedures", "interventions", "Types d'intervention", R.proceduresResponse),
   get("/reference/bbch", "interventions", "Stades BBCH", R.referenceBbchResponse, [q.text("crop", "Code culture du référentiel phyto", true)]),
+  // Propositions (lot AM8) : un accès en écriture propose, le responsable de la ferme accepte ou refuse.
+  get("/proposals", "interventions", "Propositions déposées par cet accès", proposalList, [q.enumOf("status", proposalStatus.options, "État : pending, accepted, rejected, expired")]),
+  get("/proposals/:id", "interventions", "Une proposition et sa décision", proposal),
+  post("/proposals", "interventions", "Proposer une intervention (contrôlée à blanc, à valider par le responsable)", proposalWrite, proposal),
 
   // Phytosanitaire et registres
   get("/phyto/articles", "phyto", "Produits phyto de la ferme", R.phytoArticlesResponse),

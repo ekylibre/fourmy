@@ -2,7 +2,7 @@ import { z } from "zod";
 import { ACCESS_MODULE_LABELS, accessModules } from "@fourmy/contracts";
 import * as R from "@fourmy/contracts/responses";
 import { OAUTH_SCOPES, publicOrigin } from "../auth.js";
-import { OPEN_ROUTES, type OpenRoute } from "./routes.js";
+import { EXTRA_SCHEMAS, OPEN_ROUTES, type OpenRoute } from "./routes.js";
 import { RATE_LIMITS } from "./audit.js";
 
 /**
@@ -15,7 +15,10 @@ import { RATE_LIMITS } from "./audit.js";
 type Json = Record<string, unknown>;
 
 /** Nom de composant de chaque schéma de réponse (l'export de @fourmy/contracts/responses). */
-const NAMES = new Map<unknown, string>(Object.entries(R).map(([name, schema]) => [schema, name.replace(/Response$/, "")]));
+const NAMES = new Map<unknown, string>([
+  ...Object.entries(R).map(([name, schema]) => [schema, name.replace(/Response$/, "")] as const),
+  ...Object.entries(EXTRA_SCHEMAS).map(([name, schema]) => [schema, name] as const),
+]);
 
 /** Schéma JSON (2020-12, celui d'OpenAPI 3.1) d'un schéma zod, sans l'en-tête `$schema`. */
 function jsonSchema(schema: z.ZodType, io: "input" | "output" = "output"): Json {
@@ -68,20 +71,26 @@ function operation(r: OpenRoute): Json {
       if (OTHER_FORMATS[f]) content[OTHER_FORMATS[f]] = { schema: { type: "string" } };
     }
   }
+  const write = r.method === "POST";
+  const bodyName = r.body ? NAMES.get(r.body) : undefined;
+  if (r.body && !bodyName) throw new Error(`Corps sans nom pour ${r.path}`);
   return {
-    operationId: name ?? r.path.replace(/[^a-zA-Z]+/g, "_").replace(/^_|_$/g, ""),
+    operationId: write ? `create${name ? name[0]!.toUpperCase() + name.slice(1) : ""}` : (name ?? r.path.replace(/[^a-zA-Z]+/g, "_").replace(/^_|_$/g, "")),
     summary: r.summary,
     tags: [r.module],
     "x-fourmy-module": r.module,
-    "x-fourmy-level": "read",
+    "x-fourmy-level": write ? "write" : "read",
+    ...(write ? { security: [{ apiKey: [] }, { oauth2: [OAUTH_SCOPES.write] }] } : {}),
+    ...(bodyName ? { requestBody: { required: true, content: { "application/json": { schema: { $ref: `#/components/schemas/${bodyName}` } } } } } : {}),
     parameters: [
       { $ref: "#/components/parameters/farmId" },
       ...pathParams(r.path),
       ...r.query.map((p) => ({ name: p.name, in: "query", required: p.required, description: p.description, schema: jsonSchema(p.schema, "input") })),
     ],
     responses: {
-      "200": { description: r.summary, content },
+      [write ? "201" : "200"]: { description: r.summary, content },
       ...errorResponses,
+      ...(write ? { "422": { $ref: "#/components/responses/Unprocessable" } } : {}),
     },
   };
 }
@@ -92,9 +101,11 @@ function build(): Json {
   const schemas: Json = { Problem: problem };
   for (const r of OPEN_ROUTES) {
     const path = `/farms/{farmId}${r.path.replace(/:([a-zA-Z]+)/g, "{$1}")}`;
-    paths[path] = { get: operation(r) };
+    paths[path] = { ...(paths[path] as Json | undefined), [r.method.toLowerCase()]: operation(r) };
     const name = r.response ? NAMES.get(r.response) : undefined;
     if (r.response && name && !schemas[name]) schemas[name] = jsonSchema(r.response);
+    const bodyName = r.body ? NAMES.get(r.body) : undefined;
+    if (r.body && bodyName && !schemas[bodyName]) schemas[bodyName] = jsonSchema(r.body, "input");
   }
   const problemResponse = (description: string) => ({ description, content: { "application/problem+json": { schema: { $ref: "#/components/schemas/Problem" } } } });
   return {
@@ -103,10 +114,12 @@ function build(): Json {
       title: "API Fourmy",
       version: process.env.FOURMY_VERSION ?? "dev",
       description: [
-        "API de lecture des fermes Fourmy, ouverte aux clés d'API et aux applications autorisées par OAuth.",
+        "API des fermes Fourmy, ouverte aux clés d'API et aux applications autorisées par OAuth : lecture, et dépôt de propositions d'intervention.",
         "",
         "Chaque accès est lié à une ferme : il ouvre une liste de modules, en lecture, et éventuellement un périmètre d'activités. " +
           "Une route d'un module fermé répond 403 ; une route qui n'est pas dans ce document répond 404.",
+        "Écriture : un accès qui ouvre le module Interventions en écriture dépose des propositions (POST /proposals). Elles sont contrôlées tout de suite " +
+          "(phytosanitaire, ZNT, nitrates, HVE et AB) sans rien écrire ; le responsable de la ferme les accepte, les corrige ou les refuse, et GET /proposals en donne l'état.",
         "Les données hors du périmètre d'activités sont absentes des réponses ; une intervention partagée avec une autre activité est ramenée au prorata de sa surface.",
         "",
         `Débit : ${RATE_LIMITS.perMinute} requêtes par minute et ${RATE_LIMITS.perDay.toLocaleString("fr-FR")} par jour et par accès ; au-delà, 429 avec l'en-tête Retry-After.`,
@@ -136,7 +149,11 @@ function build(): Json {
               authorizationUrl: `${origin}/api/auth/oauth2/authorize`,
               tokenUrl: `${origin}/api/auth/oauth2/token`,
               refreshUrl: `${origin}/api/auth/oauth2/token`,
-              scopes: { [OAUTH_SCOPES.read]: "Lire les modules ouverts de la ferme", offline_access: "Jeton de rafraîchissement" },
+              scopes: {
+                [OAUTH_SCOPES.read]: "Lire les modules ouverts de la ferme",
+                [OAUTH_SCOPES.write]: "Déposer des propositions d'intervention",
+                offline_access: "Jeton de rafraîchissement",
+              },
             },
           },
         },
@@ -147,9 +164,10 @@ function build(): Json {
       responses: {
         BadRequest: problemResponse("Paramètre invalide"),
         Unauthorized: problemResponse("Clé ou jeton absent, invalide, expiré ou révoqué"),
-        Forbidden: problemResponse("Ferme non couverte par l'accès, ou module non ouvert"),
+        Forbidden: problemResponse("Ferme non couverte par l'accès, ou module non ouvert (ou pas en écriture)"),
         NotFound: problemResponse("Élément introuvable, ou route non ouverte aux accès externes"),
         TooManyRequests: problemResponse("Débit dépassé : réessayer après Retry-After secondes"),
+        Unprocessable: problemResponse("Contenu refusé par les règles de la ferme (parcelle hors de l'accès, produit inconnu…)"),
       },
       schemas,
     },

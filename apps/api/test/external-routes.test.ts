@@ -17,7 +17,7 @@ const farmGets = () => {
 
 describe("routes ouvertes aux accès restreints", () => {
   it("chaque route GET de la ferme est classée", () => {
-    const open = new Set(OPEN_ROUTES.map((r) => r.path));
+    const open = new Set(OPEN_ROUTES.filter((r) => r.method === "GET").map((r) => r.path));
     const closed = new Set(Object.keys(CLOSED_ROUTES));
     const unclassified = [...farmGets()].filter((p) => !open.has(p) && !closed.has(p));
     expect(unclassified, "routes à classer dans src/external/routes.ts").toEqual([]);
@@ -25,12 +25,15 @@ describe("routes ouvertes aux accès restreints", () => {
 
   it("chaque entrée correspond à une route réelle, une seule fois", () => {
     const real = farmGets();
-    const listed = [...OPEN_ROUTES.map((r) => r.path), ...Object.keys(CLOSED_ROUTES)];
+    const listed = [...OPEN_ROUTES.filter((r) => r.method === "GET").map((r) => r.path), ...Object.keys(CLOSED_ROUTES)];
     expect(listed.filter((p) => !real.has(p)), "entrées sans route").toEqual([]);
     expect(listed.length, "entrée en double ou à la fois ouverte et fermée").toBe(new Set(listed).size);
   });
 
-  it("lot AM1 : lecture seulement", () => {
-    expect(OPEN_ROUTES.every((r) => r.method === "GET")).toBe(true);
+  it("une seule écriture : le dépôt d'une proposition (lot AM8)", () => {
+    const writes = OPEN_ROUTES.filter((r) => r.method !== "GET");
+    expect(writes.map((r) => `${r.method} ${r.path} ${r.module}`)).toEqual(["POST /proposals interventions"]);
+    const real = createApp().routes.filter((r) => r.method === "POST").map((r) => r.path);
+    expect(real).toContain(`${FARM_PREFIX}/proposals`);
   });
 });

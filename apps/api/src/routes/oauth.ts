@@ -4,7 +4,7 @@ import type { Env } from "../context.js";
 import { getAuth, publicOrigin } from "../auth.js";
 import { db } from "../db.js";
 import { appMailer } from "../mail.js";
-import { chooseOAuthFarm, clearOAuthFarm, dropOAuthAccess, notifyOwnersOfNewApp, oauthRequestInfo, recordOAuthConsent } from "../repos/oauth.js";
+import { chooseOAuthFarm, clearOAuthFarm, dropOAuthAccess, notifyOwnersOfNewApp, notifyOwnersOfWriteAccess, oauthRequestInfo, recordOAuthConsent } from "../repos/oauth.js";
 import { BadRequest, problem } from "./helpers.js";
 
 /**
@@ -67,10 +67,15 @@ export const oauthRoutes = new Hono<Env>()
       throw e;
     }
     await clearOAuthFarm(db(), s);
+    const user = c.get("user");
+    const appUrl = process.env.BETTER_AUTH_URL ?? new URL(c.req.url).origin;
     if (rec.first) {
-      const user = c.get("user");
-      const appUrl = process.env.BETTER_AUTH_URL ?? new URL(c.req.url).origin;
       void notifyOwnersOfNewApp(db(), appMailer(), { farmId: rec.farmId, appName: rec.app.name, grant: rec.grant, userName: user.name ?? user.email, appUrl }).catch(
+        (e: unknown) => console.error("[oauth] e-mail :", e),
+      );
+    } else if (rec.newWrite) {
+      // Application déjà connue qui reçoit l'écriture (API-28).
+      void notifyOwnersOfWriteAccess(db(), appMailer(), { farmId: rec.farmId, accessName: rec.app.name, kind: "oauth", userName: user.name ?? user.email, appUrl }).catch(
         (e: unknown) => console.error("[oauth] e-mail :", e),
       );
     }

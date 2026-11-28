@@ -40,7 +40,16 @@ import { irrigationVolumeM3 } from "./IrrigationFields";
 import { IRRIGATION_METHOD_LABELS, IRRIGATION_ORIGIN_LABELS, IRRIGATION_TRIGGER_LABELS, SOWING_TECHNIQUE_LABELS } from "@fourmy/contracts";
 
 const EMPTY_FC: FeatureCollection = { type: "FeatureCollection", features: [] };
-const ORIGINS: Record<string, string> = { web: "Web", mobile: "Mobile", migration: "Reprise d'Ekylibre", plugin: "Extension", import: "Import de fichier" };
+const ORIGINS: Record<string, string> = {
+  web: "Web",
+  mobile: "Mobile",
+  migration: "Reprise d'Ekylibre",
+  plugin: "Extension",
+  import: "Import de fichier",
+  // Proposition d'un accès externe, acceptée par le responsable (lot AM8).
+  api: "Proposée par l'API",
+  mcp: "Proposée par un assistant IA",
+};
 
 /**
  * Fiche d'une intervention (exigence INT-UI-2) : ce qui a été fait, où, avec
