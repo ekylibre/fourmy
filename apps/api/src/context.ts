@@ -36,6 +36,8 @@ export type Env = {
     grant: EffectiveGrant;
     /** Accès restreint : seules les routes ouvertes (external/routes.ts) répondent. */
     external: boolean;
+    /** Objets écrits par la requête, pour le journal des accès externes (lot AM8). */
+    written?: { proposals: string[] };
   };
 };
 

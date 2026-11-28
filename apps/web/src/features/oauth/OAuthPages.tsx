@@ -153,7 +153,9 @@ export function OAuthConsentPage() {
     <Frame title={`Autoriser « ${data.client.name} » ?`}>
       <Text size="sm">
         Cette application pourra <b>consulter</b> les données de la ferme <b>{farm.name}</b> choisies ci-dessous, en votre nom, sans votre mot de passe.
-        Elle ne pourra rien modifier.
+        {data.write
+          ? " Elle demande aussi à proposer des interventions : ouvrez « Lecture et propositions » pour le lui permettre. Ses propositions n'écrivent rien sans la validation du responsable de la ferme."
+          : " Elle ne pourra rien modifier."}
         {data.client.uri && (
           <>
             {" "}
@@ -165,15 +167,12 @@ export function OAuthConsentPage() {
           </>
         )}
       </Text>
-      {data.write && (
-        <Alert color="ardoise">L'application demande aussi à modifier des données : ce n'est pas encore possible, elle aura la lecture seulement.</Alert>
-      )}
       {farm.role !== "owner" && (
         <Text size="xs" c="dimmed">
           Vos propres droits sur cette ferme plafonnent ce que vous ouvrez : un module ou une activité que vous ne voyez pas reste fermé.
         </Text>
       )}
-      <AccessGrantEditor farmId={farm.id} value={grant} onChange={setGrant} />
+      <AccessGrantEditor farmId={farm.id} value={grant} onChange={setGrant} writable={data.write && farm.role !== "reader"} />
       <Text size="xs" c="dimmed">
         Vous pourrez retirer cet accès à tout moment dans Ma ferme → Accès externes.
       </Text>

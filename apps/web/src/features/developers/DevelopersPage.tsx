@@ -20,12 +20,14 @@ type Operation = {
   tags: string[];
   parameters: Param[];
   responses: Record<string, { description: string; content?: Record<string, { schema?: Schema }>; $ref?: string }>;
+  requestBody?: { content: Record<string, { schema?: Schema }> };
 };
+type Method = "get" | "post";
 type OpenApi = {
   info: { title: string; version: string; description: string };
   servers: { url: string }[];
   tags: { name: string; description: string }[];
-  paths: Record<string, { get: Operation }>;
+  paths: Record<string, Partial<Record<Method, Operation>>>;
   components: { schemas: Record<string, unknown>; securitySchemes: { oauth2: { flows: { authorizationCode: { authorizationUrl: string; tokenUrl: string } } } } };
 };
 
@@ -59,10 +61,16 @@ function CopyLine({ value, label }: { value: string; label: string }) {
   );
 }
 
+/** Opérations à plat : chemin, méthode, opération. */
+const operations = (doc: OpenApi) =>
+  Object.entries(doc.paths).flatMap(([path, methods]) => (["get", "post"] as const).flatMap((method) => (methods[method] ? [{ path, method, op: methods[method] }] : [])));
+
 function OperationPanel({ op, doc }: { op: Operation; doc: OpenApi }) {
   const [showSchema, setShowSchema] = useState(false);
+  const [showBody, setShowBody] = useState(false);
   const params = op.parameters.filter((p) => !p.$ref);
-  const ok = op.responses["200"];
+  const ok = op.responses["200"] ?? op.responses["201"];
+  const body = op.requestBody?.content["application/json"]?.schema?.$ref?.split("/").pop();
   const types = Object.keys(ok?.content ?? {});
   const ref = ok?.content?.["application/json"]?.schema?.$ref?.split("/").pop();
   return (
@@ -94,6 +102,18 @@ function OperationPanel({ op, doc }: { op: Operation; doc: OpenApi }) {
           </Table.Tbody>
         </Table>
       )}
+      {body && (
+        <div>
+          <Button size="compact-sm" variant="subtle" onClick={() => setShowBody((v) => !v)}>
+            {showBody ? "Masquer le corps" : `Corps de la requête (${body})`}
+          </Button>
+          {showBody && (
+            <Code block mt="xs" mah={420} style={{ overflow: "auto" }}>
+              {JSON.stringify(doc.components.schemas[body], null, 2)}
+            </Code>
+          )}
+        </div>
+      )}
       <Text size="sm">
         Réponse : {types.map((t) => <Code key={t} mr={4}>{t}</Code>)}
       </Text>
@@ -120,9 +140,7 @@ function Reference({ doc }: { doc: OpenApi }) {
     return doc.tags
       .map((t) => ({
         ...t,
-        ops: Object.entries(doc.paths)
-          .filter(([path, { get }]) => get.tags.includes(t.name) && (!f || path.toLowerCase().includes(f) || get.summary.toLowerCase().includes(f)))
-          .map(([path, { get }]) => ({ path, op: get })),
+        ops: operations(doc).filter(({ path, op }) => op.tags.includes(t.name) && (!f || path.toLowerCase().includes(f) || op.summary.toLowerCase().includes(f))),
       }))
       .filter((g) => g.ops.length > 0);
   }, [doc, filter]);
@@ -146,12 +164,12 @@ function Reference({ doc }: { doc: OpenApi }) {
         <Stack key={g.name} gap={6}>
           <Title order={4}>{g.description}</Title>
           <Accordion variant="separated" chevronPosition="left">
-            {g.ops.map(({ path, op }) => (
-              <Accordion.Item key={path} value={path}>
+            {g.ops.map(({ path, method, op }) => (
+              <Accordion.Item key={`${method} ${path}`} value={`${method} ${path}`}>
                 <Accordion.Control>
                   <Group gap="sm" wrap="nowrap">
-                    <Badge variant="light" color="lichen" w={52}>
-                      GET
+                    <Badge variant="light" color={method === "post" ? "paille" : "lichen"} w={52}>
+                      {method.toUpperCase()}
                     </Badge>
                     <Code>{path}</Code>
                     <Text size="sm" c="dimmed" visibleFrom="sm" lineClamp={1}>
@@ -195,8 +213,9 @@ export function DevelopersPage() {
           <Wordmark style={{ fontSize: "1.6rem" }} />
           <Title order={1}>Développeurs</Title>
           <Text maw={760}>
-            L'API de Fourmy donne accès en lecture aux données d'une ferme : parcelles, activités, interventions, registres, stocks, matériels… Chaque accès
-            est donné par le responsable de la ferme, pour des modules et des activités choisis, et peut être révoqué à tout moment.
+            L'API de Fourmy donne accès en lecture aux données d'une ferme : parcelles, activités, interventions, registres, stocks, matériels… Un accès
+            en écriture y propose des interventions, que le responsable valide. Chaque accès est donné par le responsable de la ferme, pour des modules
+            et des activités choisis, et peut être révoqué à tout moment.
           </Text>
         </Stack>
 
@@ -268,7 +287,7 @@ export function DevelopersPage() {
           {doc.data && (
             <>
               <Text size="sm" c="dimmed">
-                {Object.keys(doc.data.paths).length} routes, version {doc.data.info.version}. Le document{" "}
+                {operations(doc.data).length} routes, version {doc.data.info.version}. Le document{" "}
                 <Anchor href="/api/v1/openapi.json" target="_blank">
                   openapi.json
                 </Anchor>{" "}

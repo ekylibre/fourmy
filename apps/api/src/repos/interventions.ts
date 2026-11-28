@@ -1,4 +1,5 @@
 import { linkInboxIntervention } from "../integrations/agrirouter-read.js";
+import { acceptLinkedProposal } from "./proposals.js";
 import { sql, type SQL } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
 import {
@@ -857,6 +858,7 @@ export async function planInTx(
             ${ctx.origin}, ${clientId}, ${sql`ARRAY[${sql.join(input.purposes.map((p) => sql`${p}`), sql`, `)}]::text[]`}, ${input.notes ?? null},
             ${input.staffing ?? "free"}, ${input.bbch ?? null}, ${ctx.origin !== "import"}, ${options.periodPrecision ?? "time"}, ${input.justification ?? null})`);
   await writeBody(tx, id, input, articles);
+  await acceptLinkedProposal(tx, ctx, id, input);
   await writeMaintenance(tx, farmId, ctx, id, body, false, null);
   await writeIrrigation(tx, id, body);
   await writeSowing(tx, id, body);
@@ -1010,6 +1012,7 @@ async function applyCompletion(
   const input = flat(raw);
   const { startedAt, stoppedAt } = periodBounds(input.periods);
   await writeBody(tx, interventionId, raw, articles);
+  await acceptLinkedProposal(tx, ctx, interventionId, { ...raw, procedure });
   await writeMaintenance(tx, farmId, ctx, interventionId, input, true, stoppedAt);
   await writeIrrigation(tx, interventionId, input);
   await writeSowing(tx, interventionId, input);

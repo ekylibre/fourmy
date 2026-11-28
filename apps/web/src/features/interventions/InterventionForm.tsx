@@ -1,6 +1,6 @@
 import { useArea } from "../../app/prefs";
 import { lazy, Suspense, useState } from "react";
-import type { MaintenanceNature, TrackDraft } from "@fourmy/contracts";
+import type { MaintenanceNature, Proposal, TrackDraft } from "@fourmy/contracts";
 import { draftFrom, draftNature, maintenanceBody, MaintenanceAside, MaintenanceFields, type MaintenanceDraft } from "../maintenance/MaintenanceFields";
 import {
   ActionIcon,
@@ -66,6 +66,7 @@ import { CertificationCheckSection, useCertificationCheck } from "../certificati
 import type { Activity, InterventionWeather, MixtureDose } from "@fourmy/contracts";
 import type { FeatureCollection, Geometry } from "geojson";
 import { SprayingConditions, WeatherFields, type WeatherRequestDraft } from "../weather/Weather";
+import { ProposalBanner } from "../proposals/ProposalBanner";
 
 // La carte (MapLibre, terra-draw) n'est chargée qu'en mode « Carte ».
 const ParcelPicker = lazy(() => import("./ParcelPicker").then((m) => ({ default: m.ParcelPicker })));
@@ -119,6 +120,8 @@ export interface FormInitial {
   landParcelIds?: string[];
   /** Brouillon tiré de parcours GPS (lot P) : attelage, périodes, cibles, parcours à rattacher. */
   trackDraft?: TrackDraft;
+  /** Proposition d'un accès externe à vérifier puis enregistrer (lot AM8) : l'enregistrement l'accepte. */
+  proposal?: Proposal;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -165,10 +168,14 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   // Identifiant tiré une fois par formulaire : un second envoi (double clic,
   // Entrée répétée) retombe sur la même intervention au lieu d'en créer une autre.
   const [newId] = useState(() => crypto.randomUUID());
+  // Proposition d'un accès externe (lot AM8) : son contenu préremplit le formulaire.
+  const proposed = planned ? undefined : initial?.proposal?.payload;
   const [reason, setReason] = useState("");
   // Contrôle réglementaire : cible (usage E-Phy) choisie par produit, dernier résultat, motif d'un feu rouge.
   const [usageChoices, setUsageChoices] = useState<Record<string, string>>(() =>
-    Object.fromEntries(((toComplete ?? editing)?.compliance?.checks ?? []).filter((c) => c.usageId).map((c) => [c.articleId, c.usageId!])),
+    proposed?.compliance?.usages
+      ? { ...proposed.compliance.usages }
+      : Object.fromEntries(((toComplete ?? editing)?.compliance?.checks ?? []).filter((c) => c.usageId).map((c) => [c.articleId, c.usageId!])),
   );
   const [overrideReason, setOverrideReason] = useState((toComplete ?? editing)?.compliance?.reason ?? "");
   const [askOverride, setAskOverride] = useState(false);
@@ -177,7 +184,8 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   const [code, setCode] = useState<string | null>(planned?.procedure ?? initial?.procedure ?? null);
   const procedure: ProcedureCatalogueItem | undefined = catalogue.items.find((p) => p.code === code);
   const shape = procedure?.shape;
-  const start = planned?.startedAt ? local(planned.startedAt) : `${defaultDay}T08:00`;
+  const proposedStart = proposed?.periods[0]?.startedAt ?? proposed?.plannedAt;
+  const start = planned?.startedAt ? local(planned.startedAt) : proposedStart ? local(proposedStart) : `${defaultDay}T08:00`;
   // Nouvelle intervention : réalisée si son début est passé, à planifier sinon (modifiable).
   const fromTracks = planned ? undefined : initial?.trackDraft;
   const [mode, setMode] = useState<"done" | "planned">(() => initial?.mode ?? (fromTracks ? "done" : undefined) ?? (!planned && new Date(start).getTime() > Date.now() ? "planned" : "done"));
@@ -191,7 +199,9 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   const [periods, setPeriods] = useState<PeriodRow[]>(
     planned?.periods.length
       ? planned.periods.map((p) => ({ startedAt: local(p.startedAt), stoppedAt: local(p.stoppedAt) }))
-      : [{ startedAt: start, stoppedAt: `${start.slice(0, 10)}T10:00` }],
+      : proposed?.periods.length
+        ? proposed.periods.map((p) => ({ startedAt: local(p.startedAt), stoppedAt: local(p.stoppedAt) }))
+        : [{ startedAt: start, stoppedAt: `${start.slice(0, 10)}T10:00` }],
   );
   const [parcels, setParcels] = useState<string[]>(
     planned?.targets.filter((t) => t.kind === "land_parcel").map((t) => t.id) ?? fromTracks?.body.targets.map((t) => t.id) ?? initial?.landParcelIds ?? [],
@@ -213,7 +223,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
   const [targetExtras, setTargetExtras] = useState(
     () =>
       new Map<string, { workedAreaM2?: number; workingZone?: InterventionTarget["workingZone"] }>(
-        (planned?.targets ?? fromTracks?.body.targets ?? []).map((t) => [
+        (planned?.targets ?? fromTracks?.body.targets ?? proposed?.targets ?? []).map((t) => [
           t.id,
           { workedAreaM2: t.workedAreaM2, workingZone: t.workingZone as InterventionTarget["workingZone"] },
         ]),
@@ -235,7 +245,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       .values(),
   ];
   const [inputs, setInputs] = useState<QuantityRow[]>(
-    planned?.inputs.map((i) => ({
+    (planned?.inputs ?? proposed?.inputs)?.map((i) => ({
       articleId: i.articleId,
       quantity: i.quantity,
       per: i.per,
@@ -247,7 +257,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
     })) ?? [],
   );
   const [outputs, setOutputs] = useState<QuantityRow[]>(
-    planned?.outputs.map((o) => ({
+    (planned?.outputs ?? proposed?.outputs)?.map((o) => ({
       articleId: o.articleId,
       quantity: o.quantity,
       per: o.per,
@@ -255,8 +265,8 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       keep: { lotId: o.lotId },
     })) ?? [],
   );
-  const [tools, setTools] = useState<string[]>(planned?.tools.map((t) => t.equipmentId) ?? []);
-  const [doers, setDoers] = useState<string[]>(planned?.doers.map((d) => d.personId) ?? []);
+  const [tools, setTools] = useState<string[]>((planned?.tools ?? proposed?.tools)?.map((t) => t.equipmentId) ?? []);
+  const [doers, setDoers] = useState<string[]>((planned?.doers ?? proposed?.doers)?.map((d) => d.personId) ?? []);
   // Moyens (lot N4) : mode libre (comme avant), ou attelages avec leurs périodes.
   const [staffing, setStaffing] = useState<"free" | "crews">((planned?.staffing === "crews" && planned.crews.length) || fromTracks ? "crews" : "free");
   const [crews, setCrews] = useState<CrewRow[]>(() =>
@@ -281,11 +291,11 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         .filter((p) => p.startedAt)
         .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
     : periods;
-  const [purposes, setPurposes] = useState<TreatmentPurpose[]>(planned?.purposes ?? []);
-  const [notes, setNotes] = useState(planned?.notes ?? "");
-  const [justification, setJustification] = useState((toComplete ?? editing)?.justification ?? "");
+  const [purposes, setPurposes] = useState<TreatmentPurpose[]>(planned?.purposes ?? proposed?.purposes ?? []);
+  const [notes, setNotes] = useState(planned?.notes ?? proposed?.notes ?? "");
+  const [justification, setJustification] = useState((toComplete ?? editing)?.justification ?? proposed?.justification ?? "");
   // Stade BBCH (registre phyto réglementaire, lot X) : stades de la culture des parcelles choisies.
-  const [bbch, setBbch] = useState<string | null>(planned?.bbch?.code ?? null);
+  const [bbch, setBbch] = useState<string | null>(planned?.bbch?.code ?? proposed?.bbch ?? null);
   const [error, setError] = useState<string | null>(null);
 
   // Échéances lues au jour de l'intervention.
@@ -429,6 +439,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
       ...(weather ? { weather } : {}),
       ...(fromTracks ? { trackSessionIds: fromTracks.body.trackSessionIds } : {}),
       ...(fromTracks?.body.agrirouterInbox ? { agrirouterInbox: fromTracks.body.agrirouterInbox } : {}),
+      ...(initial?.proposal && !planned ? { proposal: initial.proposal.id } : {}),
     } satisfies InterventionCompleteWrite;
   };
 
@@ -556,6 +567,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
         message: editing ? (correcting ? "Intervention corrigée." : "Intervention modifiée.") : completing ? "Intervention enregistrée." : "Intervention planifiée.",
       });
       invalidateAfterIntervention(queryClient);
+      if (initial?.proposal) void queryClient.invalidateQueries({ queryKey: ["proposals"] });
       onDone(r.id);
     },
     onError: (e) => setError(e instanceof ApiError ? e.message : String(e)),
@@ -851,6 +863,7 @@ export function InterventionForm({ farmId, snapshot, articles, people, catalogue
               disabled={Boolean(toComplete)}
             />
             {fromTracks && <TrackDraftBanner draft={fromTracks} catalogue={catalogue} chosen={code} onChoose={chooseProcedure} />}
+            {initial?.proposal && !planned && <ProposalBanner proposal={initial.proposal} />}
             {correcting && (
               <Alert color="ardoise" variant="light" title="Correction tracée">
                 Les mouvements de stock de cette intervention sont repris puis repassés avec les nouvelles valeurs ; le registre phyto suit.

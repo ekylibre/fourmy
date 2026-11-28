@@ -109,6 +109,23 @@ describe.skipIf(!url)("OAuth (intégration)", () => {
     expect((await prm.json()).resource).toBe(mcpResource());
   });
 
+  it("écriture (lot AM8) : portée fourmy:write, propositions sur les interventions seulement", async () => {
+    const clientId = await register("fourmy:read fourmy:write offline_access");
+    const a = await authorize(farm, clientId, farm.farmId, { modules: { interventions: "write", stocks: "write" }, activities: "all" }, { scope: "fourmy:read fourmy:write offline_access" });
+    expect(a.request.write).toBe(true);
+    const t = await token(clientId, a);
+    expect(t.scope.split(" ")).toContain("fourmy:write");
+    const [stored] = await sql`SELECT access_grant FROM farm_accesses WHERE oauth_client_id = ${clientId}`;
+    expect(stored!.access_grant).toEqual({ modules: { interventions: "write", stocks: "read" }, activities: "all" });
+    const res = await app.request(`/api/v1/farms/${farm.farmId}/proposals`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${t.access_token}`, "content-type": "application/json" },
+      body: JSON.stringify({ payload: { procedure: "rolling", plannedAt: "2026-09-01T08:00:00Z" } }),
+    });
+    expect(res.status, await res.clone().text()).toBe(201);
+    expect(((await res.json()) as { channel: string }).channel).toBe("api");
+  });
+
   it("parcours complet : ferme, consentement réduit, jeton, appel limité, autre ferme refusée, rafraîchissement", async () => {
     const clientId = await register();
     const a = await authorize(farm, clientId, farm.farmId, { modules: { activities: "read", interventions: "write" }, activities: [vigne] });
@@ -126,7 +143,7 @@ describe.skipIf(!url)("OAuth (intégration)", () => {
     expect((await call(t.access_token, "/stock")).status).toBe(403);
     expect((await call(t.access_token, "/activities", other.farmId)).status).toBe(403);
     expect((await app.request("/api/v1/me/farms", { headers: { authorization: `Bearer ${t.access_token}` } })).status).toBe(403);
-    // Écriture demandée au consentement : ramenée à la lecture (pas d'écriture avant AM8).
+    // Écriture demandée au consentement sans la portée fourmy:write : ramenée à la lecture.
     const [stored] = await sql`SELECT access_grant FROM farm_accesses WHERE oauth_client_id = ${clientId}`;
     expect(stored!.access_grant).toEqual({ modules: { activities: "read", interventions: "read" }, activities: [vigne] });
 

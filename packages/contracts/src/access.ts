@@ -52,6 +52,21 @@ export const ACCESS_MODULE_LABELS: Record<AccessModule, string> = {
   certifications: "Certifications",
 };
 
+/**
+ * Modules où « écriture » a un sens (lot AM8) : on y dépose des propositions.
+ * Ailleurs, l'écriture demandée est ramenée à la lecture.
+ */
+export const WRITABLE_MODULES: readonly AccessModule[] = ["interventions"];
+
+/** Droits ramenés à ce qui a un sens : l'écriture seulement sur les modules à propositions. */
+export function writableOnly(g: AccessGrant): AccessGrant {
+  const modules = Object.fromEntries(Object.entries(g.modules).map(([m, l]) => [m, l === "write" && !WRITABLE_MODULES.includes(m as AccessModule) ? "read" : l]));
+  return { modules, activities: g.activities };
+}
+
+/** Les droits ouvrent-ils une écriture (propositions) ? */
+export const grantWrites = (g: AccessGrant) => Object.values(g.modules).some((l) => l === "write");
+
 export const ACCESS_LEVEL_LABELS: Record<AccessLevel, string> = {
   none: "Aucun accès",
   read: "Lecture",
@@ -102,6 +117,8 @@ export const accessLogEntry = z.object({
   operation: z.string(),
   status: z.number().int(),
   durationMs: z.number().int().nullable(),
+  /** Objets écrits par l'appel (lot AM8) : propositions déposées. */
+  written: z.object({ proposals: z.array(z.uuid()) }).nullable().optional(),
 });
 export type AccessLogEntry = z.infer<typeof accessLogEntry>;
 

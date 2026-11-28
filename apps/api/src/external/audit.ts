@@ -52,6 +52,9 @@ function mcpCall(value: string | undefined): { tool: string; primary: boolean } 
   return secret === MCP_SECRET && tool ? { tool, primary: primary === "1" } : null;
 }
 
+/** La requête vient-elle d'un outil MCP (appel interne) ? */
+export const isMcpCall = (c: { req: { header: (name: string) => string | undefined } }) => mcpCall(c.req.header(MCP_CALL_HEADER)) !== null;
+
 /** Écritures du journal en cours (attendues par les tests). */
 export const pendingLogs = new Set<Promise<unknown>>();
 
@@ -80,8 +83,10 @@ export const externalAudit: MiddlewareHandler<Env> = createMiddleware<Env>(async
   const touch = now - (lastUse.get(accessId) ?? 0) >= 60_000;
   if (touch) lastUse.set(accessId, now);
   const job = withFarm(db(), farmId, async (tx) => {
-    await tx.execute(sql`INSERT INTO access_log (farm_id, access_id, user_id, channel, operation, status, duration_ms)
-                         VALUES (${farmId}, ${accessId}, ${p.userId}, ${channel}, ${operation}, ${c.res.status}, ${Math.round(performance.now() - t0)})`);
+    const written = c.get("written");
+    await tx.execute(sql`INSERT INTO access_log (farm_id, access_id, user_id, channel, operation, status, duration_ms, written)
+                         VALUES (${farmId}, ${accessId}, ${p.userId}, ${channel}, ${operation}, ${c.res.status}, ${Math.round(performance.now() - t0)},
+                                 ${written ? JSON.stringify(written) : null}::jsonb)`);
     // Dernière utilisation : au plus une écriture par minute et par accès.
     if (touch) await tx.execute(sql`UPDATE farm_accesses SET last_used_at = now() WHERE id = ${accessId}`);
   }).catch((e: unknown) => console.error("[accès externes] journal :", e));

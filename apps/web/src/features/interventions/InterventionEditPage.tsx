@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { Button, Group, Paper, Stack, Title } from "@mantine/core";
 import { ArrowLeft } from "lucide-react";
-import type { InterventionDetail, TrackDraft } from "@fourmy/contracts";
+import type { InterventionDetail, Proposal, TrackDraft } from "@fourmy/contracts";
 import { useAt } from "../../app/at";
 import { useFarm } from "../../app/farm";
 import { procedureLabel } from "../../app/labels";
@@ -34,8 +34,21 @@ function initialFromParams(p: URLSearchParams): FormInitial | undefined {
 }
 import { interventionDay } from "./presenters";
 
-/** Pré-remplissage : paramètres d'URL (entretien), ou brouillon de parcours GPS passé par la navigation (lot P). */
+/**
+ * Pré-remplissage : paramètres d'URL (entretien), brouillon de parcours GPS
+ * (lot P) ou proposition d'un accès externe (lot AM8) passés par la navigation.
+ */
 function initialOf(p: URLSearchParams, state: unknown): FormInitial | undefined {
+  const proposal = (state as { proposal?: Proposal } | null)?.proposal;
+  if (proposal) {
+    const done = proposal.payload.periods.length > 0 || proposal.payload.crews.length > 0;
+    return {
+      procedure: proposal.payload.procedure,
+      mode: done ? "done" : "planned",
+      landParcelIds: proposal.payload.targets.filter((t) => t.kind === "land_parcel").map((t) => t.id),
+      proposal,
+    };
+  }
   const trackDraft = (state as { trackDraft?: TrackDraft } | null)?.trackDraft;
   const fromParams = initialFromParams(p);
   return trackDraft ? { ...fromParams, trackDraft } : fromParams;

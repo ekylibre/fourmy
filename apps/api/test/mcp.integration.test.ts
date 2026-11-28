@@ -103,10 +103,10 @@ describe.skipIf(!url)("serveur MCP (intégration)", () => {
   it("outils listés selon les droits : tout, parcelles et interventions, stock seul", async () => {
     const all = await connect({ "x-api-key": (await key({ modules: Object.fromEntries(["farm", "parcels", "activities", "interventions", "phyto", "stocks", "equipments", "certifications"].map((m) => [m, "read"])), activities: "all" })).key });
     expect((await all.listTools()).tools.map((t) => t.name).sort()).toEqual(
-      ["activites", "assolement", "controles_certification", "detail_intervention", "fermes", "fiche_parcelle", "interventions_periode", "interventions_prevues", "materiels", "parcelles", "registre_phyto", "stock"].sort(),
+      ["activites", "assolement", "controles_certification", "detail_intervention", "etat_propositions", "fermes", "fiche_parcelle", "interventions_periode", "interventions_prevues", "materiels", "parcelles", "registre_phyto", "stock"].sort(),
     );
     const some = await connect({ "x-api-key": (await key({ modules: { parcels: "read", interventions: "read" }, activities: "all" })).key });
-    expect((await some.listTools()).tools.map((t) => t.name).sort()).toEqual(["detail_intervention", "fermes", "fiche_parcelle", "interventions_periode", "interventions_prevues", "parcelles"]);
+    expect((await some.listTools()).tools.map((t) => t.name).sort()).toEqual(["detail_intervention", "etat_propositions", "fermes", "fiche_parcelle", "interventions_periode", "interventions_prevues", "parcelles"]);
     const stock = await connect({ "x-api-key": (await key({ modules: { stocks: "read" }, activities: "all" })).key });
     expect((await stock.listTools()).tools.map((t) => t.name).sort()).toEqual(["fermes", "stock"]);
     // Outil absent de la liste : refusé.
@@ -176,5 +176,42 @@ describe.skipIf(!url)("serveur MCP (intégration)", () => {
     const acts = await call(c, "activites");
     expect(acts.content[0]!.text).toMatch(/^2 activités : /);
     expect((await call(c, "activites", { ferme: "Autre ferme" })).isError).toBe(true);
+  });
+  it("propositions (lot AM8) : dépôt dicté, refus hors périmètre, acceptation, état ; canal mcp", async () => {
+    const read = await connect({ "x-api-key": (await key({ modules: { parcels: "read", interventions: "read" }, activities: "all" })).key });
+    expect((await read.listTools()).tools.map((t) => t.name)).not.toContain("proposer_intervention");
+    const k = await key({ modules: { parcels: "read", interventions: "write", stocks: "read" }, activities: [vigne] });
+    const c = await connect({ "x-api-key": k.key });
+    const tools = (await c.listTools()).tools;
+    expect(tools.map((t) => t.name)).toEqual(expect.arrayContaining(["proposer_intervention", "etat_propositions"]));
+    expect(tools.find((t) => t.name === "proposer_intervention")!.annotations?.readOnlyHint).toBe(false);
+
+    const out = await call(c, "proposer_intervention", { type: "spraying", parcelles: ["Le Grand Champ"], debut: "2026-06-12" });
+    expect(out.isError).toBe(true);
+    const r = await call(c, "proposer_intervention", {
+      type: "spraying",
+      parcelles: ["les vignes"],
+      debut: "2026-06-12T07:30",
+      intrants: [{ produit: "fongicide x", quantite: 1.5 }],
+      message: "Dicté au bord de la vigne",
+    });
+    expect(r.isError, r.content[0]!.text).toBeFalsy();
+    expect(r.content[0]!.text).toMatch(/^Proposition déposée : .* réalisée le 12\/06\/2026 07:30 sur 1 parcelle \(Les Vignes\)\. Elle attend la validation/);
+    const id = (r.structuredContent!.proposition as { id: string }).id;
+    const [stored] = await sql`SELECT channel, status, payload FROM external_proposals WHERE id = ${id}`;
+    expect(stored).toMatchObject({ channel: "mcp", status: "pending" });
+    expect((stored!.payload as { periods: { startedAt: string }[] }).periods[0]!.startedAt).toBe("2026-06-12T05:30:00.000Z");
+
+    const acc = await app.request(`${base()}/proposals/${id}/accept`, { method: "POST", headers: farm.headers, body: "{}" });
+    expect(acc.status, await acc.clone().text()).toBe(200);
+    const { interventionId } = (await acc.json()) as { interventionId: string };
+    expect((await sql`SELECT origin FROM interventions WHERE id = ${interventionId}`)[0]!.origin).toBe("mcp");
+
+    const etat = await call(c, "etat_propositions");
+    expect(etat.content[0]!.text).toMatch(/^1 proposition, dont 0 en attente de validation/);
+    expect((etat.structuredContent!.propositions as { etat: string; intervention: string }[])[0]).toMatchObject({ etat: "acceptée", intervention: interventionId });
+    await Promise.all([...pendingLogs]);
+    const log = await sql`SELECT operation, written FROM access_log WHERE access_id = ${k.access.id} AND written IS NOT NULL`;
+    expect(log).toEqual([{ operation: "proposer_intervention (POST /proposals)", written: { proposals: [id] } }]);
   });
 });

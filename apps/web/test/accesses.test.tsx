@@ -43,9 +43,12 @@ describe("accès externes", () => {
     await user.click(screen.getByRole("button", { name: "Créer une clé" }));
     const dialog = await screen.findByRole("dialog", { name: "Créer une clé d'API" });
     await user.type(within(dialog).getByRole("textbox", { name: /Nom/ }), "Conseiller vigne");
+    // Propositions (lot AM8) : seulement sur les interventions.
+    expect(within(within(dialog).getByRole("radiogroup", { name: "Accès au module Stocks et semences" })).queryByText("Lecture et propositions")).toBeNull();
+    await user.click(within(within(dialog).getByRole("radiogroup", { name: "Accès au module Interventions" })).getByText("Lecture et propositions"));
     await user.click(within(dialog).getByRole("button", { name: "Créer la clé" }));
     expect(await screen.findByRole("textbox", { name: "Clé d'API" })).toHaveValue("fmy_abcdefghijklmnopqrstuvwxyz0123456789");
-    expect(body).toEqual({ name: "Conseiller vigne", grant: { modules: { activities: "read", interventions: "read" }, activities: "all" }, expiresInDays: 90 });
+    expect(body).toEqual({ name: "Conseiller vigne", grant: { modules: { activities: "read", interventions: "write" }, activities: "all" }, expiresInDays: 90 });
   });
 
   it("journal d'une clé, puis révocation", async () => {

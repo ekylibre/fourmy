@@ -361,3 +361,24 @@ Chemin critique : AM0 → AM1 → AM2 → AM4 → AM5 → AM6. AM3 et AM7 peuven
   - API : document valide (validateur `@seriousme/openapi-schema-validator`), une entrée par route ouverte, servi sans session ; conformité des réponses réelles sur une ferme remplie par l'import Geofolia anonymisé ; portées de l'enregistrement dynamique ;
   - web (2) : la page Développeurs, avec et sans ferme.
 - Ferme l'issue #35.
+
+### AM8 — fait (28/11)
+- **Migration 0089** : `external_proposals` (RLS par ferme ; accès, auteur, nom de l'accès au dépôt, canal `api`, `mcp` ou `web`, contenu, message, contrôles, décision, intervention créée, `corrected`) ; origines `api` et `mcp` des interventions ; `access_log.written` (propositions déposées par l'appel, API-27).
+- **Contrats** (`proposals.ts`) : `proposalWrite` (le contenu reprend `interventionPlanWrite`), `proposal`, `proposalChecks`, `proposalAccept`, `proposalReject` ; `proposal` dans le corps d'une intervention ; `WRITABLE_MODULES` (Interventions) et `writableOnly`.
+- **Dépôt** (`POST /proposals`, route ouverte en écriture sur Interventions) :
+  - cibles dans le périmètre d'activités à la date (`fourmy_parcel_in_scope_on`), sinon 422 ; matériels, lieux et cuves refusés sous un périmètre ;
+  - contenu validé par l'enregistrement habituel (planification, puis réalisation) joué dans un point de sauvegarde annulé : une règle du domaine refuse dès le dépôt (422). Le périmètre est levé dans ce point de sauvegarde seulement, car une intervention naît sans cible (la RLS restrictive refuserait ses lignes) ;
+  - contrôles à blanc (API-22) : `checkCompliance` (phyto, ZNT, mélange), `checkApplicationTx` (nitrates), `checkInterventionCertification` (HVE, AB) ; niveau d'ensemble et messages renvoyés. Aucune extraction n'a été nécessaire (essai AM0, point 8).
+- **Acceptation** : par le formulaire (le corps de `POST /interventions` ou de `/complete` porte `proposal`), ou par `POST /proposals/:id/accept` (tel quel ou corrigé, une transaction). Dans la transaction de l'intervention : proposition acceptée, `corrected` si le contenu a changé, origine `api` ou `mcp`. Réservée à l'`owner` (B9) ; déjà traitée → 409. Les feux rouges demandent un motif, comme une saisie web.
+- **Refus** (`POST /proposals/:id/reject`), **suivi** (`GET /proposals`, `GET /proposals/:id` : le responsable voit tout, un accès les siennes), **worker** : expiration à 90 jours, effacement 90 jours après un refus ou l'expiration ; les acceptées restent.
+- **Écriture des accès** : clés et consentements gardent `write` sur Interventions seulement (ailleurs ramené à la lecture) ; un consentement ne l'accepte que si l'application a demandé `fourmy:write`. Le serveur MCP demande désormais `fourmy:read fourmy:write` dans son `WWW-Authenticate` : l'utilisateur choisit au consentement.
+- **E-mail API-28** : à la création d'une clé en écriture, au passage d'un accès à l'écriture, et quand une application déjà connue reçoit l'écriture ; l'e-mail de première connexion mentionne les propositions.
+- **MCP** : `proposer_intervention` (type par code ou libellé, parcelles et produits par nom, heure de Paris, faite ou prévue) et `etat_propositions`. Un outil `write` n'est proposé que si le module est ouvert en écriture.
+- **OpenAPI** : `POST /proposals` (corps `proposalWrite`, réponse 201, 422, sécurité `fourmy:write`, `x-fourmy-level: write`), `GET /proposals` et `GET /proposals/:id`. La page Développeurs montre la méthode et le corps.
+- **Web** : page *À valider* (`/f/:farmId/a-valider`) avec les contrôles du dépôt, *Vérifier et enregistrer* (formulaire prérempli, bandeau de la proposition) et *Refuser* (motif) ; entrée du menu avec le nombre en attente, pour l'`owner`, affichée s'il y en a ; « Lecture et propositions » dans l'éditeur de droits (clé, consentement qui demande l'écriture) ; origine « Proposée par un assistant IA » ou « par l'API » sur la fiche.
+- **Tests** :
+  - API (`proposals.integration.test.ts`, 6) : feu rouge renvoyé sans rien écrire, journal ; hors périmètre 422, accès en lecture 403, contenu invalide ; acceptation corrigée par le formulaire (intervention, stock, registre, origine), un `worker` refusé ; acceptation telle quelle ; refus et suivi ; expiration et purge ;
+  - MCP : dépôt dicté, refus hors périmètre, acceptation, état, journal ; OAuth : portée `fourmy:write` et propositions ;
+  - web (3 et 1) : compteur, carte, refus, formulaire prérempli et enregistrement qui porte la proposition ; « Lecture et propositions » à la création d'une clé.
+- **Reste** : la recette R5 dans un assistant réel sur dev.fourmy.org. Le connecteur Claude déjà enregistré n'a que `fourmy:read` (AM7) : il faut le retirer et l'ajouter à nouveau pour qu'il demande l'écriture.
+

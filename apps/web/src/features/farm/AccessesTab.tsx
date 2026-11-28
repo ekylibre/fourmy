@@ -20,7 +20,9 @@ const DURATIONS = [
 
 /** Résumé des droits : modules ouverts et activités. */
 export function grantSummary(g: AccessGrant): string {
-  const modules = accessModules.filter((m) => g.modules[m] && g.modules[m] !== "none").map((m) => ACCESS_MODULE_LABELS[m]);
+  const modules = accessModules
+    .filter((m) => g.modules[m] && g.modules[m] !== "none")
+    .map((m) => `${ACCESS_MODULE_LABELS[m]}${g.modules[m] === "write" ? " (et propositions)" : ""}`);
   const acts = g.activities === "all" ? "toutes activités" : `${g.activities.length} activité${g.activities.length > 1 ? "s" : ""}`;
   return `${modules.join(", ") || "aucun module"} · ${acts}`;
 }
@@ -268,7 +270,7 @@ function CreateKey({ opened, onClose, onCreated }: { opened: boolean; onClose: (
       <Stack gap="md">
         <TextInput label="Nom" description="Pour la reconnaître : logiciel, personne, usage." placeholder="Export comptable" value={name} onChange={(e) => setName(e.currentTarget.value)} maxLength={100} />
         <Select label="Durée de validité" data={DURATIONS} value={duration} allowDeselect={false} onChange={(v) => v && setDuration(v)} />
-        <AccessGrantEditor farmId={farm.id} value={grant} onChange={setGrant} />
+        <AccessGrantEditor farmId={farm.id} value={grant} onChange={setGrant} writable={farm.role === "owner" || farm.role === "worker"} />
         {create.error && <Alert color="brique">{message(create.error)}</Alert>}
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose}>

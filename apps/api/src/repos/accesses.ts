@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { withFarm, type Database, type Tx } from "@fourmy/db";
-import { accessGrant, accessModules, type AccessGrant, type AccessLogEntry, type FarmAccess, type FarmAccessCreate, type FarmAccessUpdate } from "@fourmy/contracts";
+import { accessGrant, accessModules, grantWrites, writableOnly, type AccessGrant, type AccessLogEntry, type FarmAccess, type FarmAccessCreate, type FarmAccessUpdate } from "@fourmy/contracts";
 import { capGrant, isEmptyGrant, memberGrant, type EffectiveGrant, type MemberRole } from "@fourmy/domain";
 import { getAuth } from "../auth.js";
 import { BadRequest, NotFound } from "../routes/helpers.js";
@@ -70,7 +70,8 @@ export async function capped(tx: Tx, userId: string, requested: AccessGrant) {
   await assertFarmActivities(tx, requested);
   const cap = await memberCap(tx, userId);
   if (!cap) throw new BadRequest("L'auteur de cet accès n'est plus membre de la ferme.");
-  const r = capGrant(cap, requested);
+  // Écriture (lot AM8) : seulement sur les modules à propositions (Interventions).
+  const r = capGrant(cap, writableOnly(requested));
   if (isEmptyGrant(r.grant)) throw new BadRequest("Ces droits n'ouvrent rien : choisissez au moins un module (et une activité).");
   return r;
 }
@@ -107,11 +108,19 @@ export async function createAccessKey(db: Database, farmId: string, viewer: View
 }
 
 /** Renomme ou change les droits d'un accès (toujours plafonnés par ceux de son auteur). */
-export async function updateAccess(db: Database, farmId: string, viewer: Viewer, id: string, body: FarmAccessUpdate): Promise<FarmAccess> {
+export async function updateAccess(
+  db: Database,
+  farmId: string,
+  viewer: Viewer,
+  id: string,
+  body: FarmAccessUpdate,
+  onNewWrite?: (access: FarmAccess) => void,
+): Promise<FarmAccess> {
   return withFarm(db, farmId, async (tx) => {
     const r = await readOne(tx, viewer, id);
     if (r.revoked_at) throw new BadRequest("Accès révoqué : créez-en un autre.");
     let reduced: FarmAccess["reduced"];
+    const wasWriting = grantWrites(r.access_grant);
     if (body.grant) {
       const c = await capped(tx, r.user_id, body.grant);
       reduced = c.reduced;
@@ -119,6 +128,7 @@ export async function updateAccess(db: Database, farmId: string, viewer: Viewer,
     }
     if (body.name) await tx.execute(sql`UPDATE farm_accesses SET name = ${body.name} WHERE id = ${id}`);
     const view = toView(await readOne(tx, viewer, id));
+    if (!wasWriting && grantWrites(view.grant)) onNewWrite?.(view);
     return reduced?.length ? { ...view, reduced } : view;
   });
 }
@@ -151,13 +161,13 @@ export async function forgetOAuthConsent(db: Database, farmId: string, clientId:
 export async function accessLog(db: Database, farmId: string, viewer: Viewer, id: string, q: { limit: number; before?: string }): Promise<AccessLogEntry[]> {
   return withFarm(db, farmId, async (tx) => {
     await readOne(tx, viewer, id);
-    const list = await rows<{ at: string; channel: "rest" | "mcp"; operation: string; status: number; duration_ms: number | null }>(
+    const list = await rows<{ at: string; channel: "rest" | "mcp"; operation: string; status: number; duration_ms: number | null; written: { proposals: string[] } | null }>(
       tx,
-      sql`SELECT at::text, channel, operation, status, duration_ms FROM access_log
+      sql`SELECT at::text, channel, operation, status, duration_ms, written FROM access_log
           WHERE access_id = ${id} ${q.before ? sql`AND at < ${q.before}::timestamptz` : sql``}
           ORDER BY at DESC LIMIT ${q.limit}`,
     );
-    return list.map((l) => ({ at: new Date(l.at).toISOString(), channel: l.channel, operation: l.operation, status: l.status, durationMs: l.duration_ms }));
+    return list.map((l) => ({ at: new Date(l.at).toISOString(), channel: l.channel, operation: l.operation, status: l.status, durationMs: l.duration_ms, written: l.written }));
   });
 }
 

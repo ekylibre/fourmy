@@ -40,6 +40,7 @@ import { IntegrationsPage } from "../features/integrations/IntegrationsPage";
 import { AgrirouterCallbackPage } from "../features/integrations/AgrirouterCallbackPage";
 import { AgrirouterStartPage } from "../features/integrations/AgrirouterStartPage";
 import { AgrirouterInboxPage } from "../features/integrations/AgrirouterInboxPage";
+import { ProposalsPage } from "../features/proposals/ProposalsPage";
 import { PrescriptionsPage } from "../features/modulation/PrescriptionsPage";
 import { FarmProvider, useMyFarms } from "./farm";
 import { UNAUTHORIZED_EVENT, useSession } from "./session";
@@ -211,6 +212,7 @@ const pages = [
       { path: "3d-plan", element: <MapBoundary what="la vue 3D"><Suspense fallback={<Loading />}><Plan3DPage /></Suspense></MapBoundary> },
       { path: "interventions", element: <InterventionsPage /> },
       { path: "interventions/new", element: <InterventionNewPage /> },
+      { path: "a-valider", element: <ProposalsPage /> },
       { path: "interventions/:interventionId/complete", element: <InterventionCompletePage /> },
       { path: "interventions/:interventionId", element: <Suspense fallback={<Loading />}><InterventionPage /></Suspense> },
       { path: "interventions/:interventionId/edit", element: <InterventionEditPage /> },

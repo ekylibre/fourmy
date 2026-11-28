@@ -40,3 +40,4 @@ export * from "./seeds.js";
 export * from "./technical-itinerary.js";
 export * from "./economics.js";
 export * from "./access.js";
+export * from "./proposals.js";

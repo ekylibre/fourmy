@@ -17,6 +17,8 @@ export type ToolDef = {
   title: string;
   description: string;
   module: AccessModule;
+  /** `write` : outil d'écriture (propositions), proposé si le module est ouvert en écriture. */
+  level?: "write";
   input: z.ZodRawShape;
   run: (api: FarmApi, args: Record<string, unknown>) => Promise<ToolResult>;
 };
@@ -46,7 +48,7 @@ type Intervention = {
 const STATUS: Record<Intervention["status"], string> = { planned: "prévue", done: "réalisée", cancelled: "annulée" };
 
 /** Parcelle désignée par son identifiant ou son nom (sans casse ni accents). */
-async function findParcel(api: FarmApi, ref: string) {
+export async function findParcel(api: FarmApi, ref: string) {
   const names = await api.parcelNames();
   if (names.has(ref)) return { id: ref, name: names.get(ref)! };
   // Module Parcelles fermé : un identifiant reste utilisable, sans le nom.

@@ -1,14 +1,15 @@
-import { Anchor, AppShell, Box as MBox, Burger, Group, NavLink, Stack, Text } from "@mantine/core";
+import { Anchor, AppShell, Badge, Box as MBox, Burger, Group, NavLink, Stack, Text } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { BadgeCheck, Box, Boxes, Grid3x3, Leaf, ClipboardList, Database, Euro, FileText, LayoutDashboard, Map, Plug, Scale, Wine, FlaskConical, Sprout, Tractor, Wheat, type LucideIcon } from "lucide-react";
+import { BadgeCheck, Bot, Box, Boxes, Grid3x3, Leaf, ClipboardList, Database, Euro, FileText, LayoutDashboard, Map, Plug, Scale, Wine, FlaskConical, Sprout, Tractor, Wheat, type LucideIcon } from "lucide-react";
 import { Link, Outlet, useLocation } from "react-router";
 import { Wordmark } from "@fourmy/ui-lyvre";
 import type { AccessModule } from "@fourmy/contracts";
 import { moduleOpen, useFarm, type MyFarm } from "../app/farm";
 import { useAt } from "../app/at";
 import { useControlAvailability } from "../features/certification/controls";
+import { useProposals } from "../features/proposals/queries";
 import { Timeline } from "./Timeline";
 import { UserMenu } from "./UserMenu";
 
@@ -18,7 +19,17 @@ import { UserMenu } from "./UserMenu";
  * invité restreint qui ne l'a pas ; `noGuest` : jamais pour un invité (écrans
  * qui reposent sur des routes fermées aux accès restreints).
  */
-type NavItem = { path: string; label: string; icon: LucideIcon; ownerOnly?: boolean; when?: "hve" | "ab"; module?: AccessModule; noGuest?: boolean };
+type NavItem = {
+  path: string;
+  label: string;
+  icon: LucideIcon;
+  ownerOnly?: boolean;
+  when?: "hve" | "ab";
+  module?: AccessModule;
+  noGuest?: boolean;
+  /** Entrée affichée seulement s'il y a des propositions en attente (ou sur sa page), avec leur nombre (lot AM8). */
+  pending?: true;
+};
 type NavGroup = { label: string; icon: LucideIcon; ownerOnly?: boolean; children: NavItem[] };
 type NavEntry = NavItem | NavGroup;
 
@@ -41,6 +52,7 @@ export const NAVIGATION: NavEntry[] = [
   },
   { path: "/activities", label: "Activités", icon: Sprout, module: "activities" },
   { path: "/interventions", label: "Interventions", icon: ClipboardList, module: "interventions" },
+  { path: "/a-valider", label: "À valider", icon: Bot, ownerOnly: true, pending: true },
   { path: "/equipments", label: "Matériels", icon: Tractor, module: "equipments" },
   { path: "/economics", label: "Économique", icon: Euro, module: "economics" },
   {
@@ -108,20 +120,29 @@ export function Layout() {
   const [opened, { toggle, close }] = useDisclosure();
   const { day } = useAt();
   const availability = useControlAvailability(farm.id, Number(day.slice(0, 4))).data;
-  const visible = (e: NavItem) => navAllowed(farm, e) && (!e.when || !!availability?.[e.when]);
+  // Propositions des accès externes en attente (lot AM8) : compteur du responsable.
+  const pending = useProposals(farm.id, "pending", farm.role === "owner").data?.pending ?? 0;
   const location = useLocation();
   const base = `/f/${farm.id}`;
   const current = location.pathname.slice(base.length);
+  const visible = (e: NavItem) => navAllowed(farm, e) && (!e.when || !!availability?.[e.when]) && (!e.pending || pending > 0 || isActivePath(current, e.path));
   const linkTo = (path: string) => `${base}${path}${location.search}`; // garde ?at=
   // Sous-menus : ouverts sur la section active, sinon au clic.
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
-  const item = ({ path, label, icon: Icon }: NavItem) => (
+  const item = ({ path, label, icon: Icon, pending: counted }: NavItem) => (
     <NavLink
       key={path}
       component={Link}
       to={linkTo(path)}
       label={label}
       leftSection={<Icon size={18} />}
+      rightSection={
+        counted && pending > 0 ? (
+          <Badge size="sm" circle color="brique" aria-label={`${pending} en attente`}>
+            {pending}
+          </Badge>
+        ) : undefined
+      }
       active={isActivePath(current, path)}
       onClick={close}
     />
