@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import type { Tx } from "@fourmy/db";
 import type { FertilizerArticle } from "@fourmy/contracts";
 import { copperOfAmm, cycleFromLexicon, type CropCycle } from "@fourmy/certification-refs";
@@ -9,6 +9,7 @@ import {
   type AbEquipmentEvent,
   type AbParcelInput,
   type AbProduction,
+  type NonAbProduction,
   type AbRotationYear,
   type ParcelCertificationRef,
 } from "@fourmy/domain";
@@ -276,12 +277,14 @@ export async function abProductions(tx: Tx, parcelIds: string[], from: string, t
     sown_on: string | null;
     harvest_on: string | null;
     specie: string | null;
+    lineage: string[] | null;
     variety: string | null;
     cultivation_mode: string | null;
   }>(
     tx,
     sql`SELECT p.id, p.land_parcel_id, coalesce(a.name, lp.label, p.species, p.nature, 'Production') AS label, p.cycle,
-               coalesce(a.cultivation, lp.specie, p.cultivation) AS specie, nullif(btrim(p.species), '') AS variety, p.cultivation_mode,
+               coalesce(a.cultivation, lp.specie, p.cultivation) AS specie, ${speciesLineage(sql`coalesce(a.cultivation, lp.specie, p.cultivation)`)} AS lineage,
+               nullif(btrim(p.species), '') AS variety, p.cultivation_mode,
                lp.life_years::float8 AS life_years, lp.usage,
                coalesce(p.planted_on, p.started_on, make_date(c.year, 1, 1))::text AS sown_on,
                coalesce(p.stopped_on, make_date(c.year, 12, 31))::text AS harvest_on
@@ -300,23 +303,39 @@ export async function abProductions(tx: Tx, parcelIds: string[], from: string, t
     sownOn: r.sown_on,
     harvestOn: r.harvest_on,
     species: r.specie,
+    lineage: r.lineage,
     variety: r.variety,
     cultivationMode: r.cultivation_mode,
   }));
 }
 
+/**
+ * Lignée d'une culture pour la mixité (R7, issue #166) : son taxon puis ses
+ * parents jusqu'au genre, rangs fins seulement ; NULL pour une culture
+ * générique (« plant », une famille, hors taxonomie, aucune).
+ */
+export const speciesLineage = (expr: SQL) => sql`(
+  WITH RECURSIVE l AS (
+    SELECT reference_name, parent, rank, 0 AS depth FROM taxonomy WHERE reference_name = ${expr}
+    UNION ALL SELECT t.reference_name, t.parent, t.rank, l.depth + 1 FROM taxonomy t JOIN l ON t.reference_name = l.parent
+    WHERE l.rank IS DISTINCT FROM 'genus' AND l.depth < 10)
+  SELECT CASE WHEN (SELECT rank FROM l WHERE depth = 0) IN ('genus', 'specie', 'subspecie', 'variety')
+              THEN array_agg(reference_name ORDER BY depth) FILTER (WHERE rank IN ('genus', 'specie', 'subspecie', 'variety')) END
+  FROM l)`;
+
 /** Productions des parcelles non AB de la campagne (mixité, R7). */
-export async function nonAbProductions(tx: Tx, abParcelIds: string[], campaign: number): Promise<{ species: string; label: string; variety: string | null }[]> {
-  const list = await rows<{ specie: string | null; label: string; variety: string | null }>(
+export async function nonAbProductions(tx: Tx, abParcelIds: string[], campaign: number): Promise<NonAbProduction[]> {
+  const list = await rows<{ specie: string | null; lineage: string[] | null; label: string; variety: string | null }>(
     tx,
-    sql`SELECT coalesce(a.cultivation, lp.specie, p.cultivation) AS specie, coalesce(a.name, lp.label, p.nature, 'Production') AS label, nullif(btrim(p.species), '') AS variety
+    sql`SELECT coalesce(a.cultivation, lp.specie, p.cultivation) AS specie, ${speciesLineage(sql`coalesce(a.cultivation, lp.specie, p.cultivation)`)} AS lineage,
+               coalesce(a.name, lp.label, p.nature, 'Production') AS label, nullif(btrim(p.species), '') AS variety
         FROM productions p
         JOIN campaigns c ON c.id = p.campaign_id AND c.year = ${campaign}
         LEFT JOIN activities a ON a.id = p.activity_id
         LEFT JOIN lexicon_productions lp ON lp.reference_name = a.reference
         WHERE ${abParcelIds.length ? sql`p.land_parcel_id <> ALL(${uuids(abParcelIds)})` : sql`true`}`,
   );
-  return list.flatMap((r) => (r.specie ? [{ species: r.specie, label: r.label, variety: r.variety }] : []));
+  return list.map((r) => ({ species: r.specie, lineage: r.lineage, label: r.label, variety: r.variety }));
 }
 
 // --- Lot CT5b : matériel à usage mixte, rotation ------------------------------------------

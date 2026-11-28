@@ -43,6 +43,8 @@ export interface CropPlanActivity {
   capCode: string | null;
   /** Espèce (taxonomie), pour la rotation et la mixité AB et la diversité HVE. */
   species?: string | null;
+  /** Taxon et parents jusqu'au genre, pour la mixité AB (issue #166) ; null : culture générique. */
+  speciesLineage?: string[] | null;
   /** Cycle de la culture (conversion AB). */
   cycle?: "annual" | "semi_perennial" | "perennial";
   legume?: boolean;

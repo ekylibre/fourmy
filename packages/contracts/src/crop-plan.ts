@@ -272,6 +272,8 @@ export interface CropPlanContext {
     color: string | null;
     capCode: string | null;
     species: string | null;
+    /** Taxon et parents jusqu'au genre (mixité AB, issue #166) ; null : culture générique. */
+    speciesLineage?: string[] | null;
     cycle: "annual" | "semi_perennial" | "perennial";
     legume: boolean;
     vegetable: boolean;

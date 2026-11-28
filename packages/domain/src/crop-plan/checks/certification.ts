@@ -3,6 +3,7 @@ import type { ControlFinding, CropPlanDraft } from "@fourmy/contracts";
 import { harvestStatus, rotationFindings, CONVERSION_STATUS_LABELS, type AbRotationYear } from "../../certification/ab.js";
 import { mainCropFindings, plotSizeFindings, speciesFindings, type HveBiodiversityContext } from "../../certification/hve/biodiversity.js";
 import { finding } from "../../certification/report.js";
+import { mixityLineage, sameSpeciesForMixity } from "../../certification/taxonomy.js";
 import { historyOf } from "../history.js";
 import type { CropPlanActivity, CropPlanHistory } from "../model.js";
 import type { ResolvedPlan } from "../resolve.js";
@@ -52,8 +53,9 @@ export function abPlanFindings({ plan, draft, activities, history, context }: In
   if (!context.abParcels.size) return [];
   const out: ControlFinding[] = [];
   const rotation = new Map<string, { name: string; years: AbRotationYear[] }>();
-  const abSpecies = new Map<string, { label: string; keys: string[] }>();
-  const otherSpecies = new Map<string, string[]>();
+  // Mixité (R7, issue #166) : par taxon, avec sa lignée ; une culture générique n'est comparée à rien.
+  const abSpecies = new Map<string, { label: string; lineage: string[]; keys: string[] }>();
+  const otherSpecies = new Map<string, { lineage: string[]; keys: string[] }>();
 
   for (const p of plan.parcels) {
     const state = abState(p.origins, context.abParcels);
@@ -71,11 +73,16 @@ export function abPlanFindings({ plan, draft, activities, history, context }: In
     }
     const a = mainAssignment(draft, p.key);
     const act = a ? activities.get(a.activityId) : undefined;
-    if (act?.species && state === "ab") {
-      const x = abSpecies.get(act.species) ?? { label: act.name, keys: [] };
+    const lineage = act ? mixityLineage(act.species, act.speciesLineage) : null;
+    if (lineage && state === "ab") {
+      const x = abSpecies.get(lineage[0]!) ?? { label: act!.name, lineage, keys: [] };
       x.keys.push(p.key);
-      abSpecies.set(act.species, x);
-    } else if (act?.species) otherSpecies.set(act.species, [...(otherSpecies.get(act.species) ?? []), p.key]);
+      abSpecies.set(lineage[0]!, x);
+    } else if (lineage) {
+      const x = otherSpecies.get(lineage[0]!) ?? { lineage, keys: [] };
+      x.keys.push(p.key);
+      otherSpecies.set(lineage[0]!, x);
+    }
     if (state !== "ab") continue;
 
     // Statut prévu de la récolte (conversion déduite, jamais saisie).
@@ -121,9 +128,9 @@ export function abPlanFindings({ plan, draft, activities, history, context }: In
   out.push(...rotationFindings(rotation, draft.year, context.abRotation.years, context.abRotation.sameSpeciesMax));
 
   // Mixité (R7) : même espèce en AB et hors AB la même campagne.
-  for (const [species, ab] of abSpecies) {
-    const others = otherSpecies.get(species);
-    if (!others) continue;
+  for (const ab of abSpecies.values()) {
+    const others = [...otherSpecies.values()].filter((o) => sameSpeciesForMixity(ab.lineage, o.lineage)).flatMap((o) => o.keys);
+    if (!others.length) continue;
     out.push(
       finding({
         ruleId: "ab.R7",

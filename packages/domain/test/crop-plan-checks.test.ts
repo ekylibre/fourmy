@@ -123,6 +123,22 @@ describe("Certifications sur l'assolement prévu", () => {
     expect(mix.refs.parcelIds).toEqual(["p:a", "p:b"]);
   });
 
+  it("AB, mixité (issue #166) : culture générique ignorée ; un genre englobe ses espèces", () => {
+    const acts = new Map<string, CropPlanActivity>([
+      [uuid(5), { id: uuid(5), name: "PPAM", family: "PPAM", capCode: "PPA", species: "plant", speciesLineage: null, cycle: "perennial" }],
+      [uuid(6), { id: uuid(6), name: "Prairie permanente", family: "Fourrages", capCode: "PPH", species: "plant", speciesLineage: null, cycle: "perennial" }],
+      [uuid(7), { id: uuid(7), name: "Avoine", family: "Céréales", capCode: "AVH", species: "avena", speciesLineage: ["avena"], cycle: "annual" }],
+      [uuid(8), { id: uuid(8), name: "Avoine noire", family: "Céréales", capCode: "AVH", species: "avena_sativa", speciesLineage: ["avena_sativa", "avena"], cycle: "annual" }],
+    ]);
+    const context: CropPlanCertificationContext = { ...noCert, abParcels: new Map([["a", { conversionStart: "2020-06-01" }]]) };
+    const run = (ab: number, other: number) => {
+      const draft: CropPlanDraft = { ...emptyDraft(2027), assignments: [assign("p:a", ab), assign("p:b", other)] };
+      return abPlanFindings({ plan: resolveParcels(base, draft), draft, activities: acts, history, context }).filter((f) => f.ruleId === "ab.R7");
+    };
+    expect(run(5, 6)).toEqual([]);
+    expect(run(7, 8)).toEqual([expect.objectContaining({ level: "warning", refs: { parcelIds: ["p:a", "p:b"] } })]);
+  });
+
   it("AB : semis moins de 24 mois après le début de la conversion : C2", () => {
     const draft: CropPlanDraft = { ...emptyDraft(2027), assignments: [assign("p:a", 1, { startedOn: "2026-10-20", stoppedOn: "2027-07-15" })] };
     const context: CropPlanCertificationContext = { ...noCert, abParcels: new Map([["a", { conversionStart: "2025-06-01" }]]) };

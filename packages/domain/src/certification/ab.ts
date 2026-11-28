@@ -14,6 +14,7 @@ import {
   type CropCycle,
 } from "@fourmy/certification-refs";
 import { finding, missing } from "./report.js";
+import { mixityLineage, sameSpeciesForMixity } from "./taxonomy.js";
 
 /**
  * Règles de l'Agriculture biologique, lot CT2 (claudedocs/conception_controle_hve_ab.md
@@ -57,6 +58,8 @@ export interface AbProduction {
   label: string;
   /** Espèce (taxonomie) et variété, pour la mixité (R7) ; mode de culture (R10, R13). */
   species?: string | null;
+  /** Taxon et parents jusqu'au genre (R7, issue #166) ; null : culture générique ; absent : l'espèce seule. */
+  lineage?: string[] | null;
   variety?: string | null;
   cultivationMode?: string | null;
   cycle: CropCycle;
@@ -451,22 +454,55 @@ export function growingModeFindings(productions: AbProduction[], names: Map<stri
   });
 }
 
+/** Production hors AB de la campagne, pour la mixité (R7). */
+export interface NonAbProduction {
+  species: string | null;
+  lineage?: string[] | null;
+  label: string;
+  variety: string | null;
+}
+
 /**
  * R7 : mixité, même espèce cultivée en AB et hors AB la même campagne. Variétés
  * différentes : admis (à distinguer) ; même variété : non conforme (n° 31) ;
- * variété inconnue : à renseigner.
+ * variété inconnue : à renseigner. Un genre englobe ses espèces ; une culture
+ * générique n'est comparée à rien, et une production AB dans ce cas reçoit une
+ * note sans effet sur le verdict (issue #166).
  */
-export function mixityFindings(abProductions: AbProduction[], others: { species: string; label: string; variety: string | null }[]): ControlFinding[] {
+export function mixityFindings(abProductions: AbProduction[], others: NonAbProduction[]): ControlFinding[] {
   const out: ControlFinding[] = [];
-  const bySpecies = new Map<string, AbProduction[]>();
-  for (const p of abProductions) if (p.species) bySpecies.set(p.species, [...(bySpecies.get(p.species) ?? []), p]);
-  for (const [species, ab] of bySpecies) {
-    const non = others.filter((o) => o.species === species);
+  const source = "Règlement (UE) 2018/848, art. 9.7 et 9.8";
+  const generic = new Map<string, AbProduction[]>();
+  const byTaxon = new Map<string, { lineage: string[]; productions: AbProduction[] }>();
+  for (const p of abProductions) {
+    const lineage = mixityLineage(p.species, p.lineage);
+    if (!lineage) {
+      generic.set(p.label, [...(generic.get(p.label) ?? []), p]);
+      continue;
+    }
+    const g = byTaxon.get(lineage[0]!) ?? { lineage, productions: [] };
+    g.productions.push(p);
+    byTaxon.set(lineage[0]!, g);
+  }
+  for (const [label, ps] of generic) {
+    out.push(
+      finding({
+        ruleId: "ab.R7",
+        level: "na",
+        message: `${label} : espèce à préciser sur l'activité pour contrôler la mixité (R7).`,
+        refs: { parcelIds: [...new Set(ps.map((p) => p.parcelId))] },
+        source,
+      }),
+    );
+  }
+  for (const { lineage, productions: ab } of byTaxon.values()) {
+    const non = others.filter((o) => sameSpeciesForMixity(lineage, mixityLineage(o.species, o.lineage)));
     if (!non.length) continue;
-    const label = ab[0]!.label;
+    const abLabel = ab[0]!.label;
+    const otherLabels = [...new Set(non.map((o) => o.label))].filter((l) => l !== abLabel);
+    const label = otherLabels.length ? `${abLabel} (AB) et ${otherLabels.join(", ")} (hors AB)` : abLabel;
     const abVarieties = ab.map((p) => p.variety?.trim().toLowerCase() ?? null);
     const nonVarieties = non.map((o) => o.variety?.trim().toLowerCase() ?? null);
-    const source = "Règlement (UE) 2018/848, art. 9.7 et 9.8";
     if ([...abVarieties, ...nonVarieties].includes(null)) {
       out.push(finding({ ruleId: "ab.R7", level: "missing", message: `${label} cultivé(e) en AB et hors AB : variétés à renseigner (critère de distinction).`, missing: ab.filter((p) => !p.variety).map((p) => missing(`variété (${p.label})`, "production", p.id)), refs: { parcelIds: ab.map((p) => p.parcelId) }, source }));
       continue;

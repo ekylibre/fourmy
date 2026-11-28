@@ -19,6 +19,7 @@ import {
   type AbApplication,
   type AbParcelInput,
   type AbProduction,
+  type NonAbProduction,
 } from "./ab.js";
 import { cmrInterventionFindings, hvePhytoFindings, type HvePhytoContext } from "./hve/phyto.js";
 import { hveFertilizationFindings, type HveFertilizationContext } from "./hve/fertilization.js";
@@ -67,7 +68,7 @@ export interface CertificationContext {
     productions: AbProduction[];
     applications: AbApplication[];
     /** Productions des parcelles non AB de la campagne (mixité). */
-    others?: { species: string; label: string; variety: string | null }[];
+    others?: NonAbProduction[];
     /** Usages et nettoyages des matériels (R27). */
     equipment?: AbEquipmentEvent[];
     /** Historique des cultures des parcelles AB (R11). */

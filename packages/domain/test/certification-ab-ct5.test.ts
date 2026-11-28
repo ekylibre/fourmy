@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { growingModeFindings, justificationFindings, mixityFindings, seedFindings, type AbApplication, type AbProduction } from "../src/index.js";
+import { growingModeFindings, justificationFindings, mixityFindings, sameSpeciesForMixity, seedFindings, mixityLineage, type AbApplication, type AbProduction } from "../src/index.js";
 
 const names = new Map([["p1", "Le Champ"]]);
 const seed = (extra: Partial<AbApplication>): AbApplication => ({
@@ -55,5 +55,34 @@ describe("AB justification, mode de culture, mixité", () => {
     expect(mixityFindings([prod({})], [{ species: "solanum_lycopersicum", label: "Tomate", variety: "Marmande" }])[0]!.level).toBe("ok");
     expect(mixityFindings([prod({ variety: null })], [{ species: "solanum_lycopersicum", label: "Tomate", variety: "Marmande" }])[0]!.level).toBe("missing");
     expect(mixityFindings([prod({})], [{ species: "zea_mays", label: "Maïs", variety: null }])).toEqual([]);
+  });
+
+  it("R7, issue #166 : cultures génériques ignorées, note sans effet sur le verdict", () => {
+    const ppam = prod({ label: "Plantes médicinales pérennes", species: "plant", lineage: null, variety: null });
+    const prairie = { species: "plant", lineage: null, label: "Prairie permanente", variety: null };
+    const fs = mixityFindings([ppam], [prairie]);
+    expect(fs).toEqual([expect.objectContaining({ ruleId: "ab.R7", level: "na", message: "Plantes médicinales pérennes : espèce à préciser sur l'activité pour contrôler la mixité (R7)." })]);
+    // Production hors AB générique : jamais comparée.
+    expect(mixityFindings([prod({ lineage: ["solanum_lycopersicum", "solanum"] })], [{ species: null, lineage: null, label: "Jachère", variety: null }])).toEqual([]);
+  });
+
+  it("R7, issue #166 : un genre englobe ses espèces ; deux espèces du même genre ne se comparent pas", () => {
+    const avoine = prod({ label: "Avoine", species: "avena", lineage: ["avena"], variety: "Une de Mai" });
+    const noire = (variety: string | null) => ({ species: "avena_sativa", lineage: ["avena_sativa", "avena"], label: "Avoine noire d'hiver", variety });
+    const same = mixityFindings([avoine], [noire("Une de Mai")])[0]!;
+    expect(same).toMatchObject({ level: "danger", breach: { inao: "31" } });
+    expect(same.message).toBe("Avoine (AB) et Avoine noire d'hiver (hors AB) : même variété (une de mai) en AB et hors AB la même campagne : mixité non autorisée.");
+    expect(mixityFindings([avoine], [noire("Pratex")])[0]!.level).toBe("ok");
+    expect(mixityFindings([avoine], [noire(null)])[0]!.level).toBe("missing");
+    expect(mixityFindings([prod({ species: "avena_strigosa", lineage: ["avena_strigosa", "avena"] })], [noire("Cœur de bœuf")])).toEqual([]);
+  });
+
+  it("lignée de mixité : espèce seule sans lignée calculée ; recoupement par l'ancêtre", () => {
+    expect(mixityLineage("zea_mays", undefined)).toEqual(["zea_mays"]);
+    expect(mixityLineage("plant", null)).toBeNull();
+    expect(mixityLineage(null, undefined)).toBeNull();
+    expect(sameSpeciesForMixity(["brassica_napus_napus", "brassica_napus", "brassica"], ["brassica_napus", "brassica"])).toBe(true);
+    expect(sameSpeciesForMixity(["avena_sativa", "avena"], ["avena_strigosa", "avena"])).toBe(false);
+    expect(sameSpeciesForMixity(null, ["avena"])).toBe(false);
   });
 });
