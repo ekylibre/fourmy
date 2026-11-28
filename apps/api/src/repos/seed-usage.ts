@@ -181,7 +181,8 @@ export function seedUsageCsv(u: SeedUsage): string {
         f.interventions,
         f.areaHa,
         f.stockQuantity ?? "",
-        g.unit ?? "",
+        // Plants comptés à la pièce (issue #130) : « plants », quel que soit le libellé repris (`unity`…).
+        g.unit ? (parseSeedUnit(g.unit)?.dim === "plant" ? "plants" : g.unit) : "",
         f.kg ?? "",
         f.grains ?? "",
         f.kgPerHa?.mean ?? "",

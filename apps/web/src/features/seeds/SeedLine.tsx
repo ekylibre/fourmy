@@ -34,6 +34,14 @@ export function SeedLine({ quantity, unit, seed, areaHa, farmId }: { quantity: n
   const ctx = ctxOf(seed);
   const eq = seedEquivalents(quantity, unit, ctx, areaHa);
   if (!eq) return null;
+  // Plants comptés à la pièce (issue #130) : la densité en plants, sans PMG.
+  if (eq.plantsPerHa !== undefined) {
+    return (
+      <Text size="xs" c="dimmed" className="lv-num" aria-label="Densité de plantation">
+        ≈ {fmt(eq.plantsPerHa, 0)} plants/ha · {fmt(eq.plantsPerM2 ?? 0, 2)} plant/m²
+      </Text>
+    );
+  }
   const parts = [
     eq.grainsPerM2 !== null ? `${fmt(eq.grainsPerM2, 1)} grains/m²` : null,
     eq.dosesPerHa !== null ? `${fmt(eq.dosesPerHa, 2)} dose/ha` : null,

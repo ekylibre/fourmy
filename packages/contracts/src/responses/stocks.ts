@@ -137,6 +137,7 @@ export const articlesSeedResponse = z.object({
       areaHa: z.number().nullable(),
       grainsPerM2: z.number().nullable(),
       kgPerHa: z.number().nullable(),
+      plantsPerHa: z.number().nullable().optional(),
       estimated: z.boolean(),
     }),
   ),

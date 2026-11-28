@@ -106,6 +106,15 @@ Sous la ligne de l'intrant, Fourmy affiche par exemple « ≈ 9 grains/m² · 1,
 
 La **conversion est figée** sur l'intrant (PMG, origine, grains par dose). Corriger le PMG ensuite ne change pas les stocks passés.
 
+### Plants
+
+Les plants achetés (arbres, plants de vigne, PPAM, mottes de maraîchage) se **comptent à la pièce** : unité « Plants (à la pièce) » à la création d'une semence. « plant », « pièce », « pied », « motte », et les unités `unity` et « unité » reprises d'Ekylibre, sont lus comme des plants.
+
+- La plantation se saisit en plants/ha ou en plants au total, par exemple 8 000 plants/ha sur 1,5 ha : 12 000 plants sortent du stock. Sous la ligne, Fourmy affiche « ≈ 8 000 plants/ha · 0,8 plant/m² ».
+- Un plant n'a ni PMG, ni grains par dose, ni densité en grains/m² : la fiche ne les montre pas.
+- Les plants ne se convertissent ni en kg ni en grains : une saisie dans une autre unité est refusée, avec le motif « les plants se comptent à la pièce ».
+- L'export de l'utilisation par campagne écrit « plants » dans la colonne de l'unité.
+
 ### Mélanges
 
 Pour un mélange stocké en kg, la dose de chaque espèce se saisit en kg/ha. La dose du mélange en est la somme ; c'est elle qui fait baisser le stock. Les doses du dernier semis du même mélange sont proposées. La densité de chaque espèce en grains/m² s'affiche quand son repère de PMG existe.
@@ -142,7 +151,7 @@ La synchronisation envoie, pour chaque semence, l'espèce, le mélange, les grai
 
 Voir `claudedocs/points_ouverts.md`, thème 18 :
 - faculté germinative et pertes à la levée ;
-- réécriture des unités existantes ;
+- réécriture des unités existantes : décidée (issue #130, lots SU3 à SU5 de `claudedocs/workflow_semences_unites.md`) ;
 - prix indicatifs ;
 - semences de ferme (triage, CVO) ;
 - espèces d'un mélange sur le mobile.
