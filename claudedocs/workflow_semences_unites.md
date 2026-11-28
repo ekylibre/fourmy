@@ -153,3 +153,15 @@ Chemin critique : SU1 → SU3 → SU4. SU2 et SU5 peuvent avancer en parallèle 
   - US-1 : stocks à trois dates, fiche, semis et utilisation de la campagne identiques avant et après ; toutes les tables réécrites ; l'historique ; plus rien à proposer sauf le conflit ; un nouveau semis à 1 dose/ha.
 - **Non-régression** : API 502 (6 ignorés), web 293. Typecheck 40/40, lint sans erreur.
 
+### SU4 — fait (28/11)
+- **Page Semences** (`SeedsPage.tsx`) : encadré « N semences ont une unité reprise d'un autre logiciel, dont M à réécrire… », pour l'`owner` seulement, s'il y en a ; *Voir et réécrire*.
+- **Fenêtre** (`UnitRewriteModal.tsx`) :
+  - la table « Unités à réécrire » : semence, unité actuelle, ce qu'elle devient (`stockUnitLabel` : « doses de 50 000 grains », « milliers de grains », « plants »), stock du jour, ce qu'elle concerne ;
+  - une case par semence, cochée au départ, et « Tout choisir » ;
+  - les conflits listés à part, avec la façon de les régler ;
+  - « Réécrire N semences », puis une notification avec le nombre réécrit et les ignorées avec leur motif ; les semences, le stock et les interventions sont relus.
+- **Requête** `useSeedUnitRewrites` ; mock par défaut de `GET /seeds/units` (rien à réécrire).
+- **Tests web** (`seeds.test.tsx`, 2) : l'encadré, la liste (unités avant et après, usage), le conflit à part, une semence décochée, le corps envoyé, la notification ; pas d'encadré pour un `worker`.
+- **Non-régression** : web 295. Lint sans erreur.
+- **Documentation** : `docs/semences.md`, « Unités reprises d'un autre logiciel ».
+

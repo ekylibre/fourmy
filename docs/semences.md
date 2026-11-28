@@ -90,6 +90,16 @@ Pour chaque ligne :
 
 **Exporter en CSV** : une ligne par semence (ou espèce) et par statut, avec le séparateur « ; » et des décimales françaises.
 
+### Unités reprises d'un autre logiciel
+
+Une semence reprise d'Ekylibre ou d'un import garde son unité écrite librement (« Sac de 50 000 grains », « Mille graines », « Kg », « unity »). Fourmy la lit déjà ; le responsable peut aussi la **réécrire** dans l'unité de Fourmy. Un encadré de la page Semences l'annonce (« 12 semences ont une unité reprise d'un autre logiciel »), et *Voir et réécrire* ouvre la liste :
+
+- chaque semence, son unité actuelle, l'unité de même grandeur proposée (doses de 50 000 grains, milliers de grains, kg, plants), son stock du jour et ce qu'elle concerne (mouvements, interventions, prix) ;
+- une case par semence, cochée au départ ;
+- à part, les semences dont la fiche donne un autre nombre de grains par dose que l'unité : à corriger sur la fiche d'abord.
+
+**Aucune quantité ne change** : un sac reste un sac. L'article, ses mouvements de stock, ses semis, ses prix et ses dérogations AB changent de libellé ensemble, semence par semence ; le stock de chaque lot est vérifié à plusieurs dates avant et après, et l'opération est notée dans l'historique.
+
 ## Au semis (Interventions)
 
 Une semence se saisit dans l'unité du métier. Le stock baisse dans l'unité de l'article, après conversion.

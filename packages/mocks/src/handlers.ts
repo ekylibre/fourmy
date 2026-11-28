@@ -109,6 +109,8 @@ export const handlers = [
   http.get(`*${base}/integrations`, () => HttpResponse.json({ providers: INTEGRATION_PROVIDERS, items: [] })),
   // Propositions des accès externes (lot AM8) : aucune en attente par défaut.
   http.get(`*${base}/proposals`, () => HttpResponse.json({ items: [], pending: 0 })),
+  // Unités reprises des semences (issue #130) : rien à réécrire par défaut.
+  http.get(`*${base}/seeds/units`, () => HttpResponse.json({ items: [] })),
   // « Ma ferme » (lot F1) : siège sans point, aucune certification ; les écritures renvoient ce qu'elles reçoivent.
   http.get(`*${base}/farm`, () => HttpResponse.json(demoFarmProfile())),
   http.get(`*${base}/settings/maintenance`, () => HttpResponse.json({ soonHours: 50, soonMonths: 1, notify: [] })),
