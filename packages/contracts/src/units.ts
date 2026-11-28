@@ -25,6 +25,9 @@ const UNITS: Record<string, string> = {
   grain_per_hectare: "grains/ha",
   dose_per_hectare: "doses/ha",
   grain_per_square_meter: "grains/m²",
+  // Comptage à l'unité (issue #130) : plants, pièces, pieds.
+  plant: "plants",
+  plant_per_hectare: "plants/ha",
 };
 
 export function unitLabel(unit: string | null | undefined): string {

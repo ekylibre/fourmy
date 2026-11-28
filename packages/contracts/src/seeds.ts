@@ -155,7 +155,7 @@ export interface SeedListItem {
   /** Unité de stock (articles.unit). */
   unit: string;
   /** Unité reconnue : masse, grains, dose ; null sinon. */
-  unitDim: "mass" | "grain" | "dose" | null;
+  unitDim: "mass" | "grain" | "dose" | "plant" | null;
   lexiconRef: string | null;
   organicStatus: "organic" | "conversion" | "conventional" | null;
   seedTreated: boolean | null;

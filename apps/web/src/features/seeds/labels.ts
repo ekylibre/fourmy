@@ -13,6 +13,7 @@ export function stockUnitLabel(s: Pick<SeedListItem, "unit" | "unitDim" | "sheet
   if (u?.dim === "dose") return u.grains ? `doses de ${u.grains.toLocaleString("fr-FR")} grains` : "doses";
   if (u?.dim === "grain") return u.grains === 1 ? "grains" : u.grains === 1000 ? "milliers de grains" : `lots de ${u.grains.toLocaleString("fr-FR")} grains`;
   if (u?.dim === "mass") return u.kg === 1 ? "kg" : unitLabel(s.unit);
+  if (u?.dim === "plant") return "plants";
   return s.unit;
 }
 

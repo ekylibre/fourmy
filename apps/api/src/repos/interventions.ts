@@ -463,6 +463,7 @@ const SEED_UNIT_ERRORS = {
   unit_unknown: (a: Article, unit: string) => `${a.name} : ${unit} n'est pas une unité de semence convertible en ${a.unit}.`,
   grains_per_dose_missing: (a: Article) => `${a.name} : nombre de grains par dose inconnu, à compléter dans Stocks → Semences.`,
   tgw_missing: (a: Article) => `${a.name} : PMG inconnu, à compléter dans Stocks → Semences pour passer des grains à la masse.`,
+  dimension: (a: Article) => `${a.name} : les plants se comptent à la pièce, ils ne se convertissent ni en kg ni en grains.`,
 };
 
 /**

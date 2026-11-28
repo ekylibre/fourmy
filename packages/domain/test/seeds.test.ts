@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  canonicalSeedUnit,
   convertSeedQuantity,
   coverFamilyOf,
   grainsPerM2,
@@ -33,7 +34,8 @@ describe("unités de semence", () => {
     expect(parseSeedUnit("Mille grains")).toEqual({ dim: "grain", grains: 1_000 });
     expect(parseSeedUnit("Mille graines")).toEqual({ dim: "grain", grains: 1_000 });
     expect(parseSeedUnit("graines")).toEqual({ dim: "grain", grains: 1 });
-    expect(parseSeedUnit("unity")).toEqual({ dim: "grain", grains: 1 });
+    // `unity` est un comptage à l'unité, comme plant ou pied (issue #130, U3).
+    expect(parseSeedUnit("unity")).toEqual({ dim: "plant" });
   });
 
   it("codes canoniques, doses et inconnues", () => {
@@ -214,3 +216,76 @@ describe("utilisation par campagne (lot SE7)", () => {
     expect(summarizeSeedUsage([line(null, 100, { stock: 1 }), line(null, 200, { stock: 1 })]).kgPerHa).toEqual({ mean: 150, min: 100, max: 200 });
   });
 });
+
+/** Plants et unités canoniques (issue #130, claudedocs/conception_semences_unites.md §4). */
+describe("plants comptés à l'unité", () => {
+  it("plant, pièce, pied, motte, unity et unité", () => {
+    for (const u of ["plant", "Plants", "pièce", "Pièces", "pied", "pieds", "motte", "Mottes", "unity", "unité", "Unités"]) {
+      expect(parseSeedUnit(u), u).toEqual({ dim: "plant" });
+    }
+    expect(parseSeedUnit("graines")).toEqual({ dim: "grain", grains: 1 });
+  });
+
+  it("se convertissent entre eux seulement", () => {
+    expect(convertSeedQuantity(12, "pièce", "plant")).toBe(12);
+    expect(convertSeedQuantity(12, "plant", "kilogram", { tgwG: 300 })).toBeNull();
+    expect(convertSeedQuantity(12, "plant", "grain")).toBeNull();
+    expect(convertSeedQuantity(12, "dose", "plant", { grainsPerDose: 50_000 })).toBeNull();
+    expect(seedConversionGap("plant", "kilogram", { tgwG: 300 })).toBe("dimension");
+    expect(seedConversionGap("grain", "unity")).toBe("dimension");
+    expect(seedConversionGap("unity", "plant")).toBeNull();
+    expect(seedUnitChoices("plant")).toEqual(["plant"]);
+    expect(seedUnitChoices("unity")).toEqual(["unity"]);
+  });
+
+  it("plantation : 8 000 plants/ha sur 1,5 ha = 12 000 plants", () => {
+    expect(toStockQuantity({ quantity: 8_000, unit: "plant_per_hectare", articleUnit: "plant", areaHa: 1.5, seed: {} })).toBe(12_000);
+    expect(seedEquivalents(8_000, "plant_per_hectare", {}, 1.5)).toEqual({
+      grainsPerM2: null,
+      grainsPerHa: null,
+      dosesPerHa: null,
+      kgPerHa: null,
+      plantsPerHa: 8_000,
+      plantsPerM2: 0.8,
+    });
+    expect(() => toStockQuantity({ quantity: 10, unit: "kilogram_per_hectare", articleUnit: "plant", areaHa: 1, seed: { tgwG: 300 } })).toThrow(/se comptent à la pièce/);
+  });
+});
+
+describe("unité canonique d'une unité reprise", () => {
+  it("les unités de la base de développement : même grandeur, facteur 1", () => {
+    const cases: [string, string, number | null][] = [
+      ["Sac de 50 000 grains", "dose", 50_000],
+      ["sac de 50 000 grains", "dose", 50_000],
+      ["Sac  de 50 000 grains", "dose", 50_000],
+      ["Mille grains", "thousand", null],
+      ["Mille graines", "thousand", null],
+      ["1000 grains", "thousand", null],
+      ["Kg", "kilogram", null],
+      ["Kilogramme", "kilogram", null],
+      ["graines", "grain", null],
+      ["unity", "plant", null],
+      ["Unité", "plant", null],
+      ["Pièce", "plant", null],
+    ];
+    for (const [from, code, grainsPerDose] of cases) {
+      expect(canonicalSeedUnit(from), from).toEqual({ code, grainsPerDose });
+      expect(convertSeedQuantity(7, from, code, { grainsPerDose }), from).toBe(7);
+    }
+  });
+
+  it("déjà canonique, inconnue ou sans équivalent de facteur 1 : rien", () => {
+    for (const u of ["kilogram", "dose", "thousand", "grain", "plant"]) expect(canonicalSeedUnit(u), u).toBeNull();
+    expect(canonicalSeedUnit("palette")).toBeNull();
+    expect(canonicalSeedUnit("50 000 grains")).toBeNull();
+    expect(canonicalSeedUnit("Tonne")).toBeNull();
+  });
+
+  it("dose : nombre de grains de la fiche, ou conflit", () => {
+    expect(canonicalSeedUnit("Sac de 50 000 grains", 50_000)).toEqual({ code: "dose", grainsPerDose: 50_000 });
+    expect(canonicalSeedUnit("Sac de 50 000 grains", 80_000)).toEqual({ conflict: { unitGrains: 50_000, sheetGrains: 80_000 } });
+    expect(canonicalSeedUnit("Sac", 80_000)).toEqual({ code: "dose", grainsPerDose: 80_000 });
+    expect(canonicalSeedUnit("Sac")).toEqual({ code: "dose", grainsPerDose: null });
+  });
+});
+
