@@ -1,5 +1,5 @@
 import postgres, { type Sql } from "postgres";
-import { signedQuantity, buildEvent, proposeComposition, type DomainCtx } from "@fourmy/domain";
+import { applySeedUnitRewrite, signedQuantity, buildEvent, proposeComposition, type DomainCtx } from "@fourmy/domain";
 import { idsFor, uuidv5 } from "./ids.js";
 import * as x from "./extract.js";
 import { personName, privateOf, readPicture } from "./people.js";
@@ -483,21 +483,29 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
 
         // ---- Articles et lots ------------------------------------------------
         const lotByMatter = new Map<number, { lotId: string; unit: string; placeId: string | null }>();
-        const articles = new Set<number>();
+        const articles = new Map<number, string>();
+        // Semences dont l'unité a été réécrite dans Fourmy (issue #130) : unité d'origine → code canonique.
+        const unitRewrites = new Map<string, { from: string; to: string }>();
         for (const m of data.matters) {
           const aid = id("product_nature_variants", m.variant_id);
-          const unit = m.unit_name || "unity";
           if (!articles.has(m.variant_id)) {
-            await tx`
+            const sourceUnit = m.unit_name || "unity";
+            // Une unité réécrite dans Fourmy reste, tant qu'Ekylibre garde l'unité d'origine.
+            const [saved] = await tx<{ unit: string; rewritten_from: string | null }[]>`
               INSERT INTO articles (id, farm_id, lexicon_ref, name, kind, unit, amm)
               VALUES (${aid}, ${farmId}, ${m.reference_name}, ${m.variant_name},
-                      ${articleKind(m)}, ${unit}, ${m.france_maaid})
+                      ${articleKind(m)}, ${sourceUnit}, ${m.france_maaid})
               ON CONFLICT (id) DO UPDATE SET name = excluded.name, kind = excluded.kind,
-                unit = excluded.unit, amm = excluded.amm, updated_at = now()`;
-            articles.add(m.variant_id);
+                unit = CASE WHEN articles.custom->'unitRewrite'->>'from' = excluded.unit THEN articles.unit ELSE excluded.unit END,
+                amm = excluded.amm, updated_at = now()
+              RETURNING unit, custom->'unitRewrite'->>'from' AS rewritten_from`;
+            const unit = saved?.unit ?? sourceUnit;
+            if (unit !== sourceUnit && saved?.rewritten_from === sourceUnit) unitRewrites.set(aid, { from: sourceUnit, to: unit });
+            articles.set(m.variant_id, unit);
             inc("articles");
             await migrateNutrients(tx, farmId, aid, { name: m.variant_name, lexiconRef: m.reference_name }, data.nutrients.filter((r) => r.variant_id === m.variant_id), inc);
           }
+          const unit = articles.get(m.variant_id)!;
           const lid = id("products", m.id);
           await tx`
             INSERT INTO lots (id, farm_id, article_id, code) VALUES (${lid}, ${farmId}, ${aid}, ${m.name})
@@ -809,7 +817,7 @@ export async function migrate(opts: MigrateOptions): Promise<Report> {
               INSERT INTO intervention_parameters
                 (id, intervention_id, role, ref_type, ref_id, quantity, unit, working_zone, crew_id)
               VALUES (${id("intervention_parameters", p.id)}, ${iid}, ${role}, ${refType}, ${refId},
-                      ${num(p.quantity_value)}, ${p.quantity_unit_name || null},
+                      ${num(p.quantity_value)}, ${applySeedUnitRewrite(p.quantity_unit_name || null, refType === "article" && refId ? unitRewrites.get(refId) : undefined)},
                       ${p.working_zone ? tx`ST_SetSRID(ST_GeomFromGeoJSON(${geo(p.working_zone)}), 4326)` : null},
                       ${crewOfParam.get(p.id) ?? null})
               ON CONFLICT (id) DO UPDATE SET role = excluded.role, ref_type = excluded.ref_type,

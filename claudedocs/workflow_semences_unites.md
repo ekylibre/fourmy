@@ -165,3 +165,18 @@ Chemin critique : SU1 → SU3 → SU4. SU2 et SU5 peuvent avancer en parallèle 
 - **Non-régression** : web 295. Lint sans erreur.
 - **Documentation** : `docs/semences.md`, « Unités reprises d'un autre logiciel ».
 
+### SU5 — fait (28/11)
+- **Domaine** : `seedUnitsSameSize(a, b)` (deux unités de même grandeur, par leur code canonique) et `applySeedUnitRewrite(unit, { from, to })` (l'unité d'origine, seule ou rapportée à la surface, devient le code).
+- **Migrateur Ekylibre** (`migrate.ts`) :
+  - l'upsert de l'article garde l'unité réécrite tant qu'Ekylibre a l'unité d'origine (`CASE WHEN articles.custom->'unitRewrite'->>'from' = excluded.unit`) ; une autre unité dans Ekylibre, vraie modification, l'emporte ;
+  - l'unité retenue sert aux lots et donc aux nouveaux mouvements ;
+  - les paramètres d'intervention repris d'une semence réécrite passent par `applySeedUnitRewrite`, sinon leur `ON CONFLICT … unit = excluded.unit` remettrait l'unité d'origine.
+- **Imports** :
+  - `import-reconcile.ts` : une semence créée prend le code canonique de même grandeur, et `unitRewrite.from` garde l'unité du fichier ; une dose écrite dans le fichier en unité d'origine se rapporte à une semence réécrite (`seedUnitsSameSize`), au lieu d'être refusée ;
+  - `import-apply.ts` : `custom.unitRewrite` à la création et le nombre de grains d'une dose sur la fiche.
+- **Tests** :
+  - domaine (2) : unités de même grandeur, unité d'un intrant d'une semence réécrite ;
+  - API (`seed-units-imports.integration.test.ts`, 1) : un import (lecteur de test) crée « Maïs » en dose de 50 000 grains (fiche à 50 000) et « Blé » en milliers, avec l'unité du fichier gardée ; une semence déjà réécrite, nommée dans le fichier à l'ancienne, garde `dose` ; plus rien à réécrire ensuite ;
+  - migrateur : la migration réelle (`migrate.integration.test.ts`) demande une base Ekylibre restaurée et n'a pas été rejouée ici, car elle réécrirait les fermes de la base de développement. La logique est dans les deux fonctions du domaine testées et dans l'upsert SQL.
+- **Non-régression** : domaine 464, migrateur 25 (1 ignoré), API 503 (6 ignorés). Typecheck 40/40, lint sans erreur.
+

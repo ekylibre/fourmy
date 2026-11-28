@@ -198,3 +198,36 @@ function sameSizeCode(u: Exclude<SeedUnit, { dim: "dose" }>): SeedUnitCode | nul
   if (u.dim === "mass") return u.kg === 1 ? "kilogram" : u.kg === 0.001 ? "gram" : null;
   return u.grains === 1 ? "grain" : u.grains === 1_000 ? "thousand" : u.grains === 1_000_000 ? "million" : null;
 }
+
+/** Code canonique d'une unité (elle-même si elle l'est déjà), avec les grains d'une dose s'ils sont écrits. */
+function canonicalOrSelf(unit: string): { code: string; grainsPerDose: number | null } | null {
+  if ((SEED_UNIT_CODES as readonly string[]).includes(unit)) return { code: unit, grainsPerDose: null };
+  const c = canonicalSeedUnit(unit);
+  return c && !("conflict" in c) ? c : null;
+}
+
+/**
+ * Deux unités de semence de même grandeur (issue #130, lot SU5) : une même
+ * quantité vaut autant dans l'une que dans l'autre. « Sac de 50 000 grains »
+ * et `dose`, « Mille graines » et `thousand`, « Kg » et `kilogram`. Sert aux
+ * imports et reprises qui écrivent encore l'unité d'origine d'une semence
+ * réécrite.
+ */
+export function seedUnitsSameSize(a: string, b: string): boolean {
+  if (a === b) return true;
+  const x = canonicalOrSelf(a);
+  const y = canonicalOrSelf(b);
+  if (!x || !y || x.code !== y.code) return false;
+  return x.grainsPerDose === null || y.grainsPerDose === null || x.grainsPerDose === y.grainsPerDose;
+}
+
+/**
+ * Unité d'un intrant ou d'une sortie d'une semence réécrite (lot SU5) :
+ * l'unité d'origine, seule ou rapportée à la surface, prend le code canonique.
+ */
+export function applySeedUnitRewrite(unit: string | null, rewrite: { from: string; to: string } | undefined): string | null {
+  if (!unit || !rewrite) return unit;
+  if (unit === rewrite.from) return rewrite.to;
+  const rest = unit.startsWith(rewrite.from) ? unit.slice(rewrite.from.length) : null;
+  return rest === "_per_hectare" || rest === "_per_square_meter" ? rewrite.to + rest : unit;
+}

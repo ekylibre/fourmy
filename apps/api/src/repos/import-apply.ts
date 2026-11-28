@@ -236,7 +236,13 @@ export async function applyPlan(tx: Tx, farmId: string, ctx: DomainCtx, runId: s
     tally("articles", a.action);
     const src = a.article;
     if (a.action === "create") {
-      const custom = { source: `import:${bundle.format}`, ...(src.gnis ? { gnis: src.gnis } : {}), ...(src.species ? { species: src.species } : {}) };
+      const custom = {
+        source: `import:${bundle.format}`,
+        ...(src.gnis ? { gnis: src.gnis } : {}),
+        ...(src.species ? { species: src.species } : {}),
+        // Semence créée dans le code canonique (issue #130) : l'unité du fichier est gardée, comme après une réécriture.
+        ...(a.unitRewrite ? { unitRewrite: { from: a.unitRewrite.from, at: new Date().toISOString(), by: null } } : {}),
+      };
       await tx.execute(sql`
         INSERT INTO articles (id, farm_id, lexicon_ref, name, kind, unit, amm, custom)
         VALUES (${a.articleId}, ${farmId}, ${a.lexiconRef}, ${src.name}, ${a.kind}, ${a.unit}, ${src.amm}, ${JSON.stringify(custom)}::jsonb)`);
@@ -257,6 +263,14 @@ export async function applyPlan(tx: Tx, farmId: string, ctx: DomainCtx, runId: s
   // Semences créées : rattachées à leur espèce et à leur variété (code GNIS, espèce du fichier) ; rien d'approché.
   const seeds = plan.articles.filter((a) => a.action === "create" && a.kind === "seed").map((a) => a.articleId);
   if (seeds.length) await attachSeedsIn(tx, farmId, null, seeds, importAttachable);
+  // Dose de N grains (« Sac de 50 000 grains » créé en dose) : le nombre de grains sur la fiche.
+  for (const a of plan.articles) {
+    if (a.action !== "create" || !a.unitRewrite?.grainsPerDose) continue;
+    await tx.execute(sql`
+      INSERT INTO article_seeds (article_id, farm_id, grains_per_dose, updated_at)
+      VALUES (${a.articleId}, ${farmId}, ${a.unitRewrite.grainsPerDose}, now())
+      ON CONFLICT (article_id) DO UPDATE SET grains_per_dose = coalesce(article_seeds.grains_per_dose, EXCLUDED.grains_per_dose)`);
+  }
 
   for (const p of plan.people) {
     tally("people", p.action);
