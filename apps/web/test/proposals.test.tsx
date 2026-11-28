@@ -57,10 +57,11 @@ describe("propositions à valider", () => {
     );
     const user = userEvent.setup();
     renderApp(`/f/${FARM}/interventions`);
-    const nav = await screen.findByRole("navigation", { name: "Menu principal" });
-    const entry = await within(nav).findByRole("link", { name: /À valider/ });
-    expect(within(entry).getByLabelText("1 en attente")).toHaveTextContent("1");
-    await user.click(entry);
+    // Logo de Fourmy en haut à droite, avec le nombre en attente ; plus d'entrée dans le menu.
+    const button = await screen.findByRole("link", { name: "1 proposition à valider" });
+    expect(button).toHaveAttribute("href", `/f/${FARM}/a-valider`);
+    expect(within(screen.getByRole("navigation", { name: "Menu principal" })).queryByRole("link", { name: /À valider/ })).toBeNull();
+    await user.click(button);
 
     const card = await screen.findByLabelText(/Proposition : /);
     expect(within(card).getByText(/réalisée le 12\/06\/2026/)).toBeInTheDocument();
@@ -106,10 +107,8 @@ describe("propositions à valider", () => {
     expect(calls[1]).toMatchObject({ proposal: ID, targets: [{ kind: "land_parcel", id: PARCEL }], inputs: [{ articleId: FONGICIDE, quantity: 1.5, per: "hectare" }] });
   });
 
-  it("sans proposition en attente : pas d'entrée dans la navigation", async () => {
+  it("sans proposition en attente : le logo, sans indicateur", async () => {
     renderApp(`/f/${FARM}/interventions`);
-    const nav = await screen.findByRole("navigation", { name: "Menu principal" });
-    await within(nav).findByRole("link", { name: "Interventions" });
-    expect(within(nav).queryByRole("link", { name: /À valider/ })).toBeNull();
+    expect(await screen.findByRole("link", { name: "Propositions à valider" })).toHaveAttribute("href", `/f/${FARM}/a-valider`);
   });
 });

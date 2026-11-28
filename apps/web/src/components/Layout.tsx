@@ -1,8 +1,8 @@
-import { Anchor, AppShell, Badge, Box as MBox, Burger, Group, NavLink, Stack, Text } from "@mantine/core";
+import { ActionIcon, Anchor, AppShell, Box as MBox, Indicator, Tooltip, Burger, Group, NavLink, Stack, Text } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { BadgeCheck, Bot, Box, Boxes, Grid3x3, Leaf, ClipboardList, Database, Euro, FileText, LayoutDashboard, Map, Plug, Scale, Wine, FlaskConical, Sprout, Tractor, Wheat, type LucideIcon } from "lucide-react";
+import { BadgeCheck, Box, Boxes, Grid3x3, Leaf, ClipboardList, Database, Euro, FileText, LayoutDashboard, Map, Plug, Scale, Wine, FlaskConical, Sprout, Tractor, Wheat, type LucideIcon } from "lucide-react";
 import { Link, Outlet, useLocation } from "react-router";
 import { Wordmark } from "@fourmy/ui-lyvre";
 import type { AccessModule } from "@fourmy/contracts";
@@ -27,8 +27,6 @@ type NavItem = {
   when?: "hve" | "ab";
   module?: AccessModule;
   noGuest?: boolean;
-  /** Entrée affichée seulement s'il y a des propositions en attente (ou sur sa page), avec leur nombre (lot AM8). */
-  pending?: true;
 };
 type NavGroup = { label: string; icon: LucideIcon; ownerOnly?: boolean; children: NavItem[] };
 type NavEntry = NavItem | NavGroup;
@@ -52,7 +50,6 @@ export const NAVIGATION: NavEntry[] = [
   },
   { path: "/activities", label: "Activités", icon: Sprout, module: "activities" },
   { path: "/interventions", label: "Interventions", icon: ClipboardList, module: "interventions" },
-  { path: "/a-valider", label: "À valider", icon: Bot, ownerOnly: true, pending: true },
   { path: "/equipments", label: "Matériels", icon: Tractor, module: "equipments" },
   { path: "/economics", label: "Économique", icon: Euro, module: "economics" },
   {
@@ -120,29 +117,20 @@ export function Layout() {
   const [opened, { toggle, close }] = useDisclosure();
   const { day } = useAt();
   const availability = useControlAvailability(farm.id, Number(day.slice(0, 4))).data;
-  // Propositions des accès externes en attente (lot AM8) : compteur du responsable.
-  const pending = useProposals(farm.id, "pending", farm.role === "owner").data?.pending ?? 0;
   const location = useLocation();
   const base = `/f/${farm.id}`;
   const current = location.pathname.slice(base.length);
-  const visible = (e: NavItem) => navAllowed(farm, e) && (!e.when || !!availability?.[e.when]) && (!e.pending || pending > 0 || isActivePath(current, e.path));
+  const visible = (e: NavItem) => navAllowed(farm, e) && (!e.when || !!availability?.[e.when]);
   const linkTo = (path: string) => `${base}${path}${location.search}`; // garde ?at=
   // Sous-menus : ouverts sur la section active, sinon au clic.
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
-  const item = ({ path, label, icon: Icon, pending: counted }: NavItem) => (
+  const item = ({ path, label, icon: Icon }: NavItem) => (
     <NavLink
       key={path}
       component={Link}
       to={linkTo(path)}
       label={label}
       leftSection={<Icon size={18} />}
-      rightSection={
-        counted && pending > 0 ? (
-          <Badge size="sm" circle color="brique" aria-label={`${pending} en attente`}>
-            {pending}
-          </Badge>
-        ) : undefined
-      }
       active={isActivePath(current, path)}
       onClick={close}
     />
@@ -160,7 +148,10 @@ export function Layout() {
               </Link>
             </MBox>
           </Group>
-          <UserMenu />
+          <Group gap="sm" wrap="nowrap">
+            {farm.role === "owner" && <ProposalsButton farmId={farm.id} />}
+            <UserMenu />
+          </Group>
         </Group>
       </AppShell.Header>
 
@@ -199,6 +190,24 @@ export function Layout() {
         </div>
       </AppShell.Main>
     </AppShell>
+  );
+}
+
+/**
+ * Propositions des accès externes (lot AM8) : le logo de Fourmy en haut à
+ * droite, avec le nombre de propositions en attente, mène à « À valider ».
+ */
+function ProposalsButton({ farmId }: { farmId: string }) {
+  const pending = useProposals(farmId, "pending").data?.pending ?? 0;
+  const label = pending ? `${pending} proposition${pending > 1 ? "s" : ""} à valider` : "Propositions à valider";
+  return (
+    <Tooltip label={label}>
+      <Indicator label={pending} size={16} color="brique" disabled={!pending} offset={4}>
+        <ActionIcon component={Link} to={`/f/${farmId}/a-valider`} variant="subtle" size="lg" radius="md" aria-label={label}>
+          <img src="/favicon.svg" alt="" width={28} height={28} />
+        </ActionIcon>
+      </Indicator>
+    </Tooltip>
   );
 }
 
