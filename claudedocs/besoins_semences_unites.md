@@ -24,6 +24,7 @@
 |---|---|---|
 | U1 | Réécrire les unités reprises en unité canonique ? | **Oui, en bloc**, sur confirmation du responsable, depuis la page Semences, avec la liste avant et après. |
 | U2 | Comment compter les plants ? | **À la pièce**, une unité de comptage à part : pas de PMG ni de grains/m². Cela lève en partie la décision S8 (« plants : plus tard ») pour le stock et la dose. |
+| U3 | Que valent `unity` et « unité » ? | Un **comptage à l'unité**, comme plant, pièce ou pied ; la **dose** est une quantité de grains ; une unité d'usage (plants/ha, kg/ha) est l'unité de stock rapportée à la surface. |
 
 ## 3. Exigences fonctionnelles
 
@@ -34,7 +35,8 @@
   - « Sac de 50 000 grains », quelle que soit sa casse ou ses espaces → dose de 50 000 grains (`dose`, avec 50 000 grains par dose) ;
   - « Mille grains », « Mille graines » → milliers de grains ;
   - « Kg », « Kilogramme » → kg ;
-  - « graines », « unity », « unité » → grains.
+  - « graines » → grains ;
+  - « unity », « unité » → plants (comptage à l'unité, U3).
 - **FR-SU-3.** Avant de réécrire, le responsable voit la liste : la semence, l'unité actuelle, l'unité proposée et le stock du jour dans l'une et l'autre, qui doit être le même. Il peut retirer une semence de la liste, puis confirmer.
 - **FR-SU-4.** La réécriture est réservée au responsable de la ferme (*owner*).
 - **FR-SU-5.** Une semence dont l'unité n'est pas reconnue n'est jamais réécrite. Elle reste signalée comme aujourd'hui.
@@ -43,9 +45,9 @@
 
 ### Plants à la pièce (U2)
 
-- **FR-SU-8.** « plant », « plants », « pièce », « pièces », « motte », « mottes » sont reconnus comme une unité de comptage **plant**, distincte des grains.
+- **FR-SU-8.** « plant », « plants », « pièce », « pièces », « pied », « pieds », « motte », « mottes », « unity » et « unité » sont reconnus comme une unité de comptage **plant**, distincte des grains (U3).
 - **FR-SU-9.** Une semence en plants se crée (`POST /seeds`), se reçoit en stock et se consomme à la pièce. L'écran affiche « plants », jamais « grains ».
-- **FR-SU-10.** Dans une intervention de plantation, la quantité se saisit au total ou en **plants/ha**, convertie en nombre de plants avec la surface, comme une dose à l'hectare.
+- **FR-SU-10.** Dans une intervention de plantation, la quantité se saisit au total ou en **plants/ha**, convertie en nombre de plants avec la surface. Comme pour les autres semences, l'unité d'usage est l'unité de stock rapportée à la surface (plants/ha, kg/ha, doses/ha).
 - **FR-SU-11.** Une semence en plants n'a ni PMG ni densité en grains/m². Ces champs, et leurs repères (Arvalis, Terres Inovia), ne s'affichent pas pour elle.
 - **FR-SU-12.** Il n'y a pas de conversion entre plants et kg, ni entre plants et grains. Une saisie dans une autre dimension est refusée avec un message clair.
 - **FR-SU-13.** La réécriture en bloc (FR-SU-2) propose aussi « plant » pour les articles reconnus comme tels.
@@ -66,6 +68,8 @@
   - *Critère* : `POST /seeds` avec `unit: "Plant"` réussit ; la fiche et le stock affichent « plants » ; une conversion vers des kg est refusée.
 
 ## 6. Questions ouvertes
+
+Les trois questions ont reçu leur réponse le 28/11 (voir la conception, §3).
 
 1. **Unité canonique d'une dose.** Faut-il garder le nombre de grains dans le libellé affiché (« dose de 50 000 grains ») ou seulement « dose », le nombre étant sur la fiche ? Il est proposé de le garder dans le libellé, plus lisible pour un ancien utilisateur d'Ekylibre.
 2. **Plants dans le registre et le contrôle HVE et AB.** Les plants AB (semences et plants biologiques, règle de l'annexe II) sont-ils déjà couverts par le contrôle des semences ? C'est à vérifier à la conception.
