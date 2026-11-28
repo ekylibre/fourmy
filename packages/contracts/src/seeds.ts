@@ -195,6 +195,8 @@ export interface SeedInterventionUse {
   /** Densité et dose équivalentes (PMG retenu ; « estimées » s'il vient du repère). */
   grainsPerM2: number | null;
   kgPerHa: number | null;
+  /** Semence en plants (issue #130) : plants par hectare. */
+  plantsPerHa?: number | null;
   estimated: boolean;
 }
 

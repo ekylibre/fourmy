@@ -102,8 +102,10 @@ function sheetOf(r: Row): SeedSheet | null {
 
 function itemOf(r: Row, usage: SeedListItem["usage"]): SeedListItem {
   const sheet = sheetOf(r);
-  const ref = sheet?.isMixture ? null : tgwReference(sheet?.species);
   const unit = parseSeedUnit(r.unit, sheet?.grainsPerDose ?? null);
+  // Mélange, ou plants comptés à la pièce (issue #130) : ni PMG ni repère.
+  const noTgw = sheet?.isMixture || unit?.dim === "plant";
+  const ref = noTgw ? null : tgwReference(sheet?.species);
   return {
     articleId: r.id,
     name: r.name,
@@ -118,7 +120,7 @@ function itemOf(r: Row, usage: SeedListItem["usage"]): SeedListItem {
     importedGnis: r.imported_gnis,
     componentCount: r.component_count,
     reference: referenceView(ref),
-    tgw: sheet?.isMixture ? null : resolveTgw({ article: sheet ? { tgwG: sheet.tgwG, origin: sheet.tgwOrigin } : null, reference: ref }),
+    tgw: noTgw ? null : resolveTgw({ article: sheet ? { tgwG: sheet.tgwG, origin: sheet.tgwOrigin } : null, reference: ref }),
     flags: seedFlags({ unit: r.unit, seed: sheet, componentCount: r.component_count, reference: ref }),
     looksLikeMixture: !sheet?.isMixture && looksLikeMixture(r.name, r.imported_species),
     stock: r.stock,
@@ -189,10 +191,10 @@ export async function getSeedIn(tx: Tx, articleId: string, at: string): Promise<
         ORDER BY i.started_at DESC`,
   );
   const lotTgw = new Map(lots.map((l) => [l.id, l.seed]));
-  const ref = item.sheet?.isMixture ? null : tgwReference(item.sheet?.species);
+  const ref = item.sheet?.isMixture || item.unitDim === "plant" ? null : tgwReference(item.sheet?.species);
   const interventions: SeedInterventionUse[] = uses.map((u) => {
     const lot = u.lot_id ? lotTgw.get(u.lot_id) : null;
-    const tgw = item.sheet?.isMixture
+    const tgw = item.sheet?.isMixture || item.unitDim === "plant"
       ? null
       : resolveTgw({ lot: lot ? { tgwG: lot.tgwG, origin: lot.origin } : null, article: item.sheet ? { tgwG: item.sheet.tgwG, origin: item.sheet.tgwOrigin } : null, reference: ref });
     const areaHa = u.worked_m2 ? u.worked_m2 / 10_000 : null;
@@ -215,6 +217,7 @@ export async function getSeedIn(tx: Tx, articleId: string, at: string): Promise<
       areaHa,
       grainsPerM2: eq?.grainsPerM2 ?? null,
       kgPerHa: eq?.kgPerHa ?? null,
+      ...(eq?.plantsPerHa !== undefined ? { plantsPerHa: eq.plantsPerHa } : {}),
       estimated: usedTgw && (tgw?.estimated ?? false),
     };
   });

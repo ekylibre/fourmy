@@ -134,6 +134,66 @@ describe("semences", () => {
     expect(saved).not.toHaveProperty("unit");
   });
 
+  it("plants comptés à la pièce : stock en plants, plantation en plants/ha, ni PMG ni grains (issue #130)", async () => {
+    const LAV = "00000000-0000-7000-8000-00000000e103";
+    const lavande: SeedListItem = {
+      ...maize,
+      articleId: LAV,
+      name: "Plants de lavande",
+      unit: "plant",
+      unitDim: "plant",
+      sheet: { ...maize.sheet!, articleId: LAV, species: "lavandula_angustifolia", varietyName: null, grainsPerDose: null },
+      speciesLabel: "Lavande",
+      reference: null,
+      tgw: null,
+      flags: [],
+      stock: 8000,
+    };
+    const lavandeDetail: SeedDetail = {
+      ...lavande,
+      components: [],
+      lots: [{ id: "00000000-0000-7000-8000-00000000e202", code: "LOT-LAV", stock: 8000, seed: null }],
+      interventions: [
+        {
+          interventionId: "00000000-0000-7000-8000-00000000e302",
+          startedAt: `${year}-04-20T08:00:00Z`,
+          status: "done",
+          campaign: year,
+          parcels: ["Champ de lavande"],
+          quantity: 8000,
+          unit: "plant_per_hectare",
+          areaHa: 1.5,
+          grainsPerM2: null,
+          kgPerHa: null,
+          plantsPerHa: 8000,
+          estimated: false,
+        },
+      ],
+    };
+    server.use(
+      http.get("*/seeds", () => HttpResponse.json({ items: [lavande] })),
+      http.get("*/seeds/attach", () => HttpResponse.json({ items: [] })),
+      http.get("*/seeds/species", () => HttpResponse.json({ items: [] })),
+      http.get("*/articles/:id/seed", () => HttpResponse.json(lavandeDetail)),
+    );
+    renderApp(`/f/${FARM}/seeds`);
+    const user = userEvent.setup();
+    const row = (await screen.findByText("Plants de lavande")).closest("tr")!;
+    expect(row).toHaveTextContent("plants");
+    await user.click(within(row).getByText("Plants de lavande"));
+    const drawer = await screen.findByRole("dialog", { name: "Plants de lavande" });
+    expect(await within(drawer).findByText(/Plants comptés à la pièce/)).toBeInTheDocument();
+    expect(within(drawer).queryByText("PMG (poids de mille grains)")).toBeNull();
+    expect(within(drawer).queryByRole("textbox", { name: "Grains par dose" })).toBeNull();
+    const lots = within(drawer).getByRole("table", { name: "Lots de la semence" });
+    expect(lots).toHaveTextContent("8 000 plants");
+    expect(within(lots).queryByText("PMG du lot")).toBeNull();
+    const uses = within(drawer).getByRole("table", { name: `Semis de la campagne ${year}` });
+    expect(uses).toHaveTextContent("Plants/ha");
+    expect(uses).toHaveTextContent("8 000");
+    expect(within(uses).queryByText("Grains/m²")).toBeNull();
+  });
+
   it("mélange : le responsable décrit ses espèces, légumineuses repérées, sans proportion (lot SE6)", async () => {
     let saved: { components: { label: string; species: string | null }[] } | null = null;
     const sheet = { articleId: MIX, species: null, varietyName: null, gnisCode: null, category: null, isMixture: true, grainsPerDose: null, bagKg: null, tgwG: null, tgwOrigin: null, tgwOn: null, updatedAt: "2026-01-01T00:00:00Z" };

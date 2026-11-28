@@ -14,12 +14,15 @@ export function seedFlags(input: {
 }): SeedFlag[] {
   const { unit, seed } = input;
   const flags: SeedFlag[] = [];
-  if (!parseSeedUnit(unit, seed?.grainsPerDose ?? null)) flags.push("unit_unknown");
+  const parsed = parseSeedUnit(unit, seed?.grainsPerDose ?? null);
+  if (!parsed) flags.push("unit_unknown");
   if (seed?.isMixture) {
     if (!input.componentCount) flags.push("mixture_empty");
     return flags;
   }
   if (!seed?.species) flags.push("species_unknown");
+  // Plants comptés à la pièce (issue #130) : pas de PMG.
+  if (parsed?.dim === "plant") return flags;
   if (!seed?.tgwG) flags.push("tgw_missing");
   else if (tgwWarning(seed.tgwG, input.reference)) flags.push("tgw_far_from_reference");
   return flags;

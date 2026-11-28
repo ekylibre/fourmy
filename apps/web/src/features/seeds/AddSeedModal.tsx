@@ -17,6 +17,8 @@ const UNITS = [
   { value: "kilogram", label: "kg" },
   { value: "thousand", label: "Milliers de grains" },
   { value: "dose", label: "Doses" },
+  // Plants achetés (arbres, PPAM, mottes de maraîchage), issue #130.
+  { value: "plant", label: "Plants (à la pièce)" },
 ];
 
 /**

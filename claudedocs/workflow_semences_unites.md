@@ -118,3 +118,22 @@ Chemin critique : SU1 → SU3 → SU4. SU2 et SU5 peuvent avancer en parallèle 
 - **Vérifié** : les autres usages des dimensions (`itk/needs.ts`, `seed-usage.ts`, `repos/seeds.ts`, `flags.ts`) passent par la conversion ou comparent les dimensions sans supposer qu'il n'y en a que trois. `margins.ts` et `usage.ts` ne lisent pas l'unité de semence.
 - **Tests du domaine** (27 dans `seeds.test.ts`) : `unity` en plant ; les plants dans chaque conversion ; 8 000 plants/ha sur 1,5 ha = 12 000 plants ; les 12 variantes de la base de développement → code canonique, facteur 1 ; déjà canonique, inconnue, « 50 000 grains » sans sac ; conflit de grains par dose.
 - **Non-régression** : domaine 462, contracts 9, API 497 (6 ignorés), web 292.
+
+### SU2 — fait (28/11)
+- **API** :
+  - `POST /seeds` accepte « Plant » ;
+  - `repos/seeds.ts` : pas de PMG retenu ni de repère pour un plant (comme pour un mélange), `plantsPerHa` dans les semis de la fiche ;
+  - `seedFlags` : pas de « PMG inconnu » pour un plant ;
+  - `seed-usage.ts` : l'export CSV écrit « plants » dans la colonne de l'unité ;
+  - refus d'une saisie en kg ou en grains : motif `dimension`, posé en SU1.
+- **Contrats** : `plantsPerHa` dans `SeedInterventionUse` et dans le schéma de réponse.
+- **Web** :
+  - fiche : l'unité « Plants (à la pièce) » ; les grains par dose, le poids d'un sac, le PMG, le PMG des lots et les colonnes grains/m² et kg/ha sont masqués ; une colonne plants/ha ;
+  - `SeedLine` : « ≈ 8 000 plants/ha · 0,8 plant/m² » ;
+  - création d'une semence en plants.
+- **Tests** :
+  - API (`seeds-plants.integration.test.ts`, 2) : US-3. On crée « Plants de lavande », on en reçoit 20 000, on plante 1,5 ha à 8 000 plants/ha : 12 000 plants sortent du stock. Les plants/ha apparaissent sur la fiche, une saisie en kg ou en grains/m² renvoie 422, l'export CSV dit « plants ». Une semence reprise en `unity` est un plant sans « PMG inconnu » ;
+  - web (`seeds.test.tsx`, 1) : la fiche d'une semence en plants.
+- **Non-régression** : domaine 462, API 499 (6 ignorés), web 293. Lint sans erreur.
+- **Documentation** : `docs/semences.md`, section « Plants ».
+

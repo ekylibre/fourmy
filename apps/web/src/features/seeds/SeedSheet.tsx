@@ -41,7 +41,7 @@ const EMPTY: SeedSheetWrite = {
 };
 
 /** Unités de stock proposées : celle de l'article, puis les unités canoniques. */
-const UNIT_CHOICES = ["kilogram", "thousand", "dose"];
+const UNIT_CHOICES = ["kilogram", "thousand", "dose", "plant"];
 
 const optNum = (v: string | number) => (v === "" ? null : Number(v));
 
@@ -95,9 +95,20 @@ function SheetBody({ detail, proposal }: { detail: SeedDetail; proposal: SeedAtt
   const ref = !w.isMixture && detail.sheet?.species === w.species ? detail.reference : null;
   const far = !w.isMixture && tgwWarning(w.tgwG, ref);
   const unitDim = parseSeedUnit(unit, w.grainsPerDose)?.dim ?? null;
+  // Plants comptés à la pièce (issue #130) : ni grains par dose, ni PMG.
+  const plant = unitDim === "plant";
   const unitOptions = [...new Set([detail.unit, ...UNIT_CHOICES])].map((u) => ({
     value: u,
-    label: u === "dose" ? "Doses (nombre de grains ci-dessous)" : u === "thousand" ? "Milliers de grains" : u === detail.unit ? `${unitLabel(u)} (actuelle)` : unitLabel(u),
+    label:
+      u === "dose"
+        ? "Doses (nombre de grains ci-dessous)"
+        : u === "thousand"
+          ? "Milliers de grains"
+          : u === "plant"
+            ? "Plants (à la pièce)"
+            : u === detail.unit
+              ? `${unitLabel(u)} (actuelle)`
+              : unitLabel(u),
   }));
   const speciesOptions = (species.data?.items ?? []).map((s) => ({ value: s.species, label: s.legume ? `${s.label} (légumineuse)` : s.label }));
   const pick = (v: Partial<SeedSheetWrite>) => setW((x) => ({ ...x, ...v }));
@@ -196,23 +207,32 @@ function SheetBody({ detail, proposal }: { detail: SeedDetail; proposal: SeedAtt
           allowDeselect={false}
           disabled={!owner}
         />
-        <NumberInput
-          label="Grains par dose"
-          description="Sac de maïs : 50 000 ; tournesol : 150 000"
-          thousandSeparator=" "
-          min={1}
-          allowDecimal={false}
-          value={w.grainsPerDose ?? ""}
-          onChange={(v) => pick({ grainsPerDose: optNum(v) })}
-          disabled={!owner}
-        />
-        <NumberInput label="Poids d'un sac" suffix=" kg" decimalSeparator="," min={0} value={w.bagKg ?? ""} onChange={(v) => pick({ bagKg: optNum(v) })} disabled={!owner} />
+        {!plant && (
+          <NumberInput
+            label="Grains par dose"
+            description="Sac de maïs : 50 000 ; tournesol : 150 000"
+            thousandSeparator=" "
+            min={1}
+            allowDecimal={false}
+            value={w.grainsPerDose ?? ""}
+            onChange={(v) => pick({ grainsPerDose: optNum(v) })}
+            disabled={!owner}
+          />
+        )}
+        {!plant && (
+          <NumberInput label="Poids d'un sac" suffix=" kg" decimalSeparator="," min={0} value={w.bagKg ?? ""} onChange={(v) => pick({ bagKg: optNum(v) })} disabled={!owner} />
+        )}
       </SimpleGrid>
       {!unitDim && (
-        <Alert color="brique">Unité « {unit} » non reconnue : choisissez kg, milliers de grains ou doses pour que les doses de semis se convertissent.</Alert>
+        <Alert color="brique">Unité « {unit} » non reconnue : choisissez kg, milliers de grains, doses ou plants pour que les doses de semis se convertissent.</Alert>
+      )}
+      {plant && (
+        <Text size="sm" c="dimmed">
+          Plants comptés à la pièce : le stock et les plantations se comptent en plants, ou en plants par hectare.
+        </Text>
       )}
 
-      {!w.isMixture && (
+      {!w.isMixture && !plant && (
         <>
           <Divider />
           <Title order={4}>PMG (poids de mille grains)</Title>
@@ -318,20 +338,22 @@ function SheetBody({ detail, proposal }: { detail: SeedDetail; proposal: SeedAtt
         <>
           <Divider />
           <Title order={4}>Lots</Title>
-          <Text size="xs" c="dimmed">
-            Le PMG d'un lot (étiquette du sac) l'emporte sur celui de la fiche pour les semis de ce lot.
-          </Text>
+          {!plant && (
+            <Text size="xs" c="dimmed">
+              Le PMG d'un lot (étiquette du sac) l'emporte sur celui de la fiche pour les semis de ce lot.
+            </Text>
+          )}
           <Table fz="sm" aria-label="Lots de la semence">
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>Lot</Table.Th>
                 <Table.Th ta="right">Stock</Table.Th>
-                <Table.Th>PMG du lot</Table.Th>
+                {!plant && <Table.Th>PMG du lot</Table.Th>}
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
               {detail.lots.map((l) => (
-                <LotRow key={l.id + (l.seed?.tgwG ?? "")} lot={l} detail={detail} owner={owner && !w.isMixture} />
+                <LotRow key={l.id + (l.seed?.tgwG ?? "")} lot={l} detail={detail} owner={owner && !w.isMixture} withTgw={!plant} />
               ))}
             </Table.Tbody>
           </Table>
@@ -345,7 +367,7 @@ function SheetBody({ detail, proposal }: { detail: SeedDetail; proposal: SeedAtt
   );
 }
 
-function LotRow({ lot, detail, owner }: { lot: SeedLotView; detail: SeedDetail; owner: boolean }) {
+function LotRow({ lot, detail, owner, withTgw = true }: { lot: SeedLotView; detail: SeedDetail; owner: boolean; withTgw?: boolean }) {
   const farm = useFarm();
   const { at } = useAt();
   const client = useQueryClient();
@@ -362,40 +384,42 @@ function LotRow({ lot, detail, owner }: { lot: SeedLotView; detail: SeedDetail; 
       <Table.Td ta="right" className="lv-num">
         {formatNumber(lot.stock, 3)} {stockUnitLabel(detail)}
       </Table.Td>
-      <Table.Td>
-        {owner ? (
-          <Group gap={6} wrap="nowrap">
-            <NumberInput
-              aria-label={`PMG du lot ${lot.code}`}
-              size="xs"
-              w={110}
-              suffix=" g"
-              decimalSeparator=","
-              min={0}
-              max={1999}
-              value={tgw}
-              placeholder="fiche"
-              onChange={(v) => setTgw(v === "" ? "" : Number(v))}
-            />
-            <Button
-              size="compact-xs"
-              variant="light"
-              disabled={tgw === (lot.seed?.tgwG ?? "")}
-              loading={save.isPending}
-              onClick={() => save.mutate(tgw === "" ? null : { tgwG: tgw, origin: "label", on: null })}
-            >
-              Enregistrer
-            </Button>
-          </Group>
-        ) : lot.seed ? (
-          `${fmt(lot.seed.tgwG)} g`
-        ) : (
-          <Text size="sm" c="dimmed">
-            celui de la fiche
-          </Text>
-        )}
-        {save.error && <ErrorAlert error={save.error} />}
-      </Table.Td>
+      {withTgw && (
+        <Table.Td>
+          {owner ? (
+            <Group gap={6} wrap="nowrap">
+              <NumberInput
+                aria-label={`PMG du lot ${lot.code}`}
+                size="xs"
+                w={110}
+                suffix=" g"
+                decimalSeparator=","
+                min={0}
+                max={1999}
+                value={tgw}
+                placeholder="fiche"
+                onChange={(v) => setTgw(v === "" ? "" : Number(v))}
+              />
+              <Button
+                size="compact-xs"
+                variant="light"
+                disabled={tgw === (lot.seed?.tgwG ?? "")}
+                loading={save.isPending}
+                onClick={() => save.mutate(tgw === "" ? null : { tgwG: tgw, origin: "label", on: null })}
+              >
+                Enregistrer
+              </Button>
+            </Group>
+          ) : lot.seed ? (
+            `${fmt(lot.seed.tgwG)} g`
+          ) : (
+            <Text size="sm" c="dimmed">
+              celui de la fiche
+            </Text>
+          )}
+          {save.error && <ErrorAlert error={save.error} />}
+        </Table.Td>
+      )}
     </Table.Tr>
   );
 }
@@ -403,6 +427,7 @@ function LotRow({ lot, detail, owner }: { lot: SeedLotView; detail: SeedDetail; 
 /** Interventions qui utilisent la semence, par campagne : dose saisie, densité, dose en kg/ha (FR-SE-8). */
 function Uses({ detail }: { detail: SeedDetail }) {
   const farm = useFarm();
+  const plant = detail.unitDim === "plant";
   if (!detail.interventions.length) return <Text size="sm" c="dimmed">Aucune intervention n'utilise cette semence.</Text>;
   const campaigns = [...new Set(detail.interventions.map((u) => u.campaign ?? 0))].sort((a, b) => b - a);
   return (
@@ -418,8 +443,14 @@ function Uses({ detail }: { detail: SeedDetail }) {
                 <Table.Th>Date</Table.Th>
                 <Table.Th>Parcelles</Table.Th>
                 <Table.Th ta="right">Dose saisie</Table.Th>
-                <Table.Th ta="right">Grains/m²</Table.Th>
-                <Table.Th ta="right">kg/ha</Table.Th>
+                {plant ? (
+                  <Table.Th ta="right">Plants/ha</Table.Th>
+                ) : (
+                  <>
+                    <Table.Th ta="right">Grains/m²</Table.Th>
+                    <Table.Th ta="right">kg/ha</Table.Th>
+                  </>
+                )}
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -441,21 +472,31 @@ function Uses({ detail }: { detail: SeedDetail }) {
                     <Table.Td ta="right" className="lv-num">
                       {u.quantity === null ? "—" : `${fmt(u.quantity, 3)} ${unitLabel(u.unit)}`}
                     </Table.Td>
-                    <Table.Td ta="right" className="lv-num">
-                      {u.grainsPerM2 === null ? "—" : fmt(u.grainsPerM2, 0)}
-                    </Table.Td>
-                    <Table.Td ta="right" className="lv-num" title={u.estimated ? "PMG repère : estimée" : undefined}>
-                      {u.kgPerHa === null ? "—" : `${fmt(u.kgPerHa, 1)}${u.estimated ? " (estimée)" : ""}`}
-                    </Table.Td>
+                    {plant ? (
+                      <Table.Td ta="right" className="lv-num">
+                        {u.plantsPerHa === null || u.plantsPerHa === undefined ? "—" : fmt(u.plantsPerHa, 0)}
+                      </Table.Td>
+                    ) : (
+                      <>
+                        <Table.Td ta="right" className="lv-num">
+                          {u.grainsPerM2 === null ? "—" : fmt(u.grainsPerM2, 0)}
+                        </Table.Td>
+                        <Table.Td ta="right" className="lv-num" title={u.estimated ? "PMG repère : estimée" : undefined}>
+                          {u.kgPerHa === null ? "—" : `${fmt(u.kgPerHa, 1)}${u.estimated ? " (estimée)" : ""}`}
+                        </Table.Td>
+                      </>
+                    )}
                   </Table.Tr>
                 ))}
             </Table.Tbody>
           </Table>
         </div>
       ))}
-      <Text size="xs" c="dimmed">
-        Densité et dose calculées avec le PMG du lot semé, sinon celui de la fiche ; « — » quand il manque le PMG, le nombre de grains par dose ou la surface.
-      </Text>
+      {!plant && (
+        <Text size="xs" c="dimmed">
+          Densité et dose calculées avec le PMG du lot semé, sinon celui de la fiche ; « — » quand il manque le PMG, le nombre de grains par dose ou la surface.
+        </Text>
+      )}
     </Stack>
   );
 }
