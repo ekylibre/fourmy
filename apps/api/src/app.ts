@@ -13,6 +13,8 @@ import { mcpHandler } from "./mcp/server.js";
 import { readPicture } from "./repos/activities.js";
 import { db } from "./db.js";
 import { BadRequest, NotFound, Conflict } from "./routes/helpers.js";
+import { openApiDocument } from "./external/openapi.js";
+import { narrowRegistration } from "./external/registration.js";
 
 /**
  * Application Fourmy API. Garde : authentification, puis appartenance à la
@@ -28,6 +30,8 @@ export function createApp() {
   app.route("/api/public", contactRoutes);
 
   // Connexion, déconnexion, session (better-auth), et serveur d'autorisation OAuth (lot AM5).
+  // Enregistrement dynamique d'un client : sans écriture s'il ne l'a pas demandée (lot AM7).
+  app.post("/api/auth/oauth2/register", (c) => narrowRegistration(c.req.raw, (r) => getAuth().handler(r)));
   app.on(["GET", "POST"], "/api/auth/*", (c) => getAuth().handler(c.req.raw));
   // Métadonnées OAuth à la racine du site (RFC 8414, RFC 9728) : servies par better-auth.
   app.get("/.well-known/*", (c) => getAuth().handler(c.req.raw));
@@ -43,6 +47,8 @@ export function createApp() {
     if (!pic) return c.notFound();
     return c.body(pic.bytes as unknown as ArrayBuffer, 200, { "content-type": pic.type, "cache-control": "public, max-age=604800" });
   });
+  // Description OpenAPI de l'API ouverte (lot AM7) : publique, lisible par tout outil.
+  app.get("/api/v1/openapi.json", (c) => c.json(openApiDocument(), 200, { "access-control-allow-origin": "*", "cache-control": "public, max-age=300" }));
   // Invitations (lot P3) : lues et acceptées par leur jeton, avant toute ferme.
   app.route("/api/v1/invitations", invitationRoutes);
   app.route("/api/v1/me", new Hono<Env>().use(auth).route("/", meRoutes));

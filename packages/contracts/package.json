@@ -6,7 +6,10 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./responses": { "types": "./dist/responses/index.d.ts", "default": "./dist/responses/index.js" }
+  },
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b",

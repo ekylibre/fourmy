@@ -139,6 +139,24 @@ describe.skipIf(!url)("OAuth (intégration)", () => {
     expect((await call((await r.json()).access_token, "/activities")).status).toBe(200);
   });
 
+  it("enregistrement dynamique : l'écriture n'est inscrite que si le client la demande", async () => {
+    const reg = async (scope?: string) => {
+      const res = await auth("/oauth2/register", json({ client_name: "Portées", redirect_uris: [REDIRECT], token_endpoint_auth_method: "none", ...(scope ? { scope } : {}) }));
+      expect(res.status).toBe(201);
+      const c = (await res.json()) as { client_id: string; scope: string };
+      clients.push(c.client_id);
+      const [row] = await sql<{ scopes: string[] }[]>`SELECT scopes FROM auth_oauth_clients WHERE client_id = ${c.client_id}`;
+      return { returned: c.scope.split(" "), stored: row!.scopes };
+    };
+    for (const r of [await reg("fourmy:read"), await reg()]) {
+      expect(r.returned).not.toContain("fourmy:write");
+      expect(r.stored).not.toContain("fourmy:write");
+      expect(r.stored).toEqual(expect.arrayContaining(["fourmy:read", "offline_access"]));
+    }
+    const write = await reg("fourmy:read fourmy:write");
+    expect(write.stored).toContain("fourmy:write");
+  });
+
   it("sans session : page de connexion, puis reprise de l'autorisation après connexion", async () => {
     const clientId = await register();
     const q = new URLSearchParams({ response_type: "code", client_id: clientId, redirect_uri: REDIRECT, scope: "fourmy:read", code_challenge: "x".repeat(43), code_challenge_method: "S256", resource: apiResource() });

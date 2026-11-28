@@ -48,6 +48,7 @@
   },
   "devDependencies": {
     "@fourmy/domain": "workspace:*",
+    "@seriousme/openapi-schema-validator": "2.11.0",
     "@types/pg": "8.23.1",
     "@types/smtp-server": "3.5.13",
     "smtp-server": "3.21.1",

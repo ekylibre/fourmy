@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Alert, Badge, Button, CopyButton, Group, Modal, Paper, Select, Stack, Table, Text, TextInput } from "@mantine/core";
+import { Alert, Anchor, Badge, Button, Code, CopyButton, Group, Modal, Paper, Select, Stack, Table, Text, TextInput } from "@mantine/core";
+import { Link } from "react-router";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bot, Copy, KeyRound, ScrollText, Trash2 } from "lucide-react";
+import { Bot, Code2, Copy, KeyRound, ScrollText, Trash2 } from "lucide-react";
 import { ACCESS_MODULE_LABELS, accessModules, type AccessGrant, type AccessLogEntry, type FarmAccess, type FarmAccessCreated } from "@fourmy/contracts";
 import { api, ApiError, farmPath } from "../../app/api";
 import { useFarm } from "../../app/farm";
@@ -69,6 +70,7 @@ export function AccessesTab() {
         {farm.role !== "owner" && " Vous voyez ici vos propres clés."}
       </Text>
       <ConnectAssistant />
+      <DeveloperHint />
       <Group>
         <Button leftSection={<KeyRound size={16} />} onClick={() => setCreating(true)}>
           Créer une clé
@@ -225,6 +227,22 @@ function ConnectAssistant() {
         </Text>
       </Stack>
     </Paper>
+  );
+}
+
+/** Pour un développeur : l'identifiant de la ferme et la documentation de l'API (lot AM7). */
+function DeveloperHint() {
+  const farm = useFarm();
+  return (
+    <Group gap="xs">
+      <Code2 size={16} />
+      <Text size="sm">
+        Identifiant de la ferme pour l'API : <Code>{farm.id}</Code> ·{" "}
+        <Anchor component={Link} to={`/developpeurs?ferme=${farm.id}`}>
+          Documentation de l'API
+        </Anchor>
+      </Text>
+    </Group>
   );
 }
 

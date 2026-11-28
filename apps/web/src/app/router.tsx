@@ -57,6 +57,7 @@ const PlanPage = lazy(() => import("../features/fertilization/PlanPage").then((m
 const PrescriptionNewPage = lazy(() => import("../features/modulation/PrescriptionNewPage").then((m) => ({ default: m.PrescriptionNewPage })));
 const PrescriptionPage = lazy(() => import("../features/modulation/PrescriptionPage").then((m) => ({ default: m.PrescriptionPage })));
 const ControlPage = lazy(() => import("../features/certification/ControlPage").then((m) => ({ default: m.ControlPage })));
+const DevelopersPage = lazy(() => import("../features/developers/DevelopersPage").then((m) => ({ default: m.DevelopersPage })));
 const Plan3DPage = lazy(() => import("../3d/Plan3DPage").then((m) => ({ default: m.Plan3DPage })));
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -141,6 +142,8 @@ function TeamRedirect() {
 const pages = [
   { path: "/", element: <Navigate to="/farms" replace /> },
   { path: "/login", element: <LoginPage /> },
+  // Documentation de l'API (lot AM7) : publique.
+  { path: "/developpeurs", element: <Suspense fallback={<Loading />}><DevelopersPage /></Suspense> },
   // Invitation à rejoindre une ferme (lot P3) : publique, avant connexion.
   { path: "/invitation/:token", element: <InvitationPage /> },
   // Autorisation d'une application OAuth (lot AM5) : ferme, puis consentement.

@@ -348,3 +348,16 @@ Chemin critique : AM0 → AM1 → AM2 → AM4 → AM5 → AM6. AM3 et AM7 peuven
 - **Pas fait** :
   - l'outil `marges` : les marges sont calculées dans le web (lots E3 à E5) à partir de plusieurs écrans internes ; il faudra d'abord les calculer côté API ;
   - l'essai d'un vrai connecteur sur dev.fourmy.org, après la fusion.
+- **Connecteur réel** : essayé avec Claude sur dev.fourmy.org le 27/11 après la fusion (PR #174) : enregistrement dynamique, choix de la ferme, consentement, outils. Tout fonctionne.
+
+### AM7 — fait (27/11)
+- **Schémas de réponse** (`packages/contracts/src/responses/`, export `@fourmy/contracts/responses`) : un par route ouverte (83 routes JSON). Ils sont tirés des types TypeScript des routes (sortie `c.json`, telle que Hono la sérialise) par un script ponctuel, ce qui donne les énumérations et les champs nullables. Ils ont été vérifiés sur les réponses réelles de 5 fermes de développement.
+  - Un seul écart trouvé : `GET /activities/references` renvoie des familles Lexicon hors de la liste des activités (`energy_production`). Le schéma décrit ce qui sort vraiment (`family: string`).
+- **Liste des routes ouvertes** : chaque `OpenRoute` porte son schéma de réponse et ses paramètres de requête (type, obligatoire, description). La tuile IGN est décrite comme binaire (`image/png`).
+- **`GET /api/v1/openapi.json`** (`external/openapi.ts`) : OpenAPI 3.1, public (CORS `*`), calculé une fois par processus. Il contient les chemins `/farms/{farmId}/…`, les paramètres, les schémas en composants (`z.toJSONSchema`), les erreurs RFC 9457, `x-fourmy-module`, `x-fourmy-level`, les schémas de sécurité `apiKey` et `oauth2` (adresses du serveur d'autorisation), et une étiquette par module.
+- **Web** : la page publique `/developpeurs` (authentification, premier appel, référence filtrable, schéma de chaque réponse) ; dans « Accès externes », l'identifiant de la ferme et un lien vers la page.
+- **Enregistrement dynamique** (`external/registration.ts`) : le plugin inscrit toutes les portées permises sur chaque client. On retire `fourmy:write` d'un client qui ne l'a pas demandée ; `offline_access` et les portées d'identité restent.
+- **Tests** :
+  - API : document valide (validateur `@seriousme/openapi-schema-validator`), une entrée par route ouverte, servi sans session ; conformité des réponses réelles sur une ferme remplie par l'import Geofolia anonymisé ; portées de l'enregistrement dynamique ;
+  - web (2) : la page Développeurs, avec et sans ferme.
+- Ferme l'issue #35.
