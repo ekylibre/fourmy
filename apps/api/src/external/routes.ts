@@ -237,6 +237,7 @@ export const CLOSED_ROUTES: Readonly<Record<string, string>> = {
   "/prices/suggestions/articles": "écran interne",
   "/prices/suggestions/products": "écran interne",
   "/seeds/attach": "écran interne",
+  "/seeds/units": "écran interne (réécriture des unités reprises)",
   "/fertilization/documents": "fichiers",
   "/fertilization/documents/:id": "fichiers",
   "/prescriptions/:id/files/:format": "fichiers",

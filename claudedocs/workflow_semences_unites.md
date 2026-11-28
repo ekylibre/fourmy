@@ -137,3 +137,19 @@ Chemin critique : SU1 → SU3 → SU4. SU2 et SU5 peuvent avancer en parallèle 
 - **Non-régression** : domaine 462, API 499 (6 ignorés), web 293. Lint sans erreur.
 - **Documentation** : `docs/semences.md`, section « Plants ».
 
+### SU3 — fait (28/11)
+- **`GET /seeds/units`** (membres, `repos/seed-units.ts`) : les semences dont l'unité reprise a un code canonique (`canonicalSeedUnit`). Pour chacune : la proposition, le nombre de grains par dose, le conflit, le stock du jour et l'usage (mouvements, interventions et prix dans l'unité reprise).
+- **`POST /seeds/units`** (`requireOwner`) : une transaction par article.
+  - **Nouveau contrôle** : article de type semence, pas de conflit, code identique à la proposition. Sinon `skipped` (`not_found`, `conflict`, `changed`).
+  - **Réécrits** : `stock_movements` (dans l'unité reprise), `intervention_parameters` (intrants et sorties, suffixe `_per_hectare` ou `_per_square_meter` gardé), `prices`, `seed_derogations`, `article_seeds.grains_per_dose` d'une dose (s'il manquait), puis l'article (`unit`, `custom.unitRewrite = { from, at, by }`, `updated_at`).
+  - **Historique** : une ligne `audit_log` (`article`, `unit_rewritten`, avec les lignes touchées).
+  - **Garde-fou** : le stock de chaque lot, aujourd'hui et au 1er janvier de chaque année mouvementée, est comparé avant et après ; un écart annule l'article (`stock_mismatch`).
+- **Écart avec la conception** : pas d'événement `article.updated` dans l'outbox, ce type n'existe pas. Le mobile relit l'article par son `updated_at`, comme après `PUT /articles/:id/seed`.
+- **Contrats** : `seedUnitCode`, `SeedUnitRewrite`, `seedUnitRewriteWrite`, `SeedUnitRewriteResult`.
+- **Routes** : `/seeds/units` dans `CLOSED_ROUTES` (écran interne).
+- **Tests** (`seed-units.integration.test.ts`, 3) :
+  - les propositions (dose de 50 000 grains, milliers, kg, plant ; conflit à part ; rien pour `kilogram`) ;
+  - 403 pour un `worker`, et les refus `conflict`, `changed` et `not_found` ;
+  - US-1 : stocks à trois dates, fiche, semis et utilisation de la campagne identiques avant et après ; toutes les tables réécrites ; l'historique ; plus rien à proposer sauf le conflit ; un nouveau semis à 1 dose/ha.
+- **Non-régression** : API 502 (6 ignorés), web 293. Typecheck 40/40, lint sans erreur.
+
