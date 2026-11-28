@@ -52,7 +52,7 @@ tableurs, restent hors du dépôt).
 | Règles | Contrôle |
 |---|---|
 | R1, R2, R5 | statut de conversion déduit (C1, C2, AB), redémarrage après un produit interdit, produit phyto non utilisable en AB |
-| R7, R10, R13 | mixité (même espèce en AB et hors AB), hors-sol, serres chauffées |
+| R7, R10, R13 | mixité (même espèce en AB et hors AB ; un genre englobe ses espèces, une culture générique comme « plant » n'est comparée à rien et reçoit une note « espèce à préciser », issue #166), hors-sol, serres chauffées |
 | R11 | rotation (légumineuse sur N ans, même espèce au plus K ans, maraîchage) : orange seulement |
 | R14 à R17 | fertilisants de l'annexe II, azote minéral, élevages industriels, 170 kg N/ha d'effluents |
 | R20, R21 | justification des traitements, cuivre (28 kg/ha sur 7 ans, teneur en cuivre métal d'après E-Phy ou saisie) |

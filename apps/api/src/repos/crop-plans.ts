@@ -24,6 +24,7 @@ import { checkCropPlan, cropPlanCheckInput, diffCropPlan, emptyDraft, operationB
 import { Conflict, NotFound } from "../routes/helpers.js";
 import { natureOf, pictureUrl } from "./activities.js";
 import { getCertificationSettings } from "./certification-controls.js";
+import { speciesLineage } from "./certification-ab.js";
 
 /**
  * Assolement prévisionnel, lot AS2a (claudedocs/conception_assolement.md §3,
@@ -144,6 +145,7 @@ async function contextActivities(tx: Tx, year: number): Promise<CropPlanContext[
     color: string | null;
     cap_code: string | null;
     species: string | null;
+    species_lineage: string[] | null;
     life_years: number | null;
     usage: string | null;
     legume: boolean;
@@ -153,7 +155,8 @@ async function contextActivities(tx: Tx, year: number): Promise<CropPlanContext[
   }>(
     tx,
     sql`SELECT a.id, a.name, a.family, a.color, ${activityCapCode(year)} AS cap_code,
-               coalesce(a.cultivation, lx.specie) AS species, lx.life_years::float8 AS life_years, lx.usage,
+               coalesce(a.cultivation, lx.specie) AS species, ${speciesLineage(sql`coalesce(a.cultivation, lx.specie)`)} AS species_lineage,
+               lx.life_years::float8 AS life_years, lx.usage,
                ${legumeOf(sql`coalesce(a.cultivation, lx.specie)`)} AS legume,
                fourmy_activity_picture(coalesce(a.cultivation, lx.specie), a.family, a.reference) AS picture,
                -- Dates types de Lexicon (2000/2001) ramenées à la campagne : la récolte tombe l'année de la campagne.
@@ -171,6 +174,7 @@ async function contextActivities(tx: Tx, year: number): Promise<CropPlanContext[
       color: a.color,
       capCode: a.cap_code,
       species: a.species,
+      speciesLineage: a.species_lineage,
       cycle: cycleFromLexicon(a.life_years, a.usage) as CropCycle,
       legume: a.legume,
       vegetable: a.usage === "vegetable",
