@@ -52,6 +52,7 @@ const SEED_GAP_MESSAGES = {
   unit_unknown: (from: string, to: string) => `Unité ${from} non convertible en ${to} pour cette semence.`,
   grains_per_dose_missing: () => "Nombre de grains par dose inconnu : compléter la fiche de la semence.",
   tgw_missing: () => "PMG inconnu : compléter la fiche de la semence pour passer des grains à la masse.",
+  dimension: () => "Les plants se comptent à la pièce : ils ne se convertissent ni en kg ni en grains.",
 };
 
 function seedStockQuantity(quantity: number, unit: string, articleUnit: string, areaHa: number | null, ctx: SeedConversionCtx): number {

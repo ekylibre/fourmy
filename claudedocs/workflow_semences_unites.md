@@ -106,4 +106,15 @@ Chemin critique : SU1 → SU3 → SU4. SU2 et SU5 peuvent avancer en parallèle 
 
 ## 5. Réalisé
 
-*(à remplir lot par lot)*
+### SU1 — fait (28/11)
+- **Domaine** (`seeds/units.ts`) :
+  - la dimension `{ dim: "plant" }` et le code `plant` ;
+  - `PLANT_WORDS` (plant, pièce, pied, motte, au singulier et au pluriel, plus unity, unité, unités) ; ces trois derniers ont quitté `GRAIN_WORDS` ;
+  - pour un plant : conversion vers un plant seulement, motif `"dimension"` dans `seedConversionGap`, `plantsPerHa` et `plantsPerM2` dans `seedEquivalents` ;
+  - `canonicalSeedUnit` (code de même grandeur, facteur 1 vérifié par `convertSeedQuantity`, conflit de grains par dose).
+- **Messages** du motif `"dimension"` : dans le domaine (`quantities.ts`) et dans l'API (`repos/interventions.ts`).
+- **Contrats** : `unitDim` gagne `"plant"` (type et schéma de réponse) ; les libellés `plant` (« plants ») et `plant_per_hectare` (« plants/ha »).
+- **Web** : `stockUnitLabel` affiche « plants », pour qu'une semence reprise en `unity` ne montre pas son code brut avant SU2.
+- **Vérifié** : les autres usages des dimensions (`itk/needs.ts`, `seed-usage.ts`, `repos/seeds.ts`, `flags.ts`) passent par la conversion ou comparent les dimensions sans supposer qu'il n'y en a que trois. `margins.ts` et `usage.ts` ne lisent pas l'unité de semence.
+- **Tests du domaine** (27 dans `seeds.test.ts`) : `unity` en plant ; les plants dans chaque conversion ; 8 000 plants/ha sur 1,5 ha = 12 000 plants ; les 12 variantes de la base de développement → code canonique, facteur 1 ; déjà canonique, inconnue, « 50 000 grains » sans sac ; conflit de grains par dose.
+- **Non-régression** : domaine 462, contracts 9, API 497 (6 ignorés), web 292.

@@ -1,12 +1,14 @@
 import { unitScale } from "../fertilization/units.js";
 
 /**
- * Unités des semences (claudedocs/conception_semences.md §3.1) : masse, nombre
- * de grains, ou dose de N grains. Les libellés libres des articles existants
- * (« Sac de 50 000 grains », « Mille graines », « Kg »…) sont reconnus ; rien
- * n'est deviné : une unité inconnue rend null.
+ * Unités des semences (claudedocs/conception_semences.md §3.1,
+ * conception_semences_unites.md §2) : masse, quantité de grains (grain,
+ * millier, dose de N grains) ou comptage à l'unité (plant, pièce, pied,
+ * `unity`). Les libellés libres des articles existants (« Sac de 50 000
+ * grains », « Mille graines », « Kg »…) sont reconnus ; rien n'est deviné :
+ * une unité inconnue rend null.
  */
-export type SeedUnit = { dim: "mass"; kg: number } | { dim: "grain"; grains: number } | { dim: "dose"; grains: number | null };
+export type SeedUnit = { dim: "mass"; kg: number } | { dim: "grain"; grains: number } | { dim: "dose"; grains: number | null } | { dim: "plant" };
 
 /** Ce qui permet de convertir : PMG (g) et nombre de grains d'une dose. */
 export interface SeedConversionCtx {
@@ -15,7 +17,8 @@ export interface SeedConversionCtx {
 }
 
 /** Codes enregistrés, dans l'ordre où ils sont proposés à la saisie. */
-export const SEED_UNIT_CODES = ["kilogram", "thousand", "grain", "dose", "million", "gram"] as const;
+export const SEED_UNIT_CODES = ["kilogram", "thousand", "grain", "dose", "plant", "million", "gram"] as const;
+export type SeedUnitCode = (typeof SEED_UNIT_CODES)[number];
 
 const norm = (s: string) =>
   s
@@ -25,7 +28,9 @@ const norm = (s: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
-const GRAIN_WORDS = new Set(["grain", "grains", "graine", "graines", "unity", "unite", "unites", "seed", "seeds"]);
+const GRAIN_WORDS = new Set(["grain", "grains", "graine", "graines", "seed", "seeds"]);
+// Comptage à l'unité (U3, 28/11/2026) : `unity` et « unité » en font partie, comme plant, pièce ou pied.
+const PLANT_WORDS = new Set(["plant", "plants", "piece", "pieces", "pied", "pieds", "motte", "mottes", "unity", "unite", "unites", "plant a repiquer", "plants a repiquer"]);
 const THOUSAND_WORDS = new Set(["thousand", "thousands", "mille", "millier", "milliers", "mille grains", "mille graines", "millier de grains", "milliers de grains", "milliers de graines"]);
 const MILLION_WORDS = new Set(["million", "millions", "million de grains", "millions de grains", "millions de graines"]);
 const DOSE_WORDS = new Set(["dose", "doses", "sac", "sacs", "dose de semis"]);
@@ -37,6 +42,7 @@ export function parseSeedUnit(unit: string | null | undefined, grainsPerDose?: n
   if (!unit) return null;
   const u = norm(unit);
   if (!u) return null;
+  if (PLANT_WORDS.has(u)) return { dim: "plant" };
   if (GRAIN_WORDS.has(u)) return { dim: "grain", grains: 1 };
   if (THOUSAND_WORDS.has(u)) return { dim: "grain", grains: 1_000 };
   if (MILLION_WORDS.has(u)) return { dim: "grain", grains: 1_000_000 };
@@ -53,17 +59,24 @@ export function parseSeedUnit(unit: string | null | undefined, grainsPerDose?: n
 }
 
 /** Quantité en kg ou en grains ; null pour une dose dont on ignore le nombre de grains. */
-function toBase(quantity: number, u: SeedUnit): { kind: "kg" | "grains"; value: number } | null {
+function toBase(quantity: number, u: SeedUnit): { kind: "kg" | "grains" | "plants"; value: number } | null {
   if (u.dim === "mass") return { kind: "kg", value: quantity * u.kg };
+  if (u.dim === "plant") return { kind: "plants", value: quantity };
   if (u.grains === null) return null;
   return { kind: "grains", value: quantity * u.grains };
 }
 
 /** Pourquoi une conversion de semence est impossible, ou null si elle l'est. */
-export function seedConversionGap(from: string, to: string, ctx: SeedConversionCtx = {}): "unit_unknown" | "grains_per_dose_missing" | "tgw_missing" | null {
+export function seedConversionGap(
+  from: string,
+  to: string,
+  ctx: SeedConversionCtx = {},
+): "unit_unknown" | "grains_per_dose_missing" | "tgw_missing" | "dimension" | null {
   const a = parseSeedUnit(from, ctx.grainsPerDose);
   const b = parseSeedUnit(to, ctx.grainsPerDose);
   if (!a || !b) return "unit_unknown";
+  // Les plants se comptent à la pièce : ni kg ni grains (FR-SU-12).
+  if ((a.dim === "plant") !== (b.dim === "plant")) return "dimension";
   if ((a.dim === "dose" && a.grains === null) || (b.dim === "dose" && b.grains === null)) return "grains_per_dose_missing";
   if ((a.dim === "mass") !== (b.dim === "mass") && !(ctx.tgwG && ctx.tgwG > 0)) return "tgw_missing";
   return null;
@@ -83,6 +96,7 @@ export function convertSeedQuantity(quantity: number, from: string, to: string, 
   const unit = toBase(1, b);
   if (!base || !unit) return null;
   if (base.kind === unit.kind) return base.value / unit.value;
+  if (base.kind === "plants" || unit.kind === "plants") return null;
   const tgw = ctx.tgwG;
   if (!tgw || tgw <= 0) return null;
   const converted = base.kind === "grains" ? (base.value * tgw) / 1_000_000 : (base.value * 1_000_000) / tgw;
@@ -123,6 +137,9 @@ export interface SeedEquivalents {
   grainsPerHa: number | null;
   dosesPerHa: number | null;
   kgPerHa: number | null;
+  /** Semence comptée à l'unité (plants, FR-SU-10) ; absent sinon. */
+  plantsPerHa?: number;
+  plantsPerM2?: number;
 }
 
 /**
@@ -136,9 +153,48 @@ export function seedEquivalents(quantity: number, unit: string, ctx: SeedConvers
   if (perM2 !== null) perHa = quantity * (10_000 * perM2);
   else if (areaHa && areaHa > 0) perHa = quantity / areaHa;
   else return null;
-  if (!parseSeedUnit(base, ctx.grainsPerDose)) return null;
+  const parsed = parseSeedUnit(base, ctx.grainsPerDose);
+  if (!parsed) return null;
+  if (parsed.dim === "plant") return { grainsPerM2: null, grainsPerHa: null, dosesPerHa: null, kgPerHa: null, plantsPerHa: perHa, plantsPerM2: perHa / 10_000 };
   const grainsPerHa = convertSeedQuantity(perHa, base, "grain", ctx);
   const kgPerHa = convertSeedQuantity(perHa, base, "kilogram", ctx);
   const dosesPerHa = ctx.grainsPerDose ? convertSeedQuantity(perHa, base, "dose", ctx) : null;
   return { grainsPerM2: grainsPerHa === null ? null : grainsPerHa / 10_000, grainsPerHa, dosesPerHa, kgPerHa };
+}
+
+/**
+ * Unité canonique de même grandeur (claudedocs/conception_semences_unites.md
+ * §4.2), pour réécrire l'unité d'une semence reprise sans toucher à aucune
+ * quantité : « Sac de 50 000 grains » → dose de 50 000 grains, « Mille
+ * graines » → milliers, « Kg » → kg, `unity` → plant. Null si l'unité est déjà
+ * canonique, inconnue, ou n'a pas d'équivalent de facteur 1 (« 50 000 grains »).
+ * Conflit quand la fiche porte un autre nombre de grains par dose que l'unité.
+ */
+export type CanonicalSeedUnit =
+  | { code: SeedUnitCode; grainsPerDose: number | null }
+  | { conflict: { unitGrains: number; sheetGrains: number } };
+
+export function canonicalSeedUnit(unit: string, sheetGrainsPerDose: number | null = null): CanonicalSeedUnit | null {
+  if ((SEED_UNIT_CODES as readonly string[]).includes(unit)) return null;
+  // La grandeur que l'unité porte elle-même, sans la fiche.
+  const u = parseSeedUnit(unit);
+  if (!u) return null;
+  if (u.dim === "dose") {
+    if (u.grains !== null && sheetGrainsPerDose !== null && sheetGrainsPerDose !== u.grains) {
+      return { conflict: { unitGrains: u.grains, sheetGrains: sheetGrainsPerDose } };
+    }
+    // Une dose reste une dose : le nombre écrit dans l'unité, sinon celui de la fiche.
+    return { code: "dose", grainsPerDose: u.grains ?? sheetGrainsPerDose };
+  }
+  const code = sameSizeCode(u);
+  if (!code) return null;
+  // Facteur 1 vérifié : la réécriture ne change aucune quantité.
+  return convertSeedQuantity(1, unit, code) === 1 ? { code, grainsPerDose: null } : null;
+}
+
+/** Code enregistré de même grandeur qu'une unité reconnue (hors dose). */
+function sameSizeCode(u: Exclude<SeedUnit, { dim: "dose" }>): SeedUnitCode | null {
+  if (u.dim === "plant") return "plant";
+  if (u.dim === "mass") return u.kg === 1 ? "kilogram" : u.kg === 0.001 ? "gram" : null;
+  return u.grains === 1 ? "grain" : u.grains === 1_000 ? "thousand" : u.grains === 1_000_000 ? "million" : null;
 }

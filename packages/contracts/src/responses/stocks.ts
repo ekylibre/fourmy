@@ -143,7 +143,7 @@ export const articlesSeedResponse = z.object({
   articleId: z.string(),
   name: z.string(),
   unit: z.string(),
-  unitDim: z.enum(["mass", "grain", "dose"]).nullable(),
+  unitDim: z.enum(["mass", "grain", "dose", "plant"]).nullable(),
   lexiconRef: z.string().nullable(),
   organicStatus: z.enum(["organic", "conventional", "conversion"]).nullable(),
   seedTreated: z.boolean().nullable(),
@@ -319,7 +319,7 @@ export const seedsResponse = z.object({
       articleId: z.string(),
       name: z.string(),
       unit: z.string(),
-      unitDim: z.enum(["mass", "grain", "dose"]).nullable(),
+      unitDim: z.enum(["mass", "grain", "dose", "plant"]).nullable(),
       lexiconRef: z.string().nullable(),
       organicStatus: z
         .enum(["organic", "conventional", "conversion"])
