@@ -380,5 +380,6 @@ Chemin critique : AM0 → AM1 → AM2 → AM4 → AM5 → AM6. AM3 et AM7 peuven
   - API (`proposals.integration.test.ts`, 6) : feu rouge renvoyé sans rien écrire, journal ; hors périmètre 422, accès en lecture 403, contenu invalide ; acceptation corrigée par le formulaire (intervention, stock, registre, origine), un `worker` refusé ; acceptation telle quelle ; refus et suivi ; expiration et purge ;
   - MCP : dépôt dicté, refus hors périmètre, acceptation, état, journal ; OAuth : portée `fourmy:write` et propositions ;
   - web (3 et 1) : compteur, carte, refus, formulaire prérempli et enregistrement qui porte la proposition ; « Lecture et propositions » à la création d'une clé.
-- **Reste** : la recette R5 dans un assistant réel sur dev.fourmy.org. Le connecteur Claude déjà enregistré n'a que `fourmy:read` (AM7) : il faut le retirer et l'ajouter à nouveau pour qu'il demande l'écriture.
+- **Recette R5 validée le 28/11** sur dev.fourmy.org avec Claude (connecteur retiré puis ajouté de nouveau pour obtenir `fourmy:write`). Puis, à la demande de l'utilisateur, l'entrée « À valider » du menu a laissé la place au logo de Fourmy en haut à droite, avec un indicateur du nombre en attente (PR #177).
+- **Suites** : outil MCP des marges (#178), page « Mes accès » (#179), test de bout en bout de l'invitation d'un invité restreint.
 

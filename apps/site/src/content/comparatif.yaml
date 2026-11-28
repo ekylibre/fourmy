@@ -2,8 +2,9 @@
 # l'éditeur qui la justifie (u). Statuts (s) : oui | partiel (en partie, option payante ou module
 # tiers) | non | nt (rien trouvé chez l'éditeur : pas une absence prouvée).
 # Pages des éditeurs lues le 18/11/2026, et le 22/11/2026 pour les critères « Prévisionnel et économie »,
-# reprise de données et semences ; une case de Fourmy peut renvoyer à sa fonctionnalité (f).
-date: 22/11/2026
+# reprise de données et semences, et le 28/11/2026 pour l'API ouverte et l'assistant IA ; une case
+# de Fourmy peut renvoyer à sa fonctionnalité (f).
+date: 28/11/2026
 logiciels:
   - id: mp
     nom: MesParcelles
@@ -28,6 +29,7 @@ sources:
   geo: &geo https://www.isagri.fr/geofolia/logiciel-de-gestion-parcellaire
   mpEco: &mpEco https://mesparcelles.fr/nos-solutions-metiers/suivi-technico-economique
   smagPac: &smagPac https://smag.tech/nos-logiciels/declaration-pac/
+  isagriApi: &isagriApi https://www.isagri.fr/ressources/ecosysteme-des-api-isagri
   mpTarifs: &mpTarifs https://cmds.chambres-agriculture.fr/sinformer/mon-exploitation/mesparcelles/mesparcelles-tarifs-et-formules
 
 # Prix publics : ce que chaque éditeur affiche, et ce que le prix comprend.
@@ -228,6 +230,16 @@ groupes:
         mp: { s: partiel, t: "données partagées avec vos partenaires", u: *mpD }
         smag: { s: oui, t: "bons d'apport et de livraison importés", u: *smag }
         geo: { s: partiel, t: "échange de données avec les partenaires", u: *geo }
+      - nom: API ouverte aux logiciels tiers
+        fourmy: { s: oui, t: "clés d'API et OAuth, documentation OpenAPI publique, droits par module et par activité", f: api }
+        mp: { s: partiel, t: "« interopérabilité directe entre votre compte et vos autres outils »", u: *mpD }
+        smag: { s: partiel, t: "connexion aux outils d'aide à la décision (Scopix, Xarvio…)", u: *smag }
+        geo: { s: partiel, t: "API ISAGRI, mise en production après un partenariat", u: *isagriApi }
+      - nom: Assistant IA connecté (MCP)
+        fourmy: { s: oui, t: "serveur MCP : consultation et propositions d'interventions à valider", f: assistant-ia }
+        mp: { s: nt }
+        smag: { s: nt }
+        geo: { s: nt }
       - nom: Équipe, conseiller
         fourmy: { s: oui, t: "rôles, lecture seule pour le conseiller, invitations", f: equipe }
         mp: { s: oui, t: "conseillers des Chambres ; accompagnement et formations payants", u: *mpTarifs }

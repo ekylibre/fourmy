@@ -7,7 +7,9 @@ ferme à n'importe quelle date, en 2D comme en 3D.
 
 - **Lyvre** garde l'argent et le droit (achats, ventes, facturation,
   comptabilité, juridique) ; Fourmy garde le physique.
-- **Aiffel** (aiffel.org) interrogera Fourmy par MCP.
+- Un **assistant IA** (Claude, Aiffel…) consulte la ferme par le serveur MCP de
+  Fourmy et y propose des interventions, que le responsable valide ; les
+  logiciels tiers passent par l'API ouverte (clés d'API ou OAuth).
 - Des **plugins** tiers, open source ou privés, étendent Fourmy.
 
 Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
@@ -49,6 +51,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | [`docs/materiels-entretien.md`](docs/materiels-entretien.md) · [`docs/materiels-entretien-design.md`](docs/materiels-entretien-design.md) | Matériels et entretien : exigences (et bilan de réalisation), design (et écarts à la réalisation) |
 | [`docs/equipe-personnes-design.md`](docs/equipe-personnes-design.md) | Équipe et personnes : fiche personne, données personnelles, rôle lecture seule, temps de travaux, invitations, import Ekylibre, synchro mobile |
 | [`docs/routage-osrm.md`](docs/routage-osrm.md) | Routage tracteur (OSRM auto-hébergé) : trajets du rejeu recalés sur la route |
+| [`docs/acces-externes.md`](docs/acces-externes.md) · [`claudedocs/conception_api_mcp.md`](claudedocs/conception_api_mcp.md) | API ouverte et serveur MCP : clés d'API, applications OAuth, invité restreint, droits par module et par activité, propositions à valider, journal, OpenAPI (lots AM0 à AM8) |
 | [`docs/imports.md`](docs/imports.md) · [`claudedocs/conception_import_onboarding.md`](claudedocs/conception_import_onboarding.md) | Imports DAPLOS, Geofolia et TelePAC, assistant de premier démarrage : besoins, conception, plan (lots IM1 à IM7) et état |
 | [`docs/modele-parcelles-activites-productions.md`](docs/modele-parcelles-activites-productions.md) | Modèle des parcelles (versions datées, filiation), campagnes, activités, productions et assolement : modèle conceptuel, liens entre tables, règles |
 | [`docs/assolement.md`](docs/assolement.md) · [`claudedocs/conception_assolement.md`](claudedocs/conception_assolement.md) | Assolement prévisionnel : préparer, découper et fusionner, contrôles en direct (PAC, agronomie, certifications, réglementaire), valider ; besoins des trois temps, conception, plan (lots AS1 à AS4) |
@@ -62,7 +65,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | [`claudedocs/besoins_navigation_compte.md`](claudedocs/besoins_navigation_compte.md) | Navigation : menu du compte, onglets Équipe et Préférences de « Ma ferme », version en pied de menu |
 | [`claudedocs/points_ouverts.md`](claudedocs/points_ouverts.md) | Points ouverts, par thème et priorité (alimente la roadmap GitHub) |
 
-## État du projet (2026-11-22, soir)
+## État du projet (2026-11-28)
 
 | Étape | État |
 |---|---|
@@ -103,6 +106,7 @@ Licence : AGPL-3.0. Site du projet : fourmy.org. Présentation : ekylibre.com.
 | Contrôles HVE et AB (lots CT1 à CT6a, 19-20/11) | 🟡 menu Réglementaire selon les certifications ; HVE niveau 3 (quatre indicateurs, IAE, questionnaire, IFT certifié) ; AB (règles R1 à R34, conversion déduite, cuivre, annexe II consolidée au 01/01/2026, semences, rotation) ; feux à la saisie ; registre AB et liasse HVE. Reste l'export de la grille HVE officielle remplie, qui attend une grille de référence remplie à la main (`docs/controles-hve-ab.md`) |
 | Registre phyto imprimable (22/11) | ✅ édition au format réglementaire en A4 paysage, en-tête de la ferme commun avec le plan de fumure, `?format=pdf` (#162) (`docs/phyto.md`) |
 | Déploiement du 22/11 | ✅ CI de `main` de nouveau verte (#151) ; OSRM en service sur dev.fourmy.org (graphe Aquitaine + Pays de la Loire) ; nginx résout l'API à chaque requête (#154, après une panne de 502) ; prix d'intrants Lexicon chargés (clé `bundle:fourmy`) (`docs/deploiement.md`) |
+| API ouverte et serveur MCP (lots AM0 à AM8, 27-28/11) | ✅ droits par module (aucun, lecture, lecture et propositions) et par activité, appliqués par la RLS ; invité restreint ; clés d'API et applications OAuth (consentement, une ferme) ; journal et débit ; serveur MCP (`/mcp`, 14 outils) ; `openapi.json` et page `/developpeurs` ; propositions d'interventions contrôlées à blanc et validées dans « À valider ». Connecteur Claude et recette R5 validés sur dev.fourmy.org. Suites : outil MCP des marges (#178), page « Mes accès » (#179) (`docs/acces-externes.md`) |
 | Migration réelle et recette | ✅ trois fermes reprises (08/11) ; recettes des 11 et 12/11 sur la ferme pilote de grandes cultures (`claudedocs/plan_de_test_global.md`), spécification métier (`docs/specifications-metier.md`) |
 
 ### À reprendre

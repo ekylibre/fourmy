@@ -43,5 +43,17 @@
   "d06558e": false,
   "7389bb9": "Cartes IGN gardées sur le serveur, avec l'onglet Données IGN de Ma ferme",
   "3b2beb3": "Relief et bâtiments du plan 3D servis par le cache IGN de la ferme",
-  "1aa83bb": "Copie hors ligne de la ferme dans le navigateur : cartes et données consultables sans réseau"
+  "1aa83bb": "Copie hors ligne de la ferme dans le navigateur : cartes et données consultables sans réseau",
+  "13c83bb": "Droits d'accès par module : une personne ou un logiciel peut ne consulter que certains modules de la ferme",
+  "ff58800": "Accès limité à certaines activités : parcelles, interventions, registres et assolement ne montrent que celles-ci, et une intervention partagée est ramenée à sa part",
+  "7812d35": "Invité restreint : invitez un conseiller sur quelques modules et quelques activités, en lecture ; son menu se réduit à ce qu'il peut voir",
+  "c065988": "Clés d'API : un logiciel lit les données de la ferme avec une clé créée dans Ma ferme → Accès externes, révocable, avec le journal de ses appels",
+  "a048ae7": false,
+  "2eaaff6": false,
+  "a861560": "Applications autorisées par OAuth : l'utilisateur choisit la ferme, puis les modules et les activités que l'application verra",
+  "919cd4e": "Assistant IA : Fourmy devient un serveur MCP ; Claude ou un autre assistant consulte parcelles, interventions, registre, stocks et matériels de la ferme",
+  "60d0d07": "Documentation de l'API ouverte (OpenAPI) et page Développeurs sur chaque installation",
+  "8048a3b": "Propositions à valider : un assistant IA ou un logiciel propose une intervention, contrôlée tout de suite ; le responsable la corrige et l'accepte, ou la refuse",
+  "334f82b": "Le logo de Fourmy, en haut à droite, signale les propositions à valider",
+  "e656d89": "Références cadastre et RPG des parcelles créées par un import"
 }
