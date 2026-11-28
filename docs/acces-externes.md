@@ -64,7 +64,7 @@ Un accès qui ouvre **« Lecture et propositions »** sur le module Intervention
 1. **Dépôt** : `POST /api/v1/farms/{farmId}/proposals`, ou l'outil `proposer_intervention`. Le corps est celui d'une intervention (`payload`, même contrat que `POST /interventions`) et un `message` facultatif pour le responsable.
    - Les parcelles doivent être dans les activités de l'accès (sinon 422), et le contenu est vérifié comme à l'enregistrement (produit inconnu, unité… : 422).
    - Les contrôles sont faits tout de suite, **sans rien écrire** : phytosanitaire (autorisation, dose, ZNT, délais), nitrates, HVE et AB. Ils reviennent dans la réponse (`checks`), feux rouges compris.
-2. **Validation** : les responsables de la ferme voient *À valider* dans le menu, avec le nombre de propositions en attente.
+2. **Validation** : le logo de Fourmy, en haut à droite de l'écran, mène les responsables de la ferme à *À valider* ; un indicateur y donne le nombre de propositions en attente.
    - *Vérifier et enregistrer* ouvre le formulaire d'intervention prérempli. On corrige si besoin et on enregistre : l'intervention est écrite par le chemin habituel (contrôles refaits, registre, stocks), avec l'origine « Proposée par un assistant IA » ou « Proposée par l'API ».
    - *Refuser*, avec un motif facultatif que l'accès verra.
    - Seul un responsable (*owner*) accepte ou refuse.
