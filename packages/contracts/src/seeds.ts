@@ -327,3 +327,38 @@ export interface SeedUsage {
   by: SeedUsageBy;
   groups: SeedUsageGroup[];
 }
+
+/**
+ * Réécriture des unités reprises (issue #130, claudedocs/conception_semences_unites.md §5) :
+ * code canonique de même grandeur, sans toucher aux quantités.
+ */
+export const seedUnitCode = z.enum(["kilogram", "thousand", "grain", "dose", "plant", "million", "gram"]);
+export type SeedUnitCodeName = z.infer<typeof seedUnitCode>;
+
+/** Une semence dont l'unité reprise peut s'écrire en code canonique (GET /seeds/units). */
+export interface SeedUnitRewrite {
+  articleId: string;
+  name: string;
+  /** Unité actuelle, telle que reprise. */
+  from: string;
+  /** Code proposé ; null en conflit. */
+  to: SeedUnitCodeName | null;
+  /** Grains par dose écrits sur la fiche avec une dose. */
+  grainsPerDose: number | null;
+  /** Nombre de grains de l'unité différent de celui de la fiche : rien n'est proposé. */
+  conflict: { unitGrains: number; sheetGrains: number } | null;
+  /** Stock du jour, identique avant et après. */
+  stock: number;
+  usage: { movements: number; interventions: number; prices: number };
+}
+
+export const seedUnitRewriteWrite = z.object({
+  items: z.array(z.object({ articleId: z.uuid(), to: seedUnitCode })).min(1).max(200),
+});
+export type SeedUnitRewriteWrite = z.infer<typeof seedUnitRewriteWrite>;
+
+export type SeedUnitRewriteSkip = "not_found" | "changed" | "conflict" | "stock_mismatch";
+export interface SeedUnitRewriteResult {
+  rewritten: { articleId: string; from: string; to: SeedUnitCodeName; rows: { movements: number; parameters: number; prices: number; derogations: number } }[];
+  skipped: { articleId: string; reason: SeedUnitRewriteSkip }[];
+}

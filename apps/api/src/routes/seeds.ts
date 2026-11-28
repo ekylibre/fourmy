@@ -1,10 +1,11 @@
 import { Hono } from "hono";
-import { lotSeedWrite, mixtureComponentsSave, seedAttachWrite, seedCreate, seedSheetSave, seedUsageBy } from "@fourmy/contracts";
+import { lotSeedWrite, mixtureComponentsSave, seedAttachWrite, seedCreate, seedSheetSave, seedUnitRewriteWrite, seedUsageBy } from "@fourmy/contracts";
 import { requireOwner, type Env } from "../context.js";
 import { db } from "../db.js";
 import { attachSeeds, createSeed, searchCatalog, seedAttachProposals } from "../repos/seed-catalog.js";
 import { getSeed, listSeeds, saveLotSeed, saveMixtureComponents, saveSeed, seedMixture, seedSpecies } from "../repos/seeds.js";
 import { seedUsage, seedUsageCsv } from "../repos/seed-usage.js";
+import { rewriteSeedUnits, seedUnitRewrites } from "../repos/seed-units.js";
 import { atOrNow, BadRequest, problem, uuidParam } from "./helpers.js";
 
 const invalid = (issues: { message: string; path: PropertyKey[] }[]) => issues.map((i) => `${i.path.join(".")} : ${i.message}`).join(" ");
@@ -38,6 +39,13 @@ export const seedRoutes = new Hono<Env>()
     const parsed = seedCreate.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return problem(c, 400, "Corps invalide", invalid(parsed.error.issues));
     return c.json(await createSeed(db(), c.get("farmId"), c.get("userId"), parsed.data, atOrNow(c)), 201);
+  })
+  // Unités reprises (issue #130) : propositions pour les membres, réécriture par le responsable.
+  .get("/seeds/units", async (c) => c.json({ items: await seedUnitRewrites(db(), c.get("farmId")) }))
+  .post("/seeds/units", requireOwner, async (c) => {
+    const parsed = seedUnitRewriteWrite.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return problem(c, 400, "Corps invalide", invalid(parsed.error.issues));
+    return c.json(await rewriteSeedUnits(db(), c.get("farmId"), c.get("userId"), parsed.data));
   })
   .get("/seeds/attach", async (c) => c.json({ items: await seedAttachProposals(db(), c.get("farmId")) }))
   .post("/seeds/attach", requireOwner, async (c) => {
