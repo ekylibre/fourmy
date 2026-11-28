@@ -194,6 +194,58 @@ describe("semences", () => {
     expect(within(uses).queryByText("Grains/m²")).toBeNull();
   });
 
+  it("unités reprises : encadré, liste avant et après, conflit à part, réécriture des semences cochées (issue #130)", async () => {
+    let sent: unknown = null;
+    const WHEAT = "00000000-0000-7000-8000-00000000e104";
+    const SUN = "00000000-0000-7000-8000-00000000e105";
+    const rewrites = [
+      { articleId: MAIZE, name: "Semence de maïs - P0573", from: "Sac de 50 000 grains", to: "dose", grainsPerDose: 50000, conflict: null, stock: 12, usage: { movements: 3, interventions: 2, prices: 1 } },
+      { articleId: WHEAT, name: "Thermidor", from: "Mille graines", to: "thousand", grainsPerDose: null, conflict: null, stock: 400, usage: { movements: 1, interventions: 0, prices: 0 } },
+      { articleId: SUN, name: "Tournesol", from: "Sac de 50 000 grains", to: null, grainsPerDose: 80000, conflict: { unitGrains: 50000, sheetGrains: 80000 }, stock: 3, usage: { movements: 1, interventions: 0, prices: 0 } },
+    ];
+    server.use(
+      http.get("*/seeds", () => HttpResponse.json({ items: [maize] })),
+      http.get("*/seeds/attach", () => HttpResponse.json({ items: [] })),
+      http.get("*/seeds/units", () => HttpResponse.json({ items: sent ? [rewrites[2]] : rewrites })),
+      http.post("*/seeds/units", async ({ request }) => {
+        sent = await request.json();
+        return HttpResponse.json({ rewritten: [{ articleId: MAIZE, from: "Sac de 50 000 grains", to: "dose", rows: { movements: 3, parameters: 2, prices: 1, derogations: 0 } }], skipped: [] });
+      }),
+    );
+    renderApp(`/f/${FARM}/seeds`);
+    const user = userEvent.setup();
+    expect(await screen.findByText(/3 semences ont une unité reprise d'un autre logiciel, dont 2 à réécrire/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Voir et réécrire" }));
+    const dialog = await screen.findByRole("dialog", { name: "Unités reprises d'un autre logiciel" });
+    const table = within(dialog).getByRole("table", { name: "Unités à réécrire" });
+    const maizeRow = within(table).getByText("Semence de maïs - P0573").closest("tr")!;
+    expect(maizeRow).toHaveTextContent("« Sac de 50 000 grains »");
+    expect(maizeRow).toHaveTextContent("doses de 50 000 grains");
+    expect(maizeRow).toHaveTextContent("3 mouvements, 2 interventions, 1 prix");
+    expect(within(table).getByText("Thermidor").closest("tr")!).toHaveTextContent("milliers de grains");
+    expect(within(table).queryByText("Tournesol")).toBeNull();
+    expect(within(dialog).getByText(/Tournesol : l'unité dit 50 000 grains par dose, la fiche 80 000/)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("checkbox", { name: "Réécrire Thermidor" }));
+    await user.click(within(dialog).getByRole("button", { name: "Réécrire 1 semence" }));
+    await waitFor(() => expect(sent).toEqual({ items: [{ articleId: MAIZE, to: "dose" }] }));
+    expect(await screen.findByText("1 semence réécrite.")).toBeInTheDocument();
+  });
+
+  it("unités reprises : pas d'encadré pour un salarié", async () => {
+    server.use(
+      http.get("*/api/v1/me/farms", () => HttpResponse.json({ userId: "mock", items: [{ id: FARM, name: "Ferme de démonstration", role: "worker" }] })),
+      http.get("*/seeds", () => HttpResponse.json({ items: [maize] })),
+      http.get("*/seeds/units", () =>
+        HttpResponse.json({ items: [{ articleId: MAIZE, name: "Semence de maïs - P0573", from: "Sac de 50 000 grains", to: "dose", grainsPerDose: 50000, conflict: null, stock: 12, usage: { movements: 1, interventions: 0, prices: 0 } }] }),
+      ),
+    );
+    renderApp(`/f/${FARM}/seeds`);
+    await screen.findByText("Semence de maïs - P0573");
+    expect(screen.queryByRole("button", { name: "Ajouter une semence" })).toBeNull(); // bien vu comme salarié
+    expect(screen.queryByText(/unité reprise d'un autre logiciel/)).toBeNull();
+  });
+
   it("mélange : le responsable décrit ses espèces, légumineuses repérées, sans proportion (lot SE6)", async () => {
     let saved: { components: { label: string; species: string | null }[] } | null = null;
     const sheet = { articleId: MIX, species: null, varietyName: null, gnisCode: null, category: null, isMixture: true, grainsPerDose: null, bagKg: null, tgwG: null, tgwOrigin: null, tgwOn: null, updatedAt: "2026-01-01T00:00:00Z" };

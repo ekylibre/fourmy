@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { SeedAttachProposal, SeedCatalogItem, SeedDetail, SeedListItem, SeedMixture, SeedSpeciesOption, SeedUsage, SeedUsageBy } from "@fourmy/contracts";
+import type { SeedAttachProposal, SeedCatalogItem, SeedDetail, SeedListItem, SeedMixture, SeedSpeciesOption, SeedUnitRewrite, SeedUsage, SeedUsageBy } from "@fourmy/contracts";
 import { api, farmPath } from "../../app/api";
 
 /** Semences (lot SE3) : liste à la date de la frise, fiche, espèces proposées. */
@@ -34,6 +34,15 @@ export function useSeedAttach(farmId: string, enabled: boolean) {
   return useQuery({
     queryKey: [...seedsKey(farmId), "attach"],
     queryFn: () => api.get<{ items: SeedAttachProposal[] }>(farmPath(farmId, "/seeds/attach")),
+    enabled,
+  });
+}
+
+/** Unités reprises réécrivables en code canonique (issue #130, lot SU4). */
+export function useSeedUnitRewrites(farmId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...seedsKey(farmId), "units"],
+    queryFn: () => api.get<{ items: SeedUnitRewrite[] }>(farmPath(farmId, "/seeds/units")),
     enabled,
   });
 }

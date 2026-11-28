@@ -11,10 +11,11 @@ import { ColumnPicker, pickColumns } from "../../components/ColumnPicker";
 import { ErrorAlert, Loading } from "../../components/states";
 import { AddSeedModal } from "./AddSeedModal";
 import { AttachModal } from "./AttachModal";
+import { UnitRewriteModal } from "./UnitRewriteModal";
 import { SeedSheet } from "./SeedSheet";
 import { UsagePanel } from "./UsagePanel";
 import { ORGANIC_LABELS, stockUnitLabel, tgwLabel } from "./labels";
-import { useSeedAttach, useSeeds } from "./queries";
+import { useSeedAttach, useSeedUnitRewrites, useSeeds } from "./queries";
 
 const COLUMNS: ColumnDef[] = [
   { key: "name", label: "Semence", required: true },
@@ -49,6 +50,10 @@ export function SeedsPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const owner = farm.role === "owner";
   const proposals = useSeedAttach(farm.id, owner);
+  // Unités reprises d'un autre logiciel (issue #130) : réécriture proposée au responsable.
+  const unitRewrites = useSeedUnitRewrites(farm.id, owner);
+  const [rewriting, setRewriting] = useState(false);
+  const rewritable = (unitRewrites.data?.items ?? []).filter((i) => i.to && !i.conflict).length;
   const [adding, setAdding] = useState(false);
   const [attaching, setAttaching] = useState(false);
   const [query, setQuery] = useState("");
@@ -106,6 +111,19 @@ export function SeedsPage() {
             </Text>
             <Button size="compact-sm" variant="light" onClick={() => setAttaching(true)}>
               Voir et rattacher
+            </Button>
+          </Group>
+        </Alert>
+      )}
+      {owner && !!unitRewrites.data?.items.length && (
+        <Alert color="ardoise" title="Unités reprises d'un autre logiciel">
+          <Group justify="space-between" gap="xs">
+            <Text size="sm">
+              {unitRewrites.data.items.length} semence{unitRewrites.data.items.length > 1 ? "s ont" : " a"} une unité reprise d'un autre logiciel
+              {rewritable ? `, dont ${rewritable} à réécrire dans l'unité de Fourmy, sans changer les stocks` : ""}.
+            </Text>
+            <Button size="compact-sm" variant="light" onClick={() => setRewriting(true)}>
+              Voir et réécrire
             </Button>
           </Group>
         </Alert>
@@ -278,6 +296,7 @@ export function SeedsPage() {
         />
       )}
       {attaching && proposals.data && <AttachModal proposals={proposals.data.items} onClose={() => setAttaching(false)} />}
+      {rewriting && unitRewrites.data && <UnitRewriteModal items={unitRewrites.data.items} onClose={() => setRewriting(false)} />}
     </Stack>
   );
 }
