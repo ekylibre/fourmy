@@ -149,8 +149,8 @@ Les espèces semées servent :
 
 ## Imports et reprises
 
-- **Geofolia et DAPLOS** : le code GNIS et l'espèce du fichier sont gardés. Les rattachements sûrs, ou tirés tels quels de l'espèce du fichier, sont appliqués à l'import. Les autres attendent une confirmation.
-- **Ekylibre** : l'unité d'origine est gardée et reconnue à la volée. Par exemple « Sac de 50 000 grains », « Sac  de 50 000 grains », « Mille graines » et « Kg » sont tous lus. La référence Lexicon et le nom servent au rattachement proposé.
+- **Geofolia et DAPLOS** : le code GNIS et l'espèce du fichier sont gardés. Les rattachements sûrs, ou tirés tels quels de l'espèce du fichier, sont appliqués à l'import. Les autres attendent une confirmation. Une semence créée par l'import reçoit directement l'unité de Fourmy de même grandeur (« Sac de 50 000 grains » devient une dose de 50 000 grains) ; une semence déjà réécrite garde la sienne.
+- **Ekylibre** : l'unité d'origine est gardée et reconnue à la volée ; une unité réécrite dans Fourmy le reste aux reprises suivantes, tant qu'Ekylibre garde l'unité d'origine. Par exemple « Sac de 50 000 grains », « Sac  de 50 000 grains », « Mille graines » et « Kg » sont tous lus. La référence Lexicon et le nom servent au rattachement proposé.
 - Commande en ligne de commande, pour rattacher en masse : `pnpm --filter @fourmy/api seeds:attach --farm <id> [--all] [--dry-run]`. `--dry-run` affiche les rattachements sans rien écrire.
 
 ## Application mobile

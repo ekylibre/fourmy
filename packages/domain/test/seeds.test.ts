@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
+  applySeedUnitRewrite,
   canonicalSeedUnit,
+  seedUnitsSameSize,
   convertSeedQuantity,
   coverFamilyOf,
   grainsPerM2,
@@ -286,6 +288,28 @@ describe("unité canonique d'une unité reprise", () => {
     expect(canonicalSeedUnit("Sac de 50 000 grains", 80_000)).toEqual({ conflict: { unitGrains: 50_000, sheetGrains: 80_000 } });
     expect(canonicalSeedUnit("Sac", 80_000)).toEqual({ code: "dose", grainsPerDose: 80_000 });
     expect(canonicalSeedUnit("Sac")).toEqual({ code: "dose", grainsPerDose: null });
+  });
+});
+
+describe("imports et reprises d'une semence réécrite (lot SU5)", () => {
+  it("unités de même grandeur", () => {
+    expect(seedUnitsSameSize("Sac de 50 000 grains", "dose")).toBe(true);
+    expect(seedUnitsSameSize("Mille graines", "thousand")).toBe(true);
+    expect(seedUnitsSameSize("Kg", "kilogram")).toBe(true);
+    expect(seedUnitsSameSize("unity", "plant")).toBe(true);
+    expect(seedUnitsSameSize("Sac de 50 000 grains", "sac de 50 000 grains")).toBe(true);
+    expect(seedUnitsSameSize("Sac de 50 000 grains", "Sac de 80 000 grains")).toBe(false);
+    expect(seedUnitsSameSize("Kg", "thousand")).toBe(false);
+    expect(seedUnitsSameSize("palette", "dose")).toBe(false);
+  });
+
+  it("unité d'un intrant d'une semence réécrite, suffixe gardé", () => {
+    const r = { from: "Sac de 50 000 grains", to: "dose" };
+    expect(applySeedUnitRewrite("Sac de 50 000 grains", r)).toBe("dose");
+    expect(applySeedUnitRewrite("Sac de 50 000 grains_per_hectare", r)).toBe("dose_per_hectare");
+    expect(applySeedUnitRewrite("grain_per_square_meter", r)).toBe("grain_per_square_meter");
+    expect(applySeedUnitRewrite("Sac de 50 000 grains", undefined)).toBe("Sac de 50 000 grains");
+    expect(applySeedUnitRewrite(null, r)).toBeNull();
   });
 });
 

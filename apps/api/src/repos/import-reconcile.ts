@@ -10,7 +10,7 @@ import {
   type ImportReconciliation,
   type InterventionPlanWrite,
 } from "@fourmy/contracts";
-import { convertQuantity, validateIntervention } from "@fourmy/domain";
+import { canonicalSeedUnit, convertQuantity, seedUnitsSameSize, validateIntervention } from "@fourmy/domain";
 import {
   coverOf,
   draftInterventions,
@@ -127,8 +127,10 @@ export interface LandscapeItem {
 export interface ArticleItem {
   article: BundleArticle;
   kind: ArticleKind;
-  /** Unité de l'article dans Fourmy (celle du fichier pour un article créé). */
+  /** Unité de l'article dans Fourmy (celle du fichier pour un article créé, canonique pour une semence). */
   unit: string;
+  /** Semence créée : unité du fichier réécrite en code canonique (issue #130), et les grains d'une dose. */
+  unitRewrite?: { from: string; grainsPerDose: number | null };
   action: Exclude<Action, "skip">;
   articleId: string;
   lexiconRef: string | null;
@@ -612,10 +614,15 @@ export async function reconcile(tx: Tx, farmId: string, bundle: ImportBundle, de
         match = `E-Phy : ${p.name}`;
       }
     }
+    // Semence créée (issue #130, lot SU5) : directement dans le code canonique de même grandeur.
+    const fileUnit = found?.unit ?? decided?.unit ?? a.unit;
+    const canonical = !found && kind === "seed" ? canonicalSeedUnit(fileUnit) : null;
+    const rewrite = canonical && !("conflict" in canonical) ? { code: canonical.code, from: fileUnit, grainsPerDose: canonical.grainsPerDose } : null;
     articles.push({
       article: a,
       kind,
-      unit: found?.unit ?? decided?.unit ?? a.unit,
+      unit: rewrite?.code ?? fileUnit,
+      ...(rewrite ? { unitRewrite: { from: rewrite.from, grainsPerDose: rewrite.grainsPerDose } } : {}),
       action: found ? "link" : "create",
       articleId: found?.id ?? randomUUID(),
       lexiconRef,
@@ -668,7 +675,8 @@ export async function reconcile(tx: Tx, farmId: string, bundle: ImportBundle, de
     for (const i of draft.inputs) {
       const art = articleOf.get(i.articleKey);
       if (!art) continue;
-      const quantity = convertQuantity(i.perHa, i.unit, art.unit);
+      // Semence : l'unité du fichier vaut le code canonique de même grandeur (semence réécrite, ou créée canonique).
+      const quantity = convertQuantity(i.perHa, i.unit, art.unit) ?? (art.kind === "seed" && seedUnitsSameSize(i.unit, art.unit) ? i.perHa : null);
       if (quantity !== null) inputs.push({ articleId: art.articleId, quantity: Number(quantity.toPrecision(6)), per: "hectare" });
       else if (art.kind === "fertilizer") inputs.push({ articleId: art.articleId, quantity: Number(i.perHa.toPrecision(6)), per: "hectare", unit: i.unit });
       else inputError = `${art.article.name} : dose en ${i.unit} pour un article en ${art.unit}`;
