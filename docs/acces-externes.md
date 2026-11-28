@@ -121,3 +121,8 @@ Les services maison (Aiffel, offre commune) sont déclarés par l'hébergeur, da
 ```
 
 Avec `"write": true`, l'application peut demander `fourmy:write` (propositions). Sans `clientSecret`, l'application est un client public (PKCE seul). Elles passent par le même écran de consentement que les autres.
+
+## À venir
+
+- **Outil MCP des marges** ([#178](https://github.com/ekylibre/fourmy/issues/178)) : les marges par activité, calculées aujourd'hui dans l'application web, demandent un calcul côté serveur avant d'être ouvertes à l'API et aux assistants.
+- **Page « Mes accès »** ([#179](https://github.com/ekylibre/fourmy/issues/179)) : dans *Mon compte*, les clés et applications de toutes mes fermes ; un membre en lecture seule pourra y créer une clé en lecture.

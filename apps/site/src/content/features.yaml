@@ -423,6 +423,34 @@ features:
       la connexion si agrirouter ne répond pas.
     status: en-test
     since: 0.114.0
+  - id: assistant-ia
+    module: interoperabilite
+    title: Votre assistant IA branché sur la ferme
+    text: >-
+      Ajoutez Fourmy comme connecteur dans Claude ou un autre assistant (MCP) : il consulte
+      parcelles, interventions, registre, stocks et matériels, dans les limites que vous
+      avez choisies. Dictez-lui un traitement : il le propose, les contrôles réglementaires
+      répondent tout de suite, et rien n'est enregistré avant votre validation.
+    status: disponible
+    since: 0.181.0
+  - id: api
+    module: interoperabilite
+    title: API ouverte, clés et applications autorisées
+    text: >-
+      Un logiciel lit la ferme avec une clé d'API ou une autorisation OAuth, limitée aux
+      modules et aux activités choisis, révocable à tout moment et journalisée. La
+      documentation OpenAPI est publique, sur chaque installation.
+    status: disponible
+    since: 0.179.0
+  - id: invite-restreint
+    module: ferme
+    title: Un conseiller sur quelques activités
+    text: >-
+      Invitez un conseiller ou un technicien sur certains modules et certaines activités
+      seulement : la vigne sans les céréales, le registre sans l'économique. Son menu se
+      réduit à ce qu'il peut voir.
+    status: disponible
+    since: 0.178.0
   - id: ma-ferme
     module: ferme
     title: Ma ferme, sites et cartes hors ligne
